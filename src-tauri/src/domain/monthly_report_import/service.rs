@@ -9,8 +9,6 @@ use crate::utils::time::current_timestamp;
 use rusqlite::params;
 use std::path::Path;
 
-const PREVIEW_LIMIT: usize = 50;
-
 pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
     let (input_path, records) = read_work_records(path)?;
     let source_path = display_path(&input_path);
@@ -144,7 +142,6 @@ pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSumm
 fn build_preview_rows(records: &[crate::domain::statistics::models::WorkRecord]) -> Vec<ImportPreviewRow> {
     records
         .iter()
-        .take(PREVIEW_LIMIT)
         .map(|record| ImportPreviewRow {
             date: record.date.clone(),
             project_code: record.project_code.clone(),

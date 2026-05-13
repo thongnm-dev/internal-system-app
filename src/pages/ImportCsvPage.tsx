@@ -1,7 +1,15 @@
-import { Database, FileInput, FolderOpen, Save } from "lucide-react";
+import { Database, Eye, FileInput, FolderOpen, Save } from "lucide-react";
+import { useMemo } from "react";
 import { MessageBanner } from "../components/MessageBanner";
 import { formatHourValue } from "../core/timeMath";
-import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult, MessageMode } from "../types/statistics";
+import type {
+  ImportBatchSummary,
+  ImportCsvPreviewResult,
+  ImportCsvResult,
+  ImportPreviewRow,
+  MessageMode,
+  SelectedPhaseDetail,
+} from "../types/statistics";
 
 type ImportCsvPageProps = {
   batches: ImportBatchSummary[];
@@ -14,6 +22,7 @@ type ImportCsvPageProps = {
   messageMode: MessageMode;
   onCsvPathChange: (value: string) => void;
   onImport: () => void;
+  onOpenDetail: (detail: SelectedPhaseDetail) => void;
   onPickCsvFile: () => void;
   onSave: () => void;
 };
@@ -29,6 +38,7 @@ export function ImportCsvPage({
   messageMode,
   onCsvPathChange,
   onImport,
+  onOpenDetail,
   onPickCsvFile,
   onSave,
 }: ImportCsvPageProps) {
@@ -93,7 +103,7 @@ export function ImportCsvPage({
       <MessageBanner message={message} mode={messageMode} />
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-4 overflow-hidden">
-        <ImportPreview result={importPreviewResult} saveResult={importResult} />
+        <ImportPreview result={importPreviewResult} saveResult={importResult} onOpenDetail={onOpenDetail} />
         <ImportHistory batches={batches} />
       </div>
     </section>
@@ -101,12 +111,16 @@ export function ImportCsvPage({
 }
 
 function ImportPreview({
+  onOpenDetail,
   result,
   saveResult,
 }: {
+  onOpenDetail: (detail: SelectedPhaseDetail) => void;
   result: ImportCsvPreviewResult | null;
   saveResult: ImportCsvResult | null;
 }) {
+  const groups = useMemo(() => (result ? buildPreviewGroups(result.preview_rows) : []), [result]);
+
   return (
     <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
       <div className="border-b border-stone-200 px-4 py-3">
@@ -121,11 +135,11 @@ function ImportPreview({
         <table className="w-full min-w-[920px] border-collapse">
           <thead>
             <tr>
-              <th className="table-head">Date</th>
               <th className="table-head">Project</th>
               <th className="table-head">Phase</th>
-              <th className="table-head">Work content</th>
+              <th className="table-head num">Rows</th>
               <th className="table-head num">Total (hour)</th>
+              <th className="table-head num">Detail</th>
             </tr>
           </thead>
           <tbody>
@@ -136,21 +150,38 @@ function ImportPreview({
                 </td>
               </tr>
             ) : (
-              result.preview_rows.map((row, index) => (
-                <tr key={`${row.date}-${row.project_code}-${row.process_code}-${index}`}>
-                  <td className="table-cell whitespace-nowrap">{row.date}</td>
+              groups.map((group) => (
+                <tr
+                  key={`${group.projectCode}-${group.processCode}`}
+                  className="cursor-pointer hover:bg-slate-50"
+                  title="Open phase details"
+                  onClick={() => onOpenDetail(group.detail)}
+                >
                   <td className="table-cell">
-                    <div className="font-bold">{row.project_code}</div>
-                    <div className="text-xs text-slate-500">{row.project_name || "-"}</div>
+                    <div className="font-bold">{group.projectCode}</div>
+                    <div className="text-xs text-slate-500">{group.projectName || "-"}</div>
                   </td>
                   <td className="table-cell">
                     <span className="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">
-                      {row.process_code}
+                      {group.processCode}
                     </span>
-                    {row.phase_name}
+                    {group.phaseName}
                   </td>
-                  <td className="table-cell">{row.work_content || "-"}</td>
-                  <td className="table-cell num font-bold text-brand">{formatHourValue(row.total_minutes)}</td>
+                  <td className="table-cell num">{group.rowCount.toLocaleString("en-US")}</td>
+                  <td className="table-cell num font-bold text-brand">{formatHourValue(group.totalMinutes)}</td>
+                  <td className="table-cell num">
+                    <button
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      type="button"
+                      title="Open detail"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onOpenDetail(group.detail);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -159,6 +190,64 @@ function ImportPreview({
       </div>
     </section>
   );
+}
+
+type PreviewGroup = {
+  detail: SelectedPhaseDetail;
+  phaseName: string;
+  processCode: string;
+  projectCode: string;
+  projectName: string;
+  rowCount: number;
+  totalMinutes: number;
+};
+
+function buildPreviewGroups(rows: ImportPreviewRow[]): PreviewGroup[] {
+  const groups = new Map<string, PreviewGroup>();
+
+  for (const row of rows) {
+    const key = `${row.project_code}\u0000${row.process_code}`;
+    const current =
+      groups.get(key) ??
+      ({
+        detail: {
+          project_code: row.project_code,
+          project_name: row.project_name,
+          phase: {
+            process_code: row.process_code,
+            phase_name: row.phase_name,
+            row_count: 0,
+            totals: {
+              regular_minutes: 0,
+              normal_overtime_minutes: 0,
+              legal_holiday_overtime_minutes: 0,
+              legal_public_holiday_overtime_minutes: 0,
+              late_night_overtime_minutes: 0,
+            },
+            details: [],
+          },
+        },
+        phaseName: row.phase_name,
+        processCode: row.process_code,
+        projectCode: row.project_code,
+        projectName: row.project_name,
+        rowCount: 0,
+        totalMinutes: 0,
+      } satisfies PreviewGroup);
+
+    current.rowCount += 1;
+    current.totalMinutes += row.total_minutes;
+    current.detail.phase.row_count = current.rowCount;
+    current.detail.phase.totals.regular_minutes = current.totalMinutes;
+    current.detail.phase.details.push({
+      date: row.date,
+      work_content: row.work_content,
+      total_minutes: row.total_minutes,
+    });
+    groups.set(key, current);
+  }
+
+  return Array.from(groups.values()).sort((a, b) => b.totalMinutes - a.totalMinutes);
 }
 
 function ImportHistory({ batches }: { batches: ImportBatchSummary[] }) {

@@ -8,7 +8,9 @@ export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   build: {
     rollupOptions: {
-      input: "index.html",
+      input: {
+        app: "index.html",
+      },
     },
   },
   server: {

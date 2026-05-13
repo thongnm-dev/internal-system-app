@@ -64,6 +64,7 @@ export function MainDetailArea({
         messageMode={importMessageMode}
         onCsvPathChange={onImportCsvPathChange}
         onImport={onImportMonthlyReportCsv}
+        onOpenDetail={onPhaseClick}
         onPickCsvFile={onPickImportCsvFile}
         onSave={onSaveMonthlyReportCsv}
       />
