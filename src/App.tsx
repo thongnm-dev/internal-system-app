@@ -9,17 +9,24 @@ import { MainDetailArea } from "./pages/MainDetailArea";
 export function App() {
   const {
     activeMenu,
-    analyze,
-    csvPath,
+    importBatches,
+    importCsvPath,
+    importMessage,
+    importMessageMode,
+    importMonthlyReportCsv,
+    importPreviewResult,
+    importResult,
     isSidebarCollapsed,
-    isLoading,
+    isImporting,
+    isSavingImport,
     message,
     messageMode,
-    pickCsvFile,
+    pickImportCsvFile,
     result,
     setActiveMenu,
-    setCsvPath,
+    setImportCsvPath,
     setIsSidebarCollapsed,
+    saveMonthlyReportCsv,
     selectedPhaseDetail,
     setSelectedPhaseDetail,
     summaryMetrics,
@@ -44,19 +51,25 @@ export function App() {
 
         <section className="min-h-0 overflow-hidden p-6">
           <div className="flex h-full min-h-0 flex-col gap-4">
-            <Header
-              csvPath={csvPath}
-              isLoading={isLoading}
-              onCsvPathChange={setCsvPath}
-              onAnalyze={() => void analyze()}
-              onPickCsvFile={() => void pickCsvFile()}
-            />
+            <Header activeMenu={activeMenu} />
 
-            <MessageBanner message={message} mode={messageMode} />
+            {activeMenu !== "importCsv" && <MessageBanner message={message} mode={messageMode} />}
             <MainDetailArea
               activeMenu={activeMenu}
+              importBatches={importBatches}
+              importCsvPath={importCsvPath}
+              importMessage={importMessage}
+              importMessageMode={importMessageMode}
+              importPreviewResult={importPreviewResult}
+              importResult={importResult}
+              isImporting={isImporting}
+              isSavingImport={isSavingImport}
+              onImportCsvPathChange={setImportCsvPath}
+              onImportMonthlyReportCsv={() => void importMonthlyReportCsv()}
+              onSaveMonthlyReportCsv={() => void saveMonthlyReportCsv()}
               result={result}
               summaryMetrics={summaryMetrics}
+              onPickImportCsvFile={() => void pickImportCsvFile()}
               onPhaseClick={setSelectedPhaseDetail}
             />
           </div>

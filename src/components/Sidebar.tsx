@@ -1,4 +1,4 @@
-import { BarChart3, ChevronLeft, ChevronRight, FileSpreadsheet, Home, Table2 } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, Database, FileSpreadsheet, Home, Table2 } from "lucide-react";
 import type { AnalysisResult, MenuKey } from "../types/statistics";
 
 type SidebarProps = {
@@ -14,6 +14,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
     { id: "overview" as const, label: "Overview", icon: Home },
     { id: "projects" as const, label: "Projects", icon: Table2 },
     { id: "phases" as const, label: "Phases", icon: BarChart3 },
+    { id: "importCsv" as const, label: "Import CSV", icon: Database },
   ];
 
   return (

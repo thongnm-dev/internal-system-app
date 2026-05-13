@@ -44,7 +44,7 @@ export type SystemInfo = {
 
 export type MessageMode = "info" | "error";
 
-export type MenuKey = "overview" | "projects" | "phases";
+export type MenuKey = "overview" | "projects" | "phases" | "importCsv";
 
 export type SummaryMetric = {
   label: string;
@@ -55,4 +55,40 @@ export type SelectedPhaseDetail = {
   project_code: string;
   project_name: string;
   phase: PhaseSummary;
+};
+
+export type ImportPreviewRow = {
+  date: string;
+  project_code: string;
+  project_name: string;
+  process_code: string;
+  phase_name: string;
+  work_content: string;
+  total_minutes: number;
+};
+
+export type ImportCsvResult = {
+  batch_id: number;
+  source_path: string;
+  source_file_name: string;
+  imported_at: string;
+  row_count: number;
+  total_minutes: number;
+  preview_rows: ImportPreviewRow[];
+};
+
+export type ImportCsvPreviewResult = {
+  source_path: string;
+  source_file_name: string;
+  row_count: number;
+  total_minutes: number;
+  preview_rows: ImportPreviewRow[];
+};
+
+export type ImportBatchSummary = {
+  id: number;
+  source_file_name: string;
+  imported_at: string;
+  row_count: number;
+  total_minutes: number;
 };

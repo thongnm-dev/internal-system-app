@@ -2,12 +2,13 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::domain::statistics::models::{
     AnalysisResult, MinuteTotals, PhaseAccumulator, PhaseSummary, ProjectAccumulator,
-    ProjectSummary, WorkDetail,
+    ProjectSummary, WorkDetail, WorkRecord,
 };
 use crate::domain::statistics::phase::phase_label;
 use crate::infrastructure::csv::reader::{get_required_index, parse_minutes, read_shift_jis_csv};
 use crate::infrastructure::file_system::{display_path, resolve_input_path};
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 const DATE: &str = "日付";
 const PROJECT_CODE: &str = "プロジェクトコード";
@@ -22,12 +23,41 @@ const LEGAL_PUBLIC_HOLIDAY_OVERTIME: &str = "法定祝日残業時間(分)";
 const LATE_NIGHT_OVERTIME: &str = "深夜残業(分)";
 
 pub fn analyze_csv(path: &str) -> AppResult<AnalysisResult> {
+    let (input_path, records) = read_work_records(path)?;
+    let mut projects: BTreeMap<String, ProjectAccumulator> = BTreeMap::new();
+    let mut grand_total = MinuteTotals::default();
+
+    for record in records.iter() {
+        grand_total.add(&record.totals);
+        append_record(
+            &mut projects,
+            &record.project_code,
+            &record.project_name,
+            &record.process_code,
+            record.phase_name.clone(),
+            record.totals.clone(),
+            WorkDetail {
+                date: record.date.clone(),
+                work_content: record.work_content.clone(),
+                total_minutes: record.totals.total_minutes(),
+            },
+        );
+    }
+
+    Ok(AnalysisResult {
+        source_path: display_path(&input_path),
+        row_count: records.len(),
+        grand_total,
+        projects: build_project_summaries(projects),
+    })
+}
+
+pub fn read_work_records(path: &str) -> AppResult<(PathBuf, Vec<WorkRecord>)> {
     let input_path = resolve_input_path(path)?;
     let content = read_shift_jis_csv(&input_path)?;
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
         .from_reader(content.as_bytes());
-
     let headers = reader.headers()?.clone();
     let date_idx = get_required_index(&headers, DATE)?;
     let project_code_idx = get_required_index(&headers, PROJECT_CODE)?;
@@ -41,14 +71,10 @@ pub fn analyze_csv(path: &str) -> AppResult<AnalysisResult> {
     let legal_public_holiday_idx = get_required_index(&headers, LEGAL_PUBLIC_HOLIDAY_OVERTIME)?;
     let late_night_idx = get_required_index(&headers, LATE_NIGHT_OVERTIME)?;
 
-    let mut projects: BTreeMap<String, ProjectAccumulator> = BTreeMap::new();
-    let mut grand_total = MinuteTotals::default();
-    let mut row_count = 0;
+    let mut records = Vec::new();
 
     for record in reader.records() {
         let record = record?;
-        row_count += 1;
-
         let date = record.get(date_idx).unwrap_or_default().trim();
         let project_code = record.get(project_code_idx).unwrap_or_default().trim();
         let project_name = record.get(project_name_idx).unwrap_or_default().trim();
@@ -63,22 +89,19 @@ pub fn analyze_csv(path: &str) -> AppResult<AnalysisResult> {
             legal_public_holiday_overtime_minutes: parse_minutes(record.get(legal_public_holiday_idx)),
             late_night_overtime_minutes: parse_minutes(record.get(late_night_idx)),
         };
-        let detail = WorkDetail {
+        records.push(WorkRecord {
             date: date.to_string(),
+            project_code: project_code.to_string(),
+            project_name: project_name.to_string(),
+            process_code: process_code.to_string(),
+            process_name: process_name.to_string(),
+            phase_name,
             work_content: work_content.to_string(),
-            total_minutes: totals.total_minutes(),
-        };
-
-        grand_total.add(&totals);
-        append_record(&mut projects, project_code, project_name, process_code, phase_name, totals, detail);
+            totals,
+        });
     }
 
-    Ok(AnalysisResult {
-        source_path: display_path(&input_path),
-        row_count,
-        grand_total,
-        projects: build_project_summaries(projects),
-    })
+    Ok((input_path, records))
 }
 
 fn append_record(

@@ -60,6 +60,18 @@ pub struct AnalysisResult {
     pub projects: Vec<ProjectSummary>,
 }
 
+#[derive(Clone)]
+pub struct WorkRecord {
+    pub date: String,
+    pub project_code: String,
+    pub project_name: String,
+    pub process_code: String,
+    pub process_name: String,
+    pub phase_name: String,
+    pub work_content: String,
+    pub totals: MinuteTotals,
+}
+
 #[derive(Default)]
 pub struct PhaseAccumulator {
     pub process_code: String,
