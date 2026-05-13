@@ -25,6 +25,7 @@ export function useDashboardController() {
   const [messageMode, setMessageMode] = useState<MessageMode>("info");
   const [activeMenu, setActiveMenu] = useState<MenuKey>("overview");
   const [selectedPhaseDetail, setSelectedPhaseDetail] = useState<SelectedPhaseDetail | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const analyze = async (path = csvPath) => {
@@ -107,6 +108,7 @@ export function useDashboardController() {
     activeMenu,
     analyze,
     csvPath,
+    isSidebarCollapsed,
     isLoading,
     message,
     messageMode,
@@ -114,6 +116,7 @@ export function useDashboardController() {
     result,
     setActiveMenu,
     setCsvPath,
+    setIsSidebarCollapsed,
     selectedPhaseDetail,
     setSelectedPhaseDetail,
     summaryMetrics,
