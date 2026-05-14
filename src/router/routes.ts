@@ -32,6 +32,12 @@ export const appRoutes: AppRoute[] = [
     title: "Import CSV",
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
+  {
+    key: "settings",
+    path: "/settings",
+    title: "Settings",
+    subtitle: "Manage user profile, display preferences, language, and linked API keys.",
+  },
 ];
 
 export const defaultRoute = appRoutes[0];

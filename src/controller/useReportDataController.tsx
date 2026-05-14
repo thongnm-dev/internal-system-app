@@ -1,5 +1,4 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import { defaultCsvPath } from "../config/appConfig";
 import { friendlyError, safeInvoke } from "../core/tauriRuntime";
 import { formatHours, overtimeMinutes, totalMinutes } from "../core/timeMath";
 import type { AnalysisResult, MessageMode, SummaryMetric } from "../types/statistics";
@@ -18,7 +17,7 @@ type ReportDataContextValue = {
 const ReportDataContext = createContext<ReportDataContextValue | null>(null);
 
 export function ReportDataProvider({ children }: { children: ReactNode }) {
-  const [csvPath, setCsvPath] = useState(defaultCsvPath);
+  const [csvPath, setCsvPath] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [message, setMessage] = useState("Ready to read CSV data.");
   const [messageMode, setMessageMode] = useState<MessageMode>("info");
@@ -41,7 +40,9 @@ export function ReportDataProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    void analyze(defaultCsvPath);
+    if (csvPath.trim()) {
+      void analyze(csvPath);
+    }
   }, []);
 
   const summaryMetrics = useMemo<SummaryMetric[]>(() => {

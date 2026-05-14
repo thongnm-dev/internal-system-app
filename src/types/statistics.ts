@@ -44,7 +44,7 @@ export type SystemInfo = {
 
 export type MessageMode = "info" | "error";
 
-export type MenuKey = "overview" | "projects" | "phases" | "importCsv";
+export type MenuKey = "overview" | "projects" | "phases" | "importCsv" | "settings";
 
 export type SummaryMetric = {
   label: string;

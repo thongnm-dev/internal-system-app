@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { friendlyError, safeInvoke } from "../core/tauriRuntime";
 import { useHashRouter } from "../router/useHashRouter";
 import type { MessageMode, SelectedPhaseDetail, SystemInfo } from "../types/statistics";
+import { applyStoredThemePreference } from "./useSettingsController";
 
 export function useAppShellController() {
   const router = useHashRouter();
@@ -38,6 +39,7 @@ export function useAppShellController() {
   };
 
   useEffect(() => {
+    applyStoredThemePreference();
     void refreshSystemInfo();
     const timer = window.setInterval(() => void refreshSystemInfo(), 1000);
     return () => window.clearInterval(timer);

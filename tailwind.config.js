@@ -4,10 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#1e252b",
-        panel: "#ffffff",
-        canvas: "#f4f1ea",
-        brand: "#1f6f63",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        panel: "rgb(var(--color-panel) / <alpha-value>)",
+        canvas: "rgb(var(--color-canvas) / <alpha-value>)",
+        brand: "rgb(var(--color-brand) / <alpha-value>)",
       },
     },
   },

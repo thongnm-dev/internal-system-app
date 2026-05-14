@@ -3,11 +3,13 @@ import { useImportCsvController } from "../controller/useImportCsvController";
 import { useOverviewController } from "../controller/useOverviewController";
 import { usePhasesController } from "../controller/usePhasesController";
 import { useProjectsController } from "../controller/useProjectsController";
+import { useSettingsController } from "../controller/useSettingsController";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { OverviewPage } from "./OverviewPage";
 import { PhasesPage } from "./PhasesPage";
 import { ProjectsPage } from "./ProjectsPage";
+import { SettingsPage } from "./SettingsPage";
 
 type MainDetailAreaProps = {
   activeMenu: MenuKey;
@@ -25,6 +27,10 @@ export function MainDetailArea({ activeMenu, onPhaseClick }: MainDetailAreaProps
 
   if (activeMenu === "phases") {
     return <PhasesRoute />;
+  }
+
+  if (activeMenu === "settings") {
+    return <SettingsRoute />;
   }
 
   return <OverviewRoute onPhaseClick={onPhaseClick} />;
@@ -94,6 +100,27 @@ function ImportCsvRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhase
       onOpenDetail={onPhaseClick}
       onPickCsvFile={() => void pickCsvFile()}
       onSave={() => void saveCsv()}
+    />
+  );
+}
+
+function SettingsRoute() {
+  const { addApiKey, apiKeyCount, removeApiKey, settings, updateApiKey, updateLanguage, updateTheme, updateUser } =
+    useSettingsController();
+
+  return (
+    <SettingsPage
+      apiKeyCount={apiKeyCount}
+      apiKeys={settings.apiKeys}
+      language={settings.language}
+      onAddApiKey={addApiKey}
+      onApiKeyChange={updateApiKey}
+      onLanguageChange={updateLanguage}
+      onRemoveApiKey={removeApiKey}
+      onThemeChange={updateTheme}
+      onUserChange={updateUser}
+      theme={settings.theme}
+      user={settings.user}
     />
   );
 }

@@ -1,22 +1,23 @@
-import { BarChart3, ChevronLeft, ChevronRight, Database, FileSpreadsheet, Home, Table2 } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, Database, Home, Settings, Table2 } from "lucide-react";
 import { appRoutes } from "../router/routes";
-import type { AnalysisResult, MenuKey } from "../types/statistics";
+import type { MenuKey } from "../types/statistics";
 
 type SidebarProps = {
   activeMenu: MenuKey;
   isCollapsed: boolean;
   onMenuChange: (value: MenuKey) => void;
   onToggleCollapse: () => void;
-  result: AnalysisResult | null;
 };
 
-export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollapse, result }: SidebarProps) {
+export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollapse }: SidebarProps) {
   const items = [
     { id: "overview" as const, icon: Home },
     { id: "projects" as const, icon: Table2 },
     { id: "phases" as const, icon: BarChart3 },
     { id: "importCsv" as const, icon: Database },
   ];
+  const settingsRoute = appRoutes.find((route) => route.key === "settings");
+  const settingsLabel = settingsRoute?.title ?? "Settings";
 
   return (
     <aside className="flex min-h-0 flex-col border-r border-slate-200 bg-slate-900 text-white">
@@ -84,12 +85,23 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
       </nav>
 
       <div className={["border-t border-white/10 text-sm text-slate-300", isCollapsed ? "p-2" : "p-4"].join(" ")}>
-        <div className={["group relative flex items-center", isCollapsed ? "justify-center" : "gap-2"].join(" ")}>
-          <FileSpreadsheet className="h-4 w-4" />
-          {!isCollapsed && <span>{result ? `${result.projects.length} project` : "No data"}</span>}
+        <div className="group relative">
+          <button
+            className={[
+              "flex h-10 w-full items-center rounded-md text-sm font-semibold transition",
+              isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left",
+              activeMenu === "settings" ? "bg-white text-slate-900" : "text-slate-300 hover:bg-white/10 hover:text-white",
+            ].join(" ")}
+            type="button"
+            title={isCollapsed ? undefined : settingsLabel}
+            onClick={() => onMenuChange("settings")}
+          >
+            <Settings className="h-4 w-4 shrink-0" />
+            {!isCollapsed && <span>{settingsLabel}</span>}
+          </button>
           {isCollapsed && (
             <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-              {result ? `${result.projects.length} project` : "No data"}
+              {settingsLabel}
             </span>
           )}
         </div>

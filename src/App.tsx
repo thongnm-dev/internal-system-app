@@ -26,7 +26,7 @@ function AppShell() {
     setSelectedPhaseDetail,
     systemInfo,
   } = useAppShellController();
-  const { message, messageMode, result } = useReportDataController();
+  const { message, messageMode } = useReportDataController();
 
   return (
     <main className="grid min-h-screen grid-rows-[minmax(0,1fr)_auto] bg-canvas text-ink">
@@ -41,14 +41,13 @@ function AppShell() {
           isCollapsed={isSidebarCollapsed}
           onMenuChange={navigate}
           onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
-          result={result}
         />
 
         <section className="min-h-0 overflow-hidden p-6">
           <div className="flex h-full min-h-0 flex-col gap-4">
             <Header route={route} />
 
-            {activeMenu !== "importCsv" && <MessageBanner message={message} mode={messageMode} />}
+            {activeMenu !== "importCsv" && activeMenu !== "settings" && <MessageBanner message={message} mode={messageMode} />}
             <MainDetailArea activeMenu={activeMenu} onPhaseClick={setSelectedPhaseDetail} />
           </div>
         </section>
