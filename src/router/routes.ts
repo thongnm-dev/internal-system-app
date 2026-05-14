@@ -66,5 +66,9 @@ export function routeByPath(path: string) {
     return routeByKey("projects");
   }
 
+  if (path.startsWith("/import-reports/")) {
+    return routeByKey("importReports");
+  }
+
   return appRoutes.find((route) => route.path === path) ?? defaultRoute;
 }

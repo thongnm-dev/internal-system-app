@@ -1,9 +1,10 @@
 import { useImportCsvController } from "../controller/useImportCsvController";
-import { useImportReportsController } from "../controller/useImportReportsController";
+import { useImportReportDetailController, useImportReportsController } from "../controller/useImportReportsController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { ImportCsvPage } from "./ImportCsvPage";
+import { ImportReportDetailPage } from "./ImportReportDetailPage";
 import { ImportReportsPage } from "./ImportReportsPage";
 import { OverviewPage } from "./OverviewPage";
 import { ProjectDetailPage } from "./ProjectDetailPage";
@@ -24,7 +25,7 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
   }
 
   if (activeMenu === "importReports") {
-    return <ImportReportsRoute />;
+    return <ImportReportsRoute path={path} onNavigate={navigateToPath} onPhaseClick={onPhaseClick} />;
   }
 
   if (activeMenu === "projects") {
@@ -42,7 +43,30 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
   return <OverviewRoute onPhaseClick={onPhaseClick} />;
 }
 
-function ImportReportsRoute() {
+function ImportReportsRoute({
+  onNavigate,
+  onPhaseClick,
+  path,
+}: {
+  onNavigate: (path: string) => void;
+  onPhaseClick: (detail: SelectedPhaseDetail) => void;
+  path: string;
+}) {
+  const reportId = getImportReportIdFromPath(path);
+  if (reportId !== null) {
+    return (
+      <ImportReportDetailRoute
+        reportId={reportId}
+        onBack={() => onNavigate("/import-reports")}
+        onPhaseClick={onPhaseClick}
+      />
+    );
+  }
+
+  return <ImportReportsListRoute onNavigate={onNavigate} />;
+}
+
+function ImportReportsListRoute({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { criteria, isSearching, items, message, messageMode, reset, search, setCriteria } =
     useImportReportsController();
 
@@ -56,6 +80,30 @@ function ImportReportsRoute() {
       onReset={reset}
       onSearch={() => void search()}
       onSetCriteria={setCriteria}
+      onOpenReport={(reportId) => onNavigate(`/import-reports/detail/${reportId}`)}
+    />
+  );
+}
+
+function ImportReportDetailRoute({
+  onBack,
+  onPhaseClick,
+  reportId,
+}: {
+  onBack: () => void;
+  onPhaseClick: (detail: SelectedPhaseDetail) => void;
+  reportId: number;
+}) {
+  const { detail, isLoading, message, messageMode } = useImportReportDetailController(reportId);
+
+  return (
+    <ImportReportDetailPage
+      detail={detail}
+      isLoading={isLoading}
+      message={message}
+      messageMode={messageMode}
+      onBack={onBack}
+      onOpenDetail={onPhaseClick}
     />
   );
 }
@@ -118,6 +166,16 @@ function getProjectIDFromPath(path: string) {
   }
 
   return decodeURIComponent(path.slice(prefix.length));
+}
+
+function getImportReportIdFromPath(path: string) {
+  const prefix = "/import-reports/detail/";
+  if (!path.startsWith(prefix)) {
+    return null;
+  }
+
+  const reportId = Number(decodeURIComponent(path.slice(prefix.length)));
+  return Number.isInteger(reportId) && reportId > 0 ? reportId : null;
 }
 
 function PhasesRoute() {

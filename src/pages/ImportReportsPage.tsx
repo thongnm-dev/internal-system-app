@@ -12,6 +12,7 @@ type ImportReportsPageProps = {
   onReset: () => void;
   onSearch: () => void;
   onSetCriteria: (criteria: ImportReportSearchCriteria) => void;
+  onOpenReport: (reportId: number) => void;
 };
 
 export function ImportReportsPage({
@@ -23,6 +24,7 @@ export function ImportReportsPage({
   onReset,
   onSearch,
   onSetCriteria,
+  onOpenReport,
 }: ImportReportsPageProps) {
   const setField = (field: keyof ImportReportSearchCriteria, value: string) => {
     onSetCriteria({ ...criteria, [field]: value });
@@ -107,6 +109,7 @@ export function ImportReportsPage({
           <table className="w-full min-w-[1080px] border-collapse">
             <thead>
               <tr>
+                <th className="table-head num">SEQ</th>
                 <th className="table-head">Tên</th>
                 <th className="table-head">Ghi chú</th>
                 <th className="table-head">Tên file đã import</th>
@@ -119,12 +122,12 @@ export function ImportReportsPage({
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td className="table-cell h-48 text-center text-slate-500" colSpan={7}>
+                  <td className="table-cell h-48 text-center text-slate-500" colSpan={8}>
                     No imported reports found.
                   </td>
                 </tr>
               ) : (
-                items.map((item) => <ImportReportRow key={item.id} item={item} />)
+                items.map((item) => <ImportReportRow key={item.id} item={item} onOpenReport={onOpenReport} />)
               )}
             </tbody>
           </table>
@@ -159,9 +162,20 @@ function MonthPicker({
   );
 }
 
-function ImportReportRow({ item }: { item: ImportReportListItem }) {
+function ImportReportRow({
+  item,
+  onOpenReport,
+}: {
+  item: ImportReportListItem;
+  onOpenReport: (reportId: number) => void;
+}) {
   return (
-    <tr className="hover:bg-slate-50">
+    <tr
+      className="cursor-pointer hover:bg-slate-50"
+      title={`Open report #${item.id}`}
+      onClick={() => onOpenReport(item.id)}
+    >
+      <td className="table-cell num font-bold text-slate-700">#{item.id}</td>
       <td className="table-cell">
         <div className="min-w-0">
           <strong className="block truncate text-slate-900">{item.report_name || "-"}</strong>

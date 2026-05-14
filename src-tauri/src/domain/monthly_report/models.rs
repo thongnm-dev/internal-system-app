@@ -50,3 +50,19 @@ pub struct ImportBatchListItem {
     pub row_count: i64,
     pub total_minutes: i64,
 }
+
+#[derive(Serialize)]
+pub struct ImportBatchDetail {
+    pub id: i64,
+    pub report_name: String,
+    pub note: String,
+    pub source_path: String,
+    pub source_file_name: String,
+    pub imported_at: String,
+    pub imported_by: String,
+    pub target_month_from: String,
+    pub target_month_to: String,
+    pub row_count: i64,
+    pub total_minutes: i64,
+    pub preview_rows: Vec<ImportPreviewRow>,
+}

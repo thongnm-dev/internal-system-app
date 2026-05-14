@@ -125,3 +125,8 @@ export type ImportReportListItem = {
   row_count: number;
   total_minutes: number;
 };
+
+export type ImportReportDetail = ImportReportListItem & {
+  source_path: string;
+  preview_rows: ImportPreviewRow[];
+};

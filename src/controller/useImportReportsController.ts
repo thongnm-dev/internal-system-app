@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { tauriRuntimeMessage } from "../config/appConfig";
 import { canUseTauriRuntime, friendlyError, safeInvoke } from "../core/tauriRuntime";
-import type { ImportReportListItem, ImportReportSearchCriteria, MessageMode } from "../types/statistics";
+import type { ImportReportDetail, ImportReportListItem, ImportReportSearchCriteria, MessageMode } from "../types/statistics";
 
 const emptyCriteria: ImportReportSearchCriteria = {
   target_month_from: "",
@@ -62,5 +62,57 @@ export function useImportReportsController() {
     reset,
     search,
     setCriteria,
+  };
+}
+
+export function useImportReportDetailController(reportId: number | null) {
+  const [detail, setDetail] = useState<ImportReportDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState("Loading imported report detail.");
+  const [messageMode, setMessageMode] = useState<MessageMode>("info");
+
+  useEffect(() => {
+    if (!reportId) {
+      setDetail(null);
+      setMessage("Import report ID is missing.");
+      setMessageMode("error");
+      return;
+    }
+
+    const loadDetail = async () => {
+      if (!canUseTauriRuntime()) {
+        setDetail(null);
+        setMessage(tauriRuntimeMessage);
+        setMessageMode("error");
+        return;
+      }
+
+      setIsLoading(true);
+      setMessage(`Loading imported report #${reportId.toLocaleString("en-US")}...`);
+      setMessageMode("info");
+      try {
+        const result = await safeInvoke<ImportReportDetail>("get_import_batch_detail", {
+          batchId: reportId,
+        });
+        setDetail(result);
+        setMessage("Imported report detail loaded.");
+        setMessageMode("info");
+      } catch (error) {
+        setDetail(null);
+        setMessage(friendlyError(error));
+        setMessageMode("error");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadDetail();
+  }, [reportId]);
+
+  return {
+    detail,
+    isLoading,
+    message,
+    messageMode,
   };
 }

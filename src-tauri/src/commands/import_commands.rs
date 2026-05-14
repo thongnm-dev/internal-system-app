@@ -1,7 +1,7 @@
 use crate::domain::import_csv::models::ImportCsvPreviewResult;
 use crate::domain::import_csv::service as import_csv_service;
 use crate::domain::monthly_report::models::{
-    ImportBatchListItem, ImportBatchSearchCriteria, ImportBatchSummary, ImportCsvResult,
+    ImportBatchDetail, ImportBatchListItem, ImportBatchSearchCriteria, ImportBatchSummary, ImportCsvResult,
 };
 use crate::domain::monthly_report::service as monthly_report_service;
 use tauri::Manager;
@@ -46,4 +46,16 @@ pub fn search_import_batches(
         .app_data_dir()
         .map_err(|error| error.to_string())?;
     monthly_report_service::search_import_batches(&app_data_dir, criteria).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_import_batch_detail(
+    app: tauri::AppHandle,
+    batch_id: i64,
+) -> Result<ImportBatchDetail, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    monthly_report_service::get_import_batch_detail(&app_data_dir, batch_id).map_err(|error| error.to_string())
 }
