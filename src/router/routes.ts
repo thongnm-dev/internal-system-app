@@ -22,10 +22,10 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Detailed project breakdown grouped by development phase.",
   },
   {
-    key: "phases",
-    path: "/phases",
-    title: "Phases",
-    subtitle: "Phase-level total hours across projects.",
+    key: "dailyReport",
+    path: "/daily-report",
+    title: "Daily Report",
+    subtitle: "Enter daily work hours for each assigned project task.",
   },
   {
     key: "importCsv",

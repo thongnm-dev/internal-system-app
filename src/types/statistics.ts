@@ -44,7 +44,7 @@ export type SystemInfo = {
 
 export type MessageMode = "info" | "error";
 
-export type MenuKey = "overview" | "projects" | "phases" | "importCsv" | "importReports" | "settings";
+export type MenuKey = "overview" | "projects" | "dailyReport" | "importCsv" | "importReports" | "settings";
 
 export type AppRouteKey = MenuKey | "login";
 

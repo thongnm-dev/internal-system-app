@@ -1,14 +1,16 @@
 import { useImportCsvController } from "../controller/useImportCsvController";
 import { useImportReportDetailController, useImportReportsController } from "../controller/useImportReportsController";
+import { useDailyReportController } from "../controller/useDailyReportController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
+import { useAuthStore } from "../stores/authStore";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
+import { DailyReportPage } from "./DailyReportPage";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { ImportReportDetailPage } from "./ImportReportDetailPage";
 import { ImportReportsPage } from "./ImportReportsPage";
 import { OverviewPage } from "./OverviewPage";
 import { ProjectDetailPage } from "./ProjectDetailPage";
-import { PhasesPage } from "./PhasesPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { SettingsPage } from "./SettingsPage";
 
@@ -32,8 +34,8 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
     return <ProjectsRoute path={path} onNavigate={navigateToPath} />;
   }
 
-  if (activeMenu === "phases") {
-    return <PhasesRoute />;
+  if (activeMenu === "dailyReport") {
+    return <DailyReportRoute />;
   }
 
   if (activeMenu === "settings") {
@@ -178,10 +180,28 @@ function getImportReportIdFromPath(path: string) {
   return Number.isInteger(reportId) && reportId > 0 ? reportId : null;
 }
 
-function PhasesRoute() {
+function DailyReportRoute() {
+  const { user } = useAuthStore();
+  const dailyReport = useDailyReportController(user?.username);
+
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <PhasesPage />
+      <DailyReportPage
+        availableProjects={dailyReport.availableProjects}
+        canGoNextMonth={dailyReport.canGoNextMonth}
+        days={dailyReport.days}
+        entries={dailyReport.entries}
+        maxMonthValue={dailyReport.maxMonthValue}
+        monthLabel={dailyReport.monthLabel}
+        monthValue={dailyReport.monthValue}
+        projects={dailyReport.projects}
+        totalHours={dailyReport.totalHours}
+        onAddProject={dailyReport.addProject}
+        onNextMonth={dailyReport.nextMonth}
+        onPreviousMonth={dailyReport.previousMonth}
+        onSelectMonth={dailyReport.selectMonth}
+        onUpdateEntry={dailyReport.updateEntry}
+      />
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { BarChart3, ChevronLeft, ChevronRight, ClipboardList, Database, Home, Settings, Table2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Database, Home, Settings, Table2 } from "lucide-react";
 import { appRoutes } from "../router/routes";
 import type { MenuKey } from "../types/statistics";
 
@@ -13,7 +13,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
   const items = [
     { id: "overview" as const, icon: Home },
     { id: "projects" as const, icon: Table2 },
-    { id: "phases" as const, icon: BarChart3 },
+    { id: "dailyReport" as const, icon: CalendarDays },
     { id: "importCsv" as const, icon: Database },
     { id: "importReports" as const, icon: ClipboardList },
   ];
