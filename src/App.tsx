@@ -63,7 +63,7 @@ function AppShell() {
   const activeShellMenu = activeMenu as MenuKey;
 
   return (
-    <main className="grid min-h-screen grid-rows-[minmax(0,1fr)_auto] bg-canvas text-ink">
+    <main className="grid h-screen grid-rows-[minmax(0,1fr)_auto] overflow-hidden bg-canvas text-ink">
       <section
         className={[
           "grid min-h-0 overflow-hidden transition-[grid-template-columns] duration-200",
@@ -78,7 +78,7 @@ function AppShell() {
         />
 
         <section className="min-h-0 overflow-hidden p-6">
-          <div className="flex h-full min-h-0 flex-col gap-4">
+          <div className="flex h-full min-h-0 overflow-hidden flex-col gap-4">
             <Header
               route={route}
               username={user?.username}

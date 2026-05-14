@@ -1,5 +1,6 @@
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import type { UIEvent, WheelEvent } from "react";
 import type { DailyReportEntries, DailyReportEntry, DailyReportProject, DailyReportTask } from "../controller/useDailyReportController";
 import { entryHour, entryKey } from "../controller/useDailyReportController";
 
@@ -50,94 +51,138 @@ export function DailyReportPage({
 }: DailyReportPageProps) {
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const dayHeaderRef = useRef<HTMLDivElement>(null);
+  const dayRowsRef = useRef<HTMLDivElement>(null);
+  const [dayRowsScrollbarHeight, setDayRowsScrollbarHeight] = useState(0);
+  const [tableScrollTop, setTableScrollTop] = useState(0);
+
+  useLayoutEffect(() => {
+    const dayRows = dayRowsRef.current;
+
+    if (!dayRows) {
+      return;
+    }
+
+    const updateScrollbarHeight = () => {
+      setDayRowsScrollbarHeight(dayRows.offsetHeight - dayRows.clientHeight);
+    };
+
+    updateScrollbarHeight();
+
+    const resizeObserver = new ResizeObserver(updateScrollbarHeight);
+    resizeObserver.observe(dayRows);
+
+    return () => resizeObserver.disconnect();
+  }, [days.length, projects.length]);
+
+  const syncFromDayRows = (event: UIEvent<HTMLDivElement>) => {
+    const scrollContainer = event.currentTarget;
+    setTableScrollTop(scrollContainer.scrollTop);
+
+    if (dayHeaderRef.current) {
+      dayHeaderRef.current.scrollLeft = scrollContainer.scrollLeft;
+    }
+  };
+
+  const scrollTableFromProjectColumn = (event: WheelEvent<HTMLDivElement>) => {
+    if (!dayRowsRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    dayRowsRef.current.scrollTop += event.deltaY;
+    dayRowsRef.current.scrollLeft += event.deltaX;
+  };
 
   return (
-    <section className="grid min-h-0 flex-1 grid-cols-[380px_minmax(0,1fr)] overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
-      <section className="flex h-[76px] items-center justify-between gap-3 border-b border-r border-stone-200 bg-white px-4">
-        <div className="min-w-0">
-          <h3 className="truncate font-bold">Assigned work</h3>
-          <p className="mt-1 truncate text-xs text-slate-500">{projects.length.toLocaleString("en-US")} projects</p>
-        </div>
-        <div className="relative">
-          <button
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            title="Add project"
-            disabled={availableProjects.length === 0}
-            onClick={() => setIsAddingProject((current) => !current)}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-
-          {isAddingProject ? (
-            <div className="absolute right-0 top-11 z-40 w-72 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-              {availableProjects.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-slate-500">No more projects.</p>
-              ) : (
-                availableProjects.map((project) => (
-                  <button
-                    key={project.id}
-                    className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-slate-50"
-                    type="button"
-                    onClick={() => {
-                      onAddProject(project.id);
-                      setIsAddingProject(false);
-                    }}
-                  >
-                    <span className="min-w-0">
-                      <strong className="block truncate text-slate-800">{project.code}</strong>
-                      <span className="block truncate text-xs text-slate-500">{project.name}</span>
-                    </span>
-                    <Plus className="h-4 w-4 shrink-0 text-brand" />
-                  </button>
-                ))
-              )}
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="flex h-[76px] items-center justify-between gap-4 border-b border-stone-200 bg-white px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-brand">
-            <CalendarDays className="h-5 w-5" />
-          </span>
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
+      <section className="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-stone-200 bg-white">
+        <div className="flex min-w-0 items-center justify-between gap-3 border-r border-stone-200 px-4">
           <div className="min-w-0">
-            <h3 className="truncate font-bold">{monthLabel}</h3>
-            <p className="mt-1 truncate text-xs text-slate-500">Daily work hour input</p>
+            <h3 className="truncate font-bold">Assigned work</h3>
+            <p className="mt-1 truncate text-xs text-slate-500">{projects.length.toLocaleString("en-US")} projects</p>
+          </div>
+          <div className="relative">
+            <button
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              title="Add project"
+              disabled={availableProjects.length === 0}
+              onClick={() => setIsAddingProject((current) => !current)}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+
+            {isAddingProject ? (
+              <div className="absolute right-0 top-11 z-40 w-72 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                {availableProjects.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-slate-500">No more projects.</p>
+                ) : (
+                  availableProjects.map((project) => (
+                    <button
+                      key={project.id}
+                      className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-slate-50"
+                      type="button"
+                      onClick={() => {
+                        onAddProject(project.id);
+                        setIsAddingProject(false);
+                      }}
+                    >
+                      <span className="min-w-0">
+                        <strong className="block truncate text-slate-800">{project.code}</strong>
+                        <span className="block truncate text-xs text-slate-500">{project.name}</span>
+                      </span>
+                      <Plus className="h-4 w-4 shrink-0 text-brand" />
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-            type="button"
-            title="Previous month"
-            onClick={onPreviousMonth}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <input
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            max={maxMonthValue}
-            type="month"
-            value={monthValue}
-            onChange={(event) => onSelectMonth(event.target.value)}
-          />
-          <button
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            title="Next month"
-            disabled={!canGoNextMonth}
-            onClick={onNextMonth}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+
+        <div className="flex min-w-0 items-center justify-between gap-4 px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-brand">
+              <CalendarDays className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate font-bold">{monthLabel}</h3>
+              <p className="mt-1 truncate text-xs text-slate-500">Daily work hour input</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+              type="button"
+              title="Previous month"
+              onClick={onPreviousMonth}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <input
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              max={maxMonthValue}
+              type="month"
+              value={monthValue}
+              onChange={(event) => onSelectMonth(event.target.value)}
+            />
+            <button
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              title="Next month"
+              disabled={!canGoNextMonth}
+              onClick={onNextMonth}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </section>
 
-      <section className="col-span-2 grid min-h-0 grid-cols-[380px_minmax(0,1fr)] overflow-y-auto bg-white">
-        <div className="min-w-0 border-r border-stone-200">
-          <div className="sticky top-0 z-30 flex h-[76px] items-center justify-between gap-3 border-b border-stone-200 bg-slate-800 px-4 text-white">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <div className="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] bg-slate-800 text-white">
+          <div className="flex min-w-0 items-center justify-between gap-3 border-b border-r border-stone-200 px-4">
             <div className="min-w-0">
               <h3 className="truncate text-sm font-bold">Project / task</h3>
               <p className="mt-1 truncate text-xs text-white/70">Grouped by assigned project</p>
@@ -145,19 +190,8 @@ export function DailyReportPage({
             <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-bold">Total</span>
           </div>
 
-          {projects.map((project) => (
-            <ProjectTaskRows
-              key={project.id}
-              entries={entries}
-              project={project}
-              totalHours={totalHours}
-            />
-          ))}
-        </div>
-
-        <div className="min-w-0 overflow-x-auto">
-          <div className="min-w-max">
-            <div className="sticky top-0 z-20 flex h-[76px] border-b border-stone-200 bg-slate-800 text-white">
+          <div ref={dayHeaderRef} className="min-w-0 overflow-hidden border-b border-stone-200">
+            <div className="flex h-[76px] min-w-max">
               {days.map((day) => (
                 <div
                   key={day.day}
@@ -172,16 +206,41 @@ export function DailyReportPage({
                 </div>
               ))}
             </div>
+          </div>
+        </div>
 
-            {projects.map((project) => (
-            <ProjectDayRows
-              key={project.id}
-              days={days}
-              entries={entries}
-              onEditCell={setEditingCell}
-              project={project}
-            />
-          ))}
+        <div className="grid min-h-0 flex-1 grid-cols-[380px_minmax(0,1fr)]">
+          <div className="min-w-0 overflow-hidden border-r border-stone-200" onWheel={scrollTableFromProjectColumn}>
+            <div
+              style={{
+                transform: `translateY(-${tableScrollTop}px)`,
+                willChange: "transform",
+              }}
+            >
+              {projects.map((project) => (
+                <ProjectTaskRows
+                  key={project.id}
+                  entries={entries}
+                  project={project}
+                  totalHours={totalHours}
+                />
+              ))}
+              <div aria-hidden="true" style={{ height: dayRowsScrollbarHeight }} />
+            </div>
+          </div>
+
+          <div ref={dayRowsRef} className="min-w-0 overflow-auto" onScroll={syncFromDayRows}>
+            <div className="min-w-max">
+              {projects.map((project) => (
+                <ProjectDayRows
+                  key={project.id}
+                  days={days}
+                  entries={entries}
+                  onEditCell={setEditingCell}
+                  project={project}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>

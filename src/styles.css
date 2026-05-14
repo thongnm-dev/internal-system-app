@@ -29,10 +29,17 @@
     box-sizing: border-box;
   }
 
+  html,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     margin: 0;
     min-width: 900px;
-    min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
   }
 
   button,
@@ -56,5 +63,13 @@
 
   .num {
     @apply text-right tabular-nums whitespace-nowrap;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }
