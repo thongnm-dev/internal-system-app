@@ -1,6 +1,6 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Plus } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
-import type { UIEvent, WheelEvent } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, FolderOpen, Plus, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode, UIEvent, WheelEvent } from "react";
 import type { DailyReportEntries, DailyReportEntry, DailyReportProject, DailyReportTask } from "../controller/useDailyReportController";
 import { entryHour, entryKey } from "../controller/useDailyReportController";
 
@@ -23,6 +23,7 @@ type DailyReportPageProps = {
   onAddProject: (projectId: string) => void;
   onNextMonth: () => void;
   onPreviousMonth: () => void;
+  onRemoveProject: (projectId: string) => void;
   onSelectMonth: (value: string) => void;
   onUpdateEntry: (taskId: string, day: number, value: DailyReportEntry | null) => void;
   projects: DailyReportProject[];
@@ -44,6 +45,7 @@ export function DailyReportPage({
   onAddProject,
   onNextMonth,
   onPreviousMonth,
+  onRemoveProject,
   onSelectMonth,
   onUpdateEntry,
   projects,
@@ -55,6 +57,24 @@ export function DailyReportPage({
   const dayRowsRef = useRef<HTMLDivElement>(null);
   const [dayRowsScrollbarHeight, setDayRowsScrollbarHeight] = useState(0);
   const [tableScrollTop, setTableScrollTop] = useState(0);
+  const [projectMenu, setProjectMenu] = useState<ProjectContextMenuState | null>(null);
+
+  useEffect(() => {
+    if (!projectMenu) {
+      return;
+    }
+
+    const closeMenu = () => setProjectMenu(null);
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("contextmenu", closeMenu);
+    window.addEventListener("keydown", closeMenu);
+
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("contextmenu", closeMenu);
+      window.removeEventListener("keydown", closeMenu);
+    };
+  }, [projectMenu]);
 
   useLayoutEffect(() => {
     const dayRows = dayRowsRef.current;
@@ -94,6 +114,27 @@ export function DailyReportPage({
     dayRowsRef.current.scrollLeft += event.deltaX;
   };
 
+  const openProjectMenu = (project: DailyReportProject, event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setProjectMenu({
+      canDelete: Boolean(project.isUserAdded) && projectTotal(project, entries) === 0,
+      project,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const closeProjectMenu = () => setProjectMenu(null);
+
+  const handleProjectMenuAction = (action: ProjectContextMenuAction, project: DailyReportProject) => {
+    closeProjectMenu();
+
+    if (action === "delete") {
+      onRemoveProject(project.id);
+    }
+  };
+
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
       <section className="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-stone-200 bg-white">
@@ -102,43 +143,15 @@ export function DailyReportPage({
             <h3 className="truncate font-bold">Assigned work</h3>
             <p className="mt-1 truncate text-xs text-slate-500">{projects.length.toLocaleString("en-US")} projects</p>
           </div>
-          <div className="relative">
-            <button
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              title="Add project"
-              disabled={availableProjects.length === 0}
-              onClick={() => setIsAddingProject((current) => !current)}
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-
-            {isAddingProject ? (
-              <div className="absolute right-0 top-11 z-40 w-72 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                {availableProjects.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-slate-500">No more projects.</p>
-                ) : (
-                  availableProjects.map((project) => (
-                    <button
-                      key={project.id}
-                      className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-slate-50"
-                      type="button"
-                      onClick={() => {
-                        onAddProject(project.id);
-                        setIsAddingProject(false);
-                      }}
-                    >
-                      <span className="min-w-0">
-                        <strong className="block truncate text-slate-800">{project.code}</strong>
-                        <span className="block truncate text-xs text-slate-500">{project.name}</span>
-                      </span>
-                      <Plus className="h-4 w-4 shrink-0 text-brand" />
-                    </button>
-                  ))
-                )}
-              </div>
-            ) : null}
-          </div>
+          <button
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            title="Add project"
+            disabled={availableProjects.length === 0}
+            onClick={() => setIsAddingProject(true)}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex min-w-0 items-center justify-between gap-4 px-4">
@@ -223,6 +236,7 @@ export function DailyReportPage({
                   entries={entries}
                   project={project}
                   totalHours={totalHours}
+                  onContextMenu={openProjectMenu}
                 />
               ))}
               <div aria-hidden="true" style={{ height: dayRowsScrollbarHeight }} />
@@ -259,22 +273,164 @@ export function DailyReportPage({
           }}
         />
       ) : null}
+
+      {isAddingProject ? (
+        <ProjectPickerDialog
+          projects={availableProjects}
+          onClose={() => setIsAddingProject(false)}
+          onSelect={(projectIds) => {
+            projectIds.forEach(onAddProject);
+            setIsAddingProject(false);
+          }}
+        />
+      ) : null}
+
+      {projectMenu ? (
+        <ProjectContextMenu
+          canDelete={projectMenu.canDelete}
+          project={projectMenu.project}
+          x={projectMenu.x}
+          y={projectMenu.y}
+          onAction={handleProjectMenuAction}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function ProjectPickerDialog({
+  onClose,
+  onSelect,
+  projects,
+}: {
+  onClose: () => void;
+  onSelect: (projectIds: string[]) => void;
+  projects: DailyReportProject[];
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const filteredProjects = normalizedKeyword
+    ? projects.filter((project) =>
+        `${project.code} ${project.name}`.toLowerCase().includes(normalizedKeyword),
+      )
+    : projects;
+
+  const toggleProject = (projectId: string) => {
+    setSelectedProjectIds((current) =>
+      current.includes(projectId) ? current.filter((id) => id !== projectId) : [...current, projectId],
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
+      <section
+        className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="truncate font-bold text-slate-900">Add project</h3>
+            <p className="mt-1 truncate text-sm text-slate-500">Select a project to add to daily report.</p>
+          </div>
+          <button
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            type="button"
+            title="Close"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="border-b border-stone-200 bg-slate-50 px-5 py-4">
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500">Project code / name</span>
+            <input
+              className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Search by code or name"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto p-3">
+          {projects.length === 0 ? (
+            <p className="px-2 py-6 text-center text-sm text-slate-500">No more projects.</p>
+          ) : filteredProjects.length === 0 ? (
+            <p className="px-2 py-6 text-center text-sm text-slate-500">No projects found.</p>
+          ) : (
+            <div className="grid gap-2">
+              {filteredProjects.map((project) => {
+                const isSelected = selectedProjectIds.includes(project.id);
+
+                return (
+                <label
+                  key={project.id}
+                  className={[
+                    "flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 hover:border-brand hover:bg-emerald-50",
+                    isSelected ? "border-brand bg-emerald-50" : "border-slate-200 bg-white",
+                  ].join(" ")}
+                >
+                  <input
+                    className="h-4 w-4 shrink-0 accent-brand"
+                    checked={isSelected}
+                    type="checkbox"
+                    onChange={() => toggleProject(project.id)}
+                  />
+                  <span className="min-w-0">
+                    <strong className="block truncate text-sm text-slate-900">
+                      {project.code} - {project.name}
+                    </strong>
+                    <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{project.client}</span>
+                  </span>
+                </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-stone-200 px-5 py-4">
+          <span className="text-sm font-semibold text-slate-500">{selectedProjectIds.length} selected</span>
+          <div className="flex items-center gap-2">
+            <button
+              className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              type="button"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              className="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              disabled={selectedProjectIds.length === 0}
+              onClick={() => onSelect(selectedProjectIds)}
+            >
+              Add projects
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
 function ProjectTaskRows({
   entries,
+  onContextMenu,
   project,
   totalHours,
 }: {
   entries: DailyReportEntries;
+  onContextMenu: (project: DailyReportProject, event: ReactMouseEvent<HTMLDivElement>) => void;
   project: DailyReportProject;
   totalHours: (taskId?: string) => number;
 }) {
   return (
     <>
-      <div className={projectRowClass}>
+      <div className={projectRowClass} onContextMenu={(event) => onContextMenu(project, event)}>
         <div className="min-w-0 flex-1">
           <strong className="block truncate text-sm text-white">
             {project.code} - {project.name}
@@ -288,6 +444,87 @@ function ProjectTaskRows({
         <TaskRow key={task.id} task={task} total={totalHours(task.id)} />
       ))}
     </>
+  );
+}
+
+type ProjectContextMenuAction = "addTask" | "backlog" | "importTask" | "delete";
+
+type ProjectContextMenuState = {
+  canDelete: boolean;
+  project: DailyReportProject;
+  x: number;
+  y: number;
+};
+
+function ProjectContextMenu({
+  canDelete,
+  project,
+  x,
+  y,
+  onAction,
+}: {
+  canDelete: boolean;
+  project: DailyReportProject;
+  x: number;
+  y: number;
+  onAction: (action: ProjectContextMenuAction, project: DailyReportProject) => void;
+}) {
+  return (
+    <div
+      className="fixed z-[60] w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-xl"
+      style={{ left: x, top: y }}
+      onClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <ContextMenuButton icon={<Plus className="h-4 w-4" />} label="Thêm task" onClick={() => onAction("addTask", project)} />
+      <ContextMenuButton
+        icon={<FolderOpen className="h-4 w-4" />}
+        label="Xem backlog"
+        onClick={() => onAction("backlog", project)}
+      />
+      <ContextMenuButton
+        icon={<Upload className="h-4 w-4" />}
+        label="Import task"
+        onClick={() => onAction("importTask", project)}
+      />
+      {canDelete ? (
+        <>
+          <div className="my-1 border-t border-slate-100" />
+          <ContextMenuButton
+            danger
+            icon={<Trash2 className="h-4 w-4" />}
+            label="Xóa project"
+            onClick={() => onAction("delete", project)}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function ContextMenuButton({
+  danger,
+  icon,
+  label,
+  onClick,
+}: {
+  danger?: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={[
+        "flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-slate-50",
+        danger ? "text-red-600 hover:bg-red-50" : "",
+      ].join(" ")}
+      type="button"
+      onClick={onClick}
+    >
+      {icon}
+      <span className="min-w-0 truncate">{label}</span>
+    </button>
   );
 }
 

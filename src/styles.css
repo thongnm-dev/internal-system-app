@@ -65,11 +65,4 @@
     @apply text-right tabular-nums whitespace-nowrap;
   }
 
-  .scrollbar-none {
-    scrollbar-width: none;
-  }
-
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
 }

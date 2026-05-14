@@ -11,6 +11,7 @@ export type DailyReportProject = {
   code: string;
   name: string;
   client: string;
+  isUserAdded?: boolean;
   tasks: DailyReportTask[];
 };
 
@@ -96,7 +97,12 @@ export function useDailyReportController(username?: string) {
   const storageKey = dailyReportStorageKey(username, selectedMonth);
 
   const allProjects = useMemo(() => [...assignedProjects, ...optionalProjects], []);
-  const projects = allProjects.filter((project) => visibleProjectIds.includes(project.id));
+  const projects = allProjects
+    .filter((project) => visibleProjectIds.includes(project.id))
+    .map((project) => ({
+      ...project,
+      isUserAdded: optionalProjects.some((optionalProject) => optionalProject.id === project.id),
+    }));
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null;
   const availableProjects = optionalProjects.filter((project) => !visibleProjectIds.includes(project.id));
   const days = useMemo(() => getMonthDays(year, monthIndex), [monthIndex, year]);
@@ -108,6 +114,18 @@ export function useDailyReportController(username?: string) {
   const addProject = (projectId: string) => {
     setVisibleProjectIds((current) => (current.includes(projectId) ? current : [...current, projectId]));
     setSelectedProjectId(projectId);
+  };
+
+  const removeProject = (projectId: string) => {
+    setVisibleProjectIds((current) => current.filter((id) => id !== projectId));
+    setSelectedProjectId((current) => {
+      if (current !== projectId) {
+        return current;
+      }
+
+      const nextProjectId = visibleProjectIds.find((id) => id !== projectId);
+      return nextProjectId ?? "";
+    });
   };
 
   const selectMonth = (value: string) => {
@@ -173,6 +191,7 @@ export function useDailyReportController(username?: string) {
     nextMonth,
     previousMonth,
     projects,
+    removeProject,
     selectMonth,
     selectedProject,
     selectedProjectId,

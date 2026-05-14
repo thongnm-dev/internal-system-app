@@ -199,6 +199,7 @@ function DailyReportRoute() {
         onAddProject={dailyReport.addProject}
         onNextMonth={dailyReport.nextMonth}
         onPreviousMonth={dailyReport.previousMonth}
+        onRemoveProject={dailyReport.removeProject}
         onSelectMonth={dailyReport.selectMonth}
         onUpdateEntry={dailyReport.updateEntry}
       />
