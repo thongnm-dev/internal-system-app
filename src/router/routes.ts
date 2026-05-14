@@ -1,8 +1,9 @@
-import type { MenuKey } from "../types/statistics";
+import type { AppRouteKey, MenuKey } from "../types/statistics";
 
 export type AppRoute = {
-  key: MenuKey;
+  key: AppRouteKey;
   path: string;
+  requiresAuth?: boolean;
   title: string;
   subtitle: string;
 };
@@ -35,17 +36,29 @@ export const appRoutes: AppRoute[] = [
   {
     key: "settings",
     path: "/settings",
+    requiresAuth: true,
     title: "Settings",
     subtitle: "Manage user profile, display preferences, language, and linked API keys.",
+  },
+  {
+    key: "login",
+    path: "/login",
+    title: "Login",
+    subtitle: "Authenticate to continue to protected screens.",
   },
 ];
 
 export const defaultRoute = appRoutes[0];
+export const loginRoute = appRoutes.find((route) => route.key === "login")!;
 
 export function routeByKey(key: MenuKey) {
   return appRoutes.find((route) => route.key === key) ?? defaultRoute;
 }
 
 export function routeByPath(path: string) {
+  if (path.startsWith("/projects/")) {
+    return routeByKey("projects");
+  }
+
   return appRoutes.find((route) => route.path === path) ?? defaultRoute;
 }

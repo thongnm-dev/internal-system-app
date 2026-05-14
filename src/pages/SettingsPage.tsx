@@ -137,17 +137,24 @@ export function SettingsPage({
 
         <div className="mt-4 space-y-3">
           {apiKeys.map((apiKey) => (
-            <div key={apiKey.id} className="grid grid-cols-[minmax(160px,260px)_minmax(0,1fr)_40px] gap-2">
+            <div key={apiKey.id} className="grid grid-cols-[minmax(160px,240px)_minmax(180px,260px)_minmax(0,1fr)_40px] gap-2">
               <input
                 className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                placeholder="Application name"
+                placeholder="Application name *"
                 type="text"
                 value={apiKey.name}
                 onChange={(event) => onApiKeyChange(apiKey.id, "name", event.target.value)}
               />
               <input
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 font-mono text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                placeholder="KEY *"
+                type="text"
+                value={apiKey.key}
+                onChange={(event) => onApiKeyChange(apiKey.id, "key", event.target.value.toUpperCase())}
+              />
+              <input
                 className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                placeholder="API key"
+                placeholder="API key *"
                 type="password"
                 value={apiKey.apiKey}
                 onChange={(event) => onApiKeyChange(apiKey.id, "apiKey", event.target.value)}

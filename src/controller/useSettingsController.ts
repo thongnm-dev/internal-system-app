@@ -17,6 +17,7 @@ export type UserSettings = {
 export type ApiKeySetting = {
   id: string;
   name: string;
+  key: string;
   apiKey: string;
 };
 
@@ -45,6 +46,7 @@ const defaultSettings: StoredSettings = {
     {
       id: "default",
       name: "",
+      key: "",
       apiKey: "",
     },
   ],
@@ -59,7 +61,7 @@ export function useSettingsController() {
   }, [settings]);
 
   const apiKeyCount = useMemo(
-    () => settings.apiKeys.filter((apiKey) => apiKey.name.trim() || apiKey.apiKey.trim()).length,
+    () => settings.apiKeys.filter((apiKey) => apiKey.name.trim() && apiKey.key.trim() && apiKey.apiKey.trim()).length,
     [settings.apiKeys],
   );
 
@@ -96,6 +98,7 @@ export function useSettingsController() {
         {
           id: crypto.randomUUID(),
           name: "",
+          key: "",
           apiKey: "",
         },
       ],
@@ -141,7 +144,10 @@ function loadSettings(): StoredSettings {
       user: { ...defaultSettings.user, ...parsed.user },
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: isLanguageCode(parsed.language) ? parsed.language : defaultSettings.language,
-      apiKeys: Array.isArray(parsed.apiKeys) && parsed.apiKeys.length > 0 ? parsed.apiKeys : defaultSettings.apiKeys,
+      apiKeys:
+        Array.isArray(parsed.apiKeys) && parsed.apiKeys.length > 0
+          ? parsed.apiKeys.map((apiKey) => ({ key: "", ...apiKey }))
+          : defaultSettings.apiKeys,
     };
   } catch {
     return defaultSettings;

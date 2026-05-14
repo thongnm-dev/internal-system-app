@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BottomBar } from "./components/BottomBar";
 import { Header } from "./components/Header";
 import { MessageBanner } from "./components/MessageBanner";
@@ -5,13 +6,19 @@ import { PhaseDetailDialog } from "./components/PhaseDetailDialog";
 import { Sidebar } from "./components/Sidebar";
 import { useAppShellController } from "./controller/useAppShellController";
 import { ReportDataProvider, useReportDataController } from "./controller/useReportDataController";
+import { defaultRoute, loginRoute } from "./router/routes";
 import { MainDetailArea } from "./pages/MainDetailArea";
+import { LoginPage } from "./pages/LoginPage";
+import { AuthProvider, useAuthStore } from "./stores/authStore";
+import type { MenuKey } from "./types/statistics";
 
 export function App() {
   return (
-    <ReportDataProvider>
-      <AppShell />
-    </ReportDataProvider>
+    <AuthProvider>
+      <ReportDataProvider>
+        <AppShell />
+      </ReportDataProvider>
+    </AuthProvider>
   );
 }
 
@@ -20,6 +27,8 @@ function AppShell() {
     activeMenu,
     isSidebarCollapsed,
     navigate,
+    navigateToPath,
+    path,
     route,
     setIsSidebarCollapsed,
     selectedPhaseDetail,
@@ -27,6 +36,36 @@ function AppShell() {
     systemInfo,
   } = useAppShellController();
   const { message, messageMode } = useReportDataController();
+  const { isAuthenticated, login, logout, returnPath, setReturnPath, user } = useAuthStore();
+
+  useEffect(() => {
+    if (route.requiresAuth && !isAuthenticated) {
+      setReturnPath(route.path);
+      navigateToPath(loginRoute.path);
+      return;
+    }
+
+    if (route.key === "login" && isAuthenticated) {
+      navigateToPath(returnPath ?? defaultRoute.path);
+    }
+  }, [isAuthenticated, navigateToPath, returnPath, route, setReturnPath]);
+
+  if (route.key === "login") {
+    return (
+      <LoginPage
+        onLogin={(username, _password) => {
+          login({ username });
+          navigateToPath(returnPath ?? defaultRoute.path);
+        }}
+      />
+    );
+  }
+
+  if (route.requiresAuth && !isAuthenticated) {
+    return null;
+  }
+
+  const activeShellMenu = activeMenu as MenuKey;
 
   return (
     <main className="grid min-h-screen grid-rows-[minmax(0,1fr)_auto] bg-canvas text-ink">
@@ -37,7 +76,7 @@ function AppShell() {
         ].join(" ")}
       >
         <Sidebar
-          activeMenu={activeMenu}
+          activeMenu={activeShellMenu}
           isCollapsed={isSidebarCollapsed}
           onMenuChange={navigate}
           onToggleCollapse={() => setIsSidebarCollapsed((value) => !value)}
@@ -45,10 +84,21 @@ function AppShell() {
 
         <section className="min-h-0 overflow-hidden p-6">
           <div className="flex h-full min-h-0 flex-col gap-4">
-            <Header route={route} />
+            <Header
+              route={route}
+              username={user?.username}
+              onLogout={() => {
+                logout();
+                navigateToPath(loginRoute.path);
+              }}
+            />
 
-            {activeMenu !== "importCsv" && activeMenu !== "settings" && <MessageBanner message={message} mode={messageMode} />}
-            <MainDetailArea activeMenu={activeMenu} onPhaseClick={setSelectedPhaseDetail} />
+            <MainDetailArea
+              activeMenu={activeShellMenu}
+              path={path}
+              navigateToPath={navigateToPath}
+              onPhaseClick={setSelectedPhaseDetail}
+            />
           </div>
         </section>
       </section>

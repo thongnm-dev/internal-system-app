@@ -7,22 +7,25 @@ import { useSettingsController } from "../controller/useSettingsController";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { OverviewPage } from "./OverviewPage";
+import { ProjectDetailPage } from "./ProjectDetailPage";
 import { PhasesPage } from "./PhasesPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { SettingsPage } from "./SettingsPage";
 
 type MainDetailAreaProps = {
   activeMenu: MenuKey;
+  path: string;
+  navigateToPath: (path: string) => void;
   onPhaseClick: (detail: SelectedPhaseDetail) => void;
 };
 
-export function MainDetailArea({ activeMenu, onPhaseClick }: MainDetailAreaProps) {
+export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick }: MainDetailAreaProps) {
   if (activeMenu === "importCsv") {
     return <ImportCsvRoute onPhaseClick={onPhaseClick} />;
   }
 
   if (activeMenu === "projects") {
-    return <ProjectsRoute onPhaseClick={onPhaseClick} />;
+    return <ProjectsRoute path={path} onNavigate={navigateToPath} />;
   }
 
   if (activeMenu === "phases") {
@@ -47,15 +50,56 @@ function OverviewRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhaseD
   );
 }
 
-function ProjectsRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhaseDetail) => void }) {
-  const { result, summaryMetrics } = useProjectsController(onPhaseClick);
+function ProjectsRoute({ path, onNavigate }: { path: string; onNavigate: (path: string) => void }) {
+  const projectID = getProjectIDFromPath(path);
+
+  if (path.startsWith("/projects/detail")) {
+    return (
+      <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+        <ProjectDetailPage projectID={projectID} onBack={() => onNavigate("/projects")} />
+      </section>
+    );
+  }
+
+  return <ProjectListRoute onNavigate={onNavigate} />;
+}
+
+function ProjectListRoute({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const {
+    applicationName,
+    filters,
+    isSearching,
+    result,
+    resetFilters,
+    searchError,
+    searchProjects,
+    setFilters,
+  } = useProjectsController();
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <SummaryCards metrics={summaryMetrics} />
-      <ProjectsPage result={result} onPhaseClick={onPhaseClick} />
+      <ProjectsPage
+        applicationName={applicationName}
+        filters={filters}
+        isSearching={isSearching}
+        result={result}
+        searchError={searchError}
+        onNavigate={onNavigate}
+        onReset={resetFilters}
+        onSearch={() => void searchProjects()}
+        onSetFilters={setFilters}
+      />
     </section>
   );
+}
+
+function getProjectIDFromPath(path: string) {
+  const prefix = "/projects/detail/";
+  if (!path.startsWith(prefix)) {
+    return null;
+  }
+
+  return decodeURIComponent(path.slice(prefix.length));
 }
 
 function PhasesRoute() {

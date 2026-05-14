@@ -1,0 +1,419 @@
+import { ArrowLeft, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { friendlyError, safeInvoke } from "../core/tauriRuntime";
+
+type ProjectDetailPageProps = {
+  projectID: string | null;
+  onBack: () => void;
+};
+
+type ProjectMember = {
+  username: string;
+  name: string;
+};
+
+type ProjectDetail = {
+  backlog_project_id?: string | number;
+  backlog_project_key?: string;
+  backlog_project_name?: string;
+  project_id: string | number;
+  project_code: string;
+  project_name: string;
+  members: ProjectMember[];
+};
+
+type BacklogProjectLookup = {
+  project_id: string | number;
+  project_key: string;
+  project_name: string;
+};
+
+type ProjectForm = {
+  backlogProjectID: string;
+  backlogProjectKey: string;
+  backlogProjectName: string;
+  projectID: string;
+  projectCode: string;
+  projectName: string;
+};
+
+const emptyProjectForm: ProjectForm = {
+  backlogProjectID: "",
+  backlogProjectKey: "",
+  backlogProjectName: "",
+  projectID: "",
+  projectCode: "",
+  projectName: "",
+};
+
+const memberSearchHelpItems: ProjectMember[] = [
+  { username: "thongnm", name: "Thong Nguyen" },
+  { username: "annatn", name: "Anna Tran" },
+  { username: "binhpt", name: "Binh Pham" },
+  { username: "hanhld", name: "Hanh Le" },
+  { username: "minhvo", name: "Minh Vo" },
+];
+
+export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps) {
+  const [form, setForm] = useState<ProjectForm>(emptyProjectForm);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isBacklogLookupLoading, setIsBacklogLookupLoading] = useState(false);
+  const [isSearchHelpOpen, setIsSearchHelpOpen] = useState(false);
+  const [backlogLookupError, setBacklogLookupError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [memberKeyword, setMemberKeyword] = useState("");
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const isCreateMode = !projectID;
+
+  useEffect(() => {
+    if (!projectID) {
+      setForm(emptyProjectForm);
+      setMembers([]);
+      setLoadError("");
+      return;
+    }
+
+    let isActive = true;
+    setIsLoading(true);
+    setLoadError("");
+
+    safeInvoke<ProjectDetail>("get_project_detail", { projectId: projectID })
+      .then((project) => {
+        if (!isActive) {
+          return;
+        }
+
+        setForm({
+          backlogProjectID: project.backlog_project_id ? String(project.backlog_project_id) : "",
+          backlogProjectKey: project.backlog_project_key ?? "",
+          backlogProjectName: project.backlog_project_name ?? "",
+          projectID: String(project.project_id),
+          projectCode: project.project_code,
+          projectName: project.project_name,
+        });
+        setMembers(project.members);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        setForm({ ...emptyProjectForm, projectID });
+        setMembers([]);
+        setLoadError(friendlyError(error));
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [projectID]);
+
+  useEffect(() => {
+    const projectKey = form.backlogProjectKey.trim();
+
+    if (!projectKey) {
+      setBacklogLookupError("");
+      setIsBacklogLookupLoading(false);
+      setForm((current) => ({ ...current, backlogProjectID: "", backlogProjectName: "" }));
+      return;
+    }
+
+    let isActive = true;
+    const timeoutID = window.setTimeout(() => {
+      setIsBacklogLookupLoading(true);
+      setBacklogLookupError("");
+
+      safeInvoke<BacklogProjectLookup>("get_backlog_project_by_key", { projectKey })
+        .then((project) => {
+          if (!isActive) {
+            return;
+          }
+
+          setForm((current) => ({
+            ...current,
+            backlogProjectID: String(project.project_id),
+            backlogProjectKey: project.project_key,
+            backlogProjectName: project.project_name,
+          }));
+        })
+        .catch((error) => {
+          if (!isActive) {
+            return;
+          }
+
+          setForm((current) => ({ ...current, backlogProjectID: "", backlogProjectName: "" }));
+          setBacklogLookupError(friendlyError(error));
+        })
+        .finally(() => {
+          if (isActive) {
+            setIsBacklogLookupLoading(false);
+          }
+        });
+    }, 500);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutID);
+    };
+  }, [form.backlogProjectKey]);
+
+  const filteredMembers = useMemo(() => {
+    const keyword = normalize(memberKeyword);
+    const selectedUsernames = new Set(members.map((member) => member.username));
+
+    return memberSearchHelpItems.filter((member) => {
+      if (selectedUsernames.has(member.username)) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      return normalize(`${member.username} ${member.name}`).includes(keyword);
+    });
+  }, [memberKeyword, members]);
+
+  const addMember = (member: ProjectMember) => {
+    setMembers((current) => [...current, member].sort((a, b) => a.username.localeCompare(b.username)));
+    setMemberKeyword("");
+    setIsSearchHelpOpen(false);
+  };
+
+  const removeMember = (username: string) => {
+    setMembers((current) => current.filter((member) => member.username !== username));
+  };
+
+  const updateForm = (key: keyof ProjectForm, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  return (
+    <section className="min-h-0 flex-1 overflow-auto rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-4">
+        <button
+          className="flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          type="button"
+          onClick={onBack}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <button
+          className="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
+          type="button"
+        >
+          <Save className="h-4 w-4" />
+          Save
+        </button>
+      </div>
+
+      {isLoading ? <p className="mt-4 text-sm text-slate-500">Loading project information...</p> : null}
+      {loadError ? (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{loadError}</p>
+      ) : null}
+
+      <div className="mt-4 grid gap-4">
+        <fieldset className="rounded-lg border border-stone-200 bg-white p-4">
+          <legend className="px-2 text-sm font-bold text-slate-600">Thong tin co ban cua project</legend>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label>
+              <span className="text-xs font-bold text-slate-500">Project ID</span>
+              <input
+                className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                placeholder="Auto generated"
+                readOnly
+                value={form.projectID}
+              />
+            </label>
+            <label>
+              <span className="text-xs font-bold text-slate-500">Project Code</span>
+              <input
+                className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                placeholder="Project code"
+                value={form.projectCode}
+                onChange={(event) => updateForm("projectCode", event.target.value)}
+              />
+            </label>
+            <label className="md:col-span-2">
+              <span className="text-xs font-bold text-slate-500">Project Name</span>
+              <input
+                className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                placeholder="Project name"
+                value={form.projectName}
+                onChange={(event) => updateForm("projectName", event.target.value)}
+              />
+            </label>
+            <fieldset className="rounded-lg border border-stone-200 p-4 md:col-span-2">
+              <legend className="px-2 text-sm font-bold text-slate-600">Backlog project</legend>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label>
+                  <span className="text-xs font-bold text-slate-500">Backlog Project Key</span>
+                  <input
+                    className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                    placeholder="BACKLOG_PROJECT_KEY"
+                    value={form.backlogProjectKey}
+                    onChange={(event) => updateForm("backlogProjectKey", event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span className="text-xs font-bold text-slate-500">Backlog Project ID</span>
+                  <input
+                    className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                    placeholder={isBacklogLookupLoading ? "Loading..." : "Auto fetched from Backlog"}
+                    readOnly
+                    value={form.backlogProjectID}
+                  />
+                </label>
+                <label className="md:col-span-2">
+                  <span className="text-xs font-bold text-slate-500">Backlog Project Name</span>
+                  <input
+                    className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                    placeholder={isBacklogLookupLoading ? "Loading..." : "Auto fetched from Backlog"}
+                    readOnly
+                    value={form.backlogProjectName}
+                  />
+                </label>
+                {backlogLookupError ? <p className="text-sm text-red-600 md:col-span-2">{backlogLookupError}</p> : null}
+              </div>
+            </fieldset>
+          </div>
+        </fieldset>
+
+        <fieldset className="rounded-lg border border-stone-200 bg-white p-4">
+          <legend className="px-2 text-sm font-bold text-slate-600">Danh sach thong tin thanh vien du an</legend>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-bold text-slate-800">Thanh vien</h3>
+            <button
+              className="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
+              type="button"
+              onClick={() => setIsSearchHelpOpen(true)}
+            >
+              <Search className="h-4 w-4" />
+              Search help
+            </button>
+          </div>
+
+          <div className="mt-4 overflow-auto rounded-lg border border-stone-200">
+            <table className="w-full min-w-[560px] border-collapse">
+              <thead>
+                <tr>
+                  <th className="table-head">Username</th>
+                  <th className="table-head">Ten</th>
+                  <th className="table-head w-20 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.length === 0 ? (
+                  <tr>
+                    <td className="table-cell h-28 text-center text-slate-500" colSpan={3}>
+                      Chua chon thanh vien.
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((member) => (
+                    <tr key={member.username}>
+                      <td className="table-cell font-bold text-ink">{member.username}</td>
+                      <td className="table-cell">{member.name}</td>
+                      <td className="table-cell text-center">
+                        <button
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                          type="button"
+                          title="Remove member"
+                          onClick={() => removeMember(member.username)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </fieldset>
+      </div>
+
+      {isSearchHelpOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <section className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-4 py-3">
+              <h3 className="font-bold">Search help thanh vien</h3>
+              <button
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                type="button"
+                title="Close"
+                onClick={() => setIsSearchHelpOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <label>
+                <span className="text-xs font-bold text-slate-500">Keyword</span>
+                <div className="mt-1 flex h-10 items-center rounded-md border border-slate-300 bg-white px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                  <input
+                    className="h-full min-w-0 flex-1 border-0 px-2 text-sm text-slate-900 outline-none"
+                    placeholder="Search username or name"
+                    type="search"
+                    value={memberKeyword}
+                    onChange={(event) => setMemberKeyword(event.target.value)}
+                  />
+                </div>
+              </label>
+
+              <div className="mt-4 max-h-[360px] overflow-auto rounded-lg border border-stone-200">
+                <table className="w-full min-w-[520px] border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="table-head">Username</th>
+                      <th className="table-head">Ten</th>
+                      <th className="table-head w-20 text-center">Select</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMembers.length === 0 ? (
+                      <tr>
+                        <td className="table-cell h-28 text-center text-slate-500" colSpan={3}>
+                          No members match the search conditions.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredMembers.map((member) => (
+                        <tr key={member.username}>
+                          <td className="table-cell font-bold text-ink">{member.username}</td>
+                          <td className="table-cell">{member.name}</td>
+                          <td className="table-cell text-center">
+                            <button
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white hover:opacity-90"
+                              type="button"
+                              title="Select member"
+                              onClick={() => addMember(member)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function normalize(value: string) {
+  return value.trim().toLocaleLowerCase();
+}

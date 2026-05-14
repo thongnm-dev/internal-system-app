@@ -22,18 +22,27 @@ export function useHashRouter() {
 
   const route = useMemo(() => routeByPath(path), [path]);
 
-  const navigate = useCallback((key: MenuKey) => {
-    const nextRoute = routeByKey(key);
-    if (window.location.hash !== `#${nextRoute.path}`) {
-      window.location.hash = nextRoute.path;
+  const navigateToPath = useCallback((nextPath: string) => {
+    if (window.location.hash !== `#${nextPath}`) {
+      window.location.hash = nextPath;
       return;
     }
-    setPath(nextRoute.path);
+    setPath(nextPath);
   }, []);
+
+  const navigate = useCallback(
+    (key: MenuKey) => {
+      const nextRoute = routeByKey(key);
+      navigateToPath(nextRoute.path);
+    },
+    [navigateToPath],
+  );
 
   return {
     activeMenu: route.key,
     navigate,
+    navigateToPath,
+    path,
     route,
   };
 }

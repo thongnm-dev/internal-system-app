@@ -52,6 +52,14 @@ fn migrate(connection: &Connection) -> AppResult<()> {
             ON monthly_report_rows(batch_id);
         CREATE INDEX IF NOT EXISTS idx_monthly_report_rows_match_key
             ON monthly_report_rows(work_date, project_code, process_code);
+
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            application_name TEXT NOT NULL,
+            api_key TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         ",
     )?;
 
