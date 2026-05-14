@@ -1,7 +1,5 @@
-import { SummaryCards } from "../components/SummaryCards";
 import { useImportCsvController } from "../controller/useImportCsvController";
 import { useImportReportsController } from "../controller/useImportReportsController";
-import { usePhasesController } from "../controller/usePhasesController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";

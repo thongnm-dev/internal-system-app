@@ -12,7 +12,7 @@ export function useAppShellController() {
     ip_address: "-",
     version: "-",
   });
-  const [message, setMessage] = useState("Ready to read CSV data.");
+  const [message, setMessage] = useState("");
   const [messageMode, setMessageMode] = useState<MessageMode>("info");
   const [selectedPhaseDetail, setSelectedPhaseDetail] = useState<SelectedPhaseDetail | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);

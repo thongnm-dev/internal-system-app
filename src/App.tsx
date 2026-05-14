@@ -1,11 +1,9 @@
 import { useEffect } from "react";
 import { BottomBar } from "./components/BottomBar";
 import { Header } from "./components/Header";
-import { MessageBanner } from "./components/MessageBanner";
 import { PhaseDetailDialog } from "./components/PhaseDetailDialog";
 import { Sidebar } from "./components/Sidebar";
 import { useAppShellController } from "./controller/useAppShellController";
-import { ReportDataProvider, useReportDataController } from "./controller/useReportDataController";
 import { defaultRoute, loginRoute } from "./router/routes";
 import { MainDetailArea } from "./pages/MainDetailArea";
 import { LoginPage } from "./pages/LoginPage";
@@ -15,9 +13,7 @@ import type { MenuKey } from "./types/statistics";
 export function App() {
   return (
     <AuthProvider>
-      <ReportDataProvider>
-        <AppShell />
-      </ReportDataProvider>
+      <AppShell />
     </AuthProvider>
   );
 }
@@ -35,7 +31,6 @@ function AppShell() {
     setSelectedPhaseDetail,
     systemInfo,
   } = useAppShellController();
-  const { message, messageMode } = useReportDataController();
   const { isAuthenticated, login, logout, returnPath, setReturnPath, user } = useAuthStore();
 
   useEffect(() => {

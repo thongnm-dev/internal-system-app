@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useReportDataController } from "./useReportDataController";
+import type { SummaryMetric } from "../types/statistics";
 
 export type ProjectFilters = {
   code: string;
@@ -7,8 +7,14 @@ export type ProjectFilters = {
   name: string;
 };
 
+const defaultSummaryMetrics: SummaryMetric[] = [
+  { label: "Rows", value: "-" },
+  { label: "Total hours", value: "-" },
+  { label: "Regular hours", value: "-" },
+  { label: "Overtime", value: "-" },
+];
+
 export function useProjectsController() {
-  const { result, summaryMetrics } = useReportDataController();
   const [filters, setFilters] = useState<ProjectFilters>({
     code: "",
     keyword: "",
@@ -30,11 +36,11 @@ export function useProjectsController() {
   return {
     filters,
     isSearching: false,
-    result,
+    result: null,
     resetFilters,
     searchError: "",
     searchProjects,
     setFilters,
-    summaryMetrics,
+    summaryMetrics: defaultSummaryMetrics,
   };
 }
