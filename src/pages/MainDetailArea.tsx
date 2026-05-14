@@ -1,14 +1,9 @@
 import { SummaryCards } from "../components/SummaryCards";
-import type {
-  AnalysisResult,
-  ImportBatchSummary,
-  ImportCsvPreviewResult,
-  ImportCsvResult,
-  MenuKey,
-  MessageMode,
-  SelectedPhaseDetail,
-  SummaryMetric,
-} from "../types/statistics";
+import { useImportCsvController } from "../controller/useImportCsvController";
+import { useOverviewController } from "../controller/useOverviewController";
+import { usePhasesController } from "../controller/usePhasesController";
+import { useProjectsController } from "../controller/useProjectsController";
+import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { OverviewPage } from "./OverviewPage";
 import { PhasesPage } from "./PhasesPage";
@@ -16,67 +11,89 @@ import { ProjectsPage } from "./ProjectsPage";
 
 type MainDetailAreaProps = {
   activeMenu: MenuKey;
-  importBatches: ImportBatchSummary[];
-  importCsvPath: string;
-  importMessage: string;
-  importMessageMode: MessageMode;
-  importPreviewResult: ImportCsvPreviewResult | null;
-  importResult: ImportCsvResult | null;
-  isImporting: boolean;
-  isSavingImport: boolean;
   onPhaseClick: (detail: SelectedPhaseDetail) => void;
-  onImportCsvPathChange: (value: string) => void;
-  onImportMonthlyReportCsv: () => void;
-  onPickImportCsvFile: () => void;
-  onSaveMonthlyReportCsv: () => void;
-  result: AnalysisResult | null;
-  summaryMetrics: SummaryMetric[];
 };
 
-export function MainDetailArea({
-  activeMenu,
-  importBatches,
-  importCsvPath,
-  importMessage,
-  importMessageMode,
-  importPreviewResult,
-  importResult,
-  isImporting,
-  isSavingImport,
-  onImportCsvPathChange,
-  onImportMonthlyReportCsv,
-  onPhaseClick,
-  onPickImportCsvFile,
-  onSaveMonthlyReportCsv,
-  result,
-  summaryMetrics,
-}: MainDetailAreaProps) {
+export function MainDetailArea({ activeMenu, onPhaseClick }: MainDetailAreaProps) {
   if (activeMenu === "importCsv") {
-    return (
-      <ImportCsvPage
-        batches={importBatches}
-        csvPath={importCsvPath}
-        importPreviewResult={importPreviewResult}
-        importResult={importResult}
-        isImporting={isImporting}
-        isSavingImport={isSavingImport}
-        message={importMessage}
-        messageMode={importMessageMode}
-        onCsvPathChange={onImportCsvPathChange}
-        onImport={onImportMonthlyReportCsv}
-        onOpenDetail={onPhaseClick}
-        onPickCsvFile={onPickImportCsvFile}
-        onSave={onSaveMonthlyReportCsv}
-      />
-    );
+    return <ImportCsvRoute onPhaseClick={onPhaseClick} />;
   }
+
+  if (activeMenu === "projects") {
+    return <ProjectsRoute onPhaseClick={onPhaseClick} />;
+  }
+
+  if (activeMenu === "phases") {
+    return <PhasesRoute />;
+  }
+
+  return <OverviewRoute onPhaseClick={onPhaseClick} />;
+}
+
+function OverviewRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhaseDetail) => void }) {
+  const { result, summaryMetrics } = useOverviewController(onPhaseClick);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <SummaryCards metrics={summaryMetrics} />
-      {activeMenu === "overview" && <OverviewPage result={result} onPhaseClick={onPhaseClick} />}
-      {activeMenu === "projects" && <ProjectsPage result={result} onPhaseClick={onPhaseClick} />}
-      {activeMenu === "phases" && <PhasesPage result={result} />}
+      <OverviewPage result={result} onPhaseClick={onPhaseClick} />
     </section>
+  );
+}
+
+function ProjectsRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhaseDetail) => void }) {
+  const { result, summaryMetrics } = useProjectsController(onPhaseClick);
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <SummaryCards metrics={summaryMetrics} />
+      <ProjectsPage result={result} onPhaseClick={onPhaseClick} />
+    </section>
+  );
+}
+
+function PhasesRoute() {
+  const { result, summaryMetrics } = usePhasesController();
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <SummaryCards metrics={summaryMetrics} />
+      <PhasesPage result={result} />
+    </section>
+  );
+}
+
+function ImportCsvRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhaseDetail) => void }) {
+  const {
+    batches,
+    csvPath,
+    isImporting,
+    isSaving,
+    message,
+    messageMode,
+    pickCsvFile,
+    previewCsv,
+    previewResult,
+    result,
+    saveCsv,
+    setCsvPath,
+  } = useImportCsvController();
+
+  return (
+    <ImportCsvPage
+      batches={batches}
+      csvPath={csvPath}
+      importPreviewResult={previewResult}
+      importResult={result}
+      isImporting={isImporting}
+      isSavingImport={isSaving}
+      message={message}
+      messageMode={messageMode}
+      onCsvPathChange={setCsvPath}
+      onImport={() => void previewCsv()}
+      onOpenDetail={onPhaseClick}
+      onPickCsvFile={() => void pickCsvFile()}
+      onSave={() => void saveCsv()}
+    />
   );
 }

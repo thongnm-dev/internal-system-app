@@ -16,11 +16,11 @@ const PROJECT_NAME: &str = "プロジェクト名";
 const PROCESS_CODE: &str = "プロセスコード";
 const PROCESS_NAME: &str = "プロセス";
 const WORK_CONTENT: &str = "作業内容";
-const REGULAR_MINUTES: &str = "時間内(分)";
-const NORMAL_OVERTIME: &str = "普通残業時間(分)";
-const LEGAL_HOLIDAY_OVERTIME: &str = "法定休日残業(分)";
-const LEGAL_PUBLIC_HOLIDAY_OVERTIME: &str = "法定祝日残業時間(分)";
-const LATE_NIGHT_OVERTIME: &str = "深夜残業(分)";
+pub(crate) const REGULAR_MINUTES: &str = "時間内(分)";
+pub(crate) const NORMAL_OVERTIME: &str = "普通残業時間(分)";
+pub(crate) const LEGAL_HOLIDAY_OVERTIME: &str = "法定休日残業(分)";
+pub(crate) const LEGAL_PUBLIC_HOLIDAY_OVERTIME: &str = "法定祝日残業時間(分)";
+pub(crate) const LATE_NIGHT_OVERTIME: &str = "深夜残業(分)";
 
 pub fn analyze_csv(path: &str) -> AppResult<AnalysisResult> {
     let (input_path, records) = read_work_records(path)?;

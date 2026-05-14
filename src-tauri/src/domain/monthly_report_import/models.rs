@@ -20,6 +20,9 @@ pub struct ImportCsvResult {
     pub row_count: usize,
     pub total_minutes: i64,
     pub preview_rows: Vec<ImportPreviewRow>,
+    pub raw_headers: Vec<String>,
+    pub raw_rows: Vec<Vec<String>>,
+    pub minute_column_indexes: Vec<usize>,
 }
 
 #[derive(Serialize)]
@@ -29,6 +32,9 @@ pub struct ImportCsvPreviewResult {
     pub row_count: usize,
     pub total_minutes: i64,
     pub preview_rows: Vec<ImportPreviewRow>,
+    pub raw_headers: Vec<String>,
+    pub raw_rows: Vec<Vec<String>>,
+    pub minute_column_indexes: Vec<usize>,
 }
 
 #[derive(Serialize)]

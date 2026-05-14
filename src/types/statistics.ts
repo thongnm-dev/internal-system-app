@@ -75,6 +75,9 @@ export type ImportCsvResult = {
   row_count: number;
   total_minutes: number;
   preview_rows: ImportPreviewRow[];
+  raw_headers: string[];
+  raw_rows: string[][];
+  minute_column_indexes: number[];
 };
 
 export type ImportCsvPreviewResult = {
@@ -83,6 +86,9 @@ export type ImportCsvPreviewResult = {
   row_count: number;
   total_minutes: number;
   preview_rows: ImportPreviewRow[];
+  raw_headers: string[];
+  raw_rows: string[][];
+  minute_column_indexes: number[];
 };
 
 export type ImportBatchSummary = {

@@ -2,7 +2,11 @@ use crate::app::result::AppResult;
 use crate::domain::monthly_report_import::models::{
     ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult, ImportPreviewRow,
 };
-use crate::domain::statistics::service::read_work_records;
+use crate::domain::statistics::service::{
+    read_work_records, LEGAL_HOLIDAY_OVERTIME, LEGAL_PUBLIC_HOLIDAY_OVERTIME, LATE_NIGHT_OVERTIME,
+    NORMAL_OVERTIME, REGULAR_MINUTES,
+};
+use crate::infrastructure::csv::reader::{get_required_index, read_shift_jis_csv};
 use crate::infrastructure::database::connection::open_database;
 use crate::infrastructure::file_system::display_path;
 use crate::utils::time::current_timestamp;
@@ -11,6 +15,7 @@ use std::path::Path;
 
 pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
     let (input_path, records) = read_work_records(path)?;
+    let raw_csv = read_raw_csv(&input_path)?;
     let source_path = display_path(&input_path);
     let source_file_name = input_path
         .file_name()
@@ -24,11 +29,15 @@ pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
         row_count: records.len(),
         total_minutes,
         preview_rows: build_preview_rows(&records),
+        raw_headers: raw_csv.headers,
+        raw_rows: raw_csv.rows,
+        minute_column_indexes: raw_csv.minute_column_indexes,
     })
 }
 
 pub fn import_csv_to_database(path: &str, app_data_dir: &Path) -> AppResult<ImportCsvResult> {
     let (input_path, records) = read_work_records(path)?;
+    let raw_csv = read_raw_csv(&input_path)?;
     let source_path = display_path(&input_path);
     let source_file_name = input_path
         .file_name()
@@ -107,6 +116,9 @@ pub fn import_csv_to_database(path: &str, app_data_dir: &Path) -> AppResult<Impo
         row_count: records.len(),
         total_minutes,
         preview_rows: build_preview_rows(&records),
+        raw_headers: raw_csv.headers,
+        raw_rows: raw_csv.rows,
+        minute_column_indexes: raw_csv.minute_column_indexes,
     })
 }
 
@@ -152,4 +164,40 @@ fn build_preview_rows(records: &[crate::domain::statistics::models::WorkRecord])
             total_minutes: record.totals.total_minutes(),
         })
         .collect()
+}
+
+struct RawCsv {
+    headers: Vec<String>,
+    rows: Vec<Vec<String>>,
+    minute_column_indexes: Vec<usize>,
+}
+
+fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
+    let content = read_shift_jis_csv(input_path)?;
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(content.as_bytes());
+    let headers = reader.headers()?.clone();
+    let minute_column_indexes = [
+        REGULAR_MINUTES,
+        NORMAL_OVERTIME,
+        LEGAL_HOLIDAY_OVERTIME,
+        LEGAL_PUBLIC_HOLIDAY_OVERTIME,
+        LATE_NIGHT_OVERTIME,
+    ]
+    .iter()
+    .map(|name| get_required_index(&headers, name))
+    .collect::<AppResult<Vec<usize>>>()?;
+
+    let mut rows = Vec::new();
+    for record in reader.records() {
+        let record = record?;
+        rows.push(record.iter().map(|value| value.trim().to_string()).collect());
+    }
+
+    Ok(RawCsv {
+        headers: headers.iter().map(|value| value.to_string()).collect(),
+        rows,
+        minute_column_indexes,
+    })
 }

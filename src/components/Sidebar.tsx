@@ -1,4 +1,5 @@
 import { BarChart3, ChevronLeft, ChevronRight, Database, FileSpreadsheet, Home, Table2 } from "lucide-react";
+import { appRoutes } from "../router/routes";
 import type { AnalysisResult, MenuKey } from "../types/statistics";
 
 type SidebarProps = {
@@ -11,10 +12,10 @@ type SidebarProps = {
 
 export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollapse, result }: SidebarProps) {
   const items = [
-    { id: "overview" as const, label: "Overview", icon: Home },
-    { id: "projects" as const, label: "Projects", icon: Table2 },
-    { id: "phases" as const, label: "Phases", icon: BarChart3 },
-    { id: "importCsv" as const, label: "Import CSV", icon: Database },
+    { id: "overview" as const, icon: Home },
+    { id: "projects" as const, icon: Table2 },
+    { id: "phases" as const, icon: BarChart3 },
+    { id: "importCsv" as const, icon: Database },
   ];
 
   return (
@@ -55,6 +56,8 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = activeMenu === item.id;
+          const route = appRoutes.find((route) => route.key === item.id);
+          const label = route?.title ?? item.id;
           return (
             <div key={item.id} className="group relative">
               <button
@@ -64,15 +67,15 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
                   isActive ? "bg-white text-slate-900" : "text-slate-300 hover:bg-white/10 hover:text-white",
                 ].join(" ")}
                 type="button"
-                title={isCollapsed ? undefined : item.label}
+                title={isCollapsed ? undefined : label}
                 onClick={() => onMenuChange(item.id)}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                {!isCollapsed && <span>{item.label}</span>}
+                {!isCollapsed && <span>{label}</span>}
               </button>
               {isCollapsed && (
                 <span className="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                  {item.label}
+                  {label}
                 </span>
               )}
             </div>

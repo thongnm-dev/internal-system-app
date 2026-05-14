@@ -1,13 +1,14 @@
-import { Database, Eye, FileInput, FolderOpen, Save } from "lucide-react";
-import { useMemo } from "react";
+import { Database, FileInput, FolderOpen, List, Save, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { MessageBanner } from "../components/MessageBanner";
-import { formatHourValue } from "../core/timeMath";
+import { emptyTotals, formatHourValue, totalMinutes } from "../core/timeMath";
 import type {
+  AnalysisResult,
   ImportBatchSummary,
   ImportCsvPreviewResult,
   ImportCsvResult,
-  ImportPreviewRow,
   MessageMode,
+  ProjectSummary,
   SelectedPhaseDetail,
 } from "../types/statistics";
 
@@ -119,135 +120,282 @@ function ImportPreview({
   result: ImportCsvPreviewResult | null;
   saveResult: ImportCsvResult | null;
 }) {
-  const groups = useMemo(() => (result ? buildPreviewGroups(result.preview_rows) : []), [result]);
+  const importSummary = useMemo(() => (result ? buildImportSummary(result) : null), [result]);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-      <div className="border-b border-stone-200 px-4 py-3">
-        <h3 className="font-bold">Preview</h3>
-        <p className="mt-1 truncate text-xs text-slate-500">
-          {result
-            ? `${result.source_file_name}${saveResult ? ` - saved batch #${saveResult.batch_id}` : ""}`
-            : "No CSV data imported yet."}
-        </p>
-      </div>
-      <div className="min-h-0 overflow-auto">
-        <table className="w-full min-w-[920px] border-collapse">
-          <thead>
-            <tr>
-              <th className="table-head">Project</th>
-              <th className="table-head">Phase</th>
-              <th className="table-head num">Rows</th>
-              <th className="table-head num">Total (hour)</th>
-              <th className="table-head num">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!result ? (
+    <>
+      <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-stone-200 px-4 py-3">
+          <div className="min-w-0">
+            <h3 className="font-bold">Preview</h3>
+            <p className="mt-1 truncate text-xs text-slate-500">
+              {result
+                ? `${result.source_file_name}${saveResult ? ` - saved batch #${saveResult.batch_id}` : ""}`
+                : "No CSV data imported yet."}
+            </p>
+          </div>
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={!result}
+            title="Show detail list"
+            onClick={() => setIsDetailDialogOpen(true)}
+          >
+            <List className="h-4 w-4" />
+            Show detail
+          </button>
+        </div>
+        <div className="min-h-0 overflow-auto">
+          <table className="w-full min-w-[920px] border-collapse">
+            <thead>
               <tr>
-                <td className="table-cell h-48 text-center text-slate-500" colSpan={5}>
-                  No data. Select a CSV file, then click Import.
-                </td>
+                <th className="table-head">Project</th>
+                <th className="table-head">Phase</th>
+                <th className="table-head num">Rows</th>
+                <th className="table-head num">Total (hour)</th>
+                <th className="table-head num">Detail</th>
               </tr>
-            ) : (
-              groups.map((group) => (
-                <tr
-                  key={`${group.projectCode}-${group.processCode}`}
-                  className="cursor-pointer hover:bg-slate-50"
-                  title="Open phase details"
-                  onClick={() => onOpenDetail(group.detail)}
-                >
-                  <td className="table-cell">
-                    <div className="font-bold">{group.projectCode}</div>
-                    <div className="text-xs text-slate-500">{group.projectName || "-"}</div>
-                  </td>
-                  <td className="table-cell">
-                    <span className="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">
-                      {group.processCode}
-                    </span>
-                    {group.phaseName}
-                  </td>
-                  <td className="table-cell num">{group.rowCount.toLocaleString("en-US")}</td>
-                  <td className="table-cell num font-bold text-brand">{formatHourValue(group.totalMinutes)}</td>
-                  <td className="table-cell num">
-                    <button
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-                      type="button"
-                      title="Open detail"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onOpenDetail(group.detail);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
+            </thead>
+            <tbody>
+              {!result ? (
+                <tr>
+                  <td className="table-cell h-48 text-center text-slate-500" colSpan={5}>
+                    No data. Select a CSV file, then click Import.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
+              ) : (
+                importSummary?.projects.map((project) => <ImportProjectRows key={project.project_code} project={project} onOpenDetail={onOpenDetail} />)
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <ImportDetailListDialog
+        isOpen={isDetailDialogOpen}
+        onClose={() => setIsDetailDialogOpen(false)}
+        result={result}
+        saveResult={saveResult}
+      />
+    </>
   );
 }
 
-type PreviewGroup = {
-  detail: SelectedPhaseDetail;
-  phaseName: string;
-  processCode: string;
-  projectCode: string;
-  projectName: string;
-  rowCount: number;
-  totalMinutes: number;
-};
+function ImportProjectRows({
+  onOpenDetail,
+  project,
+}: {
+  onOpenDetail: (detail: SelectedPhaseDetail) => void;
+  project: ProjectSummary;
+}) {
+  const projectLabel = `${project.project_code} ${project.project_name}`.trim();
 
-function buildPreviewGroups(rows: ImportPreviewRow[]): PreviewGroup[] {
-  const groups = new Map<string, PreviewGroup>();
+  return (
+    <>
+      <tr className="bg-emerald-50 font-bold">
+        <td className="table-cell">
+          <strong>{projectLabel}</strong>
+        </td>
+        <td className="table-cell">All phases</td>
+        <td className="table-cell num">{project.row_count.toLocaleString("en-US")}</td>
+        <td className="table-cell num font-bold text-brand">{formatHourValue(totalMinutes(project.totals))}</td>
+        <td className="table-cell num"></td>
+      </tr>
+      {project.phases.map((phase) => (
+        <tr
+          key={`${project.project_code}-${phase.process_code}`}
+          className="cursor-pointer hover:bg-slate-50"
+          title="Open phase details"
+          onClick={() =>
+            onOpenDetail({
+              project_code: project.project_code,
+              project_name: project.project_name,
+              phase,
+            })
+          }
+        >
+          <td className="table-cell"></td>
+          <td className="table-cell">
+            <span className="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">
+              {phase.process_code}
+            </span>
+            {phase.phase_name}
+          </td>
+          <td className="table-cell num">{phase.row_count.toLocaleString("en-US")}</td>
+          <td className="table-cell num font-bold text-brand">{formatHourValue(totalMinutes(phase.totals))}</td>
+          <td className="table-cell num">
+            <button
+              className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              type="button"
+              title="Open detail"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenDetail({
+                  project_code: project.project_code,
+                  project_name: project.project_name,
+                  phase,
+                });
+              }}
+            >
+              Detail
+            </button>
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
 
-  for (const row of rows) {
-    const key = `${row.project_code}\u0000${row.process_code}`;
-    const current =
-      groups.get(key) ??
+function buildImportSummary(result: ImportCsvPreviewResult): AnalysisResult {
+  const projects = new Map<string, ProjectSummary>();
+
+  for (const row of result.preview_rows) {
+    const project =
+      projects.get(row.project_code) ??
       ({
-        detail: {
-          project_code: row.project_code,
-          project_name: row.project_name,
-          phase: {
-            process_code: row.process_code,
-            phase_name: row.phase_name,
-            row_count: 0,
-            totals: {
-              regular_minutes: 0,
-              normal_overtime_minutes: 0,
-              legal_holiday_overtime_minutes: 0,
-              legal_public_holiday_overtime_minutes: 0,
-              late_night_overtime_minutes: 0,
-            },
-            details: [],
-          },
-        },
-        phaseName: row.phase_name,
-        processCode: row.process_code,
-        projectCode: row.project_code,
-        projectName: row.project_name,
-        rowCount: 0,
-        totalMinutes: 0,
-      } satisfies PreviewGroup);
+        project_code: row.project_code,
+        project_name: row.project_name,
+        totals: emptyTotals(),
+        row_count: 0,
+        phases: [],
+      } satisfies ProjectSummary);
 
-    current.rowCount += 1;
-    current.totalMinutes += row.total_minutes;
-    current.detail.phase.row_count = current.rowCount;
-    current.detail.phase.totals.regular_minutes = current.totalMinutes;
-    current.detail.phase.details.push({
+    let phase = project.phases.find((item) => item.process_code === row.process_code);
+    if (!phase) {
+      phase = {
+        process_code: row.process_code,
+        phase_name: row.phase_name,
+        totals: emptyTotals(),
+        row_count: 0,
+        details: [],
+      };
+      project.phases.push(phase);
+    }
+
+    project.row_count += 1;
+    project.totals.regular_minutes += row.total_minutes;
+    phase.row_count += 1;
+    phase.totals.regular_minutes += row.total_minutes;
+    phase.details.push({
       date: row.date,
       work_content: row.work_content,
       total_minutes: row.total_minutes,
     });
-    groups.set(key, current);
+
+    projects.set(row.project_code, project);
   }
 
-  return Array.from(groups.values()).sort((a, b) => b.totalMinutes - a.totalMinutes);
+  const sortedProjects = Array.from(projects.values()).sort((a, b) => totalMinutes(b.totals) - totalMinutes(a.totals));
+  for (const project of sortedProjects) {
+    project.phases.sort((a, b) => totalMinutes(b.totals) - totalMinutes(a.totals));
+  }
+
+  return {
+    source_path: result.source_path,
+    row_count: result.row_count,
+    grand_total: {
+      regular_minutes: result.total_minutes,
+      normal_overtime_minutes: 0,
+      legal_holiday_overtime_minutes: 0,
+      legal_public_holiday_overtime_minutes: 0,
+      late_night_overtime_minutes: 0,
+    },
+    projects: sortedProjects,
+  };
+}
+
+function ImportDetailListDialog({
+  isOpen,
+  onClose,
+  result,
+  saveResult,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  result: ImportCsvPreviewResult | null;
+  saveResult: ImportCsvResult | null;
+}) {
+  if (!isOpen || !result) {
+    return null;
+  }
+
+  const minuteColumns = new Set(result.minute_column_indexes);
+  const visibleColumns = result.raw_headers
+    .map((header, index) => ({ header, index }))
+    .filter((column) => !hiddenCsvDetailHeaders.has(column.header));
+  const tableMinWidth = Math.max(920, visibleColumns.length * 140);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-6">
+      <section className="flex max-h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+        <header className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-bold text-slate-900">CSV detail</h3>
+            <p className="mt-1 truncate text-sm text-slate-500">
+              {result.source_file_name}
+              {saveResult ? ` - saved batch #${saveResult.batch_id}` : ""}
+            </p>
+          </div>
+          <button
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+            type="button"
+            title="Close"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="min-h-0 overflow-auto">
+          <table className="w-full border-collapse" style={{ minWidth: `${tableMinWidth}px` }}>
+            <thead>
+              <tr>
+                {visibleColumns.map((column) => (
+                  <th key={`${column.header}-${column.index}`} className={minuteColumns.has(column.index) ? "table-head num" : "table-head"}>
+                    {column.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {result.raw_rows.length === 0 ? (
+                <tr>
+                  <td className="table-cell h-40 text-center text-slate-500" colSpan={Math.max(1, visibleColumns.length)}>
+                    No CSV rows.
+                  </td>
+                </tr>
+              ) : (
+                result.raw_rows.map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {visibleColumns.map((column) => {
+                      const isMinuteColumn = minuteColumns.has(column.index);
+                      return (
+                        <td key={`${rowIndex}-${column.index}`} className={isMinuteColumn ? "table-cell num" : "table-cell"}>
+                          {isMinuteColumn ? formatCsvMinuteValue(row[column.index]) : row[column.index] || ""}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+const hiddenCsvDetailHeaders = new Set(["社員番号", "給与社員番号", "プロジェクトコード（日本）", "固定プロジェクト名", "プロセス"]);
+
+function formatCsvMinuteValue(value: string | undefined): string {
+  const minutes = Number((value ?? "").trim().replace(/,/g, ""));
+  if (!Number.isFinite(minutes) || minutes === 0) {
+    return "-";
+  }
+
+  return formatHourValue(minutes);
 }
 
 function ImportHistory({ batches }: { batches: ImportBatchSummary[] }) {
