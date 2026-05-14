@@ -1,11 +1,12 @@
 import { SummaryCards } from "../components/SummaryCards";
 import { useImportCsvController } from "../controller/useImportCsvController";
-import { useOverviewController } from "../controller/useOverviewController";
+import { useImportReportsController } from "../controller/useImportReportsController";
 import { usePhasesController } from "../controller/usePhasesController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { ImportCsvPage } from "./ImportCsvPage";
+import { ImportReportsPage } from "./ImportReportsPage";
 import { OverviewPage } from "./OverviewPage";
 import { ProjectDetailPage } from "./ProjectDetailPage";
 import { PhasesPage } from "./PhasesPage";
@@ -24,6 +25,10 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
     return <ImportCsvRoute onPhaseClick={onPhaseClick} />;
   }
 
+  if (activeMenu === "importReports") {
+    return <ImportReportsRoute />;
+  }
+
   if (activeMenu === "projects") {
     return <ProjectsRoute path={path} onNavigate={navigateToPath} />;
   }
@@ -39,13 +44,30 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
   return <OverviewRoute onPhaseClick={onPhaseClick} />;
 }
 
-function OverviewRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhaseDetail) => void }) {
-  const { result, summaryMetrics } = useOverviewController(onPhaseClick);
+function ImportReportsRoute() {
+  const { criteria, isSearching, items, message, messageMode, reset, search, setCriteria } =
+    useImportReportsController();
+
+  return (
+    <ImportReportsPage
+      criteria={criteria}
+      isSearching={isSearching}
+      items={items}
+      message={message}
+      messageMode={messageMode}
+      onReset={reset}
+      onSearch={() => void search()}
+      onSetCriteria={setCriteria}
+    />
+  );
+}
+
+function OverviewRoute({  }: { onPhaseClick: (detail: SelectedPhaseDetail) => void }) {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <SummaryCards metrics={summaryMetrics} />
-      <OverviewPage result={result} onPhaseClick={onPhaseClick} />
+
+      <OverviewPage />
     </section>
   );
 }
@@ -66,7 +88,6 @@ function ProjectsRoute({ path, onNavigate }: { path: string; onNavigate: (path: 
 
 function ProjectListRoute({ onNavigate }: { onNavigate: (path: string) => void }) {
   const {
-    applicationName,
     filters,
     isSearching,
     result,
@@ -79,7 +100,6 @@ function ProjectListRoute({ onNavigate }: { onNavigate: (path: string) => void }
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <ProjectsPage
-        applicationName={applicationName}
         filters={filters}
         isSearching={isSearching}
         result={result}
@@ -103,12 +123,9 @@ function getProjectIDFromPath(path: string) {
 }
 
 function PhasesRoute() {
-  const { result, summaryMetrics } = usePhasesController();
-
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <SummaryCards metrics={summaryMetrics} />
-      <PhasesPage result={result} />
+      <PhasesPage />
     </section>
   );
 }
@@ -121,12 +138,16 @@ function ImportCsvRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhase
     isSaving,
     message,
     messageMode,
+    note,
     pickCsvFile,
     previewCsv,
+    reportName,
     previewResult,
     result,
     saveCsv,
     setCsvPath,
+    setNote,
+    setReportName,
   } = useImportCsvController();
 
   return (
@@ -139,10 +160,14 @@ function ImportCsvRoute({ onPhaseClick }: { onPhaseClick: (detail: SelectedPhase
       isSavingImport={isSaving}
       message={message}
       messageMode={messageMode}
+      note={note}
+      reportName={reportName}
       onCsvPathChange={setCsvPath}
       onImport={() => void previewCsv()}
+      onNoteChange={setNote}
       onOpenDetail={onPhaseClick}
       onPickCsvFile={() => void pickCsvFile()}
+      onReportNameChange={setReportName}
       onSave={() => void saveCsv()}
     />
   );

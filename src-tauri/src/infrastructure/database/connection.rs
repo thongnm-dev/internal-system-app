@@ -25,6 +25,11 @@ fn migrate(connection: &Connection) -> AppResult<()> {
             source_path TEXT NOT NULL,
             source_file_name TEXT NOT NULL,
             imported_at TEXT NOT NULL,
+            report_name TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            target_month_from TEXT NOT NULL DEFAULT '',
+            target_month_to TEXT NOT NULL DEFAULT '',
+            imported_by TEXT NOT NULL DEFAULT '',
             row_count INTEGER NOT NULL,
             total_minutes INTEGER NOT NULL
         );
@@ -52,16 +57,86 @@ fn migrate(connection: &Connection) -> AppResult<()> {
             ON monthly_report_rows(batch_id);
         CREATE INDEX IF NOT EXISTS idx_monthly_report_rows_match_key
             ON monthly_report_rows(work_date, project_code, process_code);
-
-        CREATE TABLE IF NOT EXISTS api_keys (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            application_name TEXT NOT NULL,
-            api_key TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
         ",
     )?;
 
+    add_column_if_missing(
+        connection,
+        "import_batches",
+        "report_name",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    add_column_if_missing(
+        connection,
+        "import_batches",
+        "note",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    add_column_if_missing(
+        connection,
+        "import_batches",
+        "target_month_from",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    add_column_if_missing(
+        connection,
+        "import_batches",
+        "target_month_to",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    add_column_if_missing(
+        connection,
+        "import_batches",
+        "imported_by",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    connection.execute_batch(
+        "
+        UPDATE import_batches
+        SET report_name = source_file_name
+        WHERE report_name = '';
+
+        UPDATE import_batches
+        SET imported_by = 'unknown'
+        WHERE imported_by = '';
+
+        UPDATE import_batches
+        SET
+            target_month_from = COALESCE((
+                SELECT MIN(SUBSTR(REPLACE(work_date, '/', '-'), 1, 7))
+                FROM monthly_report_rows
+                WHERE monthly_report_rows.batch_id = import_batches.id
+            ), ''),
+            target_month_to = COALESCE((
+                SELECT MAX(SUBSTR(REPLACE(work_date, '/', '-'), 1, 7))
+                FROM monthly_report_rows
+                WHERE monthly_report_rows.batch_id = import_batches.id
+            ), '')
+        WHERE target_month_from = '' AND target_month_to = '';
+        ",
+    )?;
+
+    Ok(())
+}
+
+fn add_column_if_missing(
+    connection: &Connection,
+    table_name: &str,
+    column_name: &str,
+    column_definition: &str,
+) -> AppResult<()> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table_name})"))?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+
+    for column in columns {
+        if column? == column_name {
+            return Ok(());
+        }
+    }
+
+    connection.execute(
+        &format!("ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"),
+        [],
+    )?;
     Ok(())
 }

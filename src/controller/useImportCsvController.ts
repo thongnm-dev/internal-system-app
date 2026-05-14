@@ -6,6 +6,8 @@ import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult, Messa
 
 export function useImportCsvController() {
   const [csvPath, setCsvPath] = useState("");
+  const [reportName, setReportName] = useState("");
+  const [note, setNote] = useState("");
   const [previewResult, setPreviewResult] = useState<ImportCsvPreviewResult | null>(null);
   const [result, setResult] = useState<ImportCsvResult | null>(null);
   const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
@@ -13,6 +15,11 @@ export function useImportCsvController() {
   const [messageMode, setMessageMode] = useState<MessageMode>("info");
   const [isImporting, setIsImporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const updateCsvPath = (value: string) => {
+    setCsvPath(value);
+    setReportName((current) => current || defaultReportName(value));
+  };
 
   const refreshBatches = async () => {
     try {
@@ -38,6 +45,8 @@ export function useImportCsvController() {
 
       if (typeof selected === "string") {
         setCsvPath(selected);
+        setReportName(defaultReportName(selected));
+        setNote("");
         setPreviewResult(null);
         setResult(null);
         setMessage("CSV selected. Click Import to preview it.");
@@ -84,7 +93,11 @@ export function useImportCsvController() {
     setMessage("Saving imported CSV rows to database...");
     setMessageMode("info");
     try {
-      const result = await safeInvoke<ImportCsvResult>("import_monthly_report_csv", { path: csvPath });
+      const result = await safeInvoke<ImportCsvResult>("import_monthly_report_csv", {
+        path: csvPath,
+        reportName,
+        note,
+      });
       setResult(result);
       setMessage(`Saved ${result.row_count.toLocaleString("en-US")} rows to database.`);
       setMessageMode("info");
@@ -108,11 +121,20 @@ export function useImportCsvController() {
     isSaving,
     message,
     messageMode,
+    note,
     pickCsvFile,
     previewCsv,
+    reportName,
     previewResult,
     result,
     saveCsv,
-    setCsvPath,
+    setCsvPath: updateCsvPath,
+    setNote,
+    setReportName,
   };
+}
+
+function defaultReportName(path: string) {
+  const fileName = path.split(/[\\/]/).pop() ?? path;
+  return fileName.replace(/\.csv$/i, "");
 }

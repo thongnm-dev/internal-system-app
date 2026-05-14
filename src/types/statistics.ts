@@ -44,7 +44,7 @@ export type SystemInfo = {
 
 export type MessageMode = "info" | "error";
 
-export type MenuKey = "overview" | "projects" | "phases" | "importCsv" | "settings";
+export type MenuKey = "overview" | "projects" | "phases" | "importCsv" | "importReports" | "settings";
 
 export type AppRouteKey = MenuKey | "login";
 
@@ -97,6 +97,31 @@ export type ImportBatchSummary = {
   id: number;
   source_file_name: string;
   imported_at: string;
+  report_name: string;
+  note: string;
+  target_month_from: string;
+  target_month_to: string;
+  imported_by: string;
+  row_count: number;
+  total_minutes: number;
+};
+
+export type ImportReportSearchCriteria = {
+  target_month_from: string;
+  target_month_to: string;
+  report_name: string;
+  keyword: string;
+};
+
+export type ImportReportListItem = {
+  id: number;
+  report_name: string;
+  note: string;
+  source_file_name: string;
+  imported_at: string;
+  imported_by: string;
+  target_month_from: string;
+  target_month_to: string;
   row_count: number;
   total_minutes: number;
 };

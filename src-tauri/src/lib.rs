@@ -4,10 +4,12 @@ mod domain;
 mod infrastructure;
 mod utils;
 
-use commands::api_key_commands::list_api_key_applications;
+use commands::import_commands::{
+    import_monthly_report_csv, list_import_batches, preview_monthly_report_csv,
+    search_import_batches,
+};
 use commands::statistics_commands::analyze_csv;
 use commands::system_commands::get_system_info;
-use commands::import_commands::{import_monthly_report_csv, list_import_batches, preview_monthly_report_csv};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -19,7 +21,7 @@ pub fn run() {
             preview_monthly_report_csv,
             import_monthly_report_csv,
             list_import_batches,
-            list_api_key_applications
+            search_import_batches
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

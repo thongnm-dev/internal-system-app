@@ -1,4 +1,4 @@
-import { BarChart3, ChevronLeft, ChevronRight, Database, Home, Settings, Table2 } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, ClipboardList, Database, Home, Settings, Table2 } from "lucide-react";
 import { appRoutes } from "../router/routes";
 import type { MenuKey } from "../types/statistics";
 
@@ -15,6 +15,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
     { id: "projects" as const, icon: Table2 },
     { id: "phases" as const, icon: BarChart3 },
     { id: "importCsv" as const, icon: Database },
+    { id: "importReports" as const, icon: ClipboardList },
   ];
   const settingsRoute = appRoutes.find((route) => route.key === "settings");
   const settingsLabel = settingsRoute?.title ?? "Settings";

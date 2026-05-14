@@ -21,10 +21,14 @@ type ImportCsvPageProps = {
   isSavingImport: boolean;
   message: string;
   messageMode: MessageMode;
+  note: string;
+  reportName: string;
   onCsvPathChange: (value: string) => void;
   onImport: () => void;
+  onNoteChange: (value: string) => void;
   onOpenDetail: (detail: SelectedPhaseDetail) => void;
   onPickCsvFile: () => void;
+  onReportNameChange: (value: string) => void;
   onSave: () => void;
 };
 
@@ -37,10 +41,14 @@ export function ImportCsvPage({
   isSavingImport,
   message,
   messageMode,
+  note,
+  reportName,
   onCsvPathChange,
   onImport,
+  onNoteChange,
   onOpenDetail,
   onPickCsvFile,
+  onReportNameChange,
   onSave,
 }: ImportCsvPageProps) {
   return (
@@ -89,6 +97,23 @@ export function ImportCsvPage({
               <Save className="h-4 w-4" />
               Save
             </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-[minmax(0,280px)_minmax(0,1fr)] gap-2">
+            <input
+              className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Report name"
+              type="text"
+              value={reportName}
+              onChange={(event) => onReportNameChange(event.target.value)}
+            />
+            <input
+              className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Note"
+              type="text"
+              value={note}
+              onChange={(event) => onNoteChange(event.target.value)}
+            />
           </div>
         </div>
 

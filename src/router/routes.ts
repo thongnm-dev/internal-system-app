@@ -34,6 +34,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
   {
+    key: "importReports",
+    path: "/import-reports",
+    title: "Reports",
+    subtitle: "Search and review monthly report import history.",
+  },
+  {
     key: "settings",
     path: "/settings",
     requiresAuth: true,

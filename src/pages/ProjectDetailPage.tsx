@@ -294,8 +294,8 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
               type="button"
               onClick={() => setIsSearchHelpOpen(true)}
             >
-              <Search className="h-4 w-4" />
-              Search help
+              <Plus className="h-4 w-4" />
+              Add member
             </button>
           </div>
 

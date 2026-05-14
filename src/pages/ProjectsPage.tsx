@@ -6,7 +6,6 @@ import { formatHourValue, totalMinutes } from "../core/timeMath";
 import type { AnalysisResult, ProjectSummary } from "../types/statistics";
 
 type ProjectsPageProps = {
-  applicationName: string;
   filters: ProjectFilters;
   isSearching: boolean;
   onNavigate: (path: string) => void;
@@ -20,7 +19,6 @@ type ProjectsPageProps = {
 const pageSize = 10;
 
 export function ProjectsPage({
-  applicationName,
   filters,
   isSearching,
   result,
@@ -47,7 +45,6 @@ export function ProjectsPage({
           [
             project.project_code,
             project.project_name,
-            applicationName,
             ...project.phases.flatMap((phase) => [
               phase.process_code,
               phase.phase_name,
@@ -58,7 +55,7 @@ export function ProjectsPage({
 
       return matchesCode && matchesName && matchesKeyword;
     });
-  }, [applicationName, filters, result]);
+  }, [filters, result]);
 
   const pageCount = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
   const visibleProjects = filteredProjects.slice((page - 1) * pageSize, page * pageSize);
@@ -160,19 +157,18 @@ export function ProjectsPage({
                 <th className="table-head">Name</th>
                 <th className="table-head num">Total hour</th>
                 <th className="table-head num">Bug count</th>
-                <th className="table-head">Application name</th>
               </tr>
             </thead>
             <tbody>
               {!result || result.projects.length === 0 ? (
                 <tr>
-                  <td className="table-cell h-40 text-center text-slate-500" colSpan={5}>
+                  <td className="table-cell h-40 text-center text-slate-500" colSpan={4}>
                     No analysis data yet.
                   </td>
                 </tr>
               ) : visibleProjects.length === 0 ? (
                 <tr>
-                  <td className="table-cell h-40 text-center text-slate-500" colSpan={5}>
+                  <td className="table-cell h-40 text-center text-slate-500" colSpan={4}>
                     No projects match the search conditions.
                   </td>
                 </tr>
@@ -188,7 +184,6 @@ export function ProjectsPage({
                     <td className="table-cell">{project.project_name || "-"}</td>
                     <td className="table-cell num font-extrabold text-brand">{formatHourValue(totalMinutes(project.totals))}</td>
                     <td className="table-cell num">{bugCount(project).toLocaleString("en-US")}</td>
-                    <td className="table-cell">{applicationName}</td>
                   </tr>
                 ))
               )}

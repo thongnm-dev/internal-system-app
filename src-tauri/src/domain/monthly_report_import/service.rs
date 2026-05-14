@@ -1,16 +1,18 @@
 use crate::app::result::AppResult;
 use crate::domain::monthly_report_import::models::{
-    ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult, ImportPreviewRow,
+    ImportBatchListItem, ImportBatchSearchCriteria, ImportBatchSummary, ImportCsvPreviewResult,
+    ImportCsvResult, ImportPreviewRow,
 };
 use crate::domain::statistics::service::{
-    read_work_records, LEGAL_HOLIDAY_OVERTIME, LEGAL_PUBLIC_HOLIDAY_OVERTIME, LATE_NIGHT_OVERTIME,
+    read_work_records, LATE_NIGHT_OVERTIME, LEGAL_HOLIDAY_OVERTIME, LEGAL_PUBLIC_HOLIDAY_OVERTIME,
     NORMAL_OVERTIME, REGULAR_MINUTES,
 };
 use crate::infrastructure::csv::reader::{get_required_index, read_shift_jis_csv};
 use crate::infrastructure::database::connection::open_database;
 use crate::infrastructure::file_system::display_path;
 use crate::utils::time::current_timestamp;
-use rusqlite::params;
+use rusqlite::{params, params_from_iter};
+use std::env;
 use std::path::Path;
 
 pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
@@ -21,7 +23,10 @@ pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
         .file_name()
         .map(|value| value.to_string_lossy().to_string())
         .unwrap_or_else(|| source_path.clone());
-    let total_minutes: i64 = records.iter().map(|record| record.totals.total_minutes()).sum();
+    let total_minutes: i64 = records
+        .iter()
+        .map(|record| record.totals.total_minutes())
+        .sum();
 
     Ok(ImportCsvPreviewResult {
         source_path,
@@ -35,7 +40,12 @@ pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
     })
 }
 
-pub fn import_csv_to_database(path: &str, app_data_dir: &Path) -> AppResult<ImportCsvResult> {
+pub fn import_csv_to_database(
+    path: &str,
+    app_data_dir: &Path,
+    report_name: Option<String>,
+    note: Option<String>,
+) -> AppResult<ImportCsvResult> {
     let (input_path, records) = read_work_records(path)?;
     let raw_csv = read_raw_csv(&input_path)?;
     let source_path = display_path(&input_path);
@@ -43,20 +53,43 @@ pub fn import_csv_to_database(path: &str, app_data_dir: &Path) -> AppResult<Impo
         .file_name()
         .map(|value| value.to_string_lossy().to_string())
         .unwrap_or_else(|| source_path.clone());
+    let report_name = trimmed_filter(report_name).unwrap_or_else(|| source_file_name.trim_end_matches(".csv").to_string());
+    let note = trimmed_filter(note).unwrap_or_default();
     let imported_at = current_timestamp();
-    let total_minutes: i64 = records.iter().map(|record| record.totals.total_minutes()).sum();
+    let imported_by = current_username();
+    let total_minutes: i64 = records
+        .iter()
+        .map(|record| record.totals.total_minutes())
+        .sum();
+    let (target_month_from, target_month_to) = target_month_range(&records);
 
     let mut connection = open_database(app_data_dir)?;
     let transaction = connection.transaction()?;
     transaction.execute(
         "
-        INSERT INTO import_batches(source_path, source_file_name, imported_at, row_count, total_minutes)
-        VALUES (?1, ?2, ?3, ?4, ?5)
+        INSERT INTO import_batches(
+            source_path,
+            source_file_name,
+            imported_at,
+            report_name,
+            note,
+            target_month_from,
+            target_month_to,
+            imported_by,
+            row_count,
+            total_minutes
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
         ",
         params![
             source_path,
             source_file_name,
             imported_at,
+            report_name,
+            note,
+            target_month_from,
+            target_month_to,
+            imported_by,
             records.len() as i64,
             total_minutes
         ],
@@ -126,7 +159,17 @@ pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSumm
     let connection = open_database(app_data_dir)?;
     let mut statement = connection.prepare(
         "
-        SELECT id, source_file_name, imported_at, row_count, total_minutes
+        SELECT
+            id,
+            source_file_name,
+            imported_at,
+            report_name,
+            note,
+            target_month_from,
+            target_month_to,
+            imported_by,
+            row_count,
+            total_minutes
         FROM import_batches
         ORDER BY id DESC
         LIMIT 20
@@ -138,8 +181,13 @@ pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSumm
             id: row.get(0)?,
             source_file_name: row.get(1)?,
             imported_at: row.get(2)?,
-            row_count: row.get(3)?,
-            total_minutes: row.get(4)?,
+            report_name: row.get(3)?,
+            note: row.get(4)?,
+            target_month_from: row.get(5)?,
+            target_month_to: row.get(6)?,
+            imported_by: row.get(7)?,
+            row_count: row.get(8)?,
+            total_minutes: row.get(9)?,
         })
     })?;
 
@@ -151,7 +199,89 @@ pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSumm
     Ok(batches)
 }
 
-fn build_preview_rows(records: &[crate::domain::statistics::models::WorkRecord]) -> Vec<ImportPreviewRow> {
+pub fn search_import_batches(
+    app_data_dir: &Path,
+    criteria: ImportBatchSearchCriteria,
+) -> AppResult<Vec<ImportBatchListItem>> {
+    let connection = open_database(app_data_dir)?;
+    let mut sql = String::from(
+        "
+        SELECT
+            id,
+            report_name,
+            note,
+            source_file_name,
+            imported_at,
+            imported_by,
+            target_month_from,
+            target_month_to,
+            row_count,
+            total_minutes
+        FROM import_batches
+        WHERE 1 = 1
+        ",
+    );
+    let mut values = Vec::new();
+
+    if let Some(value) = trimmed_filter(criteria.target_month_from) {
+        sql.push_str(" AND target_month_to >= ?");
+        values.push(value);
+    }
+
+    if let Some(value) = trimmed_filter(criteria.target_month_to) {
+        sql.push_str(" AND target_month_from <= ?");
+        values.push(value);
+    }
+
+    if let Some(value) = trimmed_filter(criteria.report_name) {
+        sql.push_str(" AND report_name LIKE ?");
+        values.push(format!("%{value}%"));
+    }
+
+    if let Some(value) = trimmed_filter(criteria.keyword) {
+        sql.push_str(
+            "
+            AND (
+                report_name LIKE ?
+                OR note LIKE ?
+                OR source_file_name LIKE ?
+                OR imported_by LIKE ?
+            )
+            ",
+        );
+        let keyword = format!("%{value}%");
+        values.extend([keyword.clone(), keyword.clone(), keyword.clone(), keyword]);
+    }
+
+    sql.push_str(" ORDER BY imported_at DESC, id DESC");
+
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(params_from_iter(values), |row| {
+        Ok(ImportBatchListItem {
+            id: row.get(0)?,
+            report_name: row.get(1)?,
+            note: row.get(2)?,
+            source_file_name: row.get(3)?,
+            imported_at: row.get(4)?,
+            imported_by: row.get(5)?,
+            target_month_from: row.get(6)?,
+            target_month_to: row.get(7)?,
+            row_count: row.get(8)?,
+            total_minutes: row.get(9)?,
+        })
+    })?;
+
+    let mut items = Vec::new();
+    for row in rows {
+        items.push(row?);
+    }
+
+    Ok(items)
+}
+
+fn build_preview_rows(
+    records: &[crate::domain::statistics::models::WorkRecord],
+) -> Vec<ImportPreviewRow> {
     records
         .iter()
         .map(|record| ImportPreviewRow {
@@ -164,6 +294,54 @@ fn build_preview_rows(records: &[crate::domain::statistics::models::WorkRecord])
             total_minutes: record.totals.total_minutes(),
         })
         .collect()
+}
+
+fn target_month_range(
+    records: &[crate::domain::statistics::models::WorkRecord],
+) -> (String, String) {
+    let mut months: Vec<String> = records
+        .iter()
+        .filter_map(|record| target_month(&record.date))
+        .collect();
+    months.sort();
+    months.dedup();
+
+    (
+        months.first().cloned().unwrap_or_default(),
+        months.last().cloned().unwrap_or_default(),
+    )
+}
+
+fn target_month(date: &str) -> Option<String> {
+    let normalized = date.trim().replace('/', "-");
+    if normalized.len() < 7 {
+        return None;
+    }
+
+    let month = &normalized[..7];
+    if month.chars().enumerate().all(|(index, value)| {
+        if index == 4 {
+            value == '-'
+        } else {
+            value.is_ascii_digit()
+        }
+    }) {
+        Some(month.to_string())
+    } else {
+        None
+    }
+}
+
+fn trimmed_filter(value: Option<String>) -> Option<String> {
+    value
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
+fn current_username() -> String {
+    env::var("USERNAME")
+        .or_else(|_| env::var("USER"))
+        .unwrap_or_else(|_| "unknown".to_string())
 }
 
 struct RawCsv {
@@ -192,7 +370,12 @@ fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
     let mut rows = Vec::new();
     for record in reader.records() {
         let record = record?;
-        rows.push(record.iter().map(|value| value.trim().to_string()).collect());
+        rows.push(
+            record
+                .iter()
+                .map(|value| value.trim().to_string())
+                .collect(),
+        );
     }
 
     Ok(RawCsv {
