@@ -1,13 +1,14 @@
-use crate::domain::monthly_report_import::models::{
-    ImportBatchListItem, ImportBatchSearchCriteria, ImportBatchSummary, ImportCsvPreviewResult,
-    ImportCsvResult,
+use crate::domain::import_csv::models::ImportCsvPreviewResult;
+use crate::domain::import_csv::service as import_csv_service;
+use crate::domain::monthly_report::models::{
+    ImportBatchListItem, ImportBatchSearchCriteria, ImportBatchSummary, ImportCsvResult,
 };
-use crate::domain::monthly_report_import::service;
+use crate::domain::monthly_report::service as monthly_report_service;
 use tauri::Manager;
 
 #[tauri::command]
 pub fn preview_monthly_report_csv(path: String) -> Result<ImportCsvPreviewResult, String> {
-    service::preview_csv(&path).map_err(|error| error.to_string())
+    import_csv_service::preview_csv(&path).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -21,7 +22,9 @@ pub fn import_monthly_report_csv(
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    service::import_csv_to_database(&path, &app_data_dir, report_name, note).map_err(|error| error.to_string())
+    let data = import_csv_service::read_csv_import_data(&path).map_err(|error| error.to_string())?;
+    monthly_report_service::save_imported_report(data, &app_data_dir, report_name, note)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -30,7 +33,7 @@ pub fn list_import_batches(app: tauri::AppHandle) -> Result<Vec<ImportBatchSumma
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    service::list_import_batches(&app_data_dir).map_err(|error| error.to_string())
+    monthly_report_service::list_import_batches(&app_data_dir).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -42,5 +45,5 @@ pub fn search_import_batches(
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    service::search_import_batches(&app_data_dir, criteria).map_err(|error| error.to_string())
+    monthly_report_service::search_import_batches(&app_data_dir, criteria).map_err(|error| error.to_string())
 }

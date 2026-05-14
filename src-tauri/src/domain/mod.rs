@@ -1,3 +1,3 @@
-pub mod monthly_report_import;
-pub mod statistics;
+pub mod import_csv;
+pub mod monthly_report;
 pub mod system;
