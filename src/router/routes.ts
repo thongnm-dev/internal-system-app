@@ -28,6 +28,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Search, review, and manage project backlog issues.",
   },
   {
+    key: "importIssues",
+    path: "/import-issues",
+    title: "Import Issues",
+    subtitle: "Import issue CSV data into a selected project.",
+  },
+  {
     key: "dailyReport",
     path: "/daily-report",
     title: "Daily Report",

@@ -1,0 +1,6 @@
+﻿Subject,Description,Issue Type,Assignee,Start Date,Due Date,Estimated Hours,Actual Hours,Categories,Version,Milestones,Priority,Parent issue,Bug Types,Bug severity levels,Test Phase
+Issue 01,Description 001,Task,Melissa,2025-05-01,2025-05-21,16,,,,Week 4,High,,,,
+Issue 02,Description 002,Bug,Dominic,2025-05-03,2025-05-09,4,,Coding,1.0,Week 2,Normal,Issue 01,,,
+Issue 03,Description 003,Task,Katrina,2025-05-05,2025-05-14,6,,"Marketing, Planning",,Week 3,,,,,
+Issue 04,Description 004,Documentation,Dominic,2025-05-07,2025-05-16,2,,Coding,1.0,Week 3,,Issue 01,,,
+Issue 05,Description 005,Other,Katrina,2025-05-09,,,,Marketing,,Week 4,Low,Issue 03,,,

@@ -9,6 +9,7 @@ import { DailyReportPage } from "./DailyReportPage";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { ImportReportDetailPage } from "./ImportReportDetailPage";
 import { ImportReportsPage } from "./ImportReportsPage";
+import { ImportIssuesPage } from "./ImportIssuesPage";
 import { IssueBacklogPage } from "./IssueBacklogPage";
 import { OverviewPage } from "./OverviewPage";
 import { ProjectDetailPage } from "./ProjectDetailPage";
@@ -37,6 +38,10 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
 
   if (activeMenu === "issueBacklog") {
     return <IssueBacklogRoute />;
+  }
+
+  if (activeMenu === "importIssues") {
+    return <ImportIssuesRoute />;
   }
 
   if (activeMenu === "dailyReport") {
@@ -170,6 +175,14 @@ function IssueBacklogRoute() {
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <IssueBacklogPage />
+    </section>
+  );
+}
+
+function ImportIssuesRoute() {
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <ImportIssuesPage />
     </section>
   );
 }
