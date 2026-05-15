@@ -9,6 +9,7 @@ import { DailyReportPage } from "./DailyReportPage";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { ImportReportDetailPage } from "./ImportReportDetailPage";
 import { ImportReportsPage } from "./ImportReportsPage";
+import { IssueBacklogPage } from "./IssueBacklogPage";
 import { OverviewPage } from "./OverviewPage";
 import { ProjectDetailPage } from "./ProjectDetailPage";
 import { ProjectsPage } from "./ProjectsPage";
@@ -32,6 +33,10 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
 
   if (activeMenu === "projects") {
     return <ProjectsRoute path={path} onNavigate={navigateToPath} />;
+  }
+
+  if (activeMenu === "issueBacklog") {
+    return <IssueBacklogRoute />;
   }
 
   if (activeMenu === "dailyReport") {
@@ -157,6 +162,14 @@ function ProjectListRoute({ onNavigate }: { onNavigate: (path: string) => void }
         onSearch={() => void searchProjects()}
         onSetFilters={setFilters}
       />
+    </section>
+  );
+}
+
+function IssueBacklogRoute() {
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <IssueBacklogPage />
     </section>
   );
 }

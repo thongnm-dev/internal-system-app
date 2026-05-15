@@ -22,6 +22,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Detailed project breakdown grouped by development phase.",
   },
   {
+    key: "issueBacklog",
+    path: "/issue-backlog",
+    title: "Issue Backlog",
+    subtitle: "Search, review, and manage project backlog issues.",
+  },
+  {
     key: "dailyReport",
     path: "/daily-report",
     title: "Daily Report",
