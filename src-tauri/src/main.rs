@@ -1,3 +1,3 @@
 fn main() {
-    pjjyuji_project_statistics_lib::run()
+    management_systems::run()
 }
