@@ -1,5 +1,7 @@
 import { Calendar, RotateCcw, Search } from "lucide-react";
-import { MessageBanner } from "../components/MessageBanner";
+import { Button } from "primereact/button";
+import { Calendar as PrimeCalendar } from "primereact/calendar";
+import { InputText } from "primereact/inputtext";
 import { formatHourValue } from "../core/timeMath";
 import type { ImportReportListItem, ImportReportSearchCriteria, MessageMode } from "../types/statistics";
 
@@ -19,8 +21,6 @@ export function ImportReportsPage({
   criteria,
   isSearching,
   items,
-  message,
-  messageMode,
   onReset,
   onSearch,
   onSetCriteria,
@@ -49,7 +49,7 @@ export function ImportReportsPage({
 
           <label className="block min-w-0">
             <span className="text-xs font-bold text-slate-500">Tên</span>
-            <input
+            <InputText
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               placeholder="Tên báo cáo"
               type="text"
@@ -60,7 +60,7 @@ export function ImportReportsPage({
 
           <label className="block min-w-0">
             <span className="text-xs font-bold text-slate-500">Keyword</span>
-            <input
+            <InputText
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               placeholder="Tên, ghi chú, file, người import"
               type="text"
@@ -75,7 +75,7 @@ export function ImportReportsPage({
           </label>
 
           <div className="flex items-center justify-end gap-2">
-            <button
+            <Button
               className="flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               disabled={isSearching}
@@ -83,9 +83,9 @@ export function ImportReportsPage({
             >
               <Search className="h-4 w-4" />
               Search
-            </button>
+            </Button>
 
-            <button
+            <Button
               className="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               title="Reset search conditions"
@@ -94,7 +94,7 @@ export function ImportReportsPage({
             >
               <RotateCcw className="h-4 w-4" />
               Reset
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -149,17 +149,35 @@ function MonthPicker({
   return (
     <label className="block min-w-0">
       <span className="text-xs font-bold text-slate-500">{label}</span>
-      <span className="relative mt-1 block">
-        <input
-          className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 pr-10 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-          type="month"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-      </span>
+      <PrimeCalendar
+        className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm outline-none focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
+        dateFormat="yy-mm"
+        icon={<Calendar className="h-4 w-4 text-slate-400" />}
+        placeholder="yyyy-mm"
+        showIcon
+        value={parseMonth(value)}
+        view="month"
+        onChange={(event) => onChange(formatMonth(event.value instanceof Date ? event.value : null))}
+      />
     </label>
   );
+}
+
+function parseMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) {
+    return null;
+  }
+
+  return new Date(year, month - 1, 1);
+}
+
+function formatMonth(value: Date | null) {
+  if (!value) {
+    return "";
+  }
+
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function ImportReportRow({

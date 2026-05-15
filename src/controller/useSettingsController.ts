@@ -146,7 +146,7 @@ function loadSettings(): StoredSettings {
       language: isLanguageCode(parsed.language) ? parsed.language : defaultSettings.language,
       apiKeys:
         Array.isArray(parsed.apiKeys) && parsed.apiKeys.length > 0
-          ? parsed.apiKeys.map((apiKey) => ({ key: "", ...apiKey }))
+          ? parsed.apiKeys.map((apiKey) => ({ ...apiKey, key: apiKey.key ?? "" }))
           : defaultSettings.apiKeys,
     };
   } catch {

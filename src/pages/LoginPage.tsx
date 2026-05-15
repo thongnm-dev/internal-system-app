@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react";
 import { LockKeyhole, LogIn, UserRound } from "lucide-react";
+import { Button } from "primereact/button";
+import { InputText } from "primereact/inputtext";
 
 type LoginPageProps = {
   onLogin: (username: string, password: string) => void;
@@ -40,7 +42,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <span className="text-xs font-bold text-slate-500">Username</span>
             <div className="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
               <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
-              <input
+              <InputText
                 className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
                 autoComplete="username"
                 autoFocus
@@ -56,7 +58,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <span className="text-xs font-bold text-slate-500">Password</span>
             <div className="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
               <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />
-              <input
+              <InputText
                 className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
                 autoComplete="current-password"
                 placeholder="password"
@@ -73,13 +75,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </p>
           )}
 
-          <button
+          <Button
             className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
             type="submit"
           >
             <LogIn className="h-4 w-4" />
             Login
-          </button>
+          </Button>
         </form>
       </section>
     </main>

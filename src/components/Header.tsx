@@ -1,4 +1,5 @@
 import { LogOut } from "lucide-react";
+import { Button } from "primereact/button";
 import type { AppRoute } from "../router/routes";
 
 type HeaderProps = {
@@ -20,7 +21,7 @@ export function Header({ onLogout, route, username }: HeaderProps) {
         </nav>
       </div>
       {username && (
-        <button
+        <Button
           className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-panel px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
           type="button"
           title="Logout"
@@ -28,7 +29,7 @@ export function Header({ onLogout, route, username }: HeaderProps) {
         >
           <LogOut className="h-4 w-4" />
           Logout
-        </button>
+        </Button>
       )}
     </header>
   );

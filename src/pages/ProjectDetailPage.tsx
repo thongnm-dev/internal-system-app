@@ -1,4 +1,7 @@
 import { ArrowLeft, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { Button } from "primereact/button";
+import { Fieldset } from "primereact/fieldset";
+import { InputText } from "primereact/inputtext";
 import { useEffect, useMemo, useState } from "react";
 import { friendlyError, safeInvoke } from "../core/tauriRuntime";
 
@@ -196,21 +199,21 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
   return (
     <section className="min-h-0 flex-1 overflow-auto rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
       <div className="flex items-center justify-between gap-4">
-        <button
+        <Button
           className="flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
           type="button"
           onClick={onBack}
         >
           <ArrowLeft className="h-4 w-4" />
           Back
-        </button>
-        <button
+        </Button>
+        <Button
           className="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
           type="button"
         >
           <Save className="h-4 w-4" />
           Save
-        </button>
+        </Button>
       </div>
 
       {isLoading ? <p className="mt-4 text-sm text-slate-500">Loading project information...</p> : null}
@@ -219,12 +222,11 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
       ) : null}
 
       <div className="mt-4 grid gap-4">
-        <fieldset className="rounded-lg border border-stone-200 bg-white p-4">
-          <legend className="px-2 text-sm font-bold text-slate-600">Thong tin co ban cua project</legend>
+        <Fieldset className="rounded-lg border border-slate-200 bg-white p-4 shadow-md fieldset-nested" toggleable legend="Thông tin chung">
           <div className="grid gap-3 md:grid-cols-2">
             <label>
               <span className="text-xs font-bold text-slate-500">Project ID</span>
-              <input
+              <InputText
                 className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="Auto generated"
                 readOnly
@@ -233,7 +235,7 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
             </label>
             <label>
               <span className="text-xs font-bold text-slate-500">Project Code</span>
-              <input
+              <InputText
                 className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="Project code"
                 value={form.projectCode}
@@ -242,19 +244,18 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
             </label>
             <label className="md:col-span-2">
               <span className="text-xs font-bold text-slate-500">Project Name</span>
-              <input
+              <InputText
                 className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="Project name"
                 value={form.projectName}
                 onChange={(event) => updateForm("projectName", event.target.value)}
               />
             </label>
-            <fieldset className="rounded-lg border border-stone-200 p-4 md:col-span-2">
-              <legend className="px-2 text-sm font-bold text-slate-600">Backlog project</legend>
+            <Fieldset className="rounded-lg border border-stone-200 p-4 md:col-span-2 fieldset-nested" legend="Backlog" toggleable>
               <div className="grid gap-3 md:grid-cols-2">
                 <label>
                   <span className="text-xs font-bold text-slate-500">Backlog Project Key</span>
-                  <input
+                  <InputText
                     className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                     placeholder="BACKLOG_PROJECT_KEY"
                     value={form.backlogProjectKey}
@@ -263,7 +264,7 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
                 </label>
                 <label>
                   <span className="text-xs font-bold text-slate-500">Backlog Project ID</span>
-                  <input
+                  <InputText
                     className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                     placeholder={isBacklogLookupLoading ? "Loading..." : "Auto fetched from Backlog"}
                     readOnly
@@ -272,7 +273,7 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
                 </label>
                 <label className="md:col-span-2">
                   <span className="text-xs font-bold text-slate-500">Backlog Project Name</span>
-                  <input
+                  <InputText
                     className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                     placeholder={isBacklogLookupLoading ? "Loading..." : "Auto fetched from Backlog"}
                     readOnly
@@ -281,22 +282,21 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
                 </label>
                 {backlogLookupError ? <p className="text-sm text-red-600 md:col-span-2">{backlogLookupError}</p> : null}
               </div>
-            </fieldset>
+            </Fieldset>
           </div>
-        </fieldset>
+        </Fieldset>
 
-        <fieldset className="rounded-lg border border-stone-200 bg-white p-4">
-          <legend className="px-2 text-sm font-bold text-slate-600">Danh sach thong tin thanh vien du an</legend>
+        <Fieldset className="rounded-lg border border-stone-200 bg-white p-4 shadow-md fieldset-nested" legend="Thành viên" toggleable>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-bold text-slate-800">Thanh vien</h3>
-            <button
+            <Button
               className="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
               type="button"
               onClick={() => setIsSearchHelpOpen(true)}
             >
               <Plus className="h-4 w-4" />
               Add member
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 overflow-auto rounded-lg border border-stone-200">
@@ -321,14 +321,14 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
                       <td className="table-cell font-bold text-ink">{member.username}</td>
                       <td className="table-cell">{member.name}</td>
                       <td className="table-cell text-center">
-                        <button
+                        <Button
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
                           type="button"
                           title="Remove member"
                           onClick={() => removeMember(member.username)}
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -336,7 +336,7 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
               </tbody>
             </table>
           </div>
-        </fieldset>
+        </Fieldset>
       </div>
 
       {isSearchHelpOpen ? (
@@ -344,14 +344,14 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
           <section className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-4 py-3">
               <h3 className="font-bold">Search help thanh vien</h3>
-              <button
+              <Button
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
                 type="button"
                 title="Close"
                 onClick={() => setIsSearchHelpOpen(false)}
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-4">
@@ -359,7 +359,7 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
                 <span className="text-xs font-bold text-slate-500">Keyword</span>
                 <div className="mt-1 flex h-10 items-center rounded-md border border-slate-300 bg-white px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
                   <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                  <input
+                  <InputText
                     className="h-full min-w-0 flex-1 border-0 px-2 text-sm text-slate-900 outline-none"
                     placeholder="Search username or name"
                     type="search"
@@ -391,14 +391,14 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
                           <td className="table-cell font-bold text-ink">{member.username}</td>
                           <td className="table-cell">{member.name}</td>
                           <td className="table-cell text-center">
-                            <button
+                            <Button
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white hover:opacity-90"
                               type="button"
                               title="Select member"
                               onClick={() => addMember(member)}
                             >
                               <Plus className="h-4 w-4" />
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))

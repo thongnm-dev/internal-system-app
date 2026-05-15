@@ -1,4 +1,7 @@
-import { Database, FileInput, FolderOpen, List, Save, X } from "lucide-react";
+import { Database, FileInput, FolderOpen, List } from "lucide-react";
+import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
+import { InputText } from "primereact/inputtext";
 import { useMemo, useState } from "react";
 import { MessageBanner } from "../components/MessageBanner";
 import { emptyTotals, formatHourValue, totalMinutes } from "../core/timeMath";
@@ -63,23 +66,23 @@ export function ImportCsvPage({
             Upload an exported CSV from the system and save it as check data for monthly report matching.
           </p>
 
-          <div className="mt-4 grid grid-cols-[minmax(0,1fr)_42px_112px_96px] gap-2">
-            <input
+          <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
+            <InputText
               className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               placeholder="Select CSV file..."
               type="text"
               value={csvPath}
               onChange={(event) => onCsvPathChange(event.target.value)}
             />
-            <button
-              className="flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            <Button
+              className="flex h-10 p-4 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
               type="button"
               title="Browse CSV"
               onClick={onPickCsvFile}
             >
-              <FolderOpen className="h-4 w-4" />
-            </button>
-            <button
+              <FolderOpen className="h-4 w-4 " />
+            </Button>
+            <Button
               className="flex h-10 items-center justify-center gap-2 rounded-md bg-slate-800 px-3 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               disabled={isImporting}
@@ -87,33 +90,7 @@ export function ImportCsvPage({
             >
               <FileInput className="h-4 w-4" />
               Import
-            </button>
-            <button
-              className="flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-              type="button"
-              disabled={isSavingImport || !importPreviewResult}
-              onClick={onSave}
-            >
-              <Save className="h-4 w-4" />
-              Save
-            </button>
-          </div>
-
-          <div className="mt-3 grid grid-cols-[minmax(0,280px)_minmax(0,1fr)] gap-2">
-            <input
-              className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              placeholder="Report name"
-              type="text"
-              value={reportName}
-              onChange={(event) => onReportNameChange(event.target.value)}
-            />
-            <input
-              className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              placeholder="Note"
-              type="text"
-              value={note}
-              onChange={(event) => onNoteChange(event.target.value)}
-            />
+            </Button>
           </div>
         </div>
 
@@ -151,7 +128,7 @@ function ImportPreview({
   return (
     <>
       <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 border-b border-stone-200 px-4 py-3">
+        <div className="grid items-start gap-3 border-b border-stone-200 px-4 py-3">
           <div className="min-w-0">
             <h3 className="font-bold">Preview</h3>
             <p className="mt-1 truncate text-xs text-slate-500">
@@ -160,7 +137,7 @@ function ImportPreview({
                 : "No CSV data imported yet."}
             </p>
           </div>
-          <button
+          <Button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
             disabled={!result}
@@ -169,7 +146,7 @@ function ImportPreview({
           >
             <List className="h-4 w-4" />
             Show detail
-          </button>
+          </Button>
         </div>
         <div className="min-h-0 overflow-auto">
           <table className="w-full min-w-[920px] border-collapse">
@@ -250,7 +227,7 @@ function ImportProjectRows({
           <td className="table-cell num">{phase.row_count.toLocaleString("en-US")}</td>
           <td className="table-cell num font-bold text-brand">{formatHourValue(totalMinutes(phase.totals))}</td>
           <td className="table-cell num">
-            <button
+            <Button
               className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
               type="button"
               title="Open detail"
@@ -264,7 +241,7 @@ function ImportProjectRows({
               }}
             >
               Detail
-            </button>
+            </Button>
           </td>
         </tr>
       ))}
@@ -352,26 +329,22 @@ function ImportDetailListDialog({
   const tableMinWidth = Math.max(920, visibleColumns.length * 140);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-6">
-      <section className="flex max-h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        <header className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-4">
-          <div className="min-w-0">
-            <h3 className="truncate text-lg font-bold text-slate-900">CSV detail</h3>
-            <p className="mt-1 truncate text-sm text-slate-500">
-              {result.source_file_name}
-              {saveResult ? ` - saved batch #${saveResult.batch_id}` : ""}
-            </p>
-          </div>
-          <button
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-            type="button"
-            title="Close"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-
+    <Dialog
+      className="w-full max-w-6xl overflow-hidden rounded-lg bg-white shadow-2xl"
+      contentClassName="p-0 min-h-0 overflow-auto"
+      header={
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-bold text-slate-900">CSV detail</h3>
+          <p className="mt-1 truncate text-sm text-slate-500">
+            {result.source_file_name}
+            {saveResult ? ` - saved batch #${saveResult.batch_id}` : ""}
+          </p>
+        </div>
+      }
+      style={{ maxHeight: "86vh" }}
+      visible={isOpen}
+      onHide={onClose}
+    >
         <div className="min-h-0 overflow-auto">
           <table className="w-full border-collapse" style={{ minWidth: `${tableMinWidth}px` }}>
             <thead>
@@ -407,8 +380,7 @@ function ImportDetailListDialog({
             </tbody>
           </table>
         </div>
-      </section>
-    </div>
+    </Dialog>
   );
 }
 

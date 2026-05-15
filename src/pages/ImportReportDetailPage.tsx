@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { Button } from "primereact/button";
 import { MessageBanner } from "../components/MessageBanner";
 import { emptyTotals, formatHourValue, totalMinutes } from "../core/timeMath";
 import type {
@@ -31,14 +32,14 @@ export function ImportReportDetailPage({
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <div className="flex items-center justify-between gap-3">
-        <button
+        <Button
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
           type="button"
           onClick={onBack}
         >
           <ArrowLeft className="h-4 w-4" />
           Back
-        </button>
+        </Button>
       </div>
 
       <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
@@ -165,7 +166,7 @@ function ImportProjectRows({
           <td className="table-cell num">{phase.row_count.toLocaleString("en-US")}</td>
           <td className="table-cell num font-bold text-brand">{formatHourValue(totalMinutes(phase.totals))}</td>
           <td className="table-cell num">
-            <button
+            <Button
               className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
               type="button"
               title="Open detail"
@@ -179,7 +180,7 @@ function ImportProjectRows({
               }}
             >
               Detail
-            </button>
+            </Button>
           </td>
         </tr>
       ))}

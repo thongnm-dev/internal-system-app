@@ -1,4 +1,10 @@
-import { CalendarDays, ChevronLeft, ChevronRight, FolderOpen, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FolderOpen, Plus, Trash2, Upload } from "lucide-react";
+import { Button } from "primereact/button";
+import { Calendar } from "primereact/calendar";
+import { Checkbox } from "primereact/checkbox";
+import { Dialog } from "primereact/dialog";
+import { InputText } from "primereact/inputtext";
+import { InputTextarea } from "primereact/inputtextarea";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, ReactNode, UIEvent, WheelEvent } from "react";
 import type { DailyReportEntries, DailyReportEntry, DailyReportProject, DailyReportTask } from "../controller/useDailyReportController";
@@ -143,7 +149,7 @@ export function DailyReportPage({
             <h3 className="truncate font-bold">Assigned work</h3>
             <p className="mt-1 truncate text-xs text-slate-500">{projects.length.toLocaleString("en-US")} projects</p>
           </div>
-          <button
+          <Button
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
             title="Add project"
@@ -151,7 +157,7 @@ export function DailyReportPage({
             onClick={() => setIsAddingProject(true)}
           >
             <Plus className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex min-w-0 items-center justify-between gap-4 px-4">
@@ -165,22 +171,23 @@ export function DailyReportPage({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
+            <Button
               className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
               type="button"
               title="Previous month"
               onClick={onPreviousMonth}
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
-            <input
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              max={maxMonthValue}
-              type="month"
-              value={monthValue}
-              onChange={(event) => onSelectMonth(event.target.value)}
+            </Button>
+            <Calendar
+              className="h-9 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 outline-none focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
+              dateFormat="yy-mm"
+              maxDate={parseMonth(maxMonthValue) ?? undefined}
+              value={parseMonth(monthValue)}
+              view="month"
+              onChange={(event) => onSelectMonth(formatMonth(event.value instanceof Date ? event.value : null))}
             />
-            <button
+            <Button
               className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               title="Next month"
@@ -188,7 +195,7 @@ export function DailyReportPage({
               onClick={onNextMonth}
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -323,30 +330,24 @@ function ProjectPickerDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
-      <section
-        className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-5 py-4">
+    <Dialog
+      className="w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl"
+      contentClassName="p-0 min-h-0 flex flex-col"
+      header={
           <div className="min-w-0">
             <h3 className="truncate font-bold text-slate-900">Add project</h3>
             <p className="mt-1 truncate text-sm text-slate-500">Select a project to add to daily report.</p>
           </div>
-          <button
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-            type="button"
-            title="Close"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      }
+      style={{ maxHeight: "86vh" }}
+      visible
+      onHide={onClose}
+    >
 
         <div className="border-b border-stone-200 bg-slate-50 px-5 py-4">
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Project code / name</span>
-            <input
+            <InputText
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               placeholder="Search by code or name"
               value={keyword}
@@ -373,10 +374,9 @@ function ProjectPickerDialog({
                     isSelected ? "border-brand bg-emerald-50" : "border-slate-200 bg-white",
                   ].join(" ")}
                 >
-                  <input
+                  <Checkbox
                     className="h-4 w-4 shrink-0 accent-brand"
                     checked={isSelected}
-                    type="checkbox"
                     onChange={() => toggleProject(project.id)}
                   />
                   <span className="min-w-0">
@@ -395,25 +395,24 @@ function ProjectPickerDialog({
         <div className="flex items-center justify-between gap-3 border-t border-stone-200 px-5 py-4">
           <span className="text-sm font-semibold text-slate-500">{selectedProjectIds.length} selected</span>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
               type="button"
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               className="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               disabled={selectedProjectIds.length === 0}
               onClick={() => onSelect(selectedProjectIds)}
             >
               Add projects
-            </button>
+            </Button>
           </div>
         </div>
-      </section>
-    </div>
+    </Dialog>
   );
 }
 
@@ -514,7 +513,7 @@ function ContextMenuButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       className={[
         "flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-slate-50",
         danger ? "text-red-600 hover:bg-red-50" : "",
@@ -524,7 +523,7 @@ function ContextMenuButton({
     >
       {icon}
       <span className="min-w-0 truncate">{label}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -602,7 +601,7 @@ function DailyHourCell({
 
   return (
     <div className={[dayCellClass, day.isWeekend ? "bg-slate-50" : "bg-white"].join(" ")}>
-      <button
+      <Button
         className={[
           "flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-emerald-100",
           hasValue
@@ -614,7 +613,7 @@ function DailyHourCell({
         onClick={() => onEdit({ day, entry: normalizeEntryForForm(entry), task })}
       >
         {hasValue ? formatHours(hour) : <Plus className="h-4 w-4" />}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -639,6 +638,23 @@ function formatHours(value: number) {
   return Number.isInteger(value) ? value.toLocaleString("en-US") : value.toFixed(2);
 }
 
+function parseMonth(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) {
+    return null;
+  }
+
+  return new Date(year, month - 1, 1);
+}
+
+function formatMonth(value: Date | null) {
+  if (!value) {
+    return "";
+  }
+
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+}
+
 type EditingCell = {
   day: DailyReportDay;
   entry: DailyReportEntry;
@@ -659,19 +675,25 @@ function DailyReportEntryDialog({
   const [form, setForm] = useState<DailyReportEntry>(cell.entry);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-      <section className="w-full max-w-md rounded-lg bg-white shadow-xl">
-        <div className="border-b border-stone-200 px-5 py-4">
+    <Dialog
+      className="w-full max-w-md rounded-lg bg-white shadow-xl"
+      contentClassName="p-0"
+      header={
+        <div>
           <h3 className="font-bold text-slate-900">Daily report detail</h3>
           <p className="mt-1 text-sm text-slate-500">
             {cell.task.name} - {cell.day.label} {cell.day.weekday}
           </p>
         </div>
+      }
+      visible
+      onHide={onClose}
+    >
 
         <div className="space-y-4 px-5 py-4">
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Hour</span>
-            <input
+            <InputText
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               inputMode="decimal"
               max="24"
@@ -685,7 +707,7 @@ function DailyReportEntryDialog({
 
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Phase</span>
-            <input
+            <InputText
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               value={form.phase}
               onChange={(event) => setForm((current) => ({ ...current, phase: event.target.value }))}
@@ -694,7 +716,7 @@ function DailyReportEntryDialog({
 
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Comment</span>
-            <textarea
+            <InputTextarea
               className="mt-1 min-h-24 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               value={form.comment}
               onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))}
@@ -702,16 +724,15 @@ function DailyReportEntryDialog({
           </label>
 
           <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-            <input
+            <Checkbox
               className="h-4 w-4 accent-brand"
               checked={form.isOt}
-              type="checkbox"
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  isOt: event.target.checked,
-                  midnightOt: event.target.checked ? current.midnightOt : "",
-                  regularOt: event.target.checked ? current.regularOt : "",
+                  isOt: Boolean(event.checked),
+                  midnightOt: event.checked ? current.midnightOt : "",
+                  regularOt: event.checked ? current.regularOt : "",
                 }))
               }
             />
@@ -722,7 +743,7 @@ function DailyReportEntryDialog({
             <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
               <label className="block">
                 <span className="text-xs font-bold text-slate-500">Regular OT</span>
-                <input
+                <InputText
                   className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                   inputMode="decimal"
                   max="24"
@@ -735,7 +756,7 @@ function DailyReportEntryDialog({
               </label>
               <label className="block">
                 <span className="text-xs font-bold text-slate-500">Midnight OT</span>
-                <input
+                <InputText
                   className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                   inputMode="decimal"
                   max="24"
@@ -751,32 +772,31 @@ function DailyReportEntryDialog({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-stone-200 px-5 py-4">
-          <button
+          <Button
             className="h-10 rounded-md border border-red-200 bg-white px-4 text-sm font-bold text-red-600 hover:bg-red-50"
             type="button"
             onClick={onDelete}
           >
             Clear
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               className="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
               type="button"
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               className="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
               type="button"
               onClick={() => onSave(form)}
             >
               Save
-            </button>
+            </Button>
           </div>
         </div>
-      </section>
-    </div>
+    </Dialog>
   );
 }
 

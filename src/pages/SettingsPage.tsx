@@ -1,4 +1,8 @@
 import { KeyRound, Languages, Moon, Plus, Sun, Trash2, UserRound } from "lucide-react";
+import { Button } from "primereact/button";
+import { Dropdown } from "primereact/dropdown";
+import { InputText } from "primereact/inputtext";
+import { SelectButton } from "primereact/selectbutton";
 import type { ApiKeySetting, LanguageCode, ThemeMode, UserSettings } from "../controller/useSettingsController";
 
 type SettingsPageProps = {
@@ -23,6 +27,17 @@ const userFields: Array<{ key: keyof UserSettings; label: string; type?: string;
   { key: "phone", label: "Phone", placeholder: "phone number" },
   { key: "address", label: "Address", placeholder: "address" },
   { key: "position", label: "Position", placeholder: "position" },
+];
+
+const languageOptions: Array<{ label: string; value: LanguageCode }> = [
+  { label: "Vietnamese", value: "vi" },
+  { label: "English", value: "en" },
+  { label: "Japanese", value: "ja" },
+];
+
+const themeOptions: Array<{ label: string; value: ThemeMode; icon: typeof Sun }> = [
+  { label: "Light", value: "light", icon: Sun },
+  { label: "Dark", value: "dark", icon: Moon },
 ];
 
 export function SettingsPage({
@@ -51,7 +66,7 @@ export function SettingsPage({
             {userFields.map((field) => (
               <label key={field.key} className={field.key === "address" ? "col-span-2" : undefined}>
                 <span className="text-xs font-bold text-slate-500">{field.label}</span>
-                <input
+                <InputText
                   className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                   placeholder={field.placeholder}
                   type={field.type ?? "text"}
@@ -69,30 +84,28 @@ export function SettingsPage({
               {theme === "dark" ? <Moon className="h-5 w-5 text-brand" /> : <Sun className="h-5 w-5 text-brand" />}
               <h3 className="font-bold">Theme</h3>
             </div>
-            <div className="mt-4 grid grid-cols-2 rounded-md border border-slate-200 bg-slate-100 p-1">
-              <button
-                className={[
-                  "flex h-9 items-center justify-center gap-2 rounded px-3 text-sm font-bold",
-                  theme === "light" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900",
-                ].join(" ")}
-                type="button"
-                onClick={() => onThemeChange("light")}
-              >
-                <Sun className="h-4 w-4" />
-                Light
-              </button>
-              <button
-                className={[
-                  "flex h-9 items-center justify-center gap-2 rounded px-3 text-sm font-bold",
-                  theme === "dark" ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900",
-                ].join(" ")}
-                type="button"
-                onClick={() => onThemeChange("dark")}
-              >
-                <Moon className="h-4 w-4" />
-                Dark
-              </button>
-            </div>
+            <SelectButton
+              className="mt-4 grid grid-cols-2 rounded-md border border-slate-200 bg-slate-100 p-1"
+              value={theme}
+              options={themeOptions}
+              optionLabel="label"
+              optionValue="value"
+              itemTemplate={(option) => {
+                const Icon = option.icon;
+                return (
+                  <span className="flex h-9 items-center justify-center gap-2 text-sm font-bold">
+                    <Icon className="h-4 w-4" />
+                    {option.label}
+                  </span>
+                );
+              }}
+              allowEmpty={false}
+              onChange={(event) => {
+                if (event.value) {
+                  onThemeChange(event.value);
+                }
+              }}
+            />
           </section>
 
           <section className="rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
@@ -100,15 +113,14 @@ export function SettingsPage({
               <Languages className="h-5 w-5 text-brand" />
               <h3 className="font-bold">Language</h3>
             </div>
-            <select
+            <Dropdown
               className="mt-4 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              options={languageOptions}
+              optionLabel="label"
+              optionValue="value"
               value={language}
-              onChange={(event) => onLanguageChange(event.target.value as LanguageCode)}
-            >
-              <option value="vi">Vietnamese</option>
-              <option value="en">English</option>
-              <option value="ja">Japanese</option>
-            </select>
+              onChange={(event) => onLanguageChange(event.value)}
+            />
           </section>
 
           <section className="rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
@@ -125,48 +137,48 @@ export function SettingsPage({
             <KeyRound className="h-5 w-5 text-brand" />
             <h3 className="font-bold">API key settings</h3>
           </div>
-          <button
+          <Button
             className="flex h-9 items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
             type="button"
             onClick={onAddApiKey}
           >
             <Plus className="h-4 w-4" />
             Add key
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4 space-y-3">
           {apiKeys.map((apiKey) => (
             <div key={apiKey.id} className="grid grid-cols-[minmax(160px,240px)_minmax(180px,260px)_minmax(0,1fr)_40px] gap-2">
-              <input
+              <InputText
                 className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="Application name *"
                 type="text"
                 value={apiKey.name}
                 onChange={(event) => onApiKeyChange(apiKey.id, "name", event.target.value)}
               />
-              <input
+              <InputText
                 className="h-10 rounded-md border border-slate-300 bg-white px-3 font-mono text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="KEY *"
                 type="text"
                 value={apiKey.key}
                 onChange={(event) => onApiKeyChange(apiKey.id, "key", event.target.value.toUpperCase())}
               />
-              <input
+              <InputText
                 className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="API key *"
                 type="password"
                 value={apiKey.apiKey}
                 onChange={(event) => onApiKeyChange(apiKey.id, "apiKey", event.target.value)}
               />
-              <button
+              <Button
                 className="flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
                 type="button"
                 title="Remove API key"
                 onClick={() => onRemoveApiKey(apiKey.id)}
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           ))}
         </div>

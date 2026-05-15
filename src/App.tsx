@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { BottomBar } from "./components/BottomBar";
 import { Header } from "./components/Header";
-import { PhaseDetailDialog } from "./components/PhaseDetailDialog";
 import { Sidebar } from "./components/Sidebar";
 import { useAppShellController } from "./controller/useAppShellController";
 import { defaultRoute, loginRoute } from "./router/routes";
@@ -99,7 +98,6 @@ function AppShell() {
       </section>
 
       <BottomBar info={systemInfo} />
-      <PhaseDetailDialog detail={selectedPhaseDetail} onClose={() => setSelectedPhaseDetail(null)} />
     </main>
   );
 }

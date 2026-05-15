@@ -9,6 +9,7 @@ import {
   Settings,
   Table2,
 } from "lucide-react";
+import { Button } from "primereact/button";
 import { appRoutes } from "../router/routes";
 import type { MenuKey } from "../types/statistics";
 
@@ -37,26 +38,26 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
         <div className={["flex items-center gap-3", isCollapsed ? "justify-center" : "justify-between"].join(" ")}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand font-bold">PJ</div>
           {!isCollapsed && (
-            <button
+            <Button
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
               type="button"
               title="Collapse sidebar"
               onClick={onToggleCollapse}
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
 
         {isCollapsed ? (
-          <button
+          <Button
             className="mt-3 flex h-9 w-full items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
             type="button"
             title="Expand sidebar"
             onClick={onToggleCollapse}
           >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </Button>
         ) : (
           <>
             <h1 className="mt-4 text-xl font-bold leading-tight">PJ Yuji Statistics</h1>
@@ -73,7 +74,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
           const label = route?.title ?? item.id;
           return (
             <div key={item.id} className="group relative">
-              <button
+              <Button
                 className={[
                   "flex h-10 w-full items-center rounded-md text-sm font-semibold transition",
                   isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left",
@@ -85,7 +86,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!isCollapsed && <span>{label}</span>}
-              </button>
+              </Button>
               {isCollapsed && (
                 <span className="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                   {label}
@@ -98,7 +99,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
 
       <div className={["border-t border-white/10 text-sm text-slate-300", isCollapsed ? "p-2" : "p-4"].join(" ")}>
         <div className="group relative">
-          <button
+          <Button
             className={[
               "flex h-10 w-full items-center rounded-md text-sm font-semibold transition",
               isCollapsed ? "justify-center px-0" : "gap-3 px-3 text-left",
@@ -110,7 +111,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
           >
             <Settings className="h-4 w-4 shrink-0" />
             {!isCollapsed && <span>{settingsLabel}</span>}
-          </button>
+          </Button>
           {isCollapsed && (
             <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
               {settingsLabel}

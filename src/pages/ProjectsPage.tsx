@@ -1,4 +1,7 @@
 import { ChevronLeft, ChevronRight, Plus, RotateCcw, Search } from "lucide-react";
+import { Button } from "primereact/button";
+import { Fieldset } from "primereact/fieldset";
+import { InputText } from "primereact/inputtext";
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ProjectFilters } from "../controller/useProjectsController";
@@ -71,23 +74,22 @@ export function ProjectsPage({
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <section className="flex items-center justify-end rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
-        <button
+        <Button
           className="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
           type="button"
           onClick={() => onNavigate("/projects/detail")}
         >
           <Plus className="h-4 w-4" />
           Register
-        </button>
+        </Button>
       </section>
 
-      <fieldset className="rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
-        <legend className="px-2 text-sm font-bold text-slate-600">Search conditions</legend>
+      <Fieldset className="rounded-lg border border-slate-200 bg-white p-4 shadow-md fieldset-nested" legend="Search" toggleable>
         <div className="grid gap-3">
           <div className="grid gap-3 lg:grid-cols-2">
             <label>
               <span className="text-xs font-bold text-slate-500">Project Code</span>
-              <input
+              <InputText
                 className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="Code"
                 type="search"
@@ -97,7 +99,7 @@ export function ProjectsPage({
             </label>
             <label>
               <span className="text-xs font-bold text-slate-500">Project Name</span>
-              <input
+              <InputText
                 className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 placeholder="Name"
                 type="search"
@@ -108,7 +110,7 @@ export function ProjectsPage({
           </div>
           <label>
             <span className="text-xs font-bold text-slate-500">Keyword Search</span>
-            <input
+            <InputText
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               placeholder="Code, name, phase, work content"
               type="search"
@@ -117,7 +119,7 @@ export function ProjectsPage({
             />
           </label>
           <div className="flex items-center justify-end gap-2">
-            <button
+            <Button
               className="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               title="Search"
@@ -126,8 +128,8 @@ export function ProjectsPage({
             >
               <Search className="h-4 w-4" />
               Search
-            </button>
-            <button
+            </Button>
+            <Button
               className="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
               type="button"
               title="Reset search conditions"
@@ -135,11 +137,11 @@ export function ProjectsPage({
             >
               <RotateCcw className="h-4 w-4" />
               Reset
-            </button>
+            </Button>
           </div>
         </div>
         {searchError ? <p className="mt-3 text-sm text-red-600">{searchError}</p> : null}
-      </fieldset>
+      </Fieldset>
 
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
         <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-4 py-3">
@@ -195,7 +197,7 @@ export function ProjectsPage({
             Page {page.toLocaleString("en-US")} / {pageCount.toLocaleString("en-US")}
           </span>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page <= 1}
               type="button"
@@ -203,8 +205,8 @@ export function ProjectsPage({
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={page >= pageCount}
               type="button"
@@ -212,7 +214,7 @@ export function ProjectsPage({
               onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       </section>

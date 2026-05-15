@@ -65,4 +65,36 @@
     @apply text-right tabular-nums whitespace-nowrap;
   }
 
+  .fieldset-nested .p-fieldset-legend {
+    @apply rounded-md border border-sky-700 bg-sky-700 text-white shadow-sm;
+  }
+
+  .p-fieldset p-toggleable-content .p-fieldset-legend {
+    @apply border-sky-700 bg-sky-700;
+  }
+
+  .p-fieldset-legend,
+  .p-fieldset-legend a,
+  .p-fieldset-legend span {
+    @apply text-sm font-bold;
+  }
+  
+  .fieldset-nested >* .p-fieldset-content {
+    @apply p-0;
+  }
+}
+
+.p-fieldset.p-fieldset-toggleable .p-fieldset-legend a {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+}
+
+.p-fieldset .p-fieldset-legend,
+.p-fieldset .p-fieldset-legend-text {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 700;
 }
