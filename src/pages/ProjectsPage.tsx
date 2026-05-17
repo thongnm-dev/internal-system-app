@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Plus, RotateCcw, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, MoreVertical, Plus, RotateCcw, Search } from "lucide-react";
 import { Button } from "primereact/button";
 import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
@@ -34,6 +34,11 @@ export function ProjectsPage({
   onSetFilters,
 }: ProjectsPageProps) {
   const [page, setPage] = useState(1);
+  const [contextMenu, setContextMenu] = useState<{
+    project: ProjectSummary;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const filteredProjects = useMemo(() => {
     const projects = result?.projects ?? [];
@@ -72,6 +77,30 @@ export function ProjectsPage({
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
   }, [pageCount]);
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener("click", closeContextMenu);
+    window.addEventListener("scroll", closeContextMenu, true);
+    return () => {
+      window.removeEventListener("click", closeContextMenu);
+      window.removeEventListener("scroll", closeContextMenu, true);
+    };
+  }, [contextMenu]);
+
+  const openProjectSkills = (project: ProjectSummary) => {
+    const params = new URLSearchParams();
+    if (project.project_name) {
+      params.set("name", project.project_name);
+    }
+
+    setContextMenu(null);
+    onNavigate(`/projects/skills/${encodeURIComponent(project.project_code)}${params.size ? `?${params.toString()}` : ""}`);
+  };
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
@@ -161,6 +190,14 @@ export function ProjectsPage({
           scrollHeight="flex"
           tableStyle={{ minWidth: "980px" }}
           value={visibleProjects}
+          onContextMenu={(event) => {
+            event.originalEvent.preventDefault();
+            setContextMenu({
+              project: event.data,
+              x: event.originalEvent.clientX,
+              y: event.originalEvent.clientY,
+            });
+          }}
           onRowClick={(event) => onNavigate(`/projects/detail/${encodeURIComponent(event.data.project_code)}`)}
         >
           <Column field="project_code" header="Code" body={(project: ProjectSummary) => project.project_code || "-"} bodyClassName="font-bold text-ink" />
@@ -177,7 +214,29 @@ export function ProjectsPage({
             bodyClassName="num"
             headerClassName="num"
           />
+          <Column
+            header="Action"
+            body={(project: ProjectSummary) => projectActionBody(project, setContextMenu)}
+            bodyClassName="text-center"
+            headerClassName="w-20 text-center"
+          />
         </DataTable>
+        {contextMenu ? (
+          <div
+            className="fixed z-50 min-w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-sm shadow-xl"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Button
+              className="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              type="button"
+              onClick={() => openProjectSkills(contextMenu.project)}
+            >
+              <FileText className="h-4 w-4" />
+              Manage SKILL.md
+            </Button>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-4 border-t border-stone-200 px-4 py-3">
           <span className="text-sm text-slate-500">
             Page {page.toLocaleString("en-US")} / {pageCount.toLocaleString("en-US")}
@@ -205,6 +264,36 @@ export function ProjectsPage({
         </div>
       </section>
     </section>
+  );
+}
+
+function projectActionBody(
+  project: ProjectSummary,
+  setContextMenu: Dispatch<
+    SetStateAction<{
+      project: ProjectSummary;
+      x: number;
+      y: number;
+    } | null>
+  >,
+) {
+  return (
+    <Button
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+      type="button"
+      title="Open project actions"
+      onClick={(event) => {
+        event.stopPropagation();
+        const rect = event.currentTarget.getBoundingClientRect();
+        setContextMenu({
+          project,
+          x: rect.left,
+          y: rect.bottom + 4,
+        });
+      }}
+    >
+      <MoreVertical className="h-4 w-4" />
+    </Button>
   );
 }
 

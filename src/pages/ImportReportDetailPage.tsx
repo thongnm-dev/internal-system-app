@@ -2,7 +2,6 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "primereact/button";
 import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
-import { MessageBanner } from "../components/MessageBanner";
 import { emptyTotals, formatHourValue, totalMinutes } from "../core/timeMath";
 import type {
   AnalysisResult,

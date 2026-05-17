@@ -144,7 +144,7 @@ function MonthPicker({
     <label className="block min-w-0">
       <span className="text-xs font-bold text-slate-500">{label}</span>
       <PrimeCalendar
-        className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm outline-none focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
+        className="app-calendar mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm outline-none hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
         dateFormat="yy-mm"
         icon={<Calendar className="h-4 w-4 text-slate-400" />}
         placeholder="yyyy-mm"

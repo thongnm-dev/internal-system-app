@@ -40,10 +40,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <form className="mt-6 space-y-4" onSubmit={submitLogin}>
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Username</span>
-            <div className="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+            <div className="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
               <UserRound className="h-4 w-4 shrink-0 text-slate-400" />
               <InputText
-                className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none focus:border-0 focus:shadow-none focus:ring-0 enabled:hover:border-0"
                 autoComplete="username"
                 autoFocus
                 placeholder="username"
@@ -56,10 +56,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Password</span>
-            <div className="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+            <div className="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
               <LockKeyhole className="h-4 w-4 shrink-0 text-slate-400" />
               <InputText
-                className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none focus:border-0 focus:shadow-none focus:ring-0 enabled:hover:border-0"
                 autoComplete="current-password"
                 placeholder="password"
                 type="password"

@@ -1,6 +1,7 @@
 import { useImportCsvController } from "../controller/useImportCsvController";
 import { useImportReportDetailController, useImportReportsController } from "../controller/useImportReportsController";
 import { useDailyReportController } from "../controller/useDailyReportController";
+import { useProjectSkillsController } from "../controller/useProjectSkillsController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
 import { useAuthStore } from "../stores/authStore";
@@ -13,6 +14,7 @@ import { ImportIssuesPage } from "./ImportIssuesPage";
 import { IssueBacklogPage } from "./IssueBacklogPage";
 import { OverviewPage } from "./OverviewPage";
 import { ProjectDetailPage } from "./ProjectDetailPage";
+import { ProjectSkillsPage } from "./ProjectSkillsPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { SettingsPage } from "./SettingsPage";
 
@@ -132,6 +134,17 @@ function OverviewRoute({  }: { onPhaseClick: (detail: SelectedPhaseDetail) => vo
 
 function ProjectsRoute({ path, onNavigate }: { path: string; onNavigate: (path: string) => void }) {
   const projectID = getProjectIDFromPath(path);
+  const projectSkillCode = getProjectSkillCodeFromPath(path);
+
+  if (projectSkillCode !== null) {
+    return (
+      <ProjectSkillsRoute
+        projectCode={projectSkillCode}
+        projectName={getProjectNameFromPath(path)}
+        onBack={() => onNavigate("/projects")}
+      />
+    );
+  }
 
   if (path.startsWith("/projects/detail")) {
     return (
@@ -171,6 +184,34 @@ function ProjectListRoute({ onNavigate }: { onNavigate: (path: string) => void }
   );
 }
 
+function ProjectSkillsRoute({
+  onBack,
+  projectCode,
+  projectName,
+}: {
+  onBack: () => void;
+  projectCode: string;
+  projectName: string;
+}) {
+  const projectSkills = useProjectSkillsController(projectCode, projectName);
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <ProjectSkillsPage
+        draft={projectSkills.draft}
+        generatedMarkdown={projectSkills.generatedMarkdown}
+        message={projectSkills.message}
+        messageMode={projectSkills.messageMode}
+        onBack={onBack}
+        onReset={projectSkills.resetDraft}
+        onSave={projectSkills.saveDraft}
+        onUpdateDraft={projectSkills.updateDraft}
+        onUpdateRole={projectSkills.updateRole}
+      />
+    </section>
+  );
+}
+
 function IssueBacklogRoute() {
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
@@ -194,6 +235,24 @@ function getProjectIDFromPath(path: string) {
   }
 
   return decodeURIComponent(path.slice(prefix.length));
+}
+
+function getProjectSkillCodeFromPath(path: string) {
+  const prefix = "/projects/skills/";
+  if (!path.startsWith(prefix)) {
+    return null;
+  }
+
+  return decodeURIComponent(path.slice(prefix.length).split("?")[0]);
+}
+
+function getProjectNameFromPath(path: string) {
+  const query = path.split("?")[1];
+  if (!query) {
+    return "";
+  }
+
+  return new URLSearchParams(query).get("name") ?? "";
 }
 
 function getImportReportIdFromPath(path: string) {

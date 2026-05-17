@@ -93,6 +93,37 @@
     @apply text-right tabular-nums whitespace-nowrap;
   }
 
+  .app-calendar {
+    @apply inline-flex items-center overflow-hidden;
+  }
+
+  .app-calendar .p-inputtext {
+    @apply h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-inherit shadow-none outline-none;
+  }
+
+  .app-calendar .p-inputtext:hover,
+  .app-calendar .p-inputtext:enabled:hover,
+  .app-calendar .p-inputtext:focus,
+  .app-calendar .p-inputtext:enabled:focus {
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  .app-calendar .p-datepicker-trigger {
+    @apply h-full shrink-0 border-0 bg-transparent px-3 text-slate-400 shadow-none outline-none;
+  }
+
+  .app-calendar .p-datepicker-trigger:hover,
+  .app-calendar .p-datepicker-trigger:focus,
+  .app-calendar .p-datepicker-trigger:enabled:hover,
+  .app-calendar .p-datepicker-trigger:enabled:focus {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
   .fieldset-nested .p-fieldset-legend {
     @apply rounded-md border border-sky-700 bg-sky-700 text-white shadow-sm;
   }

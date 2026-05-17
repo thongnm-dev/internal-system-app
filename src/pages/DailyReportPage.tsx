@@ -180,7 +180,7 @@ export function DailyReportPage({
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Calendar
-              className="h-9 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 outline-none focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
+              className="app-calendar h-9 rounded-md border border-slate-300 bg-white text-sm font-bold text-slate-700 outline-none hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
               dateFormat="yy-mm"
               maxDate={parseMonth(maxMonthValue) ?? undefined}
               value={parseMonth(monthValue)}

@@ -240,7 +240,7 @@ export function IssueBacklogPage() {
                   <span className="text-xs font-bold text-slate-500">Create date from</span>
                   <Calendar
                     ariaLabel="Create date from"
-                    className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm text-slate-900 outline-none focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
+                    className="app-calendar mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm text-slate-900 outline-none hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
                     icon={<IconCalendar className="text-slate-400" />}
                     placeholder="mm/dd/yyyy"
                     showIcon
@@ -252,7 +252,7 @@ export function IssueBacklogPage() {
                   <span className="text-xs font-bold text-slate-500">Create date to</span>
                   <Calendar
                     ariaLabel="Create date to"
-                    className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm text-slate-900 outline-none focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
+                    className="app-calendar mt-1 h-10 w-full rounded-md border border-slate-300 bg-white text-sm text-slate-900 outline-none hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100"
                     icon={<IconCalendar className="text-slate-400" />}
                     placeholder="mm/dd/yyyy"
                     showIcon
