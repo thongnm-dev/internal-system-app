@@ -61,6 +61,34 @@
     @apply sticky top-0 z-10 border-b border-slate-700 bg-slate-800 px-3 py-2.5 text-left text-xs font-bold text-white;
   }
 
+  .app-data-table {
+    @apply min-w-full;
+  }
+
+  .app-data-table .p-datatable-wrapper {
+    @apply min-h-0 overflow-auto;
+  }
+
+  .app-data-table .p-datatable-table {
+    @apply border-collapse;
+  }
+
+  .app-data-table .p-datatable-thead > tr > th {
+    @apply sticky top-0 z-10 border-b border-slate-700 bg-slate-800 px-3 py-2.5 text-left text-xs font-bold text-white;
+  }
+
+  .app-data-table .p-datatable-tbody > tr > td {
+    @apply border-b border-stone-200 px-3 py-2.5 text-left align-middle text-slate-700;
+  }
+
+  .app-data-table .p-datatable-tbody > tr:hover {
+    @apply bg-slate-50;
+  }
+
+  .app-data-table .p-datatable-emptymessage > td {
+    @apply h-40 text-center text-slate-500;
+  }
+
   .num {
     @apply text-right tabular-nums whitespace-nowrap;
   }

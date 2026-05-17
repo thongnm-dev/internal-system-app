@@ -90,7 +90,9 @@ pub fn read_work_records(path: &str) -> AppResult<(PathBuf, Vec<WorkRecord>)> {
             regular_minutes: parse_minutes(record.get(regular_idx)),
             normal_overtime_minutes: parse_minutes(record.get(normal_overtime_idx)),
             legal_holiday_overtime_minutes: parse_minutes(record.get(legal_holiday_idx)),
-            legal_public_holiday_overtime_minutes: parse_minutes(record.get(legal_public_holiday_idx)),
+            legal_public_holiday_overtime_minutes: parse_minutes(
+                record.get(legal_public_holiday_idx),
+            ),
             late_night_overtime_minutes: parse_minutes(record.get(late_night_idx)),
         };
         records.push(WorkRecord {

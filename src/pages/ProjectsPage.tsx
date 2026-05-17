@@ -1,5 +1,7 @@
 import { ChevronLeft, ChevronRight, Plus, RotateCcw, Search } from "lucide-react";
 import { Button } from "primereact/button";
+import { Column } from "primereact/column";
+import { DataTable } from "primereact/datatable";
 import { Fieldset } from "primereact/fieldset";
 import { InputText } from "primereact/inputtext";
 import { useEffect, useMemo, useState } from "react";
@@ -151,47 +153,31 @@ export function ProjectsPage({
             {result?.source_path ? ` from ${result.source_path}` : ""}
           </span>
         </div>
-        <div className="min-h-0 overflow-auto">
-          <table className="w-full min-w-[980px] border-collapse">
-            <thead>
-              <tr>
-                <th className="table-head">Code</th>
-                <th className="table-head">Name</th>
-                <th className="table-head num">Total hour</th>
-                <th className="table-head num">Bug count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!result || result.projects.length === 0 ? (
-                <tr>
-                  <td className="table-cell h-40 text-center text-slate-500" colSpan={4}>
-                    No analysis data yet.
-                  </td>
-                </tr>
-              ) : visibleProjects.length === 0 ? (
-                <tr>
-                  <td className="table-cell h-40 text-center text-slate-500" colSpan={4}>
-                    No projects match the search conditions.
-                  </td>
-                </tr>
-              ) : (
-                visibleProjects.map((project) => (
-                  <tr
-                    key={project.project_code}
-                    className="cursor-pointer hover:bg-slate-50"
-                    title="Open project detail"
-                    onClick={() => onNavigate(`/projects/detail/${encodeURIComponent(project.project_code)}`)}
-                  >
-                    <td className="table-cell font-bold text-ink">{project.project_code || "-"}</td>
-                    <td className="table-cell">{project.project_name || "-"}</td>
-                    <td className="table-cell num font-extrabold text-brand">{formatHourValue(totalMinutes(project.totals))}</td>
-                    <td className="table-cell num">{bugCount(project).toLocaleString("en-US")}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          className="app-data-table min-h-0"
+          emptyMessage={!result || result.projects.length === 0 ? "No analysis data yet." : "No projects match the search conditions."}
+          rowClassName={() => "cursor-pointer"}
+          scrollable
+          scrollHeight="flex"
+          tableStyle={{ minWidth: "980px" }}
+          value={visibleProjects}
+          onRowClick={(event) => onNavigate(`/projects/detail/${encodeURIComponent(event.data.project_code)}`)}
+        >
+          <Column field="project_code" header="Code" body={(project: ProjectSummary) => project.project_code || "-"} bodyClassName="font-bold text-ink" />
+          <Column field="project_name" header="Name" body={(project: ProjectSummary) => project.project_name || "-"} />
+          <Column
+            header="Total hour"
+            body={(project: ProjectSummary) => formatHourValue(totalMinutes(project.totals))}
+            bodyClassName="num font-extrabold text-brand"
+            headerClassName="num"
+          />
+          <Column
+            header="Bug count"
+            body={(project: ProjectSummary) => bugCount(project).toLocaleString("en-US")}
+            bodyClassName="num"
+            headerClassName="num"
+          />
+        </DataTable>
         <div className="flex items-center justify-between gap-4 border-t border-stone-200 px-4 py-3">
           <span className="text-sm text-slate-500">
             Page {page.toLocaleString("en-US")} / {pageCount.toLocaleString("en-US")}

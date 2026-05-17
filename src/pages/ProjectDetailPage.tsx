@@ -1,5 +1,7 @@
 import { ArrowLeft, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { Button } from "primereact/button";
+import { Column } from "primereact/column";
+import { DataTable } from "primereact/datatable";
 import { Fieldset } from "primereact/fieldset";
 import { InputText } from "primereact/inputtext";
 import { useEffect, useMemo, useState } from "react";
@@ -300,41 +302,16 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
           </div>
 
           <div className="mt-4 overflow-auto rounded-lg border border-stone-200">
-            <table className="w-full min-w-[560px] border-collapse">
-              <thead>
-                <tr>
-                  <th className="table-head">Username</th>
-                  <th className="table-head">Ten</th>
-                  <th className="table-head w-20 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.length === 0 ? (
-                  <tr>
-                    <td className="table-cell h-28 text-center text-slate-500" colSpan={3}>
-                      Chua chon thanh vien.
-                    </td>
-                  </tr>
-                ) : (
-                  members.map((member) => (
-                    <tr key={member.username}>
-                      <td className="table-cell font-bold text-ink">{member.username}</td>
-                      <td className="table-cell">{member.name}</td>
-                      <td className="table-cell text-center">
-                        <Button
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                          type="button"
-                          title="Remove member"
-                          onClick={() => removeMember(member.username)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <DataTable
+              className="app-data-table"
+              emptyMessage="Chua chon thanh vien."
+              tableStyle={{ minWidth: "560px" }}
+              value={members}
+            >
+              <Column field="username" header="Username" bodyClassName="font-bold text-ink" />
+              <Column field="name" header="Ten" />
+              <Column header="Action" body={(member: ProjectMember) => removeMemberBody(member, removeMember)} bodyClassName="text-center" headerClassName="w-20 text-center" />
+            </DataTable>
           </div>
         </Fieldset>
       </div>
@@ -370,47 +347,48 @@ export function ProjectDetailPage({ projectID, onBack }: ProjectDetailPageProps)
               </label>
 
               <div className="mt-4 max-h-[360px] overflow-auto rounded-lg border border-stone-200">
-                <table className="w-full min-w-[520px] border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="table-head">Username</th>
-                      <th className="table-head">Ten</th>
-                      <th className="table-head w-20 text-center">Select</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredMembers.length === 0 ? (
-                      <tr>
-                        <td className="table-cell h-28 text-center text-slate-500" colSpan={3}>
-                          No members match the search conditions.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredMembers.map((member) => (
-                        <tr key={member.username}>
-                          <td className="table-cell font-bold text-ink">{member.username}</td>
-                          <td className="table-cell">{member.name}</td>
-                          <td className="table-cell text-center">
-                            <Button
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white hover:opacity-90"
-                              type="button"
-                              title="Select member"
-                              onClick={() => addMember(member)}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                <DataTable
+                  className="app-data-table"
+                  emptyMessage="No members match the search conditions."
+                  tableStyle={{ minWidth: "520px" }}
+                  value={filteredMembers}
+                >
+                  <Column field="username" header="Username" bodyClassName="font-bold text-ink" />
+                  <Column field="name" header="Ten" />
+                  <Column header="Select" body={(member: ProjectMember) => addMemberBody(member, addMember)} bodyClassName="text-center" headerClassName="w-20 text-center" />
+                </DataTable>
               </div>
             </div>
           </section>
         </div>
       ) : null}
     </section>
+  );
+}
+
+function removeMemberBody(member: ProjectMember, removeMember: (username: string) => void) {
+  return (
+    <Button
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+      type="button"
+      title="Remove member"
+      onClick={() => removeMember(member.username)}
+    >
+      <Trash2 className="h-4 w-4" />
+    </Button>
+  );
+}
+
+function addMemberBody(member: ProjectMember, addMember: (member: ProjectMember) => void) {
+  return (
+    <Button
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white hover:opacity-90"
+      type="button"
+      title="Select member"
+      onClick={() => addMember(member)}
+    >
+      <Plus className="h-4 w-4" />
+    </Button>
   );
 }
 

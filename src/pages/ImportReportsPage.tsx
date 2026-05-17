@@ -1,6 +1,8 @@
 import { Calendar, RotateCcw, Search } from "lucide-react";
 import { Button } from "primereact/button";
 import { Calendar as PrimeCalendar } from "primereact/calendar";
+import { Column } from "primereact/column";
+import { DataTable } from "primereact/datatable";
 import { InputText } from "primereact/inputtext";
 import { formatHourValue } from "../core/timeMath";
 import type { ImportReportListItem, ImportReportSearchCriteria, MessageMode } from "../types/statistics";
@@ -105,33 +107,25 @@ export function ImportReportsPage({
           <p className="mt-1 text-xs text-slate-500">Dữ liệu đã được lưu từ màn hình Import CSV.</p>
         </div>
 
-        <div className="min-h-0 overflow-auto">
-          <table className="w-full min-w-[1080px] border-collapse">
-            <thead>
-              <tr>
-                <th className="table-head num">SEQ</th>
-                <th className="table-head">Tên</th>
-                <th className="table-head">Ghi chú</th>
-                <th className="table-head">Tên file đã import</th>
-                <th className="table-head">Ngày giờ</th>
-                <th className="table-head">Người import</th>
-                <th className="table-head num">Rows</th>
-                <th className="table-head num">Hours</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td className="table-cell h-48 text-center text-slate-500" colSpan={8}>
-                    No imported reports found.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item) => <ImportReportRow key={item.id} item={item} onOpenReport={onOpenReport} />)
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          className="app-data-table min-h-0"
+          emptyMessage="No imported reports found."
+          rowClassName={() => "cursor-pointer"}
+          scrollable
+          scrollHeight="flex"
+          tableStyle={{ minWidth: "1080px" }}
+          value={items}
+          onRowClick={(event) => onOpenReport(event.data.id)}
+        >
+          <Column header="SEQ" body={(item: ImportReportListItem) => `#${item.id}`} bodyClassName="num font-bold text-slate-700" headerClassName="num" />
+          <Column header="Tên" body={reportNameBody} />
+          <Column header="Ghi chú" body={(item: ImportReportListItem) => item.note || "-"} bodyClassName="max-w-[260px] truncate" />
+          <Column field="source_file_name" header="Tên file đã import" bodyClassName="max-w-[280px] truncate" />
+          <Column field="imported_at" header="Ngày giờ" bodyClassName="whitespace-nowrap" />
+          <Column header="Người import" body={(item: ImportReportListItem) => item.imported_by || "-"} bodyClassName="whitespace-nowrap" />
+          <Column header="Rows" body={(item: ImportReportListItem) => item.row_count.toLocaleString("en-US")} bodyClassName="num" headerClassName="num" />
+          <Column header="Hours" body={(item: ImportReportListItem) => formatHourValue(item.total_minutes)} bodyClassName="num" headerClassName="num" />
+        </DataTable>
       </section>
     </section>
   );
@@ -180,33 +174,12 @@ function formatMonth(value: Date | null) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function ImportReportRow({
-  item,
-  onOpenReport,
-}: {
-  item: ImportReportListItem;
-  onOpenReport: (reportId: number) => void;
-}) {
+function reportNameBody(item: ImportReportListItem) {
   return (
-    <tr
-      className="cursor-pointer hover:bg-slate-50"
-      title={`Open report #${item.id}`}
-      onClick={() => onOpenReport(item.id)}
-    >
-      <td className="table-cell num font-bold text-slate-700">#{item.id}</td>
-      <td className="table-cell">
-        <div className="min-w-0">
-          <strong className="block truncate text-slate-900">{item.report_name || "-"}</strong>
-          <span className="mt-1 block text-xs text-slate-500">{formatTargetMonthRange(item)}</span>
-        </div>
-      </td>
-      <td className="table-cell max-w-[260px] truncate">{item.note || "-"}</td>
-      <td className="table-cell max-w-[280px] truncate">{item.source_file_name}</td>
-      <td className="table-cell whitespace-nowrap">{item.imported_at}</td>
-      <td className="table-cell whitespace-nowrap">{item.imported_by || "-"}</td>
-      <td className="table-cell num">{item.row_count.toLocaleString("en-US")}</td>
-      <td className="table-cell num">{formatHourValue(item.total_minutes)}</td>
-    </tr>
+    <div className="min-w-0">
+      <strong className="block truncate text-slate-900">{item.report_name || "-"}</strong>
+      <span className="mt-1 block text-xs text-slate-500">{formatTargetMonthRange(item)}</span>
+    </div>
   );
 }
 

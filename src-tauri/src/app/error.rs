@@ -33,8 +33,8 @@ impl From<csv::Error> for AppError {
     }
 }
 
-impl From<rusqlite::Error> for AppError {
-    fn from(error: rusqlite::Error) -> Self {
+impl From<serde_json::Error> for AppError {
+    fn from(error: serde_json::Error) -> Self {
         Self::new(error.to_string())
     }
 }

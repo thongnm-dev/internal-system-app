@@ -1,6 +1,8 @@
 import { Calendar as IconCalendar, RotateCcw, Search } from "lucide-react";
 import { Button } from "primereact/button";
 import { Calendar } from "primereact/calendar";
+import { Column } from "primereact/column";
+import { DataTable } from "primereact/datatable";
 import { Dropdown } from "primereact/dropdown";
 
 import { Fieldset } from "primereact/fieldset";
@@ -156,14 +158,14 @@ export function IssueBacklogPage() {
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+    <section className="flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto">
       <Fieldset
         className="rounded-lg border border-slate-200 bg-white p-4 shadow-md fieldset-nested"
         legend="Search"
         toggleable
       >
         <div className="grid gap-3">
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid items-end gap-3 lg:grid-cols-2">
             <SelectField
               label="Project"
               value={criteria.project}
@@ -171,12 +173,21 @@ export function IssueBacklogPage() {
               placeholder="All projects"
               onChange={(value) => setField("project", value)}
             />
-            <div />
-          </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            <StatusSwitch value={criteria.status} onChange={(value) => setField("status", value)} />
-            <div />
+            <label className="block min-w-0">
+              <span className="text-xs font-bold text-slate-500">Status</span>
+              <SelectButton
+                className="mt-1 grid h-10 min-w-0 grid-cols-6 gap-1 rounded-md border border-slate-300 bg-white p-1 text-xs leading-none [&_.p-button]:min-w-0 [&_.p-button]:justify-center [&_.p-button]:px-1.5 [&_.p-button]:py-0 [&_.p-button]:text-xs [&_.p-button-label]:truncate [&_.p-button-label]:text-xs [&_.p-button-label]:font-normal"
+                value={criteria.status}
+                options={statusOptions}
+                allowEmpty={false}
+                onChange={(event) => {
+                  if (event.value) {
+                    setField("status", event.value);
+                  }
+                }}
+              />
+            </label>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
@@ -298,34 +309,30 @@ export function IssueBacklogPage() {
           <span className="text-xs text-slate-500">{filteredItems.length.toLocaleString("en-US")} issues</span>
         </div>
 
-        <div className="min-h-0 overflow-auto">
-          <table className="w-full min-w-[1180px] border-collapse">
-            <thead>
-              <tr>
-                <th className="table-head">Issue Type</th>
-                <th className="table-head">Issue Key</th>
-                <th className="table-head">Subject</th>
-                <th className="table-head">Assignee</th>
-                <th className="table-head">Status</th>
-                <th className="table-head num">Hours</th>
-                <th className="table-head">Priority</th>
-                <th className="table-head">Create Date</th>
-                <th className="table-head">Create User</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.length === 0 ? (
-                <tr>
-                  <td className="table-cell h-40 text-center text-slate-500" colSpan={9}>
-                    No issues match the search conditions.
-                  </td>
-                </tr>
-              ) : (
-                filteredItems.map((item) => <IssueRow key={item.id} item={item} />)
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          className="app-data-table min-h-0"
+          emptyMessage="No issues match the search conditions."
+          scrollable
+          scrollHeight="flex"
+          tableStyle={{ minWidth: "1180px" }}
+          value={filteredItems}
+        >
+          <Column field="issueType" header="Issue Type" bodyClassName="whitespace-nowrap" />
+          <Column field="issueKey" header="Issue Key" bodyClassName="whitespace-nowrap font-bold text-ink" />
+          <Column field="subject" header="Subject" bodyClassName="max-w-[360px] truncate" />
+          <Column field="assignee" header="Assignee" bodyClassName="whitespace-nowrap" />
+          <Column field="status" header="Status" body={statusBody} bodyClassName="whitespace-nowrap" />
+          <Column
+            field="hours"
+            header="Hours"
+            body={(item: IssueBacklogItem) => item.hours.toFixed(item.hours % 1 === 0 ? 0 : 1)}
+            bodyClassName="num"
+            headerClassName="num"
+          />
+          <Column field="priority" header="Priority" body={priorityBody} bodyClassName="whitespace-nowrap" />
+          <Column field="createDate" header="Create Date" bodyClassName="whitespace-nowrap" />
+          <Column field="createUser" header="Create User" bodyClassName="whitespace-nowrap" />
+        </DataTable>
       </section>
     </section>
   );
@@ -350,7 +357,7 @@ function SelectField({
     <label className="block min-w-0">
       <span className="text-xs font-bold text-slate-500">{label}</span>
       <Dropdown
-        className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+        className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100 [&_.p-dropdown-label]:text-xs"
         options={options}
         placeholder={placeholder}
         value={value}
@@ -394,46 +401,19 @@ function TextField({
   );
 }
 
-function StatusSwitch({ onChange, value }: { onChange: (value: IssueStatus) => void; value: IssueStatus }) {
+function statusBody(item: IssueBacklogItem) {
   return (
-    <div className="min-w-0">
-      <span className="text-xs font-bold text-slate-500">Status</span>
-      <SelectButton
-        className="mt-1 grid grid-cols-3 gap-1 rounded-md border border-slate-300 bg-white p-1 md:grid-cols-6"
-        value={value}
-        options={statusOptions}
-        allowEmpty={false}
-        onChange={(event) => {
-          if (event.value) {
-            onChange(event.value);
-          }
-        }}
-      />
-    </div>
+    <span className={["rounded px-2 py-1 text-xs font-bold", statusTone(item.status)].join(" ")}>
+      {item.status}
+    </span>
   );
 }
 
-function IssueRow({ item }: { item: IssueBacklogItem }) {
+function priorityBody(item: IssueBacklogItem) {
   return (
-    <tr className="hover:bg-slate-50">
-      <td className="table-cell whitespace-nowrap">{item.issueType}</td>
-      <td className="table-cell whitespace-nowrap font-bold text-ink">{item.issueKey}</td>
-      <td className="table-cell max-w-[360px] truncate">{item.subject}</td>
-      <td className="table-cell whitespace-nowrap">{item.assignee}</td>
-      <td className="table-cell whitespace-nowrap">
-        <span className={["rounded px-2 py-1 text-xs font-bold", statusTone(item.status)].join(" ")}>
-          {item.status}
-        </span>
-      </td>
-      <td className="table-cell num">{item.hours.toFixed(item.hours % 1 === 0 ? 0 : 1)}</td>
-      <td className="table-cell whitespace-nowrap">
-        <span className={["rounded px-2 py-1 text-xs font-bold", priorityTone(item.priority)].join(" ")}>
-          {item.priority}
-        </span>
-      </td>
-      <td className="table-cell whitespace-nowrap">{item.createDate}</td>
-      <td className="table-cell whitespace-nowrap">{item.createUser}</td>
-    </tr>
+    <span className={["rounded px-2 py-1 text-xs font-bold", priorityTone(item.priority)].join(" ")}>
+      {item.priority}
+    </span>
   );
 }
 

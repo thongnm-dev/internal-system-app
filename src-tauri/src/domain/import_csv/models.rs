@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default, Clone, Serialize)]
+#[derive(Default, Clone, Deserialize, Serialize)]
 pub struct MinuteTotals {
     pub regular_minutes: i64,
     pub normal_overtime_minutes: i64,
@@ -19,7 +19,7 @@ impl MinuteTotals {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct WorkRecord {
     pub date: String,
     pub project_code: String,

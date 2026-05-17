@@ -1,5 +1,7 @@
 import { FileInput, FolderOpen } from "lucide-react";
 import { Button } from "primereact/button";
+import { Column } from "primereact/column";
+import { DataTable } from "primereact/datatable";
 import { Dropdown } from "primereact/dropdown";
 import { useMemo, useRef, useState } from "react";
 import { MessageBanner } from "../components/MessageBanner";
@@ -182,68 +184,39 @@ export function ImportIssuesPage() {
           <span className="text-xs text-slate-500">{rows.length.toLocaleString("en-US")} issues</span>
         </div>
 
-        <div className="min-h-0 overflow-auto">
-          <table className="w-full min-w-[1680px] border-collapse">
-            <thead>
-              <tr>
-                <th className="table-head">Subject</th>
-                <th className="table-head">Description</th>
-                <th className="table-head">Issue Type</th>
-                <th className="table-head">Assignee</th>
-                <th className="table-head">Start Date</th>
-                <th className="table-head">Due Date</th>
-                <th className="table-head num">Estimated Hours</th>
-                <th className="table-head num">Actual Hours</th>
-                <th className="table-head">Categories</th>
-                <th className="table-head">Version</th>
-                <th className="table-head">Milestones</th>
-                <th className="table-head">Priority</th>
-                <th className="table-head">Parent issue</th>
-                <th className="table-head">Bug Types</th>
-                <th className="table-head">Bug severity levels</th>
-                <th className="table-head">Test Phase</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td className="table-cell h-48 text-center text-slate-500" colSpan={issueCsvHeaders.length}>
-                    No imported issues. Select a project and CSV file, then click Import.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row, index) => <IssueImportRow key={`${row.subject}-${index}`} row={row} />)
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          className="app-data-table min-h-0"
+          emptyMessage="No imported issues. Select a project and CSV file, then click Import."
+          scrollable
+          scrollHeight="flex"
+          tableStyle={{ minWidth: "1680px" }}
+          value={rows}
+        >
+          <Column field="subject" header="Subject" bodyClassName="max-w-[280px] truncate font-bold text-ink" />
+          <Column field="description" header="Description" bodyClassName="max-w-[320px] truncate" />
+          <Column field="issueType" header="Issue Type" bodyClassName="whitespace-nowrap" />
+          <Column field="assignee" header="Assignee" bodyClassName="whitespace-nowrap" />
+          <Column field="startDate" header="Start Date" bodyClassName="whitespace-nowrap" />
+          <Column field="dueDate" header="Due Date" bodyClassName="whitespace-nowrap" />
+          <Column header="Estimated Hours" body={(row: IssueCsvRow) => formatEmpty(row.estimatedHours)} bodyClassName="num" headerClassName="num" />
+          <Column header="Actual Hours" body={(row: IssueCsvRow) => formatEmpty(row.actualHours)} bodyClassName="num" headerClassName="num" />
+          <Column field="categories" header="Categories" bodyClassName="max-w-[220px] truncate" />
+          <Column field="version" header="Version" bodyClassName="whitespace-nowrap" />
+          <Column field="milestones" header="Milestones" bodyClassName="whitespace-nowrap" />
+          <Column field="priority" header="Priority" body={priorityBody} bodyClassName="whitespace-nowrap" />
+          <Column field="parentIssue" header="Parent issue" bodyClassName="whitespace-nowrap" />
+          <Column field="bugTypes" header="Bug Types" bodyClassName="whitespace-nowrap" />
+          <Column field="bugSeverityLevels" header="Bug severity levels" bodyClassName="whitespace-nowrap" />
+          <Column field="testPhase" header="Test Phase" bodyClassName="whitespace-nowrap" />
+        </DataTable>
       </section>
     </section>
   );
 }
 
-function IssueImportRow({ row }: { row: IssueCsvRow }) {
+function priorityBody(row: IssueCsvRow) {
   return (
-    <tr className="hover:bg-slate-50">
-      <td className="table-cell max-w-[280px] truncate font-bold text-ink">{row.subject}</td>
-      <td className="table-cell max-w-[320px] truncate">{row.description}</td>
-      <td className="table-cell whitespace-nowrap">{row.issueType}</td>
-      <td className="table-cell whitespace-nowrap">{row.assignee}</td>
-      <td className="table-cell whitespace-nowrap">{row.startDate}</td>
-      <td className="table-cell whitespace-nowrap">{row.dueDate}</td>
-      <td className="table-cell num">{formatEmpty(row.estimatedHours)}</td>
-      <td className="table-cell num">{formatEmpty(row.actualHours)}</td>
-      <td className="table-cell max-w-[220px] truncate">{row.categories}</td>
-      <td className="table-cell whitespace-nowrap">{row.version}</td>
-      <td className="table-cell whitespace-nowrap">{row.milestones}</td>
-      <td className="table-cell whitespace-nowrap">
-        {row.priority ? <span className={["rounded px-2 py-1 text-xs font-bold", priorityTone(row.priority)].join(" ")}>{row.priority}</span> : ""}
-      </td>
-      <td className="table-cell whitespace-nowrap">{row.parentIssue}</td>
-      <td className="table-cell whitespace-nowrap">{row.bugTypes}</td>
-      <td className="table-cell whitespace-nowrap">{row.bugSeverityLevels}</td>
-      <td className="table-cell whitespace-nowrap">{row.testPhase}</td>
-    </tr>
+    row.priority ? <span className={["rounded px-2 py-1 text-xs font-bold", priorityTone(row.priority)].join(" ")}>{row.priority}</span> : ""
   );
 }
 

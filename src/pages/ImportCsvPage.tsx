@@ -1,5 +1,7 @@
 import { Database, FileInput, FolderOpen, List } from "lucide-react";
 import { Button } from "primereact/button";
+import { Column } from "primereact/column";
+import { DataTable } from "primereact/datatable";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { useMemo, useState } from "react";
@@ -123,6 +125,7 @@ function ImportPreview({
   saveResult: ImportCsvResult | null;
 }) {
   const importSummary = useMemo(() => (result ? buildImportSummary(result) : null), [result]);
+  const rows = importSummary?.projects.flatMap(buildImportProjectRows) ?? [];
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
   return (
@@ -148,30 +151,30 @@ function ImportPreview({
             Show detail
           </Button>
         </div>
-        <div className="min-h-0 overflow-auto">
-          <table className="w-full min-w-[920px] border-collapse">
-            <thead>
-              <tr>
-                <th className="table-head">Project</th>
-                <th className="table-head">Phase</th>
-                <th className="table-head num">Rows</th>
-                <th className="table-head num">Total (hour)</th>
-                <th className="table-head num">Detail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!result ? (
-                <tr>
-                  <td className="table-cell h-48 text-center text-slate-500" colSpan={5}>
-                    No data. Select a CSV file, then click Import.
-                  </td>
-                </tr>
-              ) : (
-                importSummary?.projects.map((project) => <ImportProjectRows key={project.project_code} project={project} onOpenDetail={onOpenDetail} />)
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          className="app-data-table min-h-0"
+          emptyMessage="No data. Select a CSV file, then click Import."
+          rowClassName={(row: ImportProjectTableRow) => (row.kind === "project" ? "bg-emerald-50 font-bold" : "cursor-pointer")}
+          scrollable
+          scrollHeight="flex"
+          tableStyle={{ minWidth: "920px" }}
+          value={rows}
+          onRowClick={(event) => {
+            if (event.data.kind === "phase") {
+              onOpenDetail({
+                project_code: event.data.project.project_code,
+                project_name: event.data.project.project_name,
+                phase: event.data.phase,
+              });
+            }
+          }}
+        >
+          <Column header="Project" body={importProjectBody} />
+          <Column header="Phase" body={importPhaseBody} />
+          <Column header="Rows" body={(row: ImportProjectTableRow) => row.rowCount.toLocaleString("en-US")} bodyClassName="num" headerClassName="num" />
+          <Column header="Total (hour)" body={(row: ImportProjectTableRow) => formatHourValue(totalMinutes(row.totals))} bodyClassName="num font-bold text-brand" headerClassName="num" />
+          <Column header="Detail" body={(row: ImportProjectTableRow) => detailButtonBody(row, onOpenDetail)} bodyClassName="num" headerClassName="num" />
+        </DataTable>
       </section>
 
       <ImportDetailListDialog
@@ -184,68 +187,68 @@ function ImportPreview({
   );
 }
 
-function ImportProjectRows({
-  onOpenDetail,
-  project,
-}: {
-  onOpenDetail: (detail: SelectedPhaseDetail) => void;
-  project: ProjectSummary;
-}) {
-  const projectLabel = `${project.project_code} ${project.project_name}`.trim();
+type ImportProjectTableRow =
+  | { id: string; kind: "project"; project: ProjectSummary; phase: null; rowCount: number; totals: ProjectSummary["totals"] }
+  | { id: string; kind: "phase"; project: ProjectSummary; phase: ProjectSummary["phases"][number]; rowCount: number; totals: ProjectSummary["totals"] };
+
+function buildImportProjectRows(project: ProjectSummary): ImportProjectTableRow[] {
+  return [
+    { id: `${project.project_code}-all`, kind: "project", project, phase: null, rowCount: project.row_count, totals: project.totals },
+    ...project.phases.map((phase) => ({
+      id: `${project.project_code}-${phase.process_code}`,
+      kind: "phase" as const,
+      project,
+      phase,
+      rowCount: phase.row_count,
+      totals: phase.totals,
+    })),
+  ];
+}
+
+function importProjectBody(row: ImportProjectTableRow) {
+  if (row.kind === "phase") {
+    return "";
+  }
+
+  return <strong>{`${row.project.project_code} ${row.project.project_name}`.trim()}</strong>;
+}
+
+function importPhaseBody(row: ImportProjectTableRow) {
+  if (row.kind === "project") {
+    return "All phases";
+  }
 
   return (
     <>
-      <tr className="bg-emerald-50 font-bold">
-        <td className="table-cell">
-          <strong>{projectLabel}</strong>
-        </td>
-        <td className="table-cell">All phases</td>
-        <td className="table-cell num">{project.row_count.toLocaleString("en-US")}</td>
-        <td className="table-cell num font-bold text-brand">{formatHourValue(totalMinutes(project.totals))}</td>
-        <td className="table-cell num"></td>
-      </tr>
-      {project.phases.map((phase) => (
-        <tr
-          key={`${project.project_code}-${phase.process_code}`}
-          className="cursor-pointer hover:bg-slate-50"
-          title="Open phase details"
-          onClick={() =>
-            onOpenDetail({
-              project_code: project.project_code,
-              project_name: project.project_name,
-              phase,
-            })
-          }
-        >
-          <td className="table-cell"></td>
-          <td className="table-cell">
-            <span className="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">
-              {phase.process_code}
-            </span>
-            {phase.phase_name}
-          </td>
-          <td className="table-cell num">{phase.row_count.toLocaleString("en-US")}</td>
-          <td className="table-cell num font-bold text-brand">{formatHourValue(totalMinutes(phase.totals))}</td>
-          <td className="table-cell num">
-            <Button
-              className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              type="button"
-              title="Open detail"
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpenDetail({
-                  project_code: project.project_code,
-                  project_name: project.project_name,
-                  phase,
-                });
-              }}
-            >
-              Detail
-            </Button>
-          </td>
-        </tr>
-      ))}
+      <span className="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">
+        {row.phase.process_code}
+      </span>
+      {row.phase.phase_name}
     </>
+  );
+}
+
+function detailButtonBody(row: ImportProjectTableRow, onOpenDetail: (detail: SelectedPhaseDetail) => void) {
+  if (row.kind === "project") {
+    return "";
+  }
+
+  return (
+    <Button
+      className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 px-3 text-xs font-bold text-slate-600 hover:bg-slate-50"
+      type="button"
+      title="Open detail"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenDetail({
+          project_code: row.project.project_code,
+          project_name: row.project.project_name,
+          phase: row.phase,
+        });
+      }}
+    >
+      Detail
+    </Button>
   );
 }
 
@@ -345,41 +348,27 @@ function ImportDetailListDialog({
       visible={isOpen}
       onHide={onClose}
     >
-        <div className="min-h-0 overflow-auto">
-          <table className="w-full border-collapse" style={{ minWidth: `${tableMinWidth}px` }}>
-            <thead>
-              <tr>
-                {visibleColumns.map((column) => (
-                  <th key={`${column.header}-${column.index}`} className={minuteColumns.has(column.index) ? "table-head num" : "table-head"}>
-                    {column.header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.raw_rows.length === 0 ? (
-                <tr>
-                  <td className="table-cell h-40 text-center text-slate-500" colSpan={Math.max(1, visibleColumns.length)}>
-                    No CSV rows.
-                  </td>
-                </tr>
-              ) : (
-                result.raw_rows.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    {visibleColumns.map((column) => {
-                      const isMinuteColumn = minuteColumns.has(column.index);
-                      return (
-                        <td key={`${rowIndex}-${column.index}`} className={isMinuteColumn ? "table-cell num" : "table-cell"}>
-                          {isMinuteColumn ? formatCsvMinuteValue(row[column.index]) : row[column.index] || ""}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          className="app-data-table min-h-0"
+          emptyMessage="No CSV rows."
+          scrollable
+          scrollHeight="flex"
+          tableStyle={{ minWidth: `${tableMinWidth}px` }}
+          value={result.raw_rows.map((cells, index) => ({ cells, id: index }))}
+        >
+          {visibleColumns.map((column) => {
+            const isMinuteColumn = minuteColumns.has(column.index);
+            return (
+              <Column
+                key={`${column.header}-${column.index}`}
+                header={column.header}
+                body={(row: { cells: string[] }) => (isMinuteColumn ? formatCsvMinuteValue(row.cells[column.index]) : row.cells[column.index] || "")}
+                bodyClassName={isMinuteColumn ? "num" : undefined}
+                headerClassName={isMinuteColumn ? "num" : undefined}
+              />
+            );
+          })}
+        </DataTable>
     </Dialog>
   );
 }
