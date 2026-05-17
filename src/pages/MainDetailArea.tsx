@@ -1,12 +1,14 @@
 import { useImportCsvController } from "../controller/useImportCsvController";
 import { useImportReportDetailController, useImportReportsController } from "../controller/useImportReportsController";
 import { useDailyReportController } from "../controller/useDailyReportController";
+import { useDailyWorkNotesController } from "../controller/useDailyWorkNotesController";
 import { useProjectSkillsController } from "../controller/useProjectSkillsController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
 import { useAuthStore } from "../stores/authStore";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { DailyReportPage } from "./DailyReportPage";
+import { DailyWorkNotesPage } from "./DailyWorkNotesPage";
 import { ImportCsvPage } from "./ImportCsvPage";
 import { ImportReportDetailPage } from "./ImportReportDetailPage";
 import { ImportReportsPage } from "./ImportReportsPage";
@@ -39,11 +41,15 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
   }
 
   if (activeMenu === "issueBacklog") {
-    return <IssueBacklogRoute />;
+    return <IssueBacklogRoute onNavigate={navigateToPath} />;
   }
 
   if (activeMenu === "importIssues") {
-    return <ImportIssuesRoute />;
+    return <ImportIssuesRoute path={path} />;
+  }
+
+  if (activeMenu === "dailyWorkNotes") {
+    return <DailyWorkNotesRoute />;
   }
 
   if (activeMenu === "dailyReport") {
@@ -212,18 +218,22 @@ function ProjectSkillsRoute({
   );
 }
 
-function IssueBacklogRoute() {
+function IssueBacklogRoute({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <IssueBacklogPage />
+      <IssueBacklogPage
+        onOpenImport={(project) => onNavigate(`/import-issues?project=${encodeURIComponent(project)}`)}
+      />
     </section>
   );
 }
 
-function ImportIssuesRoute() {
+function ImportIssuesRoute({ path }: { path: string }) {
+  const initialProject = getImportIssueProjectFromPath(path);
+
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-      <ImportIssuesPage />
+      <ImportIssuesPage initialProject={initialProject} />
     </section>
   );
 }
@@ -265,6 +275,15 @@ function getImportReportIdFromPath(path: string) {
   return Number.isInteger(reportId) && reportId > 0 ? reportId : null;
 }
 
+function getImportIssueProjectFromPath(path: string) {
+  const query = path.split("?")[1];
+  if (!query) {
+    return "";
+  }
+
+  return new URLSearchParams(query).get("project") ?? "";
+}
+
 function DailyReportRoute() {
   const { user } = useAuthStore();
   const dailyReport = useDailyReportController(user?.username);
@@ -287,6 +306,37 @@ function DailyReportRoute() {
         onRemoveProject={dailyReport.removeProject}
         onSelectMonth={dailyReport.selectMonth}
         onUpdateEntry={dailyReport.updateEntry}
+      />
+    </section>
+  );
+}
+
+function DailyWorkNotesRoute() {
+  const { user } = useAuthStore();
+  const dailyWorkNotes = useDailyWorkNotesController(user?.username);
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <DailyWorkNotesPage
+        calendarDays={dailyWorkNotes.calendarDays}
+        filteredNotes={dailyWorkNotes.filteredNotes}
+        maxEntryDate={dailyWorkNotes.maxEntryDate}
+        monthLabel={dailyWorkNotes.monthLabel}
+        monthValue={dailyWorkNotes.monthValue}
+        selectedDate={dailyWorkNotes.selectedDate}
+        selectedDateLabel={dailyWorkNotes.selectedDateLabel}
+        statusCounts={dailyWorkNotes.statusCounts}
+        statusFilter={dailyWorkNotes.statusFilter}
+        today={dailyWorkNotes.today}
+        totalSelectedDateNotes={dailyWorkNotes.totalSelectedDateNotes}
+        onAddNote={dailyWorkNotes.addNote}
+        onNextMonth={dailyWorkNotes.nextMonth}
+        onPreviousMonth={dailyWorkNotes.previousMonth}
+        onRemoveNote={dailyWorkNotes.removeNote}
+        onSelectDate={dailyWorkNotes.selectDate}
+        onSelectMonth={dailyWorkNotes.selectMonth}
+        onStatusFilterChange={dailyWorkNotes.setStatusFilter}
+        onUpdateNoteStatus={dailyWorkNotes.updateNoteStatus}
       />
     </section>
   );

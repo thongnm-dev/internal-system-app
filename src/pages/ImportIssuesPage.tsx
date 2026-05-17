@@ -3,7 +3,7 @@ import { Button } from "primereact/button";
 import { Column } from "primereact/column";
 import { DataTable } from "primereact/datatable";
 import { Dropdown } from "primereact/dropdown";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageBanner } from "../components/MessageBanner";
 import type { MessageMode } from "../types/statistics";
 
@@ -27,6 +27,10 @@ type IssueCsvRow = {
 };
 
 const projects = [
+  { label: "Billing Portal", value: "Billing Portal" },
+  { label: "Internal Extension", value: "Internal Extension" },
+  { label: "Mobile Gateway", value: "Mobile Gateway" },
+  { label: "Reporting Hub", value: "Reporting Hub" },
   { label: "YUJI - PJ Yuji Internal Tool", value: "YUJI" },
   { label: "HRP - HR Portal", value: "HRP" },
   { label: "SALE - Sales Dashboard", value: "SALE" },
@@ -55,19 +59,35 @@ const issueCsvHeaders = [
 
 const emptyImportMessage = "Select a project and a CSV file, then click Import.";
 
-export function ImportIssuesPage() {
+type ImportIssuesPageProps = {
+  initialProject?: string;
+};
+
+export function ImportIssuesPage({ initialProject = "" }: ImportIssuesPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [projectCode, setProjectCode] = useState("");
+  const [projectCode, setProjectCode] = useState(initialProject);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [rows, setRows] = useState<IssueCsvRow[]>([]);
   const [message, setMessage] = useState(emptyImportMessage);
   const [messageMode, setMessageMode] = useState<MessageMode>("info");
   const [isImporting, setIsImporting] = useState(false);
 
+  const projectOptions = useMemo(() => {
+    if (!initialProject || projects.some((project) => project.value === initialProject)) {
+      return projects;
+    }
+
+    return [{ label: initialProject, value: initialProject }, ...projects];
+  }, [initialProject]);
+
   const selectedProject = useMemo(
-    () => projects.find((project) => project.value === projectCode),
-    [projectCode],
+    () => projectOptions.find((project) => project.value === projectCode),
+    [projectCode, projectOptions],
   );
+
+  useEffect(() => {
+    setProjectCode(initialProject);
+  }, [initialProject]);
 
   const importCsv = async () => {
     if (!projectCode) {
@@ -123,7 +143,7 @@ export function ImportIssuesPage() {
             <span className="text-xs font-bold text-slate-500">Project</span>
             <Dropdown
               className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              options={projects}
+              options={projectOptions}
               placeholder="Select project"
               value={projectCode}
               onChange={(event) => setProjectCode(event.value ?? "")}

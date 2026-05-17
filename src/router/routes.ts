@@ -34,6 +34,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import issue CSV data into a selected project.",
   },
   {
+    key: "dailyWorkNotes",
+    path: "/daily-work-notes",
+    title: "Daily Work Notes",
+    subtitle: "Track completed, incomplete, and reserved work notes by date.",
+  },
+  {
     key: "dailyReport",
     path: "/daily-report",
     title: "Daily Report",
@@ -74,13 +80,15 @@ export function routeByKey(key: MenuKey) {
 }
 
 export function routeByPath(path: string) {
-  if (path.startsWith("/projects/")) {
+  const pathname = path.split("?")[0];
+
+  if (pathname.startsWith("/projects/")) {
     return routeByKey("projects");
   }
 
-  if (path.startsWith("/import-reports/")) {
+  if (pathname.startsWith("/import-reports/")) {
     return routeByKey("importReports");
   }
 
-  return appRoutes.find((route) => route.path === path) ?? defaultRoute;
+  return appRoutes.find((route) => route.path === pathname) ?? defaultRoute;
 }

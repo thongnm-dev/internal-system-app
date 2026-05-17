@@ -1,4 +1,4 @@
-import { Calendar as IconCalendar, RotateCcw, Search } from "lucide-react";
+import { Calendar as IconCalendar, FileInput, RotateCcw, Search } from "lucide-react";
 import { Button } from "primereact/button";
 import { Calendar } from "primereact/calendar";
 import { Column } from "primereact/column";
@@ -139,9 +139,14 @@ const backlogItems: IssueBacklogItem[] = [
   },
 ];
 
-export function IssueBacklogPage() {
+type IssueBacklogPageProps = {
+  onOpenImport: (project: string) => void;
+};
+
+export function IssueBacklogPage({ onOpenImport }: IssueBacklogPageProps) {
   const [criteria, setCriteria] = useState(initialCriteria);
   const [appliedCriteria, setAppliedCriteria] = useState(initialCriteria);
+  const canOpenImport = Boolean(criteria.project);
 
   const filteredItems = useMemo(
     () => backlogItems.filter((item) => matchesCriteria(item, appliedCriteria)),
@@ -281,6 +286,20 @@ export function IssueBacklogPage() {
           </Fieldset>
 
           <div className="flex items-center justify-end gap-2">
+            <Button
+              className="flex h-10 items-center gap-2 rounded-md bg-slate-800 px-4 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              disabled={!canOpenImport}
+              title={canOpenImport ? "Import issues for selected project" : "Select a project before importing issues"}
+              onClick={() => {
+                if (criteria.project) {
+                  onOpenImport(criteria.project);
+                }
+              }}
+            >
+              <FileInput className="h-4 w-4" />
+              Import
+            </Button>
             <Button
               className="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
               type="button"

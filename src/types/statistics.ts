@@ -49,6 +49,7 @@ export type MenuKey =
   | "projects"
   | "issueBacklog"
   | "importIssues"
+  | "dailyWorkNotes"
   | "dailyReport"
   | "importCsv"
   | "importReports"
