@@ -9,6 +9,7 @@ use commands::import_commands::{
     preview_monthly_report_csv, search_import_batches,
 };
 use commands::system_commands::get_system_info;
+use commands::xlsx_markdown_commands::convert_xlsx_spec_to_markdown;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,7 +21,8 @@ pub fn run() {
             import_monthly_report_csv,
             list_import_batches,
             search_import_batches,
-            get_import_batch_detail
+            get_import_batch_detail,
+            convert_xlsx_spec_to_markdown
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

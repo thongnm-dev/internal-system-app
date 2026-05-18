@@ -34,6 +34,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import issue CSV data into a selected project.",
   },
   {
+    key: "xlsxToMarkdown",
+    path: "/xlsx-to-markdown",
+    title: "Excel to Markdown",
+    subtitle: "Convert uploaded Excel screen specs into Markdown files.",
+  },
+  {
     key: "dailyWorkNotes",
     path: "/daily-work-notes",
     title: "Daily Work Notes",

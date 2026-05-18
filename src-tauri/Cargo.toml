@@ -1,7 +1,7 @@
 [package]
-name = "pjjyuji_project_statistics"
+name = "management_systems"
 version = "0.1.0"
-description = "Desktop statistics app for PJ Yuji CSV data"
+description = "Management Systems"
 authors = ["internal"]
 edition = "2021"
 

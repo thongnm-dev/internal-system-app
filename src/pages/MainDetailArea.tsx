@@ -5,6 +5,7 @@ import { useDailyWorkNotesController } from "../controller/useDailyWorkNotesCont
 import { useProjectSkillsController } from "../controller/useProjectSkillsController";
 import { useProjectsController } from "../controller/useProjectsController";
 import { useSettingsController } from "../controller/useSettingsController";
+import { useXlsxMarkdownController } from "../controller/useXlsxMarkdownController";
 import { useAuthStore } from "../stores/authStore";
 import type { MenuKey, SelectedPhaseDetail } from "../types/statistics";
 import { DailyReportPage } from "./DailyReportPage";
@@ -19,6 +20,7 @@ import { ProjectDetailPage } from "./ProjectDetailPage";
 import { ProjectSkillsPage } from "./ProjectSkillsPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { SettingsPage } from "./SettingsPage";
+import { XlsxMarkdownPage } from "./XlsxMarkdownPage";
 
 type MainDetailAreaProps = {
   activeMenu: MenuKey;
@@ -46,6 +48,10 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
 
   if (activeMenu === "importIssues") {
     return <ImportIssuesRoute path={path} />;
+  }
+
+  if (activeMenu === "xlsxToMarkdown") {
+    return <XlsxMarkdownRoute />;
   }
 
   if (activeMenu === "dailyWorkNotes") {
@@ -235,6 +241,26 @@ function ImportIssuesRoute({ path }: { path: string }) {
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <ImportIssuesPage initialProject={initialProject} />
     </section>
+  );
+}
+
+function XlsxMarkdownRoute() {
+  const xlsxMarkdown = useXlsxMarkdownController();
+
+  return (
+    <XlsxMarkdownPage
+      inputPath={xlsxMarkdown.inputPath}
+      isConverting={xlsxMarkdown.isConverting}
+      message={xlsxMarkdown.message}
+      messageMode={xlsxMarkdown.messageMode}
+      outputPath={xlsxMarkdown.outputPath}
+      result={xlsxMarkdown.result}
+      onConvert={() => void xlsxMarkdown.convert()}
+      onInputPathChange={xlsxMarkdown.setInputPath}
+      onOutputPathChange={xlsxMarkdown.setOutputPath}
+      onPickInputFile={() => void xlsxMarkdown.pickInputFile()}
+      onPickOutputFile={() => void xlsxMarkdown.pickOutputFile()}
+    />
   );
 }
 

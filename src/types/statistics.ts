@@ -49,6 +49,7 @@ export type MenuKey =
   | "projects"
   | "issueBacklog"
   | "importIssues"
+  | "xlsxToMarkdown"
   | "dailyWorkNotes"
   | "dailyReport"
   | "importCsv"
@@ -138,4 +139,12 @@ export type ImportReportListItem = {
 export type ImportReportDetail = ImportReportListItem & {
   source_path: string;
   preview_rows: ImportPreviewRow[];
+};
+
+export type XlsxMarkdownResult = {
+  source_path: string;
+  output_path: string;
+  source_file_name: string;
+  output_file_name: string;
+  markdown: string;
 };
