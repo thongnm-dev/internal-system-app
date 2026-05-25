@@ -42,6 +42,10 @@ export function MainDetailArea({ activeMenu, path, navigateToPath, onPhaseClick 
     return <ProjectsRoute path={path} onNavigate={navigateToPath} />;
   }
 
+  if (activeMenu === "projectSkills") {
+    return <ProjectSkillsRoute />;
+  }
+
   if (activeMenu === "issueBacklog") {
     return <IssueBacklogRoute onNavigate={navigateToPath} />;
   }
@@ -149,13 +153,7 @@ function ProjectsRoute({ path, onNavigate }: { path: string; onNavigate: (path: 
   const projectSkillCode = getProjectSkillCodeFromPath(path);
 
   if (projectSkillCode !== null) {
-    return (
-      <ProjectSkillsRoute
-        projectCode={projectSkillCode}
-        projectName={getProjectNameFromPath(path)}
-        onBack={() => onNavigate("/projects")}
-      />
-    );
+    return <ProjectSkillsRoute />;
   }
 
   if (path.startsWith("/projects/detail")) {
@@ -196,29 +194,33 @@ function ProjectListRoute({ onNavigate }: { onNavigate: (path: string) => void }
   );
 }
 
-function ProjectSkillsRoute({
-  onBack,
-  projectCode,
-  projectName,
-}: {
-  onBack: () => void;
-  projectCode: string;
-  projectName: string;
-}) {
-  const projectSkills = useProjectSkillsController(projectCode, projectName);
+function ProjectSkillsRoute() {
+  const projectSkills = useProjectSkillsController();
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <ProjectSkillsPage
+        category={projectSkills.category}
         draft={projectSkills.draft}
+        filteredSkills={projectSkills.filteredSkills}
         generatedMarkdown={projectSkills.generatedMarkdown}
         message={projectSkills.message}
         messageMode={projectSkills.messageMode}
-        onBack={onBack}
+        query={projectSkills.query}
+        selectedSkillId={projectSkills.selectedSkillId}
+        sortKey={projectSkills.sortKey}
+        stats={projectSkills.stats}
+        viewMode={projectSkills.viewMode}
+        onCategoryChange={projectSkills.setCategory}
+        onCreate={projectSkills.createSkill}
+        onDelete={projectSkills.deleteDraft}
+        onQueryChange={projectSkills.setQuery}
         onReset={projectSkills.resetDraft}
         onSave={projectSkills.saveDraft}
+        onSelectSkill={projectSkills.selectSkill}
+        onSortChange={projectSkills.setSortKey}
         onUpdateDraft={projectSkills.updateDraft}
-        onUpdateRole={projectSkills.updateRole}
+        onViewModeChange={projectSkills.setViewMode}
       />
     </section>
   );
@@ -280,15 +282,6 @@ function getProjectSkillCodeFromPath(path: string) {
   }
 
   return decodeURIComponent(path.slice(prefix.length).split("?")[0]);
-}
-
-function getProjectNameFromPath(path: string) {
-  const query = path.split("?")[1];
-  if (!query) {
-    return "";
-  }
-
-  return new URLSearchParams(query).get("name") ?? "";
 }
 
 function getImportReportIdFromPath(path: string) {
