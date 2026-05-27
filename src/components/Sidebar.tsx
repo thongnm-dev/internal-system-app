@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  BookOpenCheck,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -26,6 +27,7 @@ export function Sidebar({ activeMenu, isCollapsed, onMenuChange, onToggleCollaps
   const items = [
     { id: "overview" as const, icon: Home },
     { id: "projects" as const, icon: Table2 },
+    { id: "projectSkills" as const, icon: BookOpenCheck },
     { id: "issueBacklog" as const, icon: ListTodo },
     { id: "xlsxToMarkdown" as const, icon: FileText },
     { id: "dailyWorkNotes" as const, icon: NotebookPen },

@@ -22,6 +22,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Detailed project breakdown grouped by development phase.",
   },
   {
+    key: "projectSkills",
+    path: "/project-skills",
+    title: "Skills",
+    subtitle: "Manage the internal skill catalog by skill name, category, and usage.",
+  },
+  {
     key: "issueBacklog",
     path: "/issue-backlog",
     title: "Issue Backlog",

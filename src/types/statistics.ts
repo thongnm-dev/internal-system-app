@@ -47,6 +47,7 @@ export type MessageMode = "info" | "error";
 export type MenuKey =
   | "overview"
   | "projects"
+  | "projectSkills"
   | "issueBacklog"
   | "importIssues"
   | "xlsxToMarkdown"
