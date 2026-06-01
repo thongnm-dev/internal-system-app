@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BottomBar } from "./components/BottomBar";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
+import { StartupScreen } from "./components/StartupScreen";
 import { useAppShellController } from "./controller/useAppShellController";
 import { defaultRoute, loginRoute } from "./router/routes";
 import { MainDetailArea } from "./pages/MainDetailArea";
@@ -20,6 +21,7 @@ export function App() {
 function AppShell() {
   const {
     activeMenu,
+    isBootstrapping,
     isSidebarCollapsed,
     navigate,
     navigateToPath,
@@ -43,6 +45,10 @@ function AppShell() {
       navigateToPath(returnPath ?? defaultRoute.path);
     }
   }, [isAuthenticated, navigateToPath, returnPath, route, setReturnPath]);
+
+  if (isBootstrapping) {
+    return <StartupScreen />;
+  }
 
   if (route.key === "login") {
     return (

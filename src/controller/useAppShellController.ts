@@ -4,6 +4,17 @@ import { useHashRouter } from "../router/useHashRouter";
 import type { MessageMode, SelectedPhaseDetail, SystemInfo } from "../types/statistics";
 import { applyStoredThemePreference } from "./useSettingsController";
 
+const BOOTSTRAP_MIN_DURATION_MS = 900;
+
+async function setCurrentWindowResizable(isResizable: boolean) {
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().setResizable(isResizable);
+  } catch {
+    // Browser dev sessions do not expose a Tauri window.
+  }
+}
+
 export function useAppShellController() {
   const router = useHashRouter();
   const [systemInfo, setSystemInfo] = useState<SystemInfo>({
@@ -16,6 +27,7 @@ export function useAppShellController() {
   const [messageMode, setMessageMode] = useState<MessageMode>("info");
   const [selectedPhaseDetail, setSelectedPhaseDetail] = useState<SelectedPhaseDetail | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   const refreshSystemInfo = async () => {
     try {
@@ -39,15 +51,44 @@ export function useAppShellController() {
   };
 
   useEffect(() => {
-    applyStoredThemePreference();
-    void refreshSystemInfo();
-    const timer = window.setInterval(() => void refreshSystemInfo(), 1000);
-    return () => window.clearInterval(timer);
+    let isMounted = true;
+    let timer: number | undefined;
+    const startedAt = window.performance.now();
+
+    const bootstrap = async () => {
+      await setCurrentWindowResizable(false);
+      applyStoredThemePreference();
+      await refreshSystemInfo();
+
+      const elapsed = window.performance.now() - startedAt;
+      const remainingDelay = Math.max(0, BOOTSTRAP_MIN_DURATION_MS - elapsed);
+
+      window.setTimeout(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setIsBootstrapping(false);
+        void setCurrentWindowResizable(true);
+        timer = window.setInterval(() => void refreshSystemInfo(), 1000);
+      }, remainingDelay);
+    };
+
+    void bootstrap();
+
+    return () => {
+      isMounted = false;
+      if (timer !== undefined) {
+        window.clearInterval(timer);
+      }
+      void setCurrentWindowResizable(true);
+    };
   }, []);
 
   return {
     ...router,
     isSidebarCollapsed,
+    isBootstrapping,
     message,
     messageMode,
     selectedPhaseDetail,

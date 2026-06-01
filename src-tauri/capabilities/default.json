@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "Default desktop permissions for the PJ Yuji Statistics app.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default", "dialog:allow-open", "dialog:allow-save"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-resizable",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
 }
