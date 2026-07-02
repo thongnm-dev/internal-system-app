@@ -8,6 +8,7 @@ use commands::import_commands::{
     get_import_batch_detail, import_monthly_report_csv, list_import_batches,
     preview_monthly_report_csv, search_import_batches,
 };
+use commands::project_commands::{get_backlog_project_by_key, get_project_detail};
 use commands::system_commands::get_system_info;
 use commands::xlsx_markdown_commands::convert_xlsx_spec_to_markdown;
 
@@ -22,7 +23,9 @@ pub fn run() {
             list_import_batches,
             search_import_batches,
             get_import_batch_detail,
-            convert_xlsx_spec_to_markdown
+            convert_xlsx_spec_to_markdown,
+            get_project_detail,
+            get_backlog_project_by_key
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
