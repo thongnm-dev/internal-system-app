@@ -103,12 +103,15 @@ Each feature folder follows the pattern:
 
 Clean layered architecture under `src-tauri/src/`:
 ```
-commands/       ← Tauri #[tauri::command] handlers (thin, delegate to domain)
-domain/         ← Business logic (monthly_report, import_csv, system)
-infrastructure/ ← File I/O and CSV parsing with encoding_rs (handles Shift-JIS)
+commands/       ← Tauri #[tauri::command] handlers (thin, delegate to services)
+services/       ← Business logic (import_csv, monthly_report, system, project, xlsx_markdown)
+database/       ← Persistence layer (JSON file store, CSV reading)
+infrastructure/ ← Low-level I/O utilities (encoding_rs Shift-JIS, file path resolution)
 utils/          ← Network and time helpers
 app/            ← AppError type and Result alias
 ```
+
+Data flow: `commands → services → database → infrastructure`
 
 ### Styling
 

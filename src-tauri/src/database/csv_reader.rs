@@ -1,10 +1,8 @@
 use crate::app::result::AppResult;
-use crate::domain::import_csv::models::{
-    ImportCsvPreviewResult, ImportPreviewRow, MinuteTotals, WorkRecord,
-};
-use crate::domain::import_csv::phase::phase_label;
 use crate::infrastructure::csv::reader::{get_required_index, parse_minutes, read_shift_jis_csv};
 use crate::infrastructure::file_system::{display_path, resolve_input_path};
+use crate::services::import_csv::models::{MinuteTotals, WorkRecord};
+use crate::services::import_csv::phase::phase_label;
 use std::path::{Path, PathBuf};
 
 const DATE: &str = "日付";
@@ -19,41 +17,10 @@ pub(crate) const LEGAL_HOLIDAY_OVERTIME: &str = "法定休日残業(分)";
 pub(crate) const LEGAL_PUBLIC_HOLIDAY_OVERTIME: &str = "法定祝日残業時間(分)";
 pub(crate) const LATE_NIGHT_OVERTIME: &str = "深夜残業(分)";
 
-pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
-    let data = read_csv_import_data(path)?;
-
-    Ok(ImportCsvPreviewResult {
-        source_path: data.source_path,
-        source_file_name: data.source_file_name,
-        row_count: data.records.len(),
-        total_minutes: data.total_minutes,
-        preview_rows: build_preview_rows(&data.records),
-        raw_headers: data.raw_csv.headers,
-        raw_rows: data.raw_csv.rows,
-        minute_column_indexes: data.raw_csv.minute_column_indexes,
-    })
-}
-
-pub(crate) fn read_csv_import_data(path: &str) -> AppResult<CsvImportData> {
-    let (input_path, records) = read_work_records(path)?;
-    let raw_csv = read_raw_csv(&input_path)?;
-    let source_path = display_path(&input_path);
-    let source_file_name = input_path
-        .file_name()
-        .map(|value| value.to_string_lossy().to_string())
-        .unwrap_or_else(|| source_path.clone());
-    let total_minutes: i64 = records
-        .iter()
-        .map(|record| record.totals.total_minutes())
-        .sum();
-
-    Ok(CsvImportData {
-        source_path,
-        source_file_name,
-        records,
-        total_minutes,
-        raw_csv,
-    })
+pub struct RawCsv {
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+    pub minute_column_indexes: Vec<usize>,
 }
 
 pub fn read_work_records(path: &str) -> AppResult<(PathBuf, Vec<WorkRecord>)> {
@@ -110,36 +77,7 @@ pub fn read_work_records(path: &str) -> AppResult<(PathBuf, Vec<WorkRecord>)> {
     Ok((input_path, records))
 }
 
-pub(crate) fn build_preview_rows(records: &[WorkRecord]) -> Vec<ImportPreviewRow> {
-    records
-        .iter()
-        .map(|record| ImportPreviewRow {
-            date: record.date.clone(),
-            project_code: record.project_code.clone(),
-            project_name: record.project_name.clone(),
-            process_code: record.process_code.clone(),
-            phase_name: record.phase_name.clone(),
-            work_content: record.work_content.clone(),
-            total_minutes: record.totals.total_minutes(),
-        })
-        .collect()
-}
-
-pub(crate) struct RawCsv {
-    pub headers: Vec<String>,
-    pub rows: Vec<Vec<String>>,
-    pub minute_column_indexes: Vec<usize>,
-}
-
-pub(crate) struct CsvImportData {
-    pub source_path: String,
-    pub source_file_name: String,
-    pub records: Vec<WorkRecord>,
-    pub total_minutes: i64,
-    pub raw_csv: RawCsv,
-}
-
-pub(crate) fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
+pub fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
     let content = read_shift_jis_csv(input_path)?;
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
@@ -172,4 +110,34 @@ pub(crate) fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
         rows,
         minute_column_indexes,
     })
+}
+
+pub fn read_csv_import_data(path: &str) -> AppResult<CsvImportData> {
+    let (input_path, records) = read_work_records(path)?;
+    let raw_csv = read_raw_csv(&input_path)?;
+    let source_path = display_path(&input_path);
+    let source_file_name = input_path
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .unwrap_or_else(|| source_path.clone());
+    let total_minutes: i64 = records
+        .iter()
+        .map(|record| record.totals.total_minutes())
+        .sum();
+
+    Ok(CsvImportData {
+        source_path,
+        source_file_name,
+        records,
+        total_minutes,
+        raw_csv,
+    })
+}
+
+pub struct CsvImportData {
+    pub source_path: String,
+    pub source_file_name: String,
+    pub records: Vec<WorkRecord>,
+    pub total_minutes: i64,
+    pub raw_csv: RawCsv,
 }

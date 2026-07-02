@@ -1,7 +1,8 @@
 mod app;
 mod commands;
-mod domain;
+mod database;
 mod infrastructure;
+mod services;
 mod utils;
 
 use commands::import_commands::{

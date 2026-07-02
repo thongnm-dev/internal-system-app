@@ -1,3 +1,3 @@
 fn main() {
-    management_systems::run()
+    app::run()
 }

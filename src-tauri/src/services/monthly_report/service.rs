@@ -1,39 +1,15 @@
 use crate::app::{error::AppError, result::AppResult};
-use crate::domain::import_csv::models::WorkRecord;
-use crate::domain::import_csv::service::{build_preview_rows, CsvImportData};
-use crate::domain::monthly_report::models::{
+use crate::database::csv_reader::CsvImportData;
+use crate::database::report_store::{self, StoredImportBatch};
+use crate::services::import_csv::models::WorkRecord;
+use crate::services::import_csv::service::build_preview_rows;
+use crate::services::monthly_report::models::{
     ImportBatchDetail, ImportBatchListItem, ImportBatchSearchCriteria, ImportBatchSummary,
     ImportCsvResult,
 };
 use crate::utils::time::current_timestamp;
-use serde::{Deserialize, Serialize};
 use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
-
-const REPORT_STORE_FILE: &str = "pjjyuji_statistics.json";
-
-#[derive(Default, Deserialize, Serialize)]
-struct ReportStore {
-    next_batch_id: i64,
-    batches: Vec<StoredImportBatch>,
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-struct StoredImportBatch {
-    id: i64,
-    source_path: String,
-    source_file_name: String,
-    imported_at: String,
-    report_name: String,
-    note: String,
-    target_month_from: String,
-    target_month_to: String,
-    imported_by: String,
-    row_count: i64,
-    total_minutes: i64,
-    records: Vec<WorkRecord>,
-}
+use std::path::Path;
 
 pub fn save_imported_report(
     data: CsvImportData,
@@ -55,7 +31,7 @@ pub fn save_imported_report(
     let imported_by = current_username();
     let (target_month_from, target_month_to) = target_month_range(&records);
 
-    let mut store = load_store(app_data_dir)?;
+    let mut store = report_store::load_store(app_data_dir)?;
     let batch_id = store.next_id();
     store.batches.push(StoredImportBatch {
         id: batch_id,
@@ -71,7 +47,7 @@ pub fn save_imported_report(
         total_minutes,
         records: records.clone(),
     });
-    save_store(app_data_dir, &store)?;
+    report_store::save_store(app_data_dir, &store)?;
 
     Ok(ImportCsvResult {
         batch_id,
@@ -88,7 +64,7 @@ pub fn save_imported_report(
 }
 
 pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSummary>> {
-    let mut batches = load_store(app_data_dir)?
+    let mut batches = report_store::load_store(app_data_dir)?
         .batches
         .into_iter()
         .map(|batch| ImportBatchSummary {
@@ -119,7 +95,7 @@ pub fn search_import_batches(
     let report_name = trimmed_filter(criteria.report_name);
     let keyword = trimmed_filter(criteria.keyword).map(|value| value.to_lowercase());
 
-    let mut items = load_store(app_data_dir)?
+    let mut items = report_store::load_store(app_data_dir)?
         .batches
         .into_iter()
         .filter(|batch| {
@@ -169,7 +145,7 @@ pub fn search_import_batches(
 }
 
 pub fn get_import_batch_detail(app_data_dir: &Path, batch_id: i64) -> AppResult<ImportBatchDetail> {
-    let batch = load_store(app_data_dir)?
+    let batch = report_store::load_store(app_data_dir)?
         .batches
         .into_iter()
         .find(|batch| batch.id == batch_id)
@@ -190,48 +166,6 @@ pub fn get_import_batch_detail(app_data_dir: &Path, batch_id: i64) -> AppResult<
         total_minutes: batch.total_minutes,
         preview_rows,
     })
-}
-
-impl ReportStore {
-    fn next_id(&mut self) -> i64 {
-        let id = self.next_batch_id.max(1);
-        self.next_batch_id = id + 1;
-        id
-    }
-}
-
-fn load_store(app_data_dir: &Path) -> AppResult<ReportStore> {
-    let path = store_path(app_data_dir)?;
-    if !path.exists() {
-        return Ok(ReportStore {
-            next_batch_id: 1,
-            batches: Vec::new(),
-        });
-    }
-
-    let content = fs::read_to_string(path)?;
-    let mut store: ReportStore = serde_json::from_str(&content)?;
-    let next_id = store
-        .batches
-        .iter()
-        .map(|batch| batch.id)
-        .max()
-        .unwrap_or(0)
-        + 1;
-    store.next_batch_id = store.next_batch_id.max(next_id).max(1);
-    Ok(store)
-}
-
-fn save_store(app_data_dir: &Path, store: &ReportStore) -> AppResult<()> {
-    let path = store_path(app_data_dir)?;
-    let content = serde_json::to_string_pretty(store)?;
-    fs::write(path, content)?;
-    Ok(())
-}
-
-fn store_path(app_data_dir: &Path) -> AppResult<PathBuf> {
-    fs::create_dir_all(app_data_dir)?;
-    Ok(app_data_dir.join(REPORT_STORE_FILE))
 }
 
 fn contains_case_insensitive(text: &str, needle_lowercase: &str) -> bool {
