@@ -33,13 +33,13 @@ function labelFor(id: MenuKey): string {
 </script>
 
 <template>
-  <aside class="flex min-h-0 flex-col border-r border-slate-200 bg-slate-900 text-white">
-    <div :class="['border-b border-white/10', isCollapsed ? 'p-3' : 'p-5']">
+  <aside class="flex min-h-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-text">
+    <div :class="['border-b border-sidebar-border', isCollapsed ? 'p-3' : 'p-5']">
       <div :class="['flex items-center gap-3', isCollapsed ? 'justify-center' : 'justify-between']">
-        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand font-bold">PJ</div>
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand font-bold text-white">PJ</div>
         <button
           v-if="!isCollapsed"
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
           type="button"
           title="Collapse sidebar"
           @click="emit('toggleCollapse')"
@@ -50,7 +50,7 @@ function labelFor(id: MenuKey): string {
 
       <template v-if="isCollapsed">
         <button
-          class="mt-3 flex h-9 w-full items-center justify-center rounded-md text-slate-300 hover:bg-white/10 hover:text-white"
+          class="mt-3 flex h-9 w-full items-center justify-center rounded-md text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
           type="button"
           title="Expand sidebar"
           @click="emit('toggleCollapse')"
@@ -59,7 +59,7 @@ function labelFor(id: MenuKey): string {
         </button>
       </template>
       <template v-else>
-        <h1 class="mt-4 text-xl font-bold leading-tight">Manager System</h1>
+        <h1 class="mt-4 text-xl font-bold leading-tight text-sidebar-title">Manager System</h1>
       </template>
     </div>
 
@@ -70,8 +70,8 @@ function labelFor(id: MenuKey): string {
             'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
             isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
             activeMenu === item.id
-              ? 'bg-white text-slate-900'
-              : 'text-slate-300 hover:bg-white/10 hover:text-white',
+              ? 'bg-sidebar-active text-sidebar-text-active'
+              : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
           ]"
           type="button"
           :title="isCollapsed ? undefined : labelFor(item.id)"
@@ -82,22 +82,22 @@ function labelFor(id: MenuKey): string {
         </button>
         <span
           v-if="isCollapsed"
-          class="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          class="pointer-events-none absolute left-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-bar px-2.5 py-1.5 text-xs font-semibold text-bar-strong opacity-0 shadow-float transition-opacity group-hover:opacity-100"
         >
           {{ labelFor(item.id) }}
         </span>
       </div>
     </nav>
 
-    <div :class="['border-t border-white/10 text-sm text-slate-300', isCollapsed ? 'p-2' : 'p-4']">
+    <div :class="['border-t border-sidebar-border text-sm text-sidebar-text', isCollapsed ? 'p-2' : 'p-4']">
       <div class="group relative">
         <button
           :class="[
             'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
             isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
             activeMenu === 'settings'
-              ? 'bg-white text-slate-900'
-              : 'text-slate-300 hover:bg-white/10 hover:text-white',
+              ? 'bg-sidebar-active text-sidebar-text-active'
+              : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
           ]"
           type="button"
           :title="isCollapsed ? undefined : settingsLabel"
@@ -108,7 +108,7 @@ function labelFor(id: MenuKey): string {
         </button>
         <span
           v-if="isCollapsed"
-          class="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          class="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-bar px-2.5 py-1.5 text-xs font-semibold text-bar-strong opacity-0 shadow-float transition-opacity group-hover:opacity-100"
         >
           {{ settingsLabel }}
         </span>

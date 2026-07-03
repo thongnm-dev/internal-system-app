@@ -191,13 +191,13 @@ function filteredPickerProjects() {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
+  <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
     <!-- Top bar: project list + month navigation -->
-    <section class="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-stone-200 bg-white">
-      <div class="flex min-w-0 items-center justify-between gap-3 border-r border-stone-200 px-4">
+    <section class="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-divider bg-panel">
+      <div class="flex min-w-0 items-center justify-between gap-3 border-r border-divider px-4">
         <div class="min-w-0">
           <h3 class="truncate font-bold">Assigned work</h3>
-          <p class="mt-1 truncate text-xs text-slate-500">{{ ctrl.projects.value.length.toLocaleString("en-US") }} projects</p>
+          <p class="mt-1 truncate text-xs text-muted">{{ ctrl.projects.value.length.toLocaleString("en-US") }} projects</p>
         </div>
         <button
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -217,12 +217,12 @@ function filteredPickerProjects() {
           </span>
           <div class="min-w-0">
             <h3 class="truncate font-bold">{{ ctrl.monthLabel.value }}</h3>
-            <p class="mt-1 truncate text-xs text-slate-500">Daily work hour input</p>
+            <p class="mt-1 truncate text-xs text-muted">Daily work hour input</p>
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
             type="button"
             title="Previous month"
             @click="ctrl.previousMonth()"
@@ -230,14 +230,14 @@ function filteredPickerProjects() {
             <i class="pi pi-chevron-left" />
           </button>
           <input
-            class="h-9 w-32 rounded-md border border-slate-300 bg-white px-3 text-center text-sm font-bold text-slate-700 outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
             type="month"
             :max="ctrl.maxMonthValue.value"
             :value="parseMonth(ctrl.monthValue.value)"
             @change="ctrl.selectMonth(($event.target as HTMLInputElement).value)"
           />
           <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
             title="Next month"
             :disabled="!ctrl.canGoNextMonth.value"
@@ -250,29 +250,29 @@ function filteredPickerProjects() {
     </section>
 
     <!-- Table section -->
-    <section class="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+    <section class="flex min-h-0 flex-1 flex-col overflow-hidden bg-panel">
       <!-- Column headers -->
-      <div class="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] bg-slate-800 text-white">
-        <div class="flex min-w-0 items-center justify-between gap-3 border-b border-r border-stone-200 px-4">
+      <div class="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-divider">
+        <div class="flex min-w-0 items-center justify-between gap-3 border-r border-divider px-4">
           <div class="min-w-0">
-            <h3 class="truncate text-sm font-bold">Project / task</h3>
-            <p class="mt-1 truncate text-xs text-white/70">Grouped by assigned project</p>
+            <h3 class="truncate text-sm font-bold text-ink">Project / task</h3>
+            <p class="mt-1 truncate text-xs text-muted">Grouped by assigned project</p>
           </div>
-          <span class="rounded-md bg-white/10 px-2 py-1 text-xs font-bold">Total</span>
+          <span class="rounded-md bg-canvas px-2 py-1 text-xs font-bold text-muted">Total</span>
         </div>
 
-        <div ref="dayHeaderRef" class="min-w-0 overflow-hidden border-b border-stone-200">
+        <div ref="dayHeaderRef" class="min-w-0 overflow-hidden">
           <div class="flex h-[76px] min-w-max">
             <div
               v-for="day in ctrl.days.value"
               :key="day.day"
               :class="[
-                'flex w-12 shrink-0 flex-col items-center justify-center border-r border-white/10 px-1 text-center',
-                day.isToday ? 'bg-brand' : day.isWeekend ? 'bg-slate-700' : '',
+                'flex w-12 shrink-0 flex-col items-center justify-center border-r border-divider px-1 text-center',
+                day.isToday ? 'bg-brand text-white' : day.isWeekend ? 'bg-canvas' : '',
               ]"
             >
               <span class="text-sm font-extrabold leading-none">{{ day.label }}</span>
-              <span class="mt-1 text-[8px] font-semibold text-white/30">{{ day.weekday }}</span>
+              <span :class="['mt-1 text-[8px] font-semibold', day.isToday ? 'text-white/60' : 'text-muted']">{{ day.weekday }}</span>
               <span class="mt-1 text-[11px] font-extrabold leading-none text-red-600">{{ formatHoursDisplay(dayTotal(ctrl.projects.value, ctrl.entries.value, day.day)) }}h</span>
             </div>
           </div>
@@ -282,7 +282,7 @@ function filteredPickerProjects() {
       <!-- Data rows -->
       <div class="grid min-h-0 flex-1 grid-cols-[380px_minmax(0,1fr)]">
         <!-- Project/task column (synced scroll via transform) -->
-        <div class="min-w-0 overflow-hidden border-r border-stone-200" @wheel.prevent="scrollFromProjectColumn">
+        <div class="min-w-0 overflow-hidden border-r border-divider" @wheel.prevent="scrollFromProjectColumn">
           <div
             :style="{
               transform: `translateY(-${tableScrollTop}px)`,
@@ -298,7 +298,7 @@ function filteredPickerProjects() {
                 <div class="min-w-0 flex-1">
                   <strong class="block truncate text-sm text-white">{{ project.code }} - {{ project.name }}</strong>
                 </div>
-                <span class="ml-3 shrink-0 rounded-md bg-white/20 px-2 py-1 text-xs font-bold text-white">
+                <span class="ml-3 shrink-0 rounded-md bg-panel/20 px-2 py-1 text-xs font-bold text-white">
                   {{ formatHoursDisplay(projectTotal(project, ctrl.entries.value)) }}h
                 </span>
               </div>
@@ -306,13 +306,13 @@ function filteredPickerProjects() {
               <div
                 v-for="task in project.tasks"
                 :key="task.id"
-                class="flex h-14 items-center border-b border-stone-200 bg-white px-4"
+                class="flex h-14 items-center border-b border-divider bg-panel px-4"
               >
                 <div class="min-w-0 flex-1 pl-3">
-                  <strong class="block truncate text-sm text-slate-900">{{ task.name }}</strong>
-                  <span class="mt-1 block truncate text-xs font-semibold text-slate-500">{{ task.code }}</span>
+                  <strong class="block truncate text-sm text-ink">{{ task.name }}</strong>
+                  <span class="mt-1 block truncate text-xs font-semibold text-muted">{{ task.code }}</span>
                 </div>
-                <span class="ml-3 shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                <span class="ml-3 shrink-0 rounded-md bg-canvas px-2 py-1 text-xs font-bold text-secondary">
                   {{ formatHoursDisplay(ctrl.totalHours(task.id)) }}h
                 </span>
               </div>
@@ -332,7 +332,7 @@ function filteredPickerProjects() {
                   :key="`${project.id}-${day.day}`"
                   :class="[
                     'flex h-12 w-12 shrink-0 items-center justify-center border-r border-white/20 px-1 text-xs font-extrabold tabular-nums text-white',
-                    day.isWeekend ? 'bg-white/10' : '',
+                    day.isWeekend ? 'bg-panel/10' : '',
                   ]"
                   :title="`${project.code} total - ${day.label} ${day.weekday}`"
                 >
@@ -340,13 +340,13 @@ function filteredPickerProjects() {
                 </div>
               </div>
               <!-- Task day cells -->
-              <div v-for="task in project.tasks" :key="task.id" class="flex h-14 border-b border-stone-200">
+              <div v-for="task in project.tasks" :key="task.id" class="flex h-14 border-b border-divider">
                 <div
                   v-for="day in ctrl.days.value"
                   :key="`${task.id}-${day.day}`"
                   :class="[
-                    'flex h-14 w-12 shrink-0 items-center justify-center border-r border-stone-200 px-1',
-                    day.isWeekend ? 'bg-slate-50' : 'bg-white',
+                    'flex h-14 w-12 shrink-0 items-center justify-center border-r border-divider px-1',
+                    day.isWeekend ? 'bg-canvas' : 'bg-panel',
                   ]"
                 >
                   <button
@@ -354,7 +354,7 @@ function filteredPickerProjects() {
                       'flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-emerald-100',
                       entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0
                         ? 'border-brand bg-emerald-50 text-brand hover:bg-emerald-100'
-                        : 'border-slate-200 bg-white text-slate-400 hover:border-brand hover:text-brand',
+                        : 'border-divider bg-panel text-muted hover:border-brand hover:text-brand',
                     ]"
                     type="button"
                     :title="`${task.name} - ${day.label} ${day.weekday}`"
@@ -376,14 +376,14 @@ function filteredPickerProjects() {
     <!-- Edit entry dialog -->
     <Dialog
       :visible="!!editingCell"
-      class="w-full max-w-md rounded-lg bg-white shadow-xl"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
       modal
       @update:visible="editingCell = null"
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-slate-900">Daily report detail</h3>
-          <p v-if="editingCell" class="mt-1 text-sm text-slate-500">
+          <h3 class="font-bold text-ink">Daily report detail</h3>
+          <p v-if="editingCell" class="mt-1 text-sm text-muted">
             {{ editingCell.task.name }} - {{ editingCell.day.label }} {{ editingCell.day.weekday }}
           </p>
         </div>
@@ -391,10 +391,10 @@ function filteredPickerProjects() {
 
       <div class="space-y-4">
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Hour</span>
+          <span class="text-xs font-bold text-muted">Hour</span>
           <input
             v-model="editForm.hour"
-            class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             inputmode="decimal"
             max="24"
             min="0"
@@ -404,22 +404,22 @@ function filteredPickerProjects() {
         </label>
 
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Phase</span>
+          <span class="text-xs font-bold text-muted">Phase</span>
           <input
             v-model="editForm.phase"
-            class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
           />
         </label>
 
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Comment</span>
+          <span class="text-xs font-bold text-muted">Comment</span>
           <textarea
             v-model="editForm.comment"
-            class="mt-1 min-h-24 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 min-h-24 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
           />
         </label>
 
-        <label class="flex items-center gap-2 text-sm font-bold text-slate-700">
+        <label class="flex items-center gap-2 text-sm font-bold text-secondary">
           <Checkbox
             v-model="editForm.isOt"
             :binary="true"
@@ -428,12 +428,12 @@ function filteredPickerProjects() {
           OT
         </label>
 
-        <div v-if="editForm.isOt" class="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div v-if="editForm.isOt" class="grid gap-2 rounded-md border border-divider bg-canvas p-3">
           <label class="block">
-            <span class="text-xs font-bold text-slate-500">Regular OT</span>
+            <span class="text-xs font-bold text-muted">Regular OT</span>
             <input
               v-model="editForm.regularOt"
-              class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               inputmode="decimal"
               max="24"
               min="0"
@@ -442,10 +442,10 @@ function filteredPickerProjects() {
             />
           </label>
           <label class="block">
-            <span class="text-xs font-bold text-slate-500">Midnight OT</span>
+            <span class="text-xs font-bold text-muted">Midnight OT</span>
             <input
               v-model="editForm.midnightOt"
-              class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               inputmode="decimal"
               max="24"
               min="0"
@@ -459,7 +459,7 @@ function filteredPickerProjects() {
       <template #footer>
         <div class="flex items-center justify-between gap-3">
           <button
-            class="h-10 rounded-md border border-red-200 bg-white px-4 text-sm font-bold text-red-600 hover:bg-red-50"
+            class="h-10 rounded-md border border-red-200 bg-panel px-4 text-sm font-bold text-red-600 hover:bg-red-50"
             type="button"
             @click="clearEntry"
           >
@@ -467,7 +467,7 @@ function filteredPickerProjects() {
           </button>
           <div class="flex items-center gap-2">
             <button
-              class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
               type="button"
               @click="editingCell = null"
             >
@@ -488,39 +488,39 @@ function filteredPickerProjects() {
     <!-- Add project dialog -->
     <Dialog
       :visible="isAddingProject"
-      class="w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl"
+      class="w-full max-w-3xl overflow-hidden rounded-lg bg-panel shadow-xl"
       :style="{ maxHeight: '86vh' }"
       modal
       @update:visible="isAddingProject = $event"
     >
       <template #header>
         <div class="min-w-0">
-          <h3 class="truncate font-bold text-slate-900">Add project</h3>
-          <p class="mt-1 truncate text-sm text-slate-500">Select a project to add to daily report.</p>
+          <h3 class="truncate font-bold text-ink">Add project</h3>
+          <p class="mt-1 truncate text-sm text-muted">Select a project to add to daily report.</p>
         </div>
       </template>
 
-      <div class="border-b border-stone-200 bg-slate-50 px-5 py-4">
+      <div class="border-b border-divider bg-canvas px-5 py-4">
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Project code / name</span>
+          <span class="text-xs font-bold text-muted">Project code / name</span>
           <input
             v-model="projectKeyword"
-            class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             placeholder="Search by code or name"
           />
         </label>
       </div>
 
       <div class="min-h-0 flex-1 overflow-auto p-3">
-        <p v-if="ctrl.availableProjects.value.length === 0" class="px-2 py-6 text-center text-sm text-slate-500">No more projects.</p>
-        <p v-else-if="filteredPickerProjects().length === 0" class="px-2 py-6 text-center text-sm text-slate-500">No projects found.</p>
+        <p v-if="ctrl.availableProjects.value.length === 0" class="px-2 py-6 text-center text-sm text-muted">No more projects.</p>
+        <p v-else-if="filteredPickerProjects().length === 0" class="px-2 py-6 text-center text-sm text-muted">No projects found.</p>
         <div v-else class="grid gap-2">
           <label
             v-for="project in filteredPickerProjects()"
             :key="project.id"
             :class="[
               'flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 hover:border-brand hover:bg-emerald-50',
-              selectedProjectIds.includes(project.id) ? 'border-brand bg-emerald-50' : 'border-slate-200 bg-white',
+              selectedProjectIds.includes(project.id) ? 'border-brand bg-emerald-50' : 'border-divider bg-panel',
             ]"
           >
             <Checkbox
@@ -530,8 +530,8 @@ function filteredPickerProjects() {
               @update:model-value="toggleProjectSelection(project.id)"
             />
             <span class="min-w-0">
-              <strong class="block truncate text-sm text-slate-900">{{ project.code }} - {{ project.name }}</strong>
-              <span class="mt-1 block truncate text-xs font-semibold text-slate-500">{{ project.client }}</span>
+              <strong class="block truncate text-sm text-ink">{{ project.code }} - {{ project.name }}</strong>
+              <span class="mt-1 block truncate text-xs font-semibold text-muted">{{ project.client }}</span>
             </span>
           </label>
         </div>
@@ -539,10 +539,10 @@ function filteredPickerProjects() {
 
       <template #footer>
         <div class="flex items-center justify-between gap-3">
-          <span class="text-sm font-semibold text-slate-500">{{ selectedProjectIds.length }} selected</span>
+          <span class="text-sm font-semibold text-muted">{{ selectedProjectIds.length }} selected</span>
           <div class="flex items-center gap-2">
             <button
-              class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
               type="button"
               @click="isAddingProject = false"
             >
@@ -564,25 +564,25 @@ function filteredPickerProjects() {
     <!-- Context menu -->
     <div
       v-if="contextMenu"
-      class="fixed z-[60] w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-sm text-slate-700 shadow-xl"
+      class="fixed z-[60] w-52 overflow-hidden rounded-md border border-divider bg-panel py-1 text-sm text-secondary shadow-xl"
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       @click.stop
       @contextmenu.prevent
     >
-      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-slate-50" type="button">
+      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas" type="button">
         <i class="pi pi-plus" />
         <span class="min-w-0 truncate">Thêm task</span>
       </button>
-      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-slate-50" type="button">
+      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas" type="button">
         <i class="pi pi-folder-open" />
         <span class="min-w-0 truncate">Xem backlog</span>
       </button>
-      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-slate-50" type="button">
+      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas" type="button">
         <i class="pi pi-upload" />
         <span class="min-w-0 truncate">Import task</span>
       </button>
       <template v-if="contextMenu.canDelete">
-        <div class="my-1 border-t border-slate-100" />
+        <div class="my-1 border-t border-divider" />
         <button
           class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold text-red-600 hover:bg-red-50"
           type="button"

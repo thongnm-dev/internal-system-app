@@ -1,4 +1,5 @@
 import { computed, ref, watch } from "vue";
+import { applyTheme } from "@/shared/config/themeTokens";
 
 export type ThemeMode = "light" | "dark";
 export type LanguageCode = "vi" | "en" | "ja";
@@ -77,7 +78,7 @@ export function useSettings() {
   watch(
     settings,
     (val) => {
-      document.documentElement.dataset.theme = val.theme;
+      applyTheme(val.theme);
       window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(val));
     },
     { deep: true },

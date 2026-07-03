@@ -62,10 +62,10 @@ function onRowClick(event: { data: ProjectTableRow }) {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b border-stone-200 px-4 py-3">
+  <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-card">
+    <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b border-divider px-4 py-3">
       <h3 class="font-bold">Project summary</h3>
-      <span class="min-w-0 truncate text-right text-xs text-slate-500">{{ result?.source_path ?? "" }}</span>
+      <span class="min-w-0 truncate text-right text-xs text-muted">{{ result?.source_path ?? "" }}</span>
     </div>
     <DataTable
       class="app-data-table min-h-0"

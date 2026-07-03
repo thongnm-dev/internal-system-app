@@ -59,37 +59,37 @@ function bugCount(project: ProjectSummary) {
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <section class="flex items-center justify-end rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
+    <section class="flex items-center justify-end rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="router.push('/projects/new')"><i class="pi pi-plus" />Register</button>
     </section>
 
-    <Fieldset class="rounded-lg border border-slate-200 bg-white p-4 shadow-md fieldset-nested" legend="Search" toggleable>
+    <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Search" toggleable>
       <div class="grid gap-3">
         <div class="grid gap-3 lg:grid-cols-2">
           <label>
-            <span class="text-xs font-bold text-slate-500">Project Code</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Code" type="search" :value="ctrl.filters.value.code" @input="ctrl.filters.value = { ...ctrl.filters.value, code: ($event.target as HTMLInputElement).value }" />
+            <span class="text-xs font-bold text-muted">Project Code</span>
+            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Code" type="search" :value="ctrl.filters.value.code" @input="ctrl.filters.value = { ...ctrl.filters.value, code: ($event.target as HTMLInputElement).value }" />
           </label>
           <label>
-            <span class="text-xs font-bold text-slate-500">Project Name</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Name" type="search" :value="ctrl.filters.value.name" @input="ctrl.filters.value = { ...ctrl.filters.value, name: ($event.target as HTMLInputElement).value }" />
+            <span class="text-xs font-bold text-muted">Project Name</span>
+            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Name" type="search" :value="ctrl.filters.value.name" @input="ctrl.filters.value = { ...ctrl.filters.value, name: ($event.target as HTMLInputElement).value }" />
           </label>
         </div>
         <label>
-          <span class="text-xs font-bold text-slate-500">Keyword Search</span>
-          <input class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Code, name, phase, work content" type="search" :value="ctrl.filters.value.keyword" @input="ctrl.filters.value = { ...ctrl.filters.value, keyword: ($event.target as HTMLInputElement).value }" />
+          <span class="text-xs font-bold text-muted">Keyword Search</span>
+          <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Code, name, phase, work content" type="search" :value="ctrl.filters.value.keyword" @input="ctrl.filters.value = { ...ctrl.filters.value, keyword: ($event.target as HTMLInputElement).value }" />
         </label>
         <div class="flex items-center justify-end gap-2">
           <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="ctrl.searchProjects()"><i class="pi pi-search" />Search</button>
-          <button class="flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50" type="button" @click="ctrl.resetFilters()"><i class="pi pi-refresh" />Reset</button>
+          <button class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas" type="button" @click="ctrl.resetFilters()"><i class="pi pi-refresh" />Reset</button>
         </div>
       </div>
     </Fieldset>
 
-    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
-      <div class="flex items-center justify-between gap-4 border-b border-stone-200 px-4 py-3">
+    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+      <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
         <h3 class="font-bold">Project list</h3>
-        <span class="text-xs text-slate-500">{{ filteredProjects.length.toLocaleString("en-US") }} projects</span>
+        <span class="text-xs text-muted">{{ filteredProjects.length.toLocaleString("en-US") }} projects</span>
       </div>
       <DataTable class="app-data-table min-h-0" :empty-message="!ctrl.result.value ? 'No analysis data yet.' : 'No projects match the search conditions.'" :row-class="() => 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '980px' }" :value="visibleProjects" @row-click="(e: any) => router.push(`/projects/${encodeURIComponent(e.data.project_code)}`)">
         <Column field="project_code" header="Code" body-class="font-bold text-ink"><template #body="{ data }">{{ data.project_code || '-' }}</template></Column>
@@ -98,15 +98,15 @@ function bugCount(project: ProjectSummary) {
         <Column header="Bug count" body-class="num" header-class="num"><template #body="{ data }">{{ bugCount(data).toLocaleString("en-US") }}</template></Column>
       </DataTable>
 
-      <div v-if="contextMenu" class="fixed z-50 min-w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-sm shadow-xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
-        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50" type="button"><i class="pi pi-file" />Manage SKILL.md</button>
+      <div v-if="contextMenu" class="fixed z-50 min-w-48 overflow-hidden rounded-md border border-divider bg-panel py-1 text-sm shadow-xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
+        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button"><i class="pi pi-file" />Manage SKILL.md</button>
       </div>
 
-      <div class="flex items-center justify-between gap-4 border-t border-stone-200 px-4 py-3">
-        <span class="text-sm text-slate-500">Page {{ page.toLocaleString("en-US") }} / {{ pageCount.toLocaleString("en-US") }}</span>
+      <div class="flex items-center justify-between gap-4 border-t border-divider px-4 py-3">
+        <span class="text-sm text-muted">Page {{ page.toLocaleString("en-US") }} / {{ pageCount.toLocaleString("en-US") }}</span>
         <div class="flex items-center gap-2">
-          <button class="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" :disabled="page <= 1" type="button" @click="page = Math.max(1, page - 1)"><i class="pi pi-chevron-left" /></button>
-          <button class="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" :disabled="page >= pageCount" type="button" @click="page = Math.min(pageCount, page + 1)"><i class="pi pi-chevron-right" /></button>
+          <button class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50" :disabled="page <= 1" type="button" @click="page = Math.max(1, page - 1)"><i class="pi pi-chevron-left" /></button>
+          <button class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50" :disabled="page >= pageCount" type="button" @click="page = Math.min(pageCount, page + 1)"><i class="pi pi-chevron-right" /></button>
         </div>
       </div>
     </section>

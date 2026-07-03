@@ -78,22 +78,22 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <div class="grid grid-cols-[minmax(0,1fr)_320px] gap-4">
-      <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+      <div class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-database text-xl text-brand" />
           <h3 class="font-bold">Monthly report CSV import</h3>
         </div>
-        <p class="mt-2 text-sm text-slate-600">Upload an exported CSV from the system and save it as check data for monthly report matching.</p>
+        <p class="mt-2 text-sm text-secondary">Upload an exported CSV from the system and save it as check data for monthly report matching.</p>
         <div class="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
-          <input class="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Select CSV file..." type="text" :value="ctrl.csvPath.value" @input="ctrl.updateCsvPath(($event.target as HTMLInputElement).value)" />
-          <button class="flex h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-50" type="button" title="Browse CSV" @click="ctrl.pickCsvFile()"><i class="pi pi-folder-open" /></button>
-          <button class="flex h-10 items-center justify-center gap-2 rounded-md bg-slate-800 px-3 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60" type="button" :disabled="ctrl.isImporting.value" @click="ctrl.previewCsv()"><i class="pi pi-file-import" />Import</button>
+          <input class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Select CSV file..." type="text" :value="ctrl.csvPath.value" @input="ctrl.updateCsvPath(($event.target as HTMLInputElement).value)" />
+          <button class="flex h-10 items-center justify-center rounded-md border border-divider bg-panel px-4 text-secondary hover:bg-canvas" type="button" title="Browse CSV" @click="ctrl.pickCsvFile()"><i class="pi pi-folder-open" /></button>
+          <button class="flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60" type="button" :disabled="ctrl.isImporting.value" @click="ctrl.previewCsv()"><i class="pi pi-file-import" />Import</button>
         </div>
       </div>
-      <div class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-        <span class="text-sm font-bold text-slate-500">Current import</span>
-        <strong class="mt-2 block text-2xl leading-tight text-slate-900">{{ ctrl.result.value ? ctrl.result.value.row_count.toLocaleString("en-US") : "-" }}</strong>
-        <p class="mt-1 text-sm text-slate-500">saved rows</p>
+      <div class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
+        <span class="text-sm font-bold text-muted">Current import</span>
+        <strong class="mt-2 block text-2xl leading-tight text-ink">{{ ctrl.result.value ? ctrl.result.value.row_count.toLocaleString("en-US") : "-" }}</strong>
+        <p class="mt-1 text-sm text-muted">saved rows</p>
       </div>
     </div>
 
@@ -101,15 +101,15 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
 
     <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-4 overflow-hidden">
       <!-- Preview -->
-      <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-        <div class="grid items-start gap-3 border-b border-stone-200 px-4 py-3">
+      <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+        <div class="flex items-start justify-between gap-3 border-b border-divider px-4 py-3">
           <div class="min-w-0">
             <h3 class="font-bold">Preview</h3>
-            <p class="mt-1 truncate text-xs text-slate-500">
+            <p class="mt-1 truncate text-xs text-muted">
               {{ ctrl.previewResult.value ? `${ctrl.previewResult.value.source_file_name}${ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : ''}` : 'No CSV data imported yet.' }}
             </p>
           </div>
-          <button class="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" type="button" :disabled="!ctrl.previewResult.value" title="Show detail list" @click="isDetailDialogOpen = true"><i class="pi pi-list" />Show detail</button>
+          <button class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50" type="button" :disabled="!ctrl.previewResult.value" title="Show detail list" @click="isDetailDialogOpen = true"><i class="pi pi-list" />Show detail</button>
         </div>
         <DataTable class="app-data-table min-h-0" empty-message="No data. Select a CSV file, then click Import." :row-class="(row: any) => row.kind === 'project' ? 'bg-emerald-50 font-bold' : 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="previewRows" @row-click="(e: any) => { if (e.data.kind === 'phase') onOpenDetail({ project_code: e.data.project.project_code, project_name: e.data.project.project_name, phase: e.data.phase }); }">
           <Column header="Project">
@@ -127,28 +127,28 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
       </section>
 
       <!-- Import History -->
-      <aside class="min-h-0 overflow-auto rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+      <aside class="min-h-0 overflow-auto rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <h3 class="font-bold">Recent imports</h3>
         <div class="mt-4 space-y-3">
-          <p v-if="ctrl.batches.value.length === 0" class="text-sm text-slate-500">No import history.</p>
+          <p v-if="ctrl.batches.value.length === 0" class="text-sm text-muted">No import history.</p>
           <div v-for="batch in ctrl.batches.value" :key="batch.id" class="border-b border-stone-100 pb-3 last:border-b-0">
             <div class="flex items-center justify-between gap-3">
               <span class="min-w-0 truncate text-sm font-bold">{{ batch.source_file_name }}</span>
               <span class="text-xs font-bold text-brand">#{{ batch.id }}</span>
             </div>
-            <p class="mt-1 text-xs text-slate-500">{{ batch.imported_at }}</p>
-            <p class="mt-1 text-xs text-slate-500">{{ batch.row_count.toLocaleString("en-US") }} rows / {{ formatHourValue(batch.total_minutes) }} hours</p>
+            <p class="mt-1 text-xs text-muted">{{ batch.imported_at }}</p>
+            <p class="mt-1 text-xs text-muted">{{ batch.row_count.toLocaleString("en-US") }} rows / {{ formatHourValue(batch.total_minutes) }} hours</p>
           </div>
         </div>
       </aside>
     </div>
 
     <!-- Detail Dialog -->
-    <Dialog v-if="ctrl.previewResult.value" :visible="isDetailDialogOpen" class="w-full max-w-6xl overflow-hidden rounded-lg bg-white shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isDetailDialogOpen = $event">
+    <Dialog v-if="ctrl.previewResult.value" :visible="isDetailDialogOpen" class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isDetailDialogOpen = $event">
       <template #header>
         <div class="min-w-0">
-          <h3 class="truncate text-lg font-bold text-slate-900">CSV detail</h3>
-          <p class="mt-1 truncate text-sm text-slate-500">{{ ctrl.previewResult.value.source_file_name }}{{ ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : '' }}</p>
+          <h3 class="truncate text-lg font-bold text-ink">CSV detail</h3>
+          <p class="mt-1 truncate text-sm text-muted">{{ ctrl.previewResult.value.source_file_name }}{{ ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : '' }}</p>
         </div>
       </template>
       <DataTable class="app-data-table min-h-0" empty-message="No CSV rows." scrollable scroll-height="flex" :table-style="{ minWidth: `${Math.max(920, (ctrl.previewResult.value?.raw_headers.filter(h => !hiddenCsvDetailHeaders.has(h)).length ?? 0) * 140)}px` }" :value="ctrl.previewResult.value.raw_rows.map((cells, i) => ({ cells, id: i }))">

@@ -25,22 +25,22 @@ function submitLogin() {
 
 <template>
   <main class="grid min-h-screen place-items-center bg-canvas px-6 text-ink">
-    <section class="w-full max-w-[420px] rounded-lg border border-stone-200 bg-panel p-6 shadow-sm">
+    <section class="w-full max-w-[420px] rounded-lg border border-divider bg-panel p-6 shadow-sm">
       <div class="flex items-center gap-3">
         <div class="flex h-11 w-11 items-center justify-center rounded-md bg-brand text-white">
           <i class="pi pi-lock text-xl" />
         </div>
         <div>
           <h1 class="text-xl font-bold leading-tight">Manager System Helps</h1>
-          <p class="mt-1 text-sm text-slate-500">Sign in to continue.</p>
+          <p class="mt-1 text-sm text-muted">Sign in to continue.</p>
         </div>
       </div>
 
       <form class="mt-6 space-y-4" @submit.prevent="submitLogin">
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Username</span>
-          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-            <i class="pi pi-user shrink-0 text-slate-400" />
+          <span class="text-xs font-bold text-muted">Username</span>
+          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+            <i class="pi pi-user shrink-0 text-muted" />
             <input
               v-model="username"
               class="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none"
@@ -53,9 +53,9 @@ function submitLogin() {
         </label>
 
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Password</span>
-          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-slate-900 hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-            <i class="pi pi-lock shrink-0 text-slate-400" />
+          <span class="text-xs font-bold text-muted">Password</span>
+          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+            <i class="pi pi-lock shrink-0 text-muted" />
             <input
               v-model="password"
               class="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none"

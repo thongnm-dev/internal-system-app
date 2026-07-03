@@ -58,12 +58,12 @@ function onOpenDetail(detail: SelectedPhaseDetail) { void detail; }
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <div class="flex items-center justify-between gap-3">
-      <button class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50" type="button" @click="router.push('/import-reports')"><i class="pi pi-arrow-left" />Back</button>
+      <button class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas" type="button" @click="router.push('/import-reports')"><i class="pi pi-arrow-left" />Back</button>
     </div>
 
-    <section class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-      <div class="border-b border-stone-200 pb-3"><h3 class="font-bold">Thong tin co ban</h3></div>
-      <p v-if="!ctrl.detail.value" class="py-8 text-center text-sm text-slate-500">{{ ctrl.isLoading.value ? 'Loading report detail...' : 'No report detail.' }}</p>
+    <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
+      <div class="border-b border-divider pb-3"><h3 class="font-bold">Thong tin co ban</h3></div>
+      <p v-if="!ctrl.detail.value" class="py-8 text-center text-sm text-muted">{{ ctrl.isLoading.value ? 'Loading report detail...' : 'No report detail.' }}</p>
       <div v-else class="mt-4 grid grid-cols-4 gap-3 text-sm">
         <div v-for="item in [
           { label: 'SEQ', value: `#${ctrl.detail.value.id}` },
@@ -74,25 +74,25 @@ function onOpenDetail(detail: SelectedPhaseDetail) { void detail; }
           { label: 'Thang target', value: formatTargetMonthRange(ctrl.detail.value) },
           { label: 'Rows', value: ctrl.detail.value.row_count.toLocaleString('en-US') },
           { label: 'Hours', value: formatHourValue(ctrl.detail.value.total_minutes) },
-        ]" :key="item.label" class="min-w-0 rounded-md border border-stone-200 bg-slate-50 px-3 py-2">
-          <span class="block text-xs font-bold text-slate-500">{{ item.label }}</span>
-          <strong class="mt-1 block truncate text-slate-900" :title="item.value">{{ item.value }}</strong>
+        ]" :key="item.label" class="min-w-0 rounded-md border border-divider bg-canvas px-3 py-2">
+          <span class="block text-xs font-bold text-muted">{{ item.label }}</span>
+          <strong class="mt-1 block truncate text-ink" :title="item.value">{{ item.value }}</strong>
         </div>
-        <div class="col-span-2 min-w-0 rounded-md border border-stone-200 bg-slate-50 px-3 py-2">
-          <span class="block text-xs font-bold text-slate-500">Ghi chu</span>
-          <strong class="mt-1 block truncate text-slate-900">{{ ctrl.detail.value.note || '-' }}</strong>
+        <div class="col-span-2 min-w-0 rounded-md border border-divider bg-canvas px-3 py-2">
+          <span class="block text-xs font-bold text-muted">Ghi chu</span>
+          <strong class="mt-1 block truncate text-ink">{{ ctrl.detail.value.note || '-' }}</strong>
         </div>
-        <div class="col-span-2 min-w-0 rounded-md border border-stone-200 bg-slate-50 px-3 py-2">
-          <span class="block text-xs font-bold text-slate-500">Source path</span>
-          <strong class="mt-1 block truncate text-slate-900">{{ ctrl.detail.value.source_path || '-' }}</strong>
+        <div class="col-span-2 min-w-0 rounded-md border border-divider bg-canvas px-3 py-2">
+          <span class="block text-xs font-bold text-muted">Source path</span>
+          <strong class="mt-1 block truncate text-ink">{{ ctrl.detail.value.source_path || '-' }}</strong>
         </div>
       </div>
     </section>
 
-    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
-      <div class="border-b border-stone-200 px-4 py-3">
+    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+      <div class="border-b border-divider px-4 py-3">
         <h3 class="font-bold">Danh sach chi tiet cua report</h3>
-        <p class="mt-1 truncate text-xs text-slate-500">{{ ctrl.detail.value ? `${ctrl.detail.value.source_file_name} - saved batch #${ctrl.detail.value.id}` : 'No report data.' }}</p>
+        <p class="mt-1 truncate text-xs text-muted">{{ ctrl.detail.value ? `${ctrl.detail.value.source_file_name} - saved batch #${ctrl.detail.value.id}` : 'No report data.' }}</p>
       </div>
       <DataTable class="app-data-table min-h-0" :empty-message="ctrl.isLoading.value ? 'Loading report rows...' : 'No report rows.'" :row-class="(row: any) => row.kind === 'project' ? 'bg-emerald-50 font-bold' : 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="rows" @row-click="(e: any) => { if (e.data.kind === 'phase') onOpenDetail({ project_code: e.data.project.project_code, project_name: e.data.project.project_name, phase: e.data.phase }); }">
         <Column header="Project"><template #body="{ data }"><strong v-if="data.kind === 'project'">{{ `${data.project.project_code} ${data.project.project_name}`.trim() }}</strong></template></Column>

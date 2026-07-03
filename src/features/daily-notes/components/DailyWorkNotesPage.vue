@@ -56,22 +56,22 @@ function formatMaxDate(date: Date): string {
 <template>
   <section class="grid min-h-0 flex-1 grid-cols-[minmax(360px,460px)_minmax(0,1fr)] gap-4 overflow-hidden">
     <!-- Calendar panel -->
-    <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
-      <div class="flex h-[76px] shrink-0 items-center justify-between gap-3 border-b border-stone-200 px-4">
+    <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+      <div class="flex h-[76px] shrink-0 items-center justify-between gap-3 border-b border-divider px-4">
         <div class="flex min-w-0 items-center gap-3">
           <span class="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-brand">
             <i class="pi pi-calendar text-xl" />
           </span>
           <div class="min-w-0">
             <h3 class="truncate font-bold capitalize">{{ ctrl.monthLabel.value }}</h3>
-            <p class="mt-1 truncate text-xs text-slate-500">
+            <p class="mt-1 truncate text-xs text-muted">
               Tổng {{ ctrl.totalSelectedDateNotes.value }} công việc trong ngày đã chọn
             </p>
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
             type="button"
             title="Tháng trước"
             @click="ctrl.previousMonth()"
@@ -79,13 +79,13 @@ function formatMaxDate(date: Date): string {
             <i class="pi pi-chevron-left" />
           </button>
           <input
-            class="h-9 w-32 rounded-md border border-slate-300 bg-white px-3 text-center text-sm font-bold text-slate-700 outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
             type="month"
             :value="ctrl.monthValue.value"
             @change="ctrl.selectMonth(($event.target as HTMLInputElement).value)"
           />
           <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
             type="button"
             title="Tháng sau"
             @click="ctrl.nextMonth()"
@@ -95,21 +95,21 @@ function formatMaxDate(date: Date): string {
         </div>
       </div>
 
-      <div class="grid grid-cols-7 border-b border-stone-200 bg-slate-800 text-center text-xs font-bold text-white">
+      <div class="grid grid-cols-7 border-b border-divider text-center text-xs font-bold text-ink">
         <div v-for="wd in weekdays" :key="wd" class="px-2 py-3">{{ wd }}</div>
       </div>
 
-      <div class="grid flex-1 grid-cols-7 grid-rows-6 bg-white">
+      <div class="grid flex-1 grid-cols-7 grid-rows-6 bg-panel">
         <button
           v-for="day in ctrl.calendarDays.value"
           :key="day.date"
           :class="[
-            'min-h-0 border-b border-r border-stone-200 p-2 text-left outline-none transition focus:ring-2 focus:ring-inset focus:ring-emerald-100',
+            'min-h-0 border-b border-r border-divider p-2 text-left outline-none transition focus:ring-2 focus:ring-inset focus:ring-emerald-100',
             day.isSelected
               ? 'bg-emerald-50'
               : day.isCurrentMonth
-                ? 'bg-white hover:bg-slate-50'
-                : 'bg-slate-50 text-slate-400',
+                ? 'bg-panel hover:bg-canvas'
+                : 'bg-canvas text-muted',
             day.isFutureDisabled ? 'cursor-not-allowed opacity-50' : '',
           ]"
           type="button"
@@ -119,14 +119,14 @@ function formatMaxDate(date: Date): string {
           <span
             :class="[
               'flex h-7 w-7 items-center justify-center rounded-md text-sm font-extrabold tabular-nums',
-              day.isToday ? 'bg-brand text-white' : day.isSelected ? 'text-brand' : 'text-slate-700',
+              day.isToday ? 'bg-brand text-white' : day.isSelected ? 'text-brand' : 'text-secondary',
             ]"
           >
             {{ day.day }}
           </span>
           <span class="mt-3 flex items-center justify-between gap-1">
-            <span class="text-[11px] font-semibold text-slate-500">Công việc</span>
-            <strong class="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">{{ day.taskCount }}</strong>
+            <span class="text-[11px] font-semibold text-muted">Công việc</span>
+            <strong class="rounded-md bg-canvas px-2 py-1 text-xs text-secondary">{{ day.taskCount }}</strong>
           </span>
         </button>
       </div>
@@ -134,11 +134,11 @@ function formatMaxDate(date: Date): string {
 
     <!-- Notes panel -->
     <section class="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden">
-      <section class="rounded-lg border border-stone-200 bg-panel p-4 shadow-sm">
+      <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
             <h3 class="truncate font-bold">Ghi chú công việc hằng ngày</h3>
-            <p class="mt-1 truncate text-sm text-slate-500">{{ ctrl.selectedDateLabel.value }}</p>
+            <p class="mt-1 truncate text-sm text-muted">{{ ctrl.selectedDateLabel.value }}</p>
           </div>
           <button
             class="flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
@@ -151,24 +151,24 @@ function formatMaxDate(date: Date): string {
         </div>
       </section>
 
-      <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-panel shadow-sm">
-        <div class="shrink-0 border-b border-stone-200 p-4">
-          <div class="grid grid-cols-3 rounded-md border border-slate-200 bg-slate-100 p-1">
+      <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+        <div class="shrink-0 border-b border-divider p-4">
+          <div class="grid grid-cols-3 rounded-md border border-divider bg-canvas p-1">
             <button
               v-for="opt in statusOptions"
               :key="opt.value"
               :class="[
                 'flex h-10 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
                 ctrl.statusFilter.value === opt.value
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700',
+                  ? 'bg-panel text-ink shadow-sm'
+                  : 'text-muted hover:text-secondary',
               ]"
               type="button"
               @click="ctrl.statusFilter.value = opt.value"
             >
               <i :class="`pi ${opt.icon}`" />
               <span class="truncate">{{ opt.label }}</span>
-              <span class="rounded-md bg-white/70 px-1.5 py-0.5 text-xs">{{ ctrl.statusCounts.value[opt.value] }}</span>
+              <span class="rounded-md bg-panel/70 px-1.5 py-0.5 text-xs">{{ ctrl.statusCounts.value[opt.value] }}</span>
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@ function formatMaxDate(date: Date): string {
         <div class="min-h-0 flex-1 overflow-auto p-4">
           <div
             v-if="ctrl.filteredNotes.value.length === 0"
-            class="flex h-full min-h-48 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm font-semibold text-slate-500"
+            class="flex h-full min-h-48 items-center justify-center rounded-md border border-dashed border-divider bg-canvas px-4 text-center text-sm font-semibold text-muted"
           >
             Không có công việc ở trạng thái này.
           </div>
@@ -184,14 +184,14 @@ function formatMaxDate(date: Date): string {
             <article
               v-for="note in ctrl.filteredNotes.value"
               :key="note.id"
-              class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+              class="rounded-lg border border-divider bg-panel p-4 shadow-sm"
             >
               <div class="flex items-start justify-between gap-3">
-                <p class="min-w-0 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-800">
+                <p class="min-w-0 whitespace-pre-wrap text-sm font-semibold leading-6 text-ink">
                   {{ note.content }}
                 </p>
                 <button
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-red-200 bg-white text-red-600 hover:bg-red-50"
+                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-red-200 bg-panel text-red-600 hover:bg-red-50"
                   type="button"
                   title="Xóa công việc"
                   @click="ctrl.removeNote(note.id)"
@@ -207,7 +207,7 @@ function formatMaxDate(date: Date): string {
                     'flex h-8 items-center gap-2 rounded-md border px-3 text-xs font-bold',
                     note.status === status.value
                       ? 'border-brand bg-emerald-50 text-brand'
-                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50',
+                      : 'border-divider bg-panel text-muted hover:bg-canvas',
                   ]"
                   type="button"
                   @click="ctrl.updateNoteStatus(note.id, status.value)"
@@ -225,40 +225,40 @@ function formatMaxDate(date: Date): string {
     <!-- Add note dialog -->
     <Dialog
       :visible="isAdding"
-      class="w-full max-w-xl rounded-lg bg-white shadow-xl"
+      class="w-full max-w-xl rounded-lg bg-panel shadow-xl"
       :closable="true"
       modal
       @update:visible="isAdding = $event"
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-slate-900">Thêm công việc</h3>
-          <p class="mt-1 text-sm text-slate-500">Có thể nhập ngày tương lai tối đa 1 tuần.</p>
+          <h3 class="font-bold text-ink">Thêm công việc</h3>
+          <p class="mt-1 text-sm text-muted">Có thể nhập ngày tương lai tối đa 1 tuần.</p>
         </div>
       </template>
 
       <div class="space-y-4">
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Ngày công việc</span>
+          <span class="text-xs font-bold text-muted">Ngày công việc</span>
           <input
             v-model="draftDate"
-            class="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             type="date"
             :max="formatMaxDate(ctrl.maxEntryDate)"
           />
         </label>
 
         <div>
-          <span class="text-xs font-bold text-slate-500">Trạng thái</span>
-          <div class="mt-1 grid grid-cols-3 rounded-md border border-slate-200 bg-slate-100 p-1">
+          <span class="text-xs font-bold text-muted">Trạng thái</span>
+          <div class="mt-1 grid grid-cols-3 rounded-md border border-divider bg-canvas p-1">
             <button
               v-for="opt in statusOptions"
               :key="opt.value"
               :class="[
                 'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
                 draftStatus === opt.value
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700',
+                  ? 'bg-panel text-ink shadow-sm'
+                  : 'text-muted hover:text-secondary',
               ]"
               type="button"
               @click="draftStatus = opt.value"
@@ -270,10 +270,10 @@ function formatMaxDate(date: Date): string {
         </div>
 
         <label class="block">
-          <span class="text-xs font-bold text-slate-500">Nội dung công việc</span>
+          <span class="text-xs font-bold text-muted">Nội dung công việc</span>
           <textarea
             v-model="draftContent"
-            class="mt-1 min-h-32 w-full resize-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 min-h-32 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             autofocus
           />
         </label>
@@ -282,7 +282,7 @@ function formatMaxDate(date: Date): string {
       <template #footer>
         <div class="flex items-center justify-end gap-2">
           <button
-            class="h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50"
+            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
             type="button"
             @click="isAdding = false"
           >

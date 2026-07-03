@@ -5,7 +5,7 @@ const companyBackground =
 
 <template>
   <main
-    class="flex h-screen min-h-[640px] min-w-[900px] items-center justify-center overflow-hidden bg-[#f4f1ea] text-ink"
+    class="flex h-screen min-h-[640px] min-w-[900px] items-center justify-center overflow-hidden bg-canvas text-ink"
   >
     <section
       aria-live="polite"
@@ -27,7 +27,7 @@ const companyBackground =
           <span />
           <span />
         </span>
-        <p class="text-base font-semibold text-slate-700">
+        <p class="text-base font-semibold text-secondary">
           Đang khởi động hệ thống. Vui lòng chờ!
         </p>
       </div>

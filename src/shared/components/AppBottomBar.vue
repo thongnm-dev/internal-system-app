@@ -23,23 +23,23 @@ function formatDateTime(value: string): string {
 
 <template>
   <footer
-    class="flex items-center gap-6 overflow-hidden border-t border-slate-950 bg-slate-800 px-4 py-2 text-sm text-slate-300"
+    class="flex items-center gap-6 overflow-hidden border-t border-divider px-4 py-2 text-sm text-muted"
   >
     <span class="status-item flex items-center gap-2" title="Login">
-      <i class="pi pi-user shrink-0 text-emerald-300" />
-      <strong class="min-w-0 truncate text-white">{{ props.info.username }}</strong>
+      <i class="pi pi-user shrink-0 text-brand" />
+      <strong class="min-w-0 truncate text-ink">{{ props.info.username }}</strong>
     </span>
     <span class="status-item flex items-center gap-2" title="Date time">
-      <i class="pi pi-clock shrink-0 text-emerald-300" />
-      <strong class="min-w-0 truncate text-white">{{ formatDateTime(props.info.timestamp) }}</strong>
+      <i class="pi pi-clock shrink-0 text-brand" />
+      <strong class="min-w-0 truncate text-ink">{{ formatDateTime(props.info.timestamp) }}</strong>
     </span>
     <span class="status-item flex items-center gap-2" title="IP">
-      <i class="pi pi-globe shrink-0 text-emerald-300" />
-      <strong class="min-w-0 truncate text-white">{{ props.info.ip_address }}</strong>
+      <i class="pi pi-globe shrink-0 text-brand" />
+      <strong class="min-w-0 truncate text-ink">{{ props.info.ip_address }}</strong>
     </span>
     <span class="status-item ml-auto flex items-center gap-2" title="Version">
-      <i class="pi pi-desktop shrink-0 text-emerald-300" />
-      <strong class="min-w-0 truncate text-white">{{ props.info.version }}</strong>
+      <i class="pi pi-desktop shrink-0 text-brand" />
+      <strong class="min-w-0 truncate text-ink">{{ props.info.version }}</strong>
     </span>
   </footer>
 </template>

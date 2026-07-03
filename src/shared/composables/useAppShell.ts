@@ -14,19 +14,6 @@ async function setCurrentWindowResizable(isResizable: boolean) {
   }
 }
 
-export function applyStoredThemePreference() {
-  try {
-    const saved = window.localStorage.getItem("pjjyuji.app.settings");
-    if (!saved) return;
-    const parsed = JSON.parse(saved) as { theme?: string };
-    if (parsed.theme === "dark") {
-      document.documentElement.dataset.theme = "dark";
-    }
-  } catch {
-    // ignore
-  }
-}
-
 export function useAppShell() {
   const systemInfo = ref<SystemInfo>({
     username: "-",
@@ -70,7 +57,6 @@ export function useAppShell() {
     const startedAt = performance.now();
 
     await setCurrentWindowResizable(false);
-    applyStoredThemePreference();
     await refreshSystemInfo();
 
     const elapsed = performance.now() - startedAt;
