@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useXlsxMarkdown } from "../composables/useXlsxMarkdown";
+import { useExcel2md } from "../composables/useExcel2md";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
 
-const ctrl = useXlsxMarkdown();
+const ctrl = useExcel2md();
 </script>
 
 <template>

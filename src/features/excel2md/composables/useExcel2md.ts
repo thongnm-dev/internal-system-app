@@ -8,7 +8,7 @@ function defaultMarkdownPath(path: string) {
   return path.trim() ? path.replace(/\.[^.\\/]+$/i, ".md") : "";
 }
 
-export function useXlsxMarkdown() {
+export function useExcel2md() {
   const inputPath = ref("");
   const outputPath = ref("");
   const result = ref<XlsxMarkdownResult | null>(null);
