@@ -1,7 +1,7 @@
-use crate::services::system::models::SystemInfo;
-use crate::services::system::service;
+use crate::models::system::SystemInfo;
+use crate::services::system_service;
 
 #[tauri::command]
 pub fn get_system_info() -> SystemInfo {
-    service::get_system_info()
+    system_service::get_system_info()
 }

@@ -1,4 +1,4 @@
-use crate::services::system::models::SystemInfo;
+use crate::models::system::SystemInfo;
 use crate::utils::network::local_ip_address;
 use crate::utils::time::current_timestamp;
 use std::env;

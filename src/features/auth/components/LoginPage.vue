@@ -31,7 +31,7 @@ function submitLogin() {
           <i class="pi pi-lock text-xl" />
         </div>
         <div>
-          <h1 class="text-xl font-bold leading-tight">PJ Yuji Statistics</h1>
+          <h1 class="text-xl font-bold leading-tight">Manager System Helps</h1>
           <p class="mt-1 text-sm text-slate-500">Sign in to continue.</p>
         </div>
       </div>

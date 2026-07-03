@@ -1,9 +1,4 @@
-mod app;
-mod commands;
-mod database;
-mod infrastructure;
-mod services;
-mod utils;
+include!("modules.rs");
 
 use commands::import_commands::{
     get_import_batch_detail, import_monthly_report_csv, list_import_batches,
@@ -11,7 +6,7 @@ use commands::import_commands::{
 };
 use commands::project_commands::{get_backlog_project_by_key, get_project_detail};
 use commands::system_commands::get_system_info;
-use commands::xlsx_markdown_commands::convert_xlsx_spec_to_markdown;
+use commands::excel2md_commands::excel2md;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,7 +19,7 @@ pub fn run() {
             list_import_batches,
             search_import_batches,
             get_import_batch_detail,
-            convert_xlsx_spec_to_markdown,
+            excel2md,
             get_project_detail,
             get_backlog_project_by_key
         ])

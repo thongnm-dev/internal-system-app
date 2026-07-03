@@ -1,8 +1,7 @@
 use crate::app::result::AppResult;
-use crate::infrastructure::csv::reader::{get_required_index, parse_minutes, read_shift_jis_csv};
-use crate::infrastructure::file_system::{display_path, resolve_input_path};
-use crate::services::import_csv::models::{MinuteTotals, WorkRecord};
-use crate::services::import_csv::phase::phase_label;
+use crate::models::import_csv::{MinuteTotals, WorkRecord};
+use crate::app::consts::phase_label;
+use crate::utils::csv_reader::{display_path, resolve_input_path, CsvReader};
 use std::path::{Path, PathBuf};
 
 const DATE: &str = "日付";
@@ -25,42 +24,42 @@ pub struct RawCsv {
 
 pub fn read_work_records(path: &str) -> AppResult<(PathBuf, Vec<WorkRecord>)> {
     let input_path = resolve_input_path(path)?;
-    let content = read_shift_jis_csv(&input_path)?;
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(content.as_bytes());
-    let headers = reader.headers()?.clone();
-    let date_idx = get_required_index(&headers, DATE)?;
-    let project_code_idx = get_required_index(&headers, PROJECT_CODE)?;
-    let project_name_idx = get_required_index(&headers, PROJECT_NAME)?;
-    let process_code_idx = get_required_index(&headers, PROCESS_CODE)?;
-    let process_name_idx = get_required_index(&headers, PROCESS_NAME)?;
-    let work_content_idx = get_required_index(&headers, WORK_CONTENT)?;
-    let regular_idx = get_required_index(&headers, REGULAR_MINUTES)?;
-    let normal_overtime_idx = get_required_index(&headers, NORMAL_OVERTIME)?;
-    let legal_holiday_idx = get_required_index(&headers, LEGAL_HOLIDAY_OVERTIME)?;
-    let legal_public_holiday_idx = get_required_index(&headers, LEGAL_PUBLIC_HOLIDAY_OVERTIME)?;
-    let late_night_idx = get_required_index(&headers, LATE_NIGHT_OVERTIME)?;
+    let csv = CsvReader::from_path(&input_path)?;
+
+    let date_idx = csv.column_index(DATE)?;
+    let project_code_idx = csv.column_index(PROJECT_CODE)?;
+    let project_name_idx = csv.column_index(PROJECT_NAME)?;
+    let process_code_idx = csv.column_index(PROCESS_CODE)?;
+    let process_name_idx = csv.column_index(PROCESS_NAME)?;
+    let work_content_idx = csv.column_index(WORK_CONTENT)?;
+    let regular_idx = csv.column_index(REGULAR_MINUTES)?;
+    let normal_overtime_idx = csv.column_index(NORMAL_OVERTIME)?;
+    let legal_holiday_idx = csv.column_index(LEGAL_HOLIDAY_OVERTIME)?;
+    let legal_public_holiday_idx = csv.column_index(LEGAL_PUBLIC_HOLIDAY_OVERTIME)?;
+    let late_night_idx = csv.column_index(LATE_NIGHT_OVERTIME)?;
 
     let mut records = Vec::new();
 
-    for record in reader.records() {
-        let record = record?;
-        let date = record.get(date_idx).unwrap_or_default().trim();
-        let project_code = record.get(project_code_idx).unwrap_or_default().trim();
-        let project_name = record.get(project_name_idx).unwrap_or_default().trim();
-        let process_code = record.get(process_code_idx).unwrap_or_default().trim();
-        let process_name = record.get(process_name_idx).unwrap_or_default().trim();
-        let work_content = record.get(work_content_idx).unwrap_or_default().trim();
+    for row in csv.rows() {
+        let date = csv.get_value(row, date_idx);
+        let project_code = csv.get_value(row, project_code_idx);
+        let project_name = csv.get_value(row, project_name_idx);
+        let process_code = csv.get_value(row, process_code_idx);
+        let process_name = csv.get_value(row, process_name_idx);
+        let work_content = csv.get_value(row, work_content_idx);
         let phase_name = phase_label(process_code, process_name);
         let totals = MinuteTotals {
-            regular_minutes: parse_minutes(record.get(regular_idx)),
-            normal_overtime_minutes: parse_minutes(record.get(normal_overtime_idx)),
-            legal_holiday_overtime_minutes: parse_minutes(record.get(legal_holiday_idx)),
-            legal_public_holiday_overtime_minutes: parse_minutes(
-                record.get(legal_public_holiday_idx),
+            regular_minutes: CsvReader::parse_i64(csv.get_value(row, regular_idx)),
+            normal_overtime_minutes: CsvReader::parse_i64(csv.get_value(row, normal_overtime_idx)),
+            legal_holiday_overtime_minutes: CsvReader::parse_i64(
+                csv.get_value(row, legal_holiday_idx),
             ),
-            late_night_overtime_minutes: parse_minutes(record.get(late_night_idx)),
+            legal_public_holiday_overtime_minutes: CsvReader::parse_i64(
+                csv.get_value(row, legal_public_holiday_idx),
+            ),
+            late_night_overtime_minutes: CsvReader::parse_i64(
+                csv.get_value(row, late_night_idx),
+            ),
         };
         records.push(WorkRecord {
             date: date.to_string(),
@@ -78,11 +77,8 @@ pub fn read_work_records(path: &str) -> AppResult<(PathBuf, Vec<WorkRecord>)> {
 }
 
 pub fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
-    let content = read_shift_jis_csv(input_path)?;
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
-        .from_reader(content.as_bytes());
-    let headers = reader.headers()?.clone();
+    let csv = CsvReader::from_path(input_path)?;
+
     let minute_column_indexes = [
         REGULAR_MINUTES,
         NORMAL_OVERTIME,
@@ -91,23 +87,12 @@ pub fn read_raw_csv(input_path: &Path) -> AppResult<RawCsv> {
         LATE_NIGHT_OVERTIME,
     ]
     .iter()
-    .map(|name| get_required_index(&headers, name))
+    .map(|name| csv.column_index(name))
     .collect::<AppResult<Vec<usize>>>()?;
 
-    let mut rows = Vec::new();
-    for record in reader.records() {
-        let record = record?;
-        rows.push(
-            record
-                .iter()
-                .map(|value| value.trim().to_string())
-                .collect(),
-        );
-    }
-
     Ok(RawCsv {
-        headers: headers.iter().map(|value| value.to_string()).collect(),
-        rows,
+        headers: csv.headers().to_vec(),
+        rows: csv.rows().to_vec(),
         minute_column_indexes,
     })
 }

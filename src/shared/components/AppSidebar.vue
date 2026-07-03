@@ -59,8 +59,7 @@ function labelFor(id: MenuKey): string {
         </button>
       </template>
       <template v-else>
-        <h1 class="mt-4 text-xl font-bold leading-tight">PJ Yuji Statistics</h1>
-        <p class="mt-2 text-sm text-slate-300">Project and phase statistics.</p>
+        <h1 class="mt-4 text-xl font-bold leading-tight">Manager System</h1>
       </template>
     </div>
 

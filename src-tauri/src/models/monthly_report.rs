@@ -1,4 +1,4 @@
-use crate::services::import_csv::models::ImportPreviewRow;
+use crate::models::import_csv::ImportPreviewRow;
 use serde::Serialize;
 
 #[derive(Serialize)]

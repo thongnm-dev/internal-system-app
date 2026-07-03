@@ -1,5 +1,5 @@
 use crate::app::result::AppResult;
-use crate::services::project::models::{BacklogProjectLookup, ProjectDetail};
+use crate::models::project::{BacklogProjectLookup, ProjectDetail};
 
 pub fn get_project_detail(project_id: String) -> AppResult<ProjectDetail> {
     Ok(ProjectDetail {

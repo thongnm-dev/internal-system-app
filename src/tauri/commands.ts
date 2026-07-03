@@ -67,7 +67,7 @@ export function getImportBatchDetail(batchId: number) {
 // --- Xlsx → Markdown ---
 
 export function convertXlsxSpecToMarkdown(inputPath: string, outputPath: string | null) {
-  return safeInvoke<XlsxMarkdownResult>("convert_xlsx_spec_to_markdown", { inputPath, outputPath });
+  return safeInvoke<XlsxMarkdownResult>("excel2md", { inputPath, outputPath });
 }
 
 // --- Projects ---

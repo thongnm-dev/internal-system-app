@@ -1,6 +1,6 @@
 use crate::app::result::AppResult;
 use crate::database::csv_reader;
-use crate::services::import_csv::models::{ImportCsvPreviewResult, ImportPreviewRow, WorkRecord};
+use crate::models::import_csv::{ImportCsvPreviewResult, ImportPreviewRow, WorkRecord};
 
 pub fn preview_csv(path: &str) -> AppResult<ImportCsvPreviewResult> {
     let data = csv_reader::read_csv_import_data(path)?;

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default desktop permissions for the PJ Yuji Statistics app.",
+  "description": "Default desktop permissions for the Manager System Helps app.",
   "windows": ["main"],
   "permissions": [
     "core:default",

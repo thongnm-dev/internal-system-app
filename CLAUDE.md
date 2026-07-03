@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**PJ Yuji Statistics** — a Tauri 2.0 desktop application for internal project management and statistics tracking. The app imports CSV data, generates reports, tracks daily work, and converts Excel specs to Markdown.
+**Manager System Helps** — a Tauri 2.0 desktop application for internal project management and statistics tracking. The app imports CSV data, generates reports, tracks daily work, and converts Excel specs to Markdown.
 
 ## Commands
 

@@ -1,5 +1,5 @@
 use crate::app::result::AppResult;
-use crate::services::xlsx_markdown::models::XlsxMarkdownResult;
+use crate::models::excel2md::XlsxMarkdownResult;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

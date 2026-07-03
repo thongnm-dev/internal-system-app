@@ -1,5 +1,5 @@
 use crate::app::result::AppResult;
-use crate::services::import_csv::models::WorkRecord;
+use crate::models::import_csv::WorkRecord;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
