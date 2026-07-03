@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SystemInfo } from "@/shared/types/statistics";
+import type { SystemInfo } from "@/shared/types/system";
 
 const props = defineProps<{
   info: SystemInfo;

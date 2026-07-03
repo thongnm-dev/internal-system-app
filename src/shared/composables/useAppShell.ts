@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { friendlyError, getSystemInfo } from "@/tauri/commands";
-import type { MessageMode, SystemInfo } from "@/shared/types/statistics";
+import type { MessageMode } from "@/shared/types/app";
+import type { SystemInfo } from "@/shared/types/system";
 
 const BOOTSTRAP_MIN_DURATION_MS = 900;
 

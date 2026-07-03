@@ -4,7 +4,7 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import { useImportReports } from "../composables/useImportReports";
 import { formatHourValue } from "@/shared/utils/timeMath";
-import type { ImportReportListItem, ImportReportSearchCriteria } from "@/shared/types/statistics";
+import type { ImportReportListItem, ImportReportSearchCriteria } from "@/shared/types/import-report";
 
 const router = useRouter();
 const ctrl = useImportReports();

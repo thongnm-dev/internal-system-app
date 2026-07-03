@@ -1,7 +1,8 @@
 import { onMounted, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError, getImportBatchDetail, searchImportBatches } from "@/tauri/commands";
-import type { ImportReportDetail, ImportReportListItem, ImportReportSearchCriteria, MessageMode } from "@/shared/types/statistics";
+import type { MessageMode } from "@/shared/types/app";
+import type { ImportReportDetail, ImportReportListItem, ImportReportSearchCriteria } from "@/shared/types/import-report";
 
 const emptyCriteria: ImportReportSearchCriteria = {
   target_month_from: "",

@@ -2,7 +2,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { onMounted, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError, importMonthlyReportCsv, listImportBatches, previewMonthlyReportCsv } from "@/tauri/commands";
-import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult, MessageMode } from "@/shared/types/statistics";
+import type { MessageMode } from "@/shared/types/app";
+import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult } from "@/shared/types/import-csv";
 
 function defaultReportName(path: string) {
   const fileName = path.split(/[\\/]/).pop() ?? path;

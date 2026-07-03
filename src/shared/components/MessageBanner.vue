@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MessageMode } from "@/shared/types/statistics";
+import type { MessageMode } from "@/shared/types/app";
 
 defineProps<{
   message: string;

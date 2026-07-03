@@ -1,15 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
-import type {
-  ImportBatchSummary,
-  ImportCsvPreviewResult,
-  ImportCsvResult,
-  ImportReportDetail,
-  ImportReportListItem,
-  ImportReportSearchCriteria,
-  SystemInfo,
-  XlsxMarkdownResult,
-} from "@/shared/types/statistics";
+import type { SystemInfo } from "@/shared/types/system";
+import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult } from "@/shared/types/import-csv";
+import type { ImportReportDetail, ImportReportListItem, ImportReportSearchCriteria } from "@/shared/types/import-report";
+import type { XlsxMarkdownResult } from "@/shared/types/excel2md";
 
 type TauriWindow = Window & {
   __TAURI_INTERNALS__?: { invoke?: unknown };

@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from "vue-router";
-import type { AppRouteKey, MenuKey } from "@/shared/types/statistics";
+import type { AppRouteKey, MenuKey } from "@/shared/types/app";
 
 export type AppRoute = {
   key: AppRouteKey;
@@ -41,8 +41,8 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import issue CSV data into a selected project.",
   },
   {
-    key: "xlsxToMarkdown",
-    path: "/xlsx-to-markdown",
+    key: "excel2md",
+    path: "/excel2md",
     title: "Excel to Markdown",
     subtitle: "Convert uploaded Excel screen specs into Markdown files.",
   },
@@ -139,9 +139,9 @@ export const vueRoutes: RouteRecordRaw[] = [
     meta: { key: "importIssues" as MenuKey },
   },
   {
-    path: "/xlsx-to-markdown",
-    component: () => import("@/features/xlsx-markdown/components/XlsxMarkdownPage.vue"),
-    meta: { key: "xlsxToMarkdown" as MenuKey },
+    path: "/excel2md",
+    component: () => import("@/features/excel2md/components/excel2mdPage.vue"),
+    meta: { key: "excel2md" as MenuKey },
   },
   {
     path: "/daily-work-notes",

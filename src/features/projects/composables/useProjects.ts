@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { AnalysisResult, MinuteTotals } from "@/shared/types/statistics";
+import type { AnalysisResult, MinuteTotals } from "@/shared/types/analysis";
 
 export type ProjectFilters = {
   code: string;

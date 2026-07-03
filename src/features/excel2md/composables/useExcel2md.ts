@@ -2,7 +2,8 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, convertXlsxSpecToMarkdown, friendlyError } from "@/tauri/commands";
-import type { MessageMode, XlsxMarkdownResult } from "@/shared/types/statistics";
+import type { MessageMode } from "@/shared/types/app";
+import type { XlsxMarkdownResult } from "@/shared/types/excel2md";
 
 function defaultMarkdownPath(path: string) {
   return path.trim() ? path.replace(/\.[^.\\/]+$/i, ".md") : "";

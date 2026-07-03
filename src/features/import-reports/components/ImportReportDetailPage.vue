@@ -5,7 +5,8 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import { useImportReportDetail } from "../composables/useImportReports";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
-import type { AnalysisResult, ImportReportDetail, ProjectSummary, SelectedPhaseDetail } from "@/shared/types/statistics";
+import type { AnalysisResult, ProjectSummary, SelectedPhaseDetail } from "@/shared/types/analysis";
+import type { ImportReportDetail } from "@/shared/types/import-report";
 
 const route = useRoute();
 const router = useRouter();

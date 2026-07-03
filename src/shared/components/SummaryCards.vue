@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SummaryMetric } from "@/shared/types/statistics";
+import type { SummaryMetric } from "@/shared/types/app";
 
 defineProps<{
   metrics: SummaryMetric[];

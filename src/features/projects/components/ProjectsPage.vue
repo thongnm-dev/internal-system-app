@@ -6,7 +6,7 @@ import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
 import { useProjects } from "../composables/useProjects";
 import { formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
-import type { ProjectSummary } from "@/shared/types/statistics";
+import type { ProjectSummary } from "@/shared/types/analysis";
 
 const router = useRouter();
 const ctrl = useProjects();

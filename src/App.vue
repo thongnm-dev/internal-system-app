@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useAppShell } from "@/shared/composables/useAppShell";
 import { useAuthStore } from "@/app/stores/auth";
 import { appRoutes, defaultRoute, loginRoute } from "@/app/router/routes";
-import type { MenuKey } from "@/shared/types/statistics";
+import type { MenuKey } from "@/shared/types/app";
 import StartupScreen from "@/shared/components/StartupScreen.vue";
 import AppSidebar from "@/shared/components/AppSidebar.vue";
 import AppHeader from "@/shared/components/AppHeader.vue";

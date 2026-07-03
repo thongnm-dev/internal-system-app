@@ -8,10 +8,10 @@ import MessageBanner from "@/shared/components/MessageBanner.vue";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
 import type {
   AnalysisResult,
-  ImportCsvPreviewResult,
   ProjectSummary,
   SelectedPhaseDetail,
-} from "@/shared/types/statistics";
+} from "@/shared/types/analysis";
+import type { ImportCsvPreviewResult } from "@/shared/types/import-csv";
 
 const ctrl = useImportCsv();
 const isDetailDialogOpen = ref(false);

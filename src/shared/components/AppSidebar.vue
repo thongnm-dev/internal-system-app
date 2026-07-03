@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { appRoutes } from "@/app/router/routes";
-import type { MenuKey } from "@/shared/types/statistics";
+import type { MenuKey } from "@/shared/types/app";
 
 defineProps<{
   activeMenu: MenuKey;
@@ -17,7 +17,7 @@ const items: { id: MenuKey; icon: string }[] = [
   { id: "projects", icon: "pi-table" },
   { id: "projectSkills", icon: "pi-book" },
   { id: "issueBacklog", icon: "pi-list-check" },
-  { id: "xlsxToMarkdown", icon: "pi-file" },
+  { id: "excel2md", icon: "pi-file" },
   { id: "dailyWorkNotes", icon: "pi-pencil" },
   { id: "dailyReport", icon: "pi-calendar" },
   { id: "importCsv", icon: "pi-database" },
