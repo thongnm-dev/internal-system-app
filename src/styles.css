@@ -80,7 +80,7 @@
   }
 
   .table-head {
-    @apply sticky top-0 z-10 border-b border-divider px-3 py-2.5 text-left text-xs font-bold text-ink;
+    @apply sticky top-0 z-10 border-b border-divider bg-canvas px-3 py-2.5 text-left text-xs font-bold text-ink;
   }
 
   .app-data-table {
@@ -96,7 +96,7 @@
   }
 
   .app-data-table .p-datatable-thead > tr > th {
-    @apply sticky top-0 z-10 border-b border-divider px-3 py-2.5 text-left text-xs font-bold text-ink;
+    @apply sticky top-0 z-10 border-b border-divider bg-canvas px-3 py-2.5 text-left text-xs font-bold text-ink;
   }
 
   .app-data-table .p-datatable-tbody > tr > td {
@@ -147,7 +147,7 @@
   }
 
   .fieldset-nested .p-fieldset-legend {
-    @apply rounded-md border border-divider text-ink shadow-sm;
+    @apply rounded-md border border-divider bg-panel text-ink shadow-sm;
   }
 
   .p-fieldset p-toggleable-content .p-fieldset-legend {
@@ -178,4 +178,49 @@
   font-size: 0.875rem;
   line-height: 1.25rem;
   font-weight: 700;
+}
+
+.p-fieldset.p-component {
+  background: rgb(var(--color-panel));
+  border-color: rgb(var(--color-border));
+  color: rgb(var(--color-ink));
+}
+
+.p-fieldset .p-fieldset-content-container,
+.p-fieldset .p-fieldset-content {
+  background: transparent;
+}
+
+.p-fieldset .p-fieldset-legend {
+  background: rgb(var(--color-panel));
+  border-color: rgb(var(--color-border));
+}
+
+.p-fieldset .p-fieldset-toggle-button,
+.p-fieldset .p-fieldset-legend-label {
+  background: transparent;
+  color: rgb(var(--color-ink));
+}
+
+.app-data-table.p-datatable .p-datatable-thead > tr > th {
+  background: rgb(var(--color-canvas));
+  color: rgb(var(--color-ink));
+  border-color: rgb(var(--color-border));
+}
+
+.app-data-table.p-datatable .p-datatable-tbody > tr {
+  background: rgb(var(--color-panel));
+  color: rgb(var(--color-text-secondary));
+}
+
+.app-data-table.p-datatable .p-datatable-tbody > tr:nth-child(even) {
+  background: rgb(var(--color-canvas));
+}
+
+.app-data-table.p-datatable .p-datatable-tbody > tr:hover {
+  background: rgb(var(--color-sidebar-hover-bg));
+}
+
+.app-data-table.p-datatable .p-datatable-tbody > tr > td {
+  border-color: rgb(var(--color-border));
 }
