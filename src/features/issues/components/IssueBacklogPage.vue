@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
@@ -17,8 +17,10 @@ import {
   type BacklogSearchCriteria,
 } from "../composables/useIssueBacklog";
 
+const route = useRoute();
 const router = useRouter();
-const ctrl = useIssueBacklog();
+const initialProject = (route.query.project as string) || "";
+const ctrl = useIssueBacklog(initialProject);
 
 function openImport() {
   if (ctrl.criteria.value.project) {
@@ -44,6 +46,12 @@ function openImport() {
               @change="ctrl.setField('project', ($event.target as HTMLSelectElement).value)"
             >
               <option value="">All projects</option>
+              <option
+                v-if="ctrl.criteria.value.project && !projects.includes(ctrl.criteria.value.project)"
+                :value="ctrl.criteria.value.project"
+              >
+                {{ ctrl.criteria.value.project }}
+              </option>
               <option v-for="p in projects" :key="p" :value="p">{{ p }}</option>
             </select>
           </label>

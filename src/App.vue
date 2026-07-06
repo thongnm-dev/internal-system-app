@@ -2,10 +2,14 @@
 import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAppShell } from "@/shared/composables/useAppShell";
+import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
+import { installNavigationHistory, markMenuNavigation } from "@/shared/composables/useNavigationHistory";
 import { useAuthStore } from "@/app/stores/auth";
 import { appRoutes, defaultRoute, loginRoute } from "@/app/router/routes";
 import type { MenuKey } from "@/shared/types/app";
 import StartupScreen from "@/shared/components/StartupScreen.vue";
+import ConnectionErrorScreen from "@/shared/components/ConnectionErrorScreen.vue";
+import NetworkStatusBanner from "@/shared/components/NetworkStatusBanner.vue";
 import AppSidebar from "@/shared/components/AppSidebar.vue";
 import AppHeader from "@/shared/components/AppHeader.vue";
 import AppBottomBar from "@/shared/components/AppBottomBar.vue";
@@ -14,6 +18,9 @@ const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
 const shell = useAppShell();
+const network = useNetworkStatus();
+
+installNavigationHistory(router);
 
 const activeMenu = computed<MenuKey>(() => (route.meta.key as MenuKey) ?? "overview");
 
@@ -24,6 +31,7 @@ const currentAppRoute = computed(() => {
 function handleMenuChange(key: MenuKey) {
   const target = appRoutes.find((r) => r.key === key);
   if (target) {
+    markMenuNavigation();
     router.push(target.path);
   }
 }
@@ -46,6 +54,12 @@ watch(
 
 <template>
   <StartupScreen v-if="shell.isBootstrapping.value" />
+
+  <ConnectionErrorScreen
+    v-else-if="!network.hasConnectedOnce.value && !network.isOnline.value"
+    :is-checking="network.isChecking.value"
+    @retry="network.retry()"
+  />
 
   <template v-else-if="route.path === '/login'">
     <router-view />
@@ -81,5 +95,16 @@ watch(
     </section>
 
     <AppBottomBar :info="shell.systemInfo.value" />
+
+    <div
+      v-if="!network.isOnline.value"
+      class="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4"
+    >
+      <NetworkStatusBanner
+        class="w-full max-w-2xl"
+        :is-checking="network.isChecking.value"
+        @retry="network.retry()"
+      />
+    </div>
   </main>
 </template>

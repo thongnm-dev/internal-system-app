@@ -5,7 +5,7 @@ use commands::import_commands::{
     preview_monthly_report_csv, search_import_batches,
 };
 use commands::project_commands::{get_backlog_project_by_key, get_project_detail};
-use commands::system_commands::get_system_info;
+use commands::system_commands::{check_internet_connection, get_system_info};
 use commands::excel2md_commands::excel2md;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -14,6 +14,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_system_info,
+            check_internet_connection,
             preview_monthly_report_csv,
             import_monthly_report_csv,
             list_import_batches,

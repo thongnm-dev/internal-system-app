@@ -28,6 +28,7 @@ mod services {
     pub mod excel2md_service;
     pub mod import_csv_service;
     pub mod monthly_report_service;
+    pub mod network_service;
     pub mod project_service;
     pub mod system_service;
 }

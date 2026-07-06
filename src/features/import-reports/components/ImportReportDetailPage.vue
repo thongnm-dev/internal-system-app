@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import { useImportReportDetail } from "../composables/useImportReports";
@@ -9,7 +9,6 @@ import type { AnalysisResult, ProjectSummary, SelectedPhaseDetail } from "@/shar
 import type { ImportReportDetail } from "@/shared/types/import-report";
 
 const route = useRoute();
-const router = useRouter();
 const reportId = Number(route.params.id) || null;
 const ctrl = useImportReportDetail(reportId);
 
@@ -57,10 +56,6 @@ function onOpenDetail(detail: SelectedPhaseDetail) { void detail; }
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <div class="flex items-center justify-between gap-3">
-      <button class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas" type="button" @click="router.push('/import-reports')"><i class="pi pi-arrow-left" />Back</button>
-    </div>
-
     <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="border-b border-divider pb-3"><h3 class="font-bold">Thong tin co ban</h3></div>
       <p v-if="!ctrl.detail.value" class="py-8 text-center text-sm text-muted">{{ ctrl.isLoading.value ? 'Loading report detail...' : 'No report detail.' }}</p>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
@@ -17,7 +17,6 @@ const memberSearchHelpItems: ProjectMember[] = [
 ];
 
 const route = useRoute();
-const router = useRouter();
 const projectID = (route.params.id as string) || null;
 
 const form = ref<ProjectForm>({ ...emptyForm });
@@ -93,8 +92,7 @@ watch(() => form.value.backlogProjectKey, (key) => {
 
 <template>
   <section class="min-h-0 flex-1 overflow-auto rounded-lg border border-divider bg-panel p-4 shadow-sm">
-    <div class="flex items-center justify-between gap-4">
-      <button class="flex h-9 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas" type="button" @click="router.push('/projects')"><i class="pi pi-arrow-left" />Back</button>
+    <div class="flex items-center justify-end gap-4">
       <button class="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90" type="button"><i class="pi pi-save" />Save</button>
     </div>
 

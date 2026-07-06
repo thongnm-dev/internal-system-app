@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { friendlyError, getSystemInfo } from "@/tauri/commands";
+import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import type { MessageMode } from "@/shared/types/app";
 import type { SystemInfo } from "@/shared/types/system";
 
@@ -25,6 +26,8 @@ export function useAppShell() {
   const messageMode = ref<MessageMode>("info");
   const isSidebarCollapsed = ref(false);
   const isBootstrapping = ref(true);
+
+  const network = useNetworkStatus();
 
   let pollTimer: number | undefined;
 
@@ -57,16 +60,22 @@ export function useAppShell() {
     const startedAt = performance.now();
 
     await setCurrentWindowResizable(false);
+
+    // Kick off the connectivity check immediately so it overlaps the splash.
+    const networkReady = network.start();
     await refreshSystemInfo();
 
     const elapsed = performance.now() - startedAt;
     const remainingDelay = Math.max(0, BOOTSTRAP_MIN_DURATION_MS - elapsed);
 
-    window.setTimeout(() => {
-      isBootstrapping.value = false;
-      void setCurrentWindowResizable(true);
-      pollTimer = window.setInterval(() => void refreshSystemInfo(), 1000);
-    }, remainingDelay);
+    await new Promise((resolve) => window.setTimeout(resolve, remainingDelay));
+    // Ensure the initial connectivity decision is ready before revealing the
+    // app, so an offline launch shows the error screen without flashing the UI.
+    await networkReady;
+
+    isBootstrapping.value = false;
+    void setCurrentWindowResizable(true);
+    pollTimer = window.setInterval(() => void refreshSystemInfo(), 1000);
   });
 
   onUnmounted(() => {

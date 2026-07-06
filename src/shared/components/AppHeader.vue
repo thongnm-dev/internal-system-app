@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppRoute } from "@/app/router/routes";
 import { useSettings } from "@/features/settings/composables/useSettings";
+import { useNavigationHistory } from "@/shared/composables/useNavigationHistory";
 
 defineProps<{
   route: AppRoute;
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const { settings, updateTheme } = useSettings();
+const { canGoBack, backTitle, goBack } = useNavigationHistory();
 
 function toggleTheme() {
   updateTheme(settings.value.theme === "dark" ? "light" : "dark");
@@ -28,6 +30,16 @@ function toggleTheme() {
         <span class="text-divider">/</span>
         <span class="text-brand">{{ route.title }}</span>
       </nav>
+      <button
+        v-if="canGoBack"
+        class="mt-3 flex h-8 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-sidebar-hover"
+        type="button"
+        :title="backTitle ? `Back to ${backTitle}` : 'Back'"
+        @click="goBack"
+      >
+        <i class="pi pi-arrow-left" />
+        <span class="min-w-0 truncate">{{ backTitle ? `Back to ${backTitle}` : "Back" }}</span>
+      </button>
     </div>
     <div class="flex shrink-0 items-center gap-2">
       <button

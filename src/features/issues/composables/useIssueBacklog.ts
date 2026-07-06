@@ -170,9 +170,10 @@ export function priorityTone(priority: string) {
   return "bg-slate-100 text-slate-700";
 }
 
-export function useIssueBacklog() {
-  const criteria = ref<BacklogSearchCriteria>({ ...initialCriteria });
-  const appliedCriteria = ref<BacklogSearchCriteria>({ ...initialCriteria });
+export function useIssueBacklog(initialProject = "") {
+  const startingCriteria: BacklogSearchCriteria = { ...initialCriteria, project: initialProject };
+  const criteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
+  const appliedCriteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
 
   const filteredItems = computed(() => backlogItems.filter((item) => matchesCriteria(item, appliedCriteria.value)));
 

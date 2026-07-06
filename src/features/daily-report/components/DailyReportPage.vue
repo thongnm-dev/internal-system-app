@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
 import { useAuthStore } from "@/app/stores/auth";
@@ -21,6 +22,7 @@ import {
 } from "../composables/useDailyReport";
 
 const auth = useAuthStore();
+const router = useRouter();
 const ctrl = useDailyReport(auth.user?.username);
 
 // --- Editing cell dialog ---
@@ -100,6 +102,13 @@ function openContextMenu(project: DailyReportProject, event: MouseEvent) {
 
 function closeContextMenu() {
   contextMenu.value = null;
+}
+
+function openBacklog() {
+  if (!contextMenu.value) return;
+  const project = contextMenu.value.project.name;
+  contextMenu.value = null;
+  router.push({ path: "/issue-backlog", query: { project } });
 }
 
 function deleteProject() {
@@ -573,7 +582,11 @@ function filteredPickerProjects() {
         <i class="pi pi-plus" />
         <span class="min-w-0 truncate">Thêm task</span>
       </button>
-      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas" type="button">
+      <button
+        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
+        type="button"
+        @click="openBacklog"
+      >
         <i class="pi pi-folder-open" />
         <span class="min-w-0 truncate">Xem backlog</span>
       </button>
