@@ -21,7 +21,6 @@ const items: { id: MenuKey; icon: string }[] = [
   { id: "dailyWorkNotes", icon: "pi-pencil" },
   { id: "dailyReport", icon: "pi-calendar" },
   { id: "importCsv", icon: "pi-database" },
-  { id: "importReports", icon: "pi-clipboard" },
 ];
 
 const settingsRoute = appRoutes.find((r) => r.key === "settings");

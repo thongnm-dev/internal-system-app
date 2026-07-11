@@ -8,7 +8,6 @@ export type MenuKey =
   | "dailyWorkNotes"
   | "dailyReport"
   | "importCsv"
-  | "importReports"
   | "settings";
 
 export type AppRouteKey = MenuKey | "login";

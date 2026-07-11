@@ -65,12 +65,6 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
   {
-    key: "importReports",
-    path: "/import-reports",
-    title: "Reports",
-    subtitle: "Search and review monthly report import history.",
-  },
-  {
     key: "settings",
     path: "/settings",
     requiresAuth: true,
@@ -96,7 +90,6 @@ export function routeByPath(path: string): AppRoute {
   const pathname = path.split("?")[0];
 
   if (pathname.startsWith("/projects/")) return routeByKey("projects");
-  if (pathname.startsWith("/import-reports/")) return routeByKey("importReports");
 
   return appRoutes.find((r) => r.path === pathname) ?? defaultRoute;
 }
@@ -157,16 +150,6 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/import-csv",
     component: () => import("@/features/import-csv/components/ImportCsvPage.vue"),
     meta: { key: "importCsv" as MenuKey },
-  },
-  {
-    path: "/import-reports",
-    component: () => import("@/features/import-reports/components/ImportReportsPage.vue"),
-    meta: { key: "importReports" as MenuKey },
-  },
-  {
-    path: "/import-reports/:id",
-    component: () => import("@/features/import-reports/components/ImportReportDetailPage.vue"),
-    meta: { key: "importReports" as MenuKey },
   },
   {
     path: "/settings",

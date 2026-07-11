@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import type { SystemInfo } from "@/shared/types/system";
 import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult } from "@/shared/types/import-csv";
-import type { ImportReportDetail, ImportReportListItem, ImportReportSearchCriteria } from "@/shared/types/import-report";
 import type { XlsxMarkdownResult } from "@/shared/types/excel2md";
 
 type TauriWindow = Window & {
@@ -50,16 +49,6 @@ export function previewMonthlyReportCsv(path: string) {
 
 export function importMonthlyReportCsv(path: string, reportName: string, note: string) {
   return safeInvoke<ImportCsvResult>("import_monthly_report_csv", { path, reportName, note });
-}
-
-// --- Import Reports ---
-
-export function searchImportBatches(criteria: ImportReportSearchCriteria) {
-  return safeInvoke<ImportReportListItem[]>("search_import_batches", { criteria });
-}
-
-export function getImportBatchDetail(batchId: number) {
-  return safeInvoke<ImportReportDetail>("get_import_batch_detail", { batchId });
 }
 
 // --- Xlsx → Markdown ---
