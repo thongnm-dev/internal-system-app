@@ -1,9 +1,37 @@
 import { computed, ref, watch } from "vue";
 
+export type TaskCategory = "PG" | "Review PG" | "UT" | "Review UT" | "Other";
+
+export const TASK_CATEGORIES: TaskCategory[] = ["PG", "Review PG", "UT", "Review UT", "Other"];
+
 export type DailyReportTask = {
   id: string;
   code: string;
   name: string;
+  /** Long description shown in task detail. */
+  description?: string;
+  /** Task classification tags (PG, Review PG, UT, ...). */
+  categories?: TaskCategory[];
+  /** Username the task is assigned to. Defaults to the logged-in user. */
+  assignee?: string;
+  /** Estimated hours (kept as string for form binding). */
+  estimateHour?: string;
+  /** Due date as an ISO `YYYY-MM-DD` string. */
+  dueDate?: string;
+  /** Backlog issue key used to map/sync this task with the backlog. */
+  issueKey?: string;
+  /** True when the task was created by the user via the New Task dialog. */
+  isUserAdded?: boolean;
+};
+
+export type NewTaskInput = {
+  shortName: string;
+  description: string;
+  categories: TaskCategory[];
+  assignee: string;
+  estimateHour: string;
+  dueDate: string;
+  issueKey: string;
 };
 
 export type DailyReportProject = {
@@ -99,6 +127,7 @@ export function useDailyReport(username?: string) {
   const currentMonth = startOfMonth(now);
   const selectedMonth = ref(startOfMonth(now));
   const entries = ref<DailyReportEntries>(loadEntries(username, startOfMonth(now)));
+  const userTasks = ref<Record<string, DailyReportTask[]>>(loadUserTasks(username));
 
   const allProjects = [...assignedProjects, ...optionalProjects];
 
@@ -108,6 +137,7 @@ export function useDailyReport(username?: string) {
       .map((p) => ({
         ...p,
         isUserAdded: optionalProjects.some((op) => op.id === p.id),
+        tasks: [...p.tasks, ...(userTasks.value[p.id] ?? [])],
       })),
   );
 
@@ -125,6 +155,11 @@ export function useDailyReport(username?: string) {
   const days = computed<DailyReportDay[]>(() => getMonthDays(year.value, monthIndex.value));
 
   const canGoNextMonth = computed(() => selectedMonth.value < currentMonth);
+
+  // Editable only for the current month and the one right before it.
+  // Months at or before (current - 2) are locked (read-only).
+  const editableFromMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+  const isEditable = computed(() => selectedMonth.value >= editableFromMonth);
 
   const monthLabel = computed(() =>
     selectedMonth.value.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
@@ -145,6 +180,32 @@ export function useDailyReport(username?: string) {
       visibleProjectIds.value = [...visibleProjectIds.value, projectId];
     }
     selectedProjectId.value = projectId;
+  }
+
+  function addTask(projectId: string, input: NewTaskInput): DailyReportTask | null {
+    const shortName = input.shortName.trim();
+    if (!shortName) return null;
+    const categories = input.categories.slice();
+    const task: DailyReportTask = {
+      id: `${projectId}-task-${Date.now()}`,
+      code: categories[0] ?? "TASK",
+      name: shortName,
+      description: input.description.trim(),
+      categories,
+      assignee: input.assignee.trim() || (username ?? ""),
+      estimateHour: input.estimateHour.trim(),
+      dueDate: input.dueDate,
+      issueKey: input.issueKey.trim(),
+      isUserAdded: true,
+    };
+    const existing = userTasks.value[projectId] ?? [];
+    userTasks.value = { ...userTasks.value, [projectId]: [...existing, task] };
+    persistUserTasks(username, userTasks.value);
+    // Make sure the project the task belongs to is visible.
+    if (!visibleProjectIds.value.includes(projectId)) {
+      visibleProjectIds.value = [...visibleProjectIds.value, projectId];
+    }
+    return task;
   }
 
   function removeProject(projectId: string) {
@@ -172,6 +233,7 @@ export function useDailyReport(username?: string) {
   }
 
   function updateEntry(taskId: string, day: number, value: DailyReportEntry | null) {
+    if (!isEditable.value) return;
     const normalized = value ? normalizeEntry(value) : null;
     const key = entryKey(taskId, day);
     if (!normalized) {
@@ -193,10 +255,12 @@ export function useDailyReport(username?: string) {
 
   return {
     addProject,
+    addTask,
     availableProjects,
     canGoNextMonth,
     days,
     entries,
+    isEditable,
     maxMonthValue,
     monthLabel,
     monthValue,
@@ -268,6 +332,27 @@ function loadEntries(username: string | undefined, month: Date): DailyReportEntr
     return saved ? (JSON.parse(saved) as DailyReportEntries) : {};
   } catch {
     return {};
+  }
+}
+
+function userTasksStorageKey(username: string | undefined) {
+  return `pjjyuji.daily-report.tasks.${username || "guest"}`;
+}
+
+function loadUserTasks(username: string | undefined): Record<string, DailyReportTask[]> {
+  try {
+    const saved = window.localStorage.getItem(userTasksStorageKey(username));
+    return saved ? (JSON.parse(saved) as Record<string, DailyReportTask[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistUserTasks(username: string | undefined, tasks: Record<string, DailyReportTask[]>) {
+  try {
+    window.localStorage.setItem(userTasksStorageKey(username), JSON.stringify(tasks));
+  } catch {
+    /* ignore quota / serialization errors */
   }
 }
 

@@ -117,6 +117,21 @@ export const vueRoutes: RouteRecordRaw[] = [
     meta: { key: "projects" as MenuKey },
   },
   {
+    path: "/projects/:id/tasks",
+    component: () => import("@/features/projects/components/ProjectTasksPage.vue"),
+    meta: { key: "projects" as MenuKey },
+  },
+  {
+    path: "/projects/:id/tasks/new",
+    component: () => import("@/features/projects/components/ProjectAddTaskPage.vue"),
+    meta: { key: "projects" as MenuKey },
+  },
+  {
+    path: "/projects/:id/report",
+    component: () => import("@/features/projects/components/ProjectReportPage.vue"),
+    meta: { key: "projects" as MenuKey },
+  },
+  {
     path: "/project-skills",
     component: () => import("@/features/skills/components/ProjectSkillsPage.vue"),
     meta: { key: "projectSkills" as MenuKey },

@@ -35,7 +35,20 @@ const visibleProjects = computed(() => filteredProjects.value.slice((page.value 
 watch(() => [ctrl.filters.value.code, ctrl.filters.value.name, ctrl.filters.value.keyword], () => { page.value = 1; });
 watch(pageCount, (c) => { page.value = Math.min(page.value, c); });
 
+function openContextMenu(event: { originalEvent: Event; data: ProjectSummary }) {
+  const mouseEvent = event.originalEvent as MouseEvent;
+  mouseEvent.preventDefault();
+  contextMenu.value = { project: event.data, x: mouseEvent.clientX, y: mouseEvent.clientY };
+}
+
 function closeContextMenu() { contextMenu.value = null; }
+
+function goToProjectRoute(suffix: string) {
+  if (!contextMenu.value) return;
+  const code = encodeURIComponent(contextMenu.value.project.project_code);
+  contextMenu.value = null;
+  router.push(`/projects/${code}${suffix}`);
+}
 
 watch(contextMenu, (val) => {
   if (val) {
@@ -91,15 +104,17 @@ function bugCount(project: ProjectSummary) {
         <h3 class="font-bold">Project list</h3>
         <span class="text-xs text-muted">{{ filteredProjects.length.toLocaleString("en-US") }} projects</span>
       </div>
-      <DataTable class="app-data-table min-h-0" :empty-message="!ctrl.result.value ? 'No analysis data yet.' : 'No projects match the search conditions.'" :row-class="() => 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '980px' }" :value="visibleProjects" @row-click="(e: any) => router.push(`/projects/${encodeURIComponent(e.data.project_code)}`)">
+      <DataTable class="app-data-table min-h-0" :empty-message="!ctrl.result.value ? 'No analysis data yet.' : 'No projects match the search conditions.'" :row-class="() => 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '980px' }" :value="visibleProjects" @row-click="(e: any) => router.push(`/projects/${encodeURIComponent(e.data.project_code)}`)" @row-contextmenu="openContextMenu">
         <Column field="project_code" header="Code" body-class="font-bold text-ink"><template #body="{ data }">{{ data.project_code || '-' }}</template></Column>
         <Column field="project_name" header="Name"><template #body="{ data }">{{ data.project_name || '-' }}</template></Column>
         <Column header="Total hour" body-class="num font-extrabold text-brand" header-class="num"><template #body="{ data }">{{ formatHourValue(totalMinutes(data.totals)) }}</template></Column>
         <Column header="Bug count" body-class="num" header-class="num"><template #body="{ data }">{{ bugCount(data).toLocaleString("en-US") }}</template></Column>
       </DataTable>
 
-      <div v-if="contextMenu" class="fixed z-50 min-w-48 overflow-hidden rounded-md border border-divider bg-panel py-1 text-sm shadow-xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
-        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button"><i class="pi pi-file" />Manage SKILL.md</button>
+      <div v-if="contextMenu" class="fixed z-50 min-w-48 overflow-hidden rounded-md border border-divider bg-panel py-1 text-sm shadow-xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop @contextmenu.prevent>
+        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/tasks/new')"><i class="pi pi-plus" />Add Task</button>
+        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/tasks')"><i class="pi pi-list" />View Tasks</button>
+        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/report')"><i class="pi pi-chart-bar" />View Report</button>
       </div>
 
       <div class="flex items-center justify-between gap-4 border-t border-divider px-4 py-3">

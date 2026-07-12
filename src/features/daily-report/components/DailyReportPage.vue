@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
@@ -13,12 +13,15 @@ import {
   normalizeEntryForForm,
   projectDayTotal,
   projectTotal,
+  TASK_CATEGORIES,
   useDailyReport,
   type DailyReportDay,
   type DailyReportEntries,
   type DailyReportEntry,
   type DailyReportProject,
   type DailyReportTask,
+  type NewTaskInput,
+  type TaskCategory,
 } from "../composables/useDailyReport";
 
 const auth = useAuthStore();
@@ -36,6 +39,7 @@ const editingCell = ref<EditingCell | null>(null);
 const editForm = ref<DailyReportEntry>(emptyEntry());
 
 function openEditDialog(task: DailyReportTask, day: DailyReportDay) {
+  if (!ctrl.isEditable.value) return;
   const entry = ctrl.entries.value[entryKey(task.id, day.day)];
   const normalized = normalizeEntryForForm(entry);
   editingCell.value = { day, entry: normalized, task };
@@ -77,6 +81,47 @@ function toggleProjectSelection(projectId: string) {
 function confirmAddProjects() {
   selectedProjectIds.value.forEach((id) => ctrl.addProject(id));
   isAddingProject.value = false;
+}
+
+// --- New task dialog ---
+const isAddingTask = ref(false);
+const taskTargetProject = ref<DailyReportProject | null>(null);
+const taskForm = ref<NewTaskInput>(emptyTaskForm());
+
+function emptyTaskForm(): NewTaskInput {
+  return {
+    shortName: "",
+    description: "",
+    categories: [],
+    assignee: auth.user?.username ?? "",
+    estimateHour: "",
+    dueDate: "",
+    issueKey: "",
+  };
+}
+
+function openTaskDialog() {
+  if (!contextMenu.value) return;
+  taskTargetProject.value = contextMenu.value.project;
+  taskForm.value = emptyTaskForm();
+  contextMenu.value = null;
+  isAddingTask.value = true;
+}
+
+function toggleTaskCategory(category: TaskCategory) {
+  const list = taskForm.value.categories;
+  taskForm.value.categories = list.includes(category)
+    ? list.filter((c) => c !== category)
+    : [...list, category];
+}
+
+const canSaveTask = computed(() => taskForm.value.shortName.trim().length > 0);
+
+function saveTask() {
+  if (!taskTargetProject.value || !canSaveTask.value) return;
+  ctrl.addTask(taskTargetProject.value.id, taskForm.value);
+  isAddingTask.value = false;
+  taskTargetProject.value = null;
 }
 
 // --- Context menu ---
@@ -225,8 +270,18 @@ function filteredPickerProjects() {
             <i class="pi pi-calendar text-xl" />
           </span>
           <div class="min-w-0">
-            <h3 class="truncate font-bold">{{ ctrl.monthLabel.value }}</h3>
-            <p class="mt-1 truncate text-xs text-muted">Daily work hour input</p>
+            <div class="flex items-center gap-2">
+              <h3 class="truncate font-bold">{{ ctrl.monthLabel.value }}</h3>
+              <span
+                v-if="!ctrl.isEditable.value"
+                class="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700"
+              >
+                Read-only
+              </span>
+            </div>
+            <p class="mt-1 truncate text-xs text-muted">
+              {{ ctrl.isEditable.value ? "Daily work hour input" : "Locked — editing is disabled for this month" }}
+            </p>
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -362,17 +417,26 @@ function filteredPickerProjects() {
                     :class="[
                       'flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-emerald-100',
                       entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0
-                        ? 'border-brand bg-emerald-50 text-brand hover:bg-emerald-100'
-                        : 'border-divider bg-panel text-muted hover:border-brand hover:text-brand',
+                        ? 'border-brand bg-emerald-50 text-brand'
+                        : 'border-divider bg-panel text-muted',
+                      ctrl.isEditable.value
+                        ? entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0
+                          ? 'hover:bg-emerald-100'
+                          : 'hover:border-brand hover:text-brand'
+                        : 'cursor-not-allowed opacity-60',
                     ]"
                     type="button"
-                    :title="`${task.name} - ${day.label} ${day.weekday}`"
+                    :disabled="!ctrl.isEditable.value"
+                    :title="ctrl.isEditable.value
+                      ? `${task.name} - ${day.label} ${day.weekday}`
+                      : `${task.name} - ${day.label} ${day.weekday} (read-only)`"
                     @click="openEditDialog(task, day)"
                   >
                     <template v-if="entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0">
                       {{ formatHoursDisplay(entryHour(ctrl.entries.value[entryKey(task.id, day.day)])) }}
                     </template>
-                    <i v-else class="pi pi-plus" />
+                    <i v-else-if="ctrl.isEditable.value" class="pi pi-plus" />
+                    <span v-else class="text-muted">-</span>
                   </button>
                 </div>
               </div>
@@ -409,14 +473,6 @@ function filteredPickerProjects() {
             min="0"
             step="0.25"
             type="number"
-          />
-        </label>
-
-        <label class="block">
-          <span class="text-xs font-bold text-muted">Phase</span>
-          <input
-            v-model="editForm.phase"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
           />
         </label>
 
@@ -570,6 +626,138 @@ function filteredPickerProjects() {
       </template>
     </Dialog>
 
+    <!-- New task dialog -->
+    <Dialog
+      :visible="isAddingTask"
+      class="w-full max-w-lg rounded-lg bg-panel shadow-xl"
+      :style="{ maxHeight: '90vh' }"
+      modal
+      @update:visible="isAddingTask = $event"
+    >
+      <template #header>
+        <div class="min-w-0">
+          <h3 class="truncate font-bold text-ink">New Task</h3>
+          <p v-if="taskTargetProject" class="mt-1 truncate text-sm text-muted">
+            {{ taskTargetProject.code }} - {{ taskTargetProject.name }}
+          </p>
+        </div>
+      </template>
+
+      <div class="space-y-4">
+        <!-- Short name -->
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Short name <span class="text-red-500">*</span></span>
+          <input
+            v-model="taskForm.shortName"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            placeholder="Task short name"
+            autofocus
+          />
+        </label>
+
+        <!-- Description -->
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Mô tả</span>
+          <textarea
+            v-model="taskForm.description"
+            class="mt-1 min-h-24 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            placeholder="Task description"
+          />
+        </label>
+
+        <!-- Task category (multi-select) -->
+        <div>
+          <span class="text-xs font-bold text-muted">Phân loại task</span>
+          <div class="mt-1 flex flex-wrap gap-2">
+            <label
+              v-for="category in TASK_CATEGORIES"
+              :key="category"
+              :class="[
+                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition',
+                taskForm.categories.includes(category)
+                  ? 'border-brand bg-emerald-50 text-brand'
+                  : 'border-divider bg-panel text-secondary hover:border-brand',
+              ]"
+            >
+              <Checkbox
+                :model-value="taskForm.categories.includes(category)"
+                :binary="true"
+                class="h-4 w-4 accent-brand"
+                @update:model-value="toggleTaskCategory(category)"
+              />
+              {{ category }}
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Assignee -->
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Assignee</span>
+            <input
+              v-model="taskForm.assignee"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Username"
+            />
+          </label>
+
+          <!-- Estimate hour -->
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Estimate Hour</span>
+            <input
+              v-model="taskForm.estimateHour"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              inputmode="decimal"
+              min="0"
+              step="0.25"
+              type="number"
+              placeholder="0"
+            />
+          </label>
+
+          <!-- Due date -->
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Due Date</span>
+            <input
+              v-model="taskForm.dueDate"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              type="date"
+            />
+          </label>
+
+          <!-- Backlog issue key -->
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Link Issue Backlog</span>
+            <input
+              v-model="taskForm.issueKey"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Issue Key"
+            />
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            type="button"
+            @click="isAddingTask = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="!canSaveTask"
+            @click="saveTask"
+          >
+            Add task
+          </button>
+        </div>
+      </template>
+    </Dialog>
+
     <!-- Context menu -->
     <div
       v-if="contextMenu"
@@ -578,7 +766,11 @@ function filteredPickerProjects() {
       @click.stop
       @contextmenu.prevent
     >
-      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas" type="button">
+      <button
+        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
+        type="button"
+        @click="openTaskDialog"
+      >
         <i class="pi pi-plus" />
         <span class="min-w-0 truncate">Thêm task</span>
       </button>
