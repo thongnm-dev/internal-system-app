@@ -9,6 +9,13 @@ use commands::daily_note_commands::{
     create_daily_note, delete_daily_note, get_daily_note_counts, get_daily_notes_by_date,
     get_daily_notes_by_month, update_daily_note_status,
 };
+use commands::daily_report_commands::{
+    clear_daily_report_entry, create_daily_report_task, delete_daily_report_task,
+    get_daily_report_entries, get_daily_report_tasks, save_daily_report_entry,
+};
+use commands::db_config_commands::{
+    check_database_status, get_database_config, save_database_config, test_database_config,
+};
 use commands::import_commands::{
     get_import_batch_detail, import_monthly_report_csv, list_import_batches,
     preview_monthly_report_csv, search_import_batches,
@@ -44,6 +51,11 @@ pub fn run() {
             // === System commands ===
             get_system_info,
             check_internet_connection,
+            // === Database config commands ===
+            check_database_status,
+            get_database_config,
+            test_database_config,
+            save_database_config,
             // === Import CSV commands ===
             preview_monthly_report_csv,
             import_monthly_report_csv,
@@ -65,7 +77,14 @@ pub fn run() {
             get_daily_notes_by_month,
             get_daily_note_counts,
             update_daily_note_status,
-            delete_daily_note
+            delete_daily_note,
+            // === Daily Report commands ===
+            save_daily_report_entry,
+            clear_daily_report_entry,
+            get_daily_report_entries,
+            create_daily_report_task,
+            get_daily_report_tasks,
+            delete_daily_report_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

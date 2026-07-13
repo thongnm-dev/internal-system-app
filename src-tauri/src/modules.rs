@@ -17,6 +17,10 @@ mod app {
 mod commands {
     /// Commands cho module ghi chú công việc hằng ngày.
     pub mod daily_note_commands;
+    /// Commands cho màn hình daily report (giờ công + task người dùng thêm).
+    pub mod daily_report_commands;
+    /// Commands cho cấu hình kết nối database.
+    pub mod db_config_commands;
     /// Command chuyển đổi Excel → Markdown.
     pub mod excel2md_commands;
     /// Commands cho import CSV báo cáo tháng.
@@ -33,6 +37,8 @@ mod database {
     pub mod csv_reader;
     /// Data access cho bảng `daily_work_notes` (PostgreSQL).
     pub mod daily_note_store;
+    /// Data access cho bảng `daily_report_entries` và `daily_report_tasks`.
+    pub mod daily_report_store;
     /// Data access cho bảng `projects` và `project_members` (PostgreSQL).
     pub mod project_store;
     /// Lưu trữ lịch sử import CSV dưới dạng JSON file.
@@ -43,6 +49,10 @@ mod database {
 mod models {
     /// Model cho module ghi chú công việc hằng ngày.
     pub mod daily_note;
+    /// Model cho màn hình daily report (giờ công + task người dùng thêm).
+    pub mod daily_report;
+    /// Model cho cấu hình kết nối database.
+    pub mod db_config;
     /// Model kết quả chuyển đổi Excel → Markdown.
     pub mod excel2md;
     /// Model cho import CSV (preview row, minute totals, work record).
@@ -59,6 +69,10 @@ mod models {
 mod services {
     /// Service cho module ghi chú công việc hằng ngày.
     pub mod daily_note_service;
+    /// Service cho màn hình daily report (giờ công + task người dùng thêm).
+    pub mod daily_report_service;
+    /// Service cho cấu hình kết nối database.
+    pub mod db_config_service;
     /// Service chuyển đổi Excel → Markdown (gọi script Python).
     pub mod excel2md_service;
     /// Service preview và đọc dữ liệu import CSV.

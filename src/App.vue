@@ -3,12 +3,15 @@ import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAppShell } from "@/shared/composables/useAppShell";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
+import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { installNavigationHistory, markMenuNavigation } from "@/shared/composables/useNavigationHistory";
 import { useAuthStore } from "@/app/stores/auth";
 import { appRoutes, defaultRoute, loginRoute } from "@/app/router/routes";
 import type { MenuKey } from "@/shared/types/app";
 import StartupScreen from "@/shared/components/StartupScreen.vue";
 import ConnectionErrorScreen from "@/shared/components/ConnectionErrorScreen.vue";
+import DatabaseErrorScreen from "@/shared/components/DatabaseErrorScreen.vue";
+import DatabaseConfigScreen from "@/shared/components/DatabaseConfigScreen.vue";
 import NetworkStatusBanner from "@/shared/components/NetworkStatusBanner.vue";
 import AppSidebar from "@/shared/components/AppSidebar.vue";
 import AppHeader from "@/shared/components/AppHeader.vue";
@@ -19,6 +22,7 @@ const route = useRoute();
 const auth = useAuthStore();
 const shell = useAppShell();
 const network = useNetworkStatus();
+const database = useDatabaseStatus();
 
 installNavigationHistory(router);
 
@@ -59,6 +63,19 @@ watch(
     v-else-if="!network.hasConnectedOnce.value && !network.isOnline.value"
     :is-checking="network.isChecking.value"
     @retry="network.retry()"
+  />
+
+  <DatabaseErrorScreen
+    v-else-if="
+      database.hasChecked.value &&
+      database.isConfigured.value &&
+      !database.isConnected.value &&
+      !database.wantsReconfigure.value
+    "
+  />
+
+  <DatabaseConfigScreen
+    v-else-if="database.hasChecked.value && !database.isConnected.value"
   />
 
   <template v-else-if="route.path === '/login'">

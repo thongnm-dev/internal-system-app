@@ -1,6 +1,7 @@
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { friendlyError, getSystemInfo } from "@/tauri/commands";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
+import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import type { MessageMode } from "@/shared/types/app";
 import type { SystemInfo } from "@/shared/types/system";
 
@@ -28,8 +29,21 @@ export function useAppShell() {
   const isBootstrapping = ref(true);
 
   const network = useNetworkStatus();
+  const database = useDatabaseStatus();
 
   let pollTimer: number | undefined;
+
+  // Re-verify the database whenever connectivity is (re)established while it is
+  // not yet confirmed connected — e.g. the app was launched offline and the
+  // user has just retried successfully, so the bootstrap DB check was skipped.
+  watch(
+    () => network.isOnline.value,
+    (online, wasOnline) => {
+      if (online && !wasOnline && !database.isConnected.value && !database.isChecking.value) {
+        void database.check();
+      }
+    },
+  );
 
   async function refreshSystemInfo() {
     try {
@@ -71,7 +85,15 @@ export function useAppShell() {
     await new Promise((resolve) => window.setTimeout(resolve, remainingDelay));
     // Ensure the initial connectivity decision is ready before revealing the
     // app, so an offline launch shows the error screen without flashing the UI.
-    await networkReady;
+    const online = await networkReady;
+
+    // After the internet check, verify the database configuration. When online
+    // (the DB check screen only follows a successful connectivity check), probe
+    // the database so a missing/invalid config shows the config screen instead
+    // of flashing the app.
+    if (online) {
+      await database.check();
+    }
 
     isBootstrapping.value = false;
     void setCurrentWindowResizable(true);

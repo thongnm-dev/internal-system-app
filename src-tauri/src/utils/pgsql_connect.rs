@@ -9,6 +9,60 @@ use ini::Ini;
 use std::path::PathBuf;
 use tokio_postgres::{Client, NoTls};
 
+impl PgConfig {
+    /// Ghi cấu hình xuống `config.ini` (section `[database]`), ghi đè nếu đã có.
+    pub fn save_to_ini(&self) -> AppResult<()> {
+        let mut ini = Ini::new();
+        ini.with_section(Some("database"))
+            .set("host", &self.host)
+            .set("port", self.port.to_string())
+            .set("dbname", &self.dbname)
+            .set("user", &self.user)
+            .set("password", &self.password);
+
+        let path = config_path();
+        ini.write_to_file(&path).map_err(|e| {
+            AppError::new(format!("Failed to write config.ini at {}: {e}", path.display()))
+        })?;
+        Ok(())
+    }
+}
+
+/// Thời gian chờ tối đa cho một lần thử kết nối (giây).
+const CONNECT_TIMEOUT_SECS: u64 = 5;
+
+/// Thử kết nối tới database với một cấu hình cho trước.
+///
+/// Mở kết nối tạm, chạy `SELECT 1` để xác nhận database phản hồi, rồi trả về.
+/// Có timeout để không treo UI khi host/port sai (không phản hồi).
+/// Dùng để kiểm tra cấu hình trước khi lưu.
+pub async fn test_connection(config: &PgConfig) -> AppResult<()> {
+    let timeout = std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS);
+
+    let attempt = async {
+        let (client, connection) = tokio_postgres::connect(&config.connection_string(), NoTls)
+            .await
+            .map_err(|e| AppError::new(format!("Cannot connect to database: {e}")))?;
+
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+
+        client
+            .query_one("SELECT 1", &[])
+            .await
+            .map_err(|e| AppError::new(format!("Database did not respond: {e}")))?;
+
+        Ok::<(), AppError>(())
+    };
+
+    tokio::time::timeout(timeout, attempt).await.map_err(|_| {
+        AppError::new(format!(
+            "Kết nối database quá thời gian chờ ({CONNECT_TIMEOUT_SECS}s). Vui lòng kiểm tra host/port."
+        ))
+    })?
+}
+
 /// Cấu hình kết nối PostgreSQL, được đọc từ file `config.ini`.
 #[derive(Debug, Clone)]
 pub struct PgConfig {
@@ -137,6 +191,47 @@ pub async fn ensure_tables(client: &Client) -> AppResult<()> {
 
             CREATE INDEX IF NOT EXISTS idx_daily_notes_user_date
                 ON daily_work_notes(username, note_date);
+
+            -- Bảng ô nhập giờ công của màn hình daily report
+            CREATE TABLE IF NOT EXISTS daily_report_entries (
+                id          SERIAL           PRIMARY KEY,
+                username    VARCHAR(100)     NOT NULL,
+                task_id     VARCHAR(120)     NOT NULL,
+                project_id  VARCHAR(120)     NOT NULL,
+                entry_date  DATE             NOT NULL,
+                comment     TEXT             NOT NULL DEFAULT '',
+                hour        DOUBLE PRECISION NOT NULL DEFAULT 0,
+                is_ot       BOOLEAN          NOT NULL DEFAULT FALSE,
+                regular_ot  DOUBLE PRECISION NOT NULL DEFAULT 0,
+                midnight_ot DOUBLE PRECISION NOT NULL DEFAULT 0,
+                phase       VARCHAR(100)     NOT NULL DEFAULT '',
+                updated_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+                UNIQUE(username, task_id, entry_date)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_daily_report_entries_user_date
+                ON daily_report_entries(username, entry_date);
+
+            -- Bảng task do người dùng tự thêm trên màn hình daily report
+            CREATE TABLE IF NOT EXISTS daily_report_tasks (
+                id            SERIAL       PRIMARY KEY,
+                username      VARCHAR(100) NOT NULL,
+                task_id       VARCHAR(120) NOT NULL,
+                project_id    VARCHAR(120) NOT NULL,
+                code          VARCHAR(50)  NOT NULL DEFAULT 'TASK',
+                name          VARCHAR(300) NOT NULL,
+                description   TEXT         NOT NULL DEFAULT '',
+                categories    TEXT[]       NOT NULL DEFAULT '{}',
+                assignee      VARCHAR(100) NOT NULL DEFAULT '',
+                estimate_hour VARCHAR(20)  NOT NULL DEFAULT '',
+                due_date      VARCHAR(20)  NOT NULL DEFAULT '',
+                issue_key     VARCHAR(50)  NOT NULL DEFAULT '',
+                created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+                UNIQUE(username, task_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_daily_report_tasks_user
+                ON daily_report_tasks(username, project_id);
             ",
         )
         .await
@@ -280,6 +375,74 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         .await
         .map_err(|e| AppError::new(format!("Failed to create sp_daily_note_delete: {e}")))?;
 
+    // === Daily Report stored procedures ===
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_entry_upsert.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_entry_upsert: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_entry_delete.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_entry_delete: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_entry_select_by_month.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_entry_select_by_month: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_task_insert.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_task_insert: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_task_select.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_task_select: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_task_delete.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_task_delete: {e}"
+            ))
+        })?;
+
     Ok(())
 }
 
@@ -287,7 +450,7 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
 ///
 /// Ưu tiên tìm cạnh file thực thi (production build),
 /// nếu không tìm thấy thì fallback về thư mục `CARGO_MANIFEST_DIR` (development).
-fn config_path() -> PathBuf {
+pub fn config_path() -> PathBuf {
     // Production: config.ini nằm cạnh file .exe
     let exe_dir = std::env::current_exe()
         .ok()

@@ -37,6 +37,46 @@ export function checkInternetConnection() {
   return safeInvoke<boolean>("check_internet_connection");
 }
 
+// --- Database config ---
+
+export type DatabaseStatus = {
+  configured: boolean;
+  connected: boolean;
+  message: string;
+};
+
+export type DatabaseConfig = {
+  host: string;
+  port: number;
+  dbname: string;
+  user: string;
+  password: string;
+};
+
+export type SaveDatabaseConfigRequest = {
+  host: string;
+  port: number;
+  dbname: string;
+  user: string;
+  password: string;
+};
+
+export function checkDatabaseStatus() {
+  return safeInvoke<DatabaseStatus>("check_database_status");
+}
+
+export function getDatabaseConfig() {
+  return safeInvoke<DatabaseConfig | null>("get_database_config");
+}
+
+export function testDatabaseConfig(request: SaveDatabaseConfigRequest) {
+  return safeInvoke<void>("test_database_config", { request });
+}
+
+export function saveDatabaseConfig(request: SaveDatabaseConfigRequest) {
+  return safeInvoke<DatabaseStatus>("save_database_config", { request });
+}
+
 // --- Import CSV ---
 
 export function listImportBatches() {
@@ -169,4 +209,86 @@ export function updateDailyNoteStatus(id: number, username: string, status: stri
 
 export function deleteDailyNote(id: number, username: string) {
   return safeInvoke<void>("delete_daily_note", { id, username });
+}
+
+// --- Daily Report ---
+
+export type DailyReportEntryResult = {
+  id: number;
+  username: string;
+  task_id: string;
+  project_id: string;
+  entry_date: string;
+  comment: string;
+  hour: number;
+  is_ot: boolean;
+  regular_ot: number;
+  midnight_ot: number;
+  phase: string;
+  updated_at: string;
+};
+
+export type SaveDailyReportEntryRequest = {
+  task_id: string;
+  project_id: string;
+  entry_date: string;
+  comment: string;
+  hour: number;
+  is_ot: boolean;
+  regular_ot: number;
+  midnight_ot: number;
+  phase: string;
+};
+
+export type DailyReportUserTaskResult = {
+  id: number;
+  username: string;
+  task_id: string;
+  project_id: string;
+  code: string;
+  name: string;
+  description: string;
+  categories: string[];
+  assignee: string;
+  estimate_hour: string;
+  due_date: string;
+  issue_key: string;
+  created_at: string;
+};
+
+export type CreateDailyReportTaskRequest = {
+  task_id: string;
+  project_id: string;
+  code: string;
+  name: string;
+  description: string;
+  categories: string[];
+  assignee: string;
+  estimate_hour: string;
+  due_date: string;
+  issue_key: string;
+};
+
+export function saveDailyReportEntry(username: string, request: SaveDailyReportEntryRequest) {
+  return safeInvoke<DailyReportEntryResult>("save_daily_report_entry", { username, request });
+}
+
+export function clearDailyReportEntry(username: string, taskId: string, entryDate: string) {
+  return safeInvoke<void>("clear_daily_report_entry", { username, taskId, entryDate });
+}
+
+export function getDailyReportEntries(username: string, year: number, month: number) {
+  return safeInvoke<DailyReportEntryResult[]>("get_daily_report_entries", { username, year, month });
+}
+
+export function createDailyReportTask(username: string, request: CreateDailyReportTaskRequest) {
+  return safeInvoke<DailyReportUserTaskResult>("create_daily_report_task", { username, request });
+}
+
+export function getDailyReportTasks(username: string) {
+  return safeInvoke<DailyReportUserTaskResult[]>("get_daily_report_tasks", { username });
+}
+
+export function deleteDailyReportTask(username: string, taskId: string) {
+  return safeInvoke<void>("delete_daily_report_task", { username, taskId });
 }

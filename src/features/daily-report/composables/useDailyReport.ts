@@ -1,4 +1,14 @@
 import { computed, ref, watch } from "vue";
+import {
+  clearDailyReportEntry,
+  createDailyReportTask,
+  friendlyError,
+  getDailyReportEntries,
+  getDailyReportTasks,
+  saveDailyReportEntry,
+  type DailyReportEntryResult,
+  type DailyReportUserTaskResult,
+} from "@/tauri/commands";
 
 export type TaskCategory = "PG" | "Review PG" | "UT" | "Review UT" | "Other";
 
@@ -120,16 +130,18 @@ const optionalProjects: DailyReportProject[] = [
   },
 ];
 
+const allProjects = [...assignedProjects, ...optionalProjects];
+
 export function useDailyReport(username?: string) {
   const visibleProjectIds = ref<string[]>(assignedProjects.map((p) => p.id));
   const selectedProjectId = ref(assignedProjects[0]?.id ?? "");
   const now = new Date();
   const currentMonth = startOfMonth(now);
   const selectedMonth = ref(startOfMonth(now));
-  const entries = ref<DailyReportEntries>(loadEntries(username, startOfMonth(now)));
-  const userTasks = ref<Record<string, DailyReportTask[]>>(loadUserTasks(username));
-
-  const allProjects = [...assignedProjects, ...optionalProjects];
+  const entries = ref<DailyReportEntries>({});
+  const userTasks = ref<Record<string, DailyReportTask[]>>({});
+  const isLoading = ref(false);
+  const error = ref("");
 
   const projects = computed(() =>
     allProjects
@@ -169,10 +181,58 @@ export function useDailyReport(username?: string) {
 
   const maxMonthValue = computed(() => formatMonthValue(currentMonth));
 
-  const storageKeyValue = computed(() => dailyReportStorageKey(username, selectedMonth.value));
+  /** Find which visible project a task belongs to (for persisting entries). */
+  function projectIdOfTask(taskId: string): string {
+    for (const project of projects.value) {
+      if (project.tasks.some((t) => t.id === taskId)) return project.id;
+    }
+    return "";
+  }
 
-  watch([selectedMonth, () => username], () => {
-    entries.value = loadEntries(username, selectedMonth.value);
+  async function loadEntries() {
+    entries.value = {};
+    if (!username) return;
+    isLoading.value = true;
+    error.value = "";
+    try {
+      const rows = await getDailyReportEntries(username, year.value, monthIndex.value + 1);
+      entries.value = rows.reduce<DailyReportEntries>((acc, row) => {
+        acc[entryKey(row.task_id, dayOfDate(row.entry_date))] = toFrontendEntry(row);
+        return acc;
+      }, {});
+    } catch (e) {
+      error.value = friendlyError(e);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function loadUserTasks() {
+    userTasks.value = {};
+    if (!username) return;
+    try {
+      const rows = await getDailyReportTasks(username);
+      userTasks.value = rows.reduce<Record<string, DailyReportTask[]>>((acc, row) => {
+        const list = acc[row.project_id] ?? (acc[row.project_id] = []);
+        list.push(toFrontendTask(row));
+        return acc;
+      }, {});
+      // Ensure any project that has user-added tasks is visible.
+      for (const projectId of Object.keys(userTasks.value)) {
+        if (allProjects.some((p) => p.id === projectId) && !visibleProjectIds.value.includes(projectId)) {
+          visibleProjectIds.value = [...visibleProjectIds.value, projectId];
+        }
+      }
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
+  loadUserTasks();
+  loadEntries();
+
+  watch(selectedMonth, () => {
+    loadEntries();
   });
 
   function addProject(projectId: string) {
@@ -182,7 +242,7 @@ export function useDailyReport(username?: string) {
     selectedProjectId.value = projectId;
   }
 
-  function addTask(projectId: string, input: NewTaskInput): DailyReportTask | null {
+  async function addTask(projectId: string, input: NewTaskInput): Promise<DailyReportTask | null> {
     const shortName = input.shortName.trim();
     if (!shortName) return null;
     const categories = input.categories.slice();
@@ -198,12 +258,36 @@ export function useDailyReport(username?: string) {
       issueKey: input.issueKey.trim(),
       isUserAdded: true,
     };
+    // Optimistic local update so the UI reflects the new task immediately.
     const existing = userTasks.value[projectId] ?? [];
     userTasks.value = { ...userTasks.value, [projectId]: [...existing, task] };
-    persistUserTasks(username, userTasks.value);
-    // Make sure the project the task belongs to is visible.
     if (!visibleProjectIds.value.includes(projectId)) {
       visibleProjectIds.value = [...visibleProjectIds.value, projectId];
+    }
+
+    if (username) {
+      try {
+        await createDailyReportTask(username, {
+          task_id: task.id,
+          project_id: projectId,
+          code: task.code,
+          name: task.name,
+          description: task.description ?? "",
+          categories,
+          assignee: task.assignee ?? "",
+          estimate_hour: task.estimateHour ?? "",
+          due_date: task.dueDate ?? "",
+          issue_key: task.issueKey ?? "",
+        });
+      } catch (e) {
+        error.value = friendlyError(e);
+        // Roll back the optimistic insert on failure.
+        userTasks.value = {
+          ...userTasks.value,
+          [projectId]: (userTasks.value[projectId] ?? []).filter((t) => t.id !== task.id),
+        };
+        return null;
+      }
     }
     return task;
   }
@@ -232,17 +316,45 @@ export function useDailyReport(username?: string) {
     if (next <= currentMonth) selectedMonth.value = next;
   }
 
-  function updateEntry(taskId: string, day: number, value: DailyReportEntry | null) {
+  async function updateEntry(taskId: string, day: number, value: DailyReportEntry | null) {
     if (!isEditable.value) return;
     const normalized = value ? normalizeEntry(value) : null;
     const key = entryKey(taskId, day);
+    const entryDate = formatDate(year.value, monthIndex.value, day);
+
     if (!normalized) {
+      // Clear: remove locally, then delete on the backend.
       const { [key]: _removed, ...rest } = entries.value;
       entries.value = rest;
-    } else {
-      entries.value = { ...entries.value, [key]: normalized };
+      if (username) {
+        try {
+          await clearDailyReportEntry(username, taskId, entryDate);
+        } catch (e) {
+          error.value = friendlyError(e);
+        }
+      }
+      return;
     }
-    window.localStorage.setItem(storageKeyValue.value, JSON.stringify(entries.value));
+
+    // Save (upsert): update locally, then persist.
+    entries.value = { ...entries.value, [key]: normalized };
+    if (username) {
+      try {
+        await saveDailyReportEntry(username, {
+          task_id: taskId,
+          project_id: projectIdOfTask(taskId),
+          entry_date: entryDate,
+          comment: normalized.comment,
+          hour: Number(normalized.hour) || 0,
+          is_ot: normalized.isOt,
+          regular_ot: Number(normalized.regularOt) || 0,
+          midnight_ot: Number(normalized.midnightOt) || 0,
+          phase: normalized.phase,
+        });
+      } catch (e) {
+        error.value = friendlyError(e);
+      }
+    }
   }
 
   function totalHours(taskId?: string): number {
@@ -260,7 +372,9 @@ export function useDailyReport(username?: string) {
     canGoNextMonth,
     days,
     entries,
+    error,
     isEditable,
+    isLoading,
     maxMonthValue,
     monthLabel,
     monthValue,
@@ -283,6 +397,44 @@ export function entryKey(taskId: string, day: number) {
 export function entryHour(entry: DailyReportEntry | string | undefined): number {
   if (!entry) return 0;
   return Number(typeof entry === "string" ? entry : entry.hour) || 0;
+}
+
+/** Map a backend entry row to the frontend cell shape. */
+function toFrontendEntry(row: DailyReportEntryResult): DailyReportEntry {
+  return {
+    comment: row.comment ?? "",
+    hour: numToStr(row.hour),
+    isOt: row.is_ot,
+    midnightOt: row.is_ot ? numToStr(row.midnight_ot) : "",
+    phase: row.phase ?? "",
+    regularOt: row.is_ot ? numToStr(row.regular_ot) : "",
+  };
+}
+
+/** Map a backend user-task row to the frontend task shape. */
+function toFrontendTask(row: DailyReportUserTaskResult): DailyReportTask {
+  return {
+    id: row.task_id,
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    categories: (row.categories ?? []) as TaskCategory[],
+    assignee: row.assignee,
+    estimateHour: row.estimate_hour,
+    dueDate: row.due_date,
+    issueKey: row.issue_key,
+    isUserAdded: true,
+  };
+}
+
+function numToStr(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return "";
+  return String(value);
+}
+
+/** Extract the day-of-month (1-31) from a `YYYY-MM-DD` string. */
+function dayOfDate(value: string): number {
+  return Number(value.slice(8, 10));
 }
 
 function getMonthDays(year: number, monthIndex: number): DailyReportDay[] {
@@ -316,44 +468,15 @@ function formatMonthValue(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Build a `YYYY-MM-DD` string from a year, 0-based month index and day. */
+function formatDate(year: number, monthIndex: number, day: number) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function parseMonthValue(value: string) {
   const [y, m] = value.split("-").map(Number);
   if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return null;
   return new Date(y, m - 1, 1);
-}
-
-function dailyReportStorageKey(username: string | undefined, month: Date) {
-  return `pjjyuji.daily-report.${username || "guest"}.${formatMonthValue(month)}`;
-}
-
-function loadEntries(username: string | undefined, month: Date): DailyReportEntries {
-  try {
-    const saved = window.localStorage.getItem(dailyReportStorageKey(username, month));
-    return saved ? (JSON.parse(saved) as DailyReportEntries) : {};
-  } catch {
-    return {};
-  }
-}
-
-function userTasksStorageKey(username: string | undefined) {
-  return `pjjyuji.daily-report.tasks.${username || "guest"}`;
-}
-
-function loadUserTasks(username: string | undefined): Record<string, DailyReportTask[]> {
-  try {
-    const saved = window.localStorage.getItem(userTasksStorageKey(username));
-    return saved ? (JSON.parse(saved) as Record<string, DailyReportTask[]>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function persistUserTasks(username: string | undefined, tasks: Record<string, DailyReportTask[]>) {
-  try {
-    window.localStorage.setItem(userTasksStorageKey(username), JSON.stringify(tasks));
-  } catch {
-    /* ignore quota / serialization errors */
-  }
 }
 
 function normalizeEntry(value: DailyReportEntry): DailyReportEntry | null {
