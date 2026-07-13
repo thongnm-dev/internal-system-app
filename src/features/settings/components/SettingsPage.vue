@@ -2,7 +2,7 @@
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
-const { settings, apiKeyCount, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey } =
+const { settings, apiKeyCount, isDirty, save, discard, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey } =
   useSettings();
 
 const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string }[] = [
@@ -149,5 +149,28 @@ const themeOptions = [
         </div>
       </div>
     </section>
+
+    <div
+      class="sticky bottom-0 mt-4 flex items-center justify-end gap-2 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm"
+    >
+      <template v-if="isDirty">
+        <span class="mr-auto text-sm font-semibold text-brand">You have unsaved changes.</span>
+        <button
+          class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+          type="button"
+          @click="discard"
+        >
+          Discard
+        </button>
+      </template>
+      <button
+        class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        type="button"
+        :disabled="!isDirty"
+        @click="save"
+      >
+        Save changes
+      </button>
+    </div>
   </section>
 </template>

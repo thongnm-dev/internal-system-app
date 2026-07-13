@@ -65,6 +65,27 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
   {
+    key: "governanceMenus",
+    path: "/governance/menus",
+    requiresAuth: true,
+    title: "Menus",
+    subtitle: "Configure sidebar menu items, groups, visibility, and display order.",
+  },
+  {
+    key: "governanceUsers",
+    path: "/governance/users",
+    requiresAuth: true,
+    title: "Users",
+    subtitle: "Manage system users, roles, and access permissions.",
+  },
+  {
+    key: "governanceLogs",
+    path: "/governance/logs",
+    requiresAuth: true,
+    title: "Logs",
+    subtitle: "View system activity logs and audit trails.",
+  },
+  {
     key: "settings",
     path: "/settings",
     requiresAuth: true,
@@ -165,6 +186,21 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/import-csv",
     component: () => import("@/features/import-csv/components/ImportCsvPage.vue"),
     meta: { key: "importCsv" as MenuKey },
+  },
+  {
+    path: "/governance/menus",
+    component: () => import("@/features/governance/components/GovernanceMenusPage.vue"),
+    meta: { key: "governanceMenus" as MenuKey, requiresAuth: true },
+  },
+  {
+    path: "/governance/users",
+    component: () => import("@/features/governance/components/GovernanceUsersPage.vue"),
+    meta: { key: "governanceUsers" as MenuKey, requiresAuth: true },
+  },
+  {
+    path: "/governance/logs",
+    component: () => import("@/features/governance/components/GovernanceLogsPage.vue"),
+    meta: { key: "governanceLogs" as MenuKey, requiresAuth: true },
   },
   {
     path: "/settings",

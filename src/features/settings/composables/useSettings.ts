@@ -68,21 +68,37 @@ function isLanguageCode(v: unknown): v is LanguageCode {
   return v === "vi" || v === "en" || v === "ja";
 }
 
+function cloneSettings(s: StoredSettings): StoredSettings {
+  return JSON.parse(JSON.stringify(s));
+}
+
 export function useSettings() {
-  const settings = ref<StoredSettings>(loadSettings());
+  const savedSnapshot = ref<StoredSettings>(loadSettings());
+  const settings = ref<StoredSettings>(cloneSettings(savedSnapshot.value));
 
   const apiKeyCount = computed(
     () => settings.value.apiKeys.filter((k) => k.name.trim() && k.key.trim() && k.apiKey.trim()).length,
   );
 
+  const isDirty = computed(() => JSON.stringify(settings.value) !== JSON.stringify(savedSnapshot.value));
+
   watch(
-    settings,
-    (val) => {
-      applyTheme(val.theme);
-      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(val));
-    },
-    { deep: true },
+    () => settings.value.theme,
+    (theme) => applyTheme(theme),
   );
+
+  function persist() {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings.value));
+    savedSnapshot.value = cloneSettings(settings.value);
+  }
+
+  function save() {
+    persist();
+  }
+
+  function discard() {
+    settings.value = cloneSettings(savedSnapshot.value);
+  }
 
   function updateUser(key: keyof UserSettings, value: string) {
     settings.value.user[key] = value;
@@ -110,5 +126,17 @@ export function useSettings() {
     settings.value.apiKeys = next.length > 0 ? next : [{ id: "default", name: "", key: "", apiKey: "" }];
   }
 
-  return { settings, apiKeyCount, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey };
+  return {
+    settings,
+    apiKeyCount,
+    isDirty,
+    save,
+    discard,
+    updateUser,
+    updateTheme,
+    updateLanguage,
+    updateApiKey,
+    addApiKey,
+    removeApiKey,
+  };
 }
