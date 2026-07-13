@@ -62,13 +62,17 @@ export function convertXlsxSpecToMarkdown(inputPath: string, outputPath: string 
 export type ProjectMember = { username: string; name: string };
 
 export type ProjectDetailResult = {
-  project_id: string | number;
-  project_code: string;
-  project_name: string;
-  backlog_project_id?: string | number;
-  backlog_project_key?: string;
-  backlog_project_name?: string;
+  id: number;
+  code: string;
+  name: string;
+  client: string;
+  backlog_key: string;
+  backlog_url: string;
+  backlog_space: string;
+  is_active: boolean;
   members: ProjectMember[];
+  created_at: string;
+  updated_at: string;
 };
 
 export type BacklogProjectLookup = {
@@ -77,10 +81,92 @@ export type BacklogProjectLookup = {
   project_name: string;
 };
 
-export function getProjectDetail(projectId: string) {
+export type CreateProjectRequest = {
+  code: string;
+  name: string;
+  client?: string;
+  backlog_key?: string;
+  backlog_url?: string;
+  backlog_space?: string;
+  members: ProjectMember[];
+};
+
+export type ProjectSummaryResult = {
+  id: number;
+  code: string;
+  name: string;
+  client: string;
+  is_active: boolean;
+  member_count: number;
+  created_at: string;
+};
+
+export function createProject(request: CreateProjectRequest) {
+  return safeInvoke<ProjectDetailResult>("create_project", { request });
+}
+
+export function updateProject(projectId: number, request: CreateProjectRequest) {
+  return safeInvoke<ProjectDetailResult>("update_project", { projectId, request });
+}
+
+export function getProjectDetail(projectId: number) {
   return safeInvoke<ProjectDetailResult>("get_project_detail", { projectId });
+}
+
+export function listProjects() {
+  return safeInvoke<ProjectSummaryResult[]>("list_projects");
+}
+
+export function deleteProject(projectId: number) {
+  return safeInvoke<void>("delete_project", { projectId });
 }
 
 export function getBacklogProjectByKey(projectKey: string) {
   return safeInvoke<BacklogProjectLookup>("get_backlog_project_by_key", { projectKey });
+}
+
+// --- Daily Work Notes ---
+
+export type DailyWorkNoteResult = {
+  id: number;
+  username: string;
+  content: string;
+  note_date: string;
+  status: string;
+  created_at: string;
+};
+
+export type CreateDailyNoteRequest = {
+  content: string;
+  note_date: string;
+  status: string;
+};
+
+export type DailyNoteDateCountResult = {
+  note_date: string;
+  note_count: number;
+};
+
+export function createDailyNote(username: string, request: CreateDailyNoteRequest) {
+  return safeInvoke<DailyWorkNoteResult>("create_daily_note", { username, request });
+}
+
+export function getDailyNotesByDate(username: string, noteDate: string) {
+  return safeInvoke<DailyWorkNoteResult[]>("get_daily_notes_by_date", { username, noteDate });
+}
+
+export function getDailyNotesByMonth(username: string, year: number, month: number) {
+  return safeInvoke<DailyWorkNoteResult[]>("get_daily_notes_by_month", { username, year, month });
+}
+
+export function getDailyNoteCounts(username: string, year: number, month: number) {
+  return safeInvoke<DailyNoteDateCountResult[]>("get_daily_note_counts", { username, year, month });
+}
+
+export function updateDailyNoteStatus(id: number, username: string, status: string) {
+  return safeInvoke<DailyWorkNoteResult>("update_daily_note_status", { id, username, status });
+}
+
+export function deleteDailyNote(id: number, username: string) {
+  return safeInvoke<void>("delete_daily_note", { id, username });
 }

@@ -1,8 +1,17 @@
+//! Service chuyển đổi file Excel (.xlsx) sang Markdown.
+//!
+//! Gọi script Python `scripts/xlsx_spec_to_markdown.py` để thực hiện chuyển đổi.
+//! Hỗ trợ tìm Python interpreter trên cả Windows và Unix.
+
 use crate::app::result::AppResult;
 use crate::models::excel2md::XlsxMarkdownResult;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Chuyển đổi file Excel thành Markdown.
+///
+/// Validate file đầu vào (phải tồn tại, phải là .xlsx),
+/// xác định đường dẫn đầu ra, gọi script Python, đọc kết quả.
 pub fn convert(input_path: String, output_path: Option<String>) -> AppResult<XlsxMarkdownResult> {
     let input = PathBuf::from(input_path.trim());
     if input.as_os_str().is_empty() {
@@ -27,6 +36,7 @@ pub fn convert(input_path: String, output_path: Option<String>) -> AppResult<Xls
         ));
     }
 
+    // Nếu không chỉ định output, tạo file .md cùng thư mục với file Excel
     let output = output_path
         .as_deref()
         .map(str::trim)
@@ -59,6 +69,7 @@ pub fn convert(input_path: String, output_path: Option<String>) -> AppResult<Xls
     })
 }
 
+/// Xác định thư mục gốc của repository (parent của CARGO_MANIFEST_DIR).
 fn repository_root() -> AppResult<PathBuf> {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -68,6 +79,10 @@ fn repository_root() -> AppResult<PathBuf> {
         })
 }
 
+/// Chạy script Python converter.
+///
+/// Thử lần lượt các Python interpreter: `python`, `py -3`, `python3`.
+/// Trả về lỗi nếu không tìm thấy Python hoặc script thất bại.
 fn run_converter(script: &Path, input: &Path, output: &Path) -> AppResult<()> {
     let candidates: &[(&str, &[&str])] = if cfg!(target_os = "windows") {
         &[("python", &[]), ("py", &["-3"]), ("python3", &[])]
@@ -100,6 +115,7 @@ fn run_converter(script: &Path, input: &Path, output: &Path) -> AppResult<()> {
     )))
 }
 
+/// Lấy tên file từ đường dẫn (chỉ phần tên, không có thư mục).
 fn file_name(path: &Path) -> String {
     path.file_name()
         .and_then(|value| value.to_str())

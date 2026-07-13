@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
-import { friendlyError, getBacklogProjectByKey, getProjectDetail, type ProjectMember } from "@/tauri/commands";
-type ProjectForm = { backlogProjectID: string; backlogProjectKey: string; backlogProjectName: string; projectID: string; projectCode: string; projectName: string };
+import { createProject, updateProject, friendlyError, getBacklogProjectByKey, getProjectDetail, type ProjectMember } from "@/tauri/commands";
 
-const emptyForm: ProjectForm = { backlogProjectID: "", backlogProjectKey: "", backlogProjectName: "", projectID: "", projectCode: "", projectName: "" };
+type ProjectForm = {
+  id: number | null;
+  code: string;
+  name: string;
+  client: string;
+  backlogKey: string;
+  backlogUrl: string;
+  backlogSpace: string;
+};
+
+const emptyForm: ProjectForm = { id: null, code: "", name: "", client: "", backlogKey: "", backlogUrl: "", backlogSpace: "" };
 const memberSearchHelpItems: ProjectMember[] = [
   { username: "thongnm", name: "Thong Nguyen" },
   { username: "annatn", name: "Anna Tran" },
@@ -18,14 +27,17 @@ const memberSearchHelpItems: ProjectMember[] = [
 ];
 
 const route = useRoute();
-const projectID = (route.params.id as string) || null;
+const router = useRouter();
+const projectID = route.params.id ? Number(route.params.id) : null;
 
 const form = ref<ProjectForm>({ ...emptyForm });
 const isLoading = ref(false);
+const isSaving = ref(false);
 const isBacklogLookupLoading = ref(false);
 const isSearchHelpOpen = ref(false);
 const backlogLookupError = ref("");
 const loadError = ref("");
+const saveError = ref("");
 const memberKeyword = ref("");
 const members = ref<ProjectMember[]>([]);
 
@@ -56,30 +68,65 @@ onMounted(async () => {
   isLoading.value = true;
   try {
     const project = await getProjectDetail(projectID);
-    form.value = { backlogProjectID: project.backlog_project_id ? String(project.backlog_project_id) : "", backlogProjectKey: project.backlog_project_key ?? "", backlogProjectName: project.backlog_project_name ?? "", projectID: String(project.project_id), projectCode: project.project_code, projectName: project.project_name };
+    form.value = {
+      id: project.id,
+      code: project.code,
+      name: project.name,
+      client: project.client,
+      backlogKey: project.backlog_key,
+      backlogUrl: project.backlog_url,
+      backlogSpace: project.backlog_space,
+    };
     members.value = project.members;
   } catch (e) {
-    form.value = { ...emptyForm, projectID: projectID ?? "" };
+    form.value = { ...emptyForm };
     loadError.value = friendlyError(e);
   } finally {
     isLoading.value = false;
   }
 });
 
+async function saveProject() {
+  isSaving.value = true;
+  saveError.value = "";
+  try {
+    const request = {
+      code: form.value.code,
+      name: form.value.name,
+      client: form.value.client || undefined,
+      backlog_key: form.value.backlogKey || undefined,
+      backlog_url: form.value.backlogUrl || undefined,
+      backlog_space: form.value.backlogSpace || undefined,
+      members: members.value,
+    };
+    if (projectID) {
+      const updated = await updateProject(projectID, request);
+      form.value = { ...form.value, id: updated.id, code: updated.code, name: updated.name };
+    } else {
+      const created = await createProject(request);
+      router.replace(`/projects/${created.id}`);
+    }
+  } catch (e) {
+    saveError.value = friendlyError(e);
+  } finally {
+    isSaving.value = false;
+  }
+}
+
 async function fetchBacklogProject(key: string) {
   const trimmed = key.trim();
   if (!trimmed) {
     backlogLookupError.value = "";
-    form.value = { ...form.value, backlogProjectID: "", backlogProjectName: "" };
+    form.value = { ...form.value, backlogUrl: "", backlogSpace: "" };
     return;
   }
   isBacklogLookupLoading.value = true;
   backlogLookupError.value = "";
   try {
     const project = await getBacklogProjectByKey(trimmed);
-    form.value = { ...form.value, backlogProjectID: String(project.project_id), backlogProjectKey: project.project_key, backlogProjectName: project.project_name };
+    form.value = { ...form.value, backlogKey: project.project_key, backlogUrl: "", backlogSpace: project.project_name };
   } catch (e) {
-    form.value = { ...form.value, backlogProjectID: "", backlogProjectName: "" };
+    form.value = { ...form.value, backlogUrl: "", backlogSpace: "" };
     backlogLookupError.value = friendlyError(e);
   } finally {
     isBacklogLookupLoading.value = false;
@@ -87,11 +134,11 @@ async function fetchBacklogProject(key: string) {
 }
 
 function reloadBacklogProject() {
-  fetchBacklogProject(form.value.backlogProjectKey);
+  fetchBacklogProject(form.value.backlogKey);
 }
 
 let backlogLookupTimeout: number | undefined;
-watch(() => form.value.backlogProjectKey, (key) => {
+watch(() => form.value.backlogKey, (key) => {
   clearTimeout(backlogLookupTimeout);
   backlogLookupTimeout = window.setTimeout(() => fetchBacklogProject(key), 500);
 });
@@ -100,43 +147,48 @@ watch(() => form.value.backlogProjectKey, (key) => {
 <template>
   <section class="min-h-0 flex-1 overflow-auto rounded-lg border border-divider bg-panel p-4 shadow-sm">
     <div class="flex items-center justify-end gap-4">
-      <button class="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90" type="button"><i class="pi pi-save" />Save</button>
+      <button class="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" type="button" :disabled="isSaving" @click="saveProject"><i :class="['pi', isSaving ? 'pi-spinner animate-spin' : 'pi-save']" />{{ isSaving ? 'Saving...' : 'Save' }}</button>
     </div>
 
     <p v-if="isLoading" class="mt-4 text-sm text-muted">Loading project information...</p>
     <p v-if="loadError" class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{{ loadError }}</p>
+    <p v-if="saveError" class="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ saveError }}</p>
 
     <div class="mt-4 grid gap-4">
       <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" toggleable legend="Project Information">
         <div class="grid gap-3 md:grid-cols-2">
           <label>
             <span class="text-xs font-bold text-muted">Project ID</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" placeholder="Auto generated" readonly :value="form.projectID" />
+            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" placeholder="Auto generated" readonly :value="form.id ?? ''" />
           </label>
           <label>
             <span class="text-xs font-bold text-muted">Project Code</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Project code" :value="form.projectCode" @input="updateForm('projectCode', ($event.target as HTMLInputElement).value)" />
+            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Project code" :value="form.code" @input="updateForm('code', ($event.target as HTMLInputElement).value)" />
           </label>
           <label class="md:col-span-2">
             <span class="text-xs font-bold text-muted">Project Name</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Project name" :value="form.projectName" @input="updateForm('projectName', ($event.target as HTMLInputElement).value)" />
+            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Project name" :value="form.name" @input="updateForm('name', ($event.target as HTMLInputElement).value)" />
+          </label>
+          <label class="md:col-span-2">
+            <span class="text-xs font-bold text-muted">Client</span>
+            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Client name" :value="form.client" @input="updateForm('client', ($event.target as HTMLInputElement).value)" />
           </label>
           <Fieldset class="rounded-lg border border-divider p-4 md:col-span-2 fieldset-nested" legend="Backlog" toggleable>
             <div class="grid gap-3 md:grid-cols-2">
               <div>
-                <span class="text-xs font-bold text-muted">Backlog Project Key</span>
+                <span class="text-xs font-bold text-muted">Backlog Key</span>
                 <div class="group/key mt-1 flex rounded-md ring-emerald-100 focus-within:ring-2">
                   <input
                     class="h-10 min-w-0 flex-1 rounded-l-md border border-r-0 border-divider bg-panel px-3 text-sm text-ink outline-none group-hover/key:border-brand group-focus-within/key:border-brand"
-                    placeholder="BACKLOG_PROJECT_KEY"
-                    :value="form.backlogProjectKey"
-                    @input="updateForm('backlogProjectKey', ($event.target as HTMLInputElement).value)"
+                    placeholder="BACKLOG_KEY"
+                    :value="form.backlogKey"
+                    @input="updateForm('backlogKey', ($event.target as HTMLInputElement).value)"
                   />
                   <button
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-r-md border border-divider bg-canvas text-secondary group-hover/key:border-brand group-focus-within/key:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
                     type="button"
                     title="Reload from Backlog API"
-                    :disabled="isBacklogLookupLoading || !form.backlogProjectKey.trim()"
+                    :disabled="isBacklogLookupLoading || !form.backlogKey.trim()"
                     @click="reloadBacklogProject"
                   >
                     <i :class="['pi pi-refresh', isBacklogLookupLoading ? 'animate-spin' : '']" />
@@ -144,12 +196,12 @@ watch(() => form.value.backlogProjectKey, (key) => {
                 </div>
               </div>
               <label>
-                <span class="text-xs font-bold text-muted">Backlog Project ID</span>
-                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" :placeholder="isBacklogLookupLoading ? 'Loading...' : 'Auto fetched from Backlog'" readonly :value="form.backlogProjectID" />
+                <span class="text-xs font-bold text-muted">Backlog Space</span>
+                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" :placeholder="isBacklogLookupLoading ? 'Loading...' : 'Backlog space'" :value="form.backlogSpace" @input="updateForm('backlogSpace', ($event.target as HTMLInputElement).value)" />
               </label>
               <label class="md:col-span-2">
-                <span class="text-xs font-bold text-muted">Backlog Project Name</span>
-                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" :placeholder="isBacklogLookupLoading ? 'Loading...' : 'Auto fetched from Backlog'" readonly :value="form.backlogProjectName" />
+                <span class="text-xs font-bold text-muted">Backlog URL</span>
+                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="https://xxx.backlog.com/..." :value="form.backlogUrl" @input="updateForm('backlogUrl', ($event.target as HTMLInputElement).value)" />
               </label>
               <p v-if="backlogLookupError" class="text-sm text-red-600 md:col-span-2">{{ backlogLookupError }}</p>
             </div>

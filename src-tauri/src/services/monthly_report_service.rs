@@ -1,3 +1,8 @@
+//! Service lưu trữ và truy vấn lịch sử import báo cáo tháng.
+//!
+//! Dữ liệu được lưu dưới dạng JSON file trong app data directory.
+//! Hỗ trợ: lưu batch mới, liệt kê, tìm kiếm theo điều kiện, xem chi tiết.
+
 use crate::app::{error::AppError, result::AppResult};
 use crate::database::csv_reader::CsvImportData;
 use crate::database::report_store::{self, StoredImportBatch};
@@ -11,6 +16,10 @@ use crate::utils::time::current_timestamp;
 use std::env;
 use std::path::Path;
 
+/// Lưu dữ liệu import CSV thành một batch mới trong JSON store.
+///
+/// Tự động sinh batch ID, timestamp, username, và xác định khoảng tháng
+/// từ dữ liệu work records. Trả về `ImportCsvResult` để frontend hiển thị xác nhận.
 pub fn save_imported_report(
     data: CsvImportData,
     app_data_dir: &Path,
@@ -24,6 +33,7 @@ pub fn save_imported_report(
         total_minutes,
         raw_csv,
     } = data;
+    // Nếu không đặt tên, dùng tên file CSV (bỏ đuôi .csv)
     let report_name = trimmed_filter(report_name)
         .unwrap_or_else(|| source_file_name.trim_end_matches(".csv").to_string());
     let note = trimmed_filter(note).unwrap_or_default();
@@ -63,6 +73,7 @@ pub fn save_imported_report(
     })
 }
 
+/// Lấy danh sách 20 batch gần nhất, sắp xếp theo ID giảm dần.
 pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSummary>> {
     let mut batches = report_store::load_store(app_data_dir)?
         .batches
@@ -86,6 +97,8 @@ pub fn list_import_batches(app_data_dir: &Path) -> AppResult<Vec<ImportBatchSumm
     Ok(batches)
 }
 
+/// Tìm kiếm batch import theo điều kiện: khoảng tháng, tên báo cáo, từ khóa.
+/// Kết quả sắp xếp theo thời gian import giảm dần.
 pub fn search_import_batches(
     app_data_dir: &Path,
     criteria: ImportBatchSearchCriteria,
@@ -98,6 +111,7 @@ pub fn search_import_batches(
     let mut items = report_store::load_store(app_data_dir)?
         .batches
         .into_iter()
+        // Lọc theo khoảng tháng (overlap check)
         .filter(|batch| {
             target_month_from
                 .as_ref()
@@ -108,11 +122,13 @@ pub fn search_import_batches(
                 .as_ref()
                 .map_or(true, |value| batch.target_month_from <= *value)
         })
+        // Lọc theo tên báo cáo (substring match)
         .filter(|batch| {
             report_name
                 .as_ref()
                 .map_or(true, |value| batch.report_name.contains(value))
         })
+        // Lọc theo từ khóa tự do (tìm trong nhiều trường)
         .filter(|batch| {
             keyword.as_ref().map_or(true, |value| {
                 contains_case_insensitive(&batch.report_name, value)
@@ -144,6 +160,8 @@ pub fn search_import_batches(
     Ok(items)
 }
 
+/// Lấy thông tin chi tiết đầy đủ một batch import theo ID.
+/// Trả về lỗi nếu không tìm thấy batch.
 pub fn get_import_batch_detail(app_data_dir: &Path, batch_id: i64) -> AppResult<ImportBatchDetail> {
     let batch = report_store::load_store(app_data_dir)?
         .batches
@@ -168,10 +186,13 @@ pub fn get_import_batch_detail(app_data_dir: &Path, batch_id: i64) -> AppResult<
     })
 }
 
+/// So sánh chuỗi không phân biệt hoa/thường.
 fn contains_case_insensitive(text: &str, needle_lowercase: &str) -> bool {
     text.to_lowercase().contains(needle_lowercase)
 }
 
+/// Xác định khoảng tháng (from, to) từ danh sách work records.
+/// Parse cột date để lấy tháng (YYYY-MM), trả về tháng nhỏ nhất và lớn nhất.
 fn target_month_range(records: &[WorkRecord]) -> (String, String) {
     let mut months: Vec<String> = records
         .iter()
@@ -186,6 +207,8 @@ fn target_month_range(records: &[WorkRecord]) -> (String, String) {
     )
 }
 
+/// Trích xuất tháng (YYYY-MM) từ chuỗi ngày.
+/// Hỗ trợ cả format `YYYY/MM/DD` và `YYYY-MM-DD`.
 fn target_month(date: &str) -> Option<String> {
     let normalized = date.trim().replace('/', "-");
     if normalized.len() < 7 {
@@ -206,12 +229,14 @@ fn target_month(date: &str) -> Option<String> {
     }
 }
 
+/// Trim chuỗi và trả về `None` nếu kết quả rỗng.
 fn trimmed_filter(value: Option<String>) -> Option<String> {
     value
         .map(|text| text.trim().to_string())
         .filter(|text| !text.is_empty())
 }
 
+/// Lấy username của người dùng hiện tại từ biến môi trường OS.
 fn current_username() -> String {
     env::var("USERNAME")
         .or_else(|_| env::var("USER"))

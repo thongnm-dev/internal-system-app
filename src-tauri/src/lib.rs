@@ -1,28 +1,71 @@
+//! Entry point của ứng dụng Tauri.
+//!
+//! Khởi tạo Tauri Builder, đăng ký plugin, thiết lập database khi khởi động,
+//! và đăng ký tất cả các Tauri command handlers cho frontend gọi qua IPC.
+
 include!("modules.rs");
 
+use commands::daily_note_commands::{
+    create_daily_note, delete_daily_note, get_daily_note_counts, get_daily_notes_by_date,
+    get_daily_notes_by_month, update_daily_note_status,
+};
 use commands::import_commands::{
     get_import_batch_detail, import_monthly_report_csv, list_import_batches,
     preview_monthly_report_csv, search_import_batches,
 };
-use commands::project_commands::{get_backlog_project_by_key, get_project_detail};
+use commands::project_commands::{
+    create_project, delete_project, get_backlog_project_by_key, get_project_detail, list_projects,
+    update_project,
+};
 use commands::system_commands::{check_internet_connection, get_system_info};
 use commands::excel2md_commands::excel2md;
 
+/// Khởi chạy ứng dụng Tauri desktop.
+///
+/// Thứ tự khởi tạo:
+/// 1. Đăng ký plugin dialog (cho file picker, message box, v.v.)
+/// 2. Setup hook: khởi tạo database (tạo bảng + stored procedure) chạy nền
+/// 3. Đăng ký toàn bộ IPC command handlers
+/// 4. Chạy event loop của ứng dụng
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|_app| {
+            // Khởi tạo database chạy nền để không block UI thread
+            tauri::async_runtime::spawn(async {
+                if let Err(e) = database::project_store::init().await {
+                    eprintln!("Failed to initialize database tables: {e}");
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            // === System commands ===
             get_system_info,
             check_internet_connection,
+            // === Import CSV commands ===
             preview_monthly_report_csv,
             import_monthly_report_csv,
             list_import_batches,
             search_import_batches,
             get_import_batch_detail,
+            // === Excel → Markdown command ===
             excel2md,
+            // === Project CRUD commands ===
+            create_project,
+            update_project,
             get_project_detail,
-            get_backlog_project_by_key
+            list_projects,
+            delete_project,
+            get_backlog_project_by_key,
+            // === Daily Work Notes commands ===
+            create_daily_note,
+            get_daily_notes_by_date,
+            get_daily_notes_by_month,
+            get_daily_note_counts,
+            update_daily_note_status,
+            delete_daily_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

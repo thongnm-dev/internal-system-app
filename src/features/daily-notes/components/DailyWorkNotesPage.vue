@@ -30,14 +30,14 @@ function openAddDialog() {
   isAdding.value = true;
 }
 
-function saveDraft() {
+async function saveDraft() {
   const dateValue = draftDate.value ? parseDateStr(draftDate.value) : null;
   const draft: DailyWorkNoteDraft = {
     content: draftContent.value,
     date: dateValue,
     status: draftStatus.value,
   };
-  if (ctrl.addNote(draft)) {
+  if (await ctrl.addNote(draft)) {
     isAdding.value = false;
   }
 }

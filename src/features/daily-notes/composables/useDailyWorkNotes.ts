@@ -1,9 +1,19 @@
 import { computed, ref, watch } from "vue";
+import {
+  createDailyNote,
+  deleteDailyNote,
+  getDailyNoteCounts,
+  getDailyNotesByDate,
+  updateDailyNoteStatus,
+  friendlyError,
+  type DailyWorkNoteResult,
+  type DailyNoteDateCountResult,
+} from "@/tauri/commands";
 
 export type DailyWorkStatus = "completed" | "incomplete" | "reserved";
 
 export type DailyWorkNote = {
-  id: string;
+  id: number;
   content: string;
   date: string;
   status: DailyWorkStatus;
@@ -28,29 +38,69 @@ export type DailyWorkNoteDraft = {
 
 const statusOrder: DailyWorkStatus[] = ["completed", "incomplete", "reserved"];
 
+function toNote(r: DailyWorkNoteResult): DailyWorkNote {
+  return {
+    id: r.id,
+    content: r.content,
+    date: r.note_date,
+    status: r.status as DailyWorkStatus,
+    createdAt: r.created_at,
+  };
+}
+
 export function useDailyWorkNotes(username?: string) {
   const today = startOfDay(new Date());
   const maxEntryDate = addDays(today, 7);
   const selectedDate = ref(formatDate(today));
   const visibleMonth = ref(startOfMonth(today));
-  const notes = ref<DailyWorkNote[]>(loadNotes(username));
+  const notes = ref<DailyWorkNote[]>([]);
+  const dateCounts = ref<DailyNoteDateCountResult[]>([]);
   const statusFilter = ref<DailyWorkStatus>("completed");
+  const isLoading = ref(false);
+  const isSaving = ref(false);
+  const error = ref("");
 
-  watch(
-    () => username,
-    () => {
-      notes.value = loadNotes(username);
-    },
-  );
+  async function loadNotesByDate() {
+    if (!username) return;
+    isLoading.value = true;
+    error.value = "";
+    try {
+      const results = await getDailyNotesByDate(username, selectedDate.value);
+      notes.value = results.map(toNote);
+    } catch (e) {
+      error.value = friendlyError(e);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function loadDateCounts() {
+    if (!username) return;
+    try {
+      const m = visibleMonth.value;
+      dateCounts.value = await getDailyNoteCounts(username, m.getFullYear(), m.getMonth() + 1);
+    } catch {
+      dateCounts.value = [];
+    }
+  }
+
+  loadNotesByDate();
+  loadDateCounts();
+
+  watch(selectedDate, () => {
+    loadNotesByDate();
+  });
+
+  watch(visibleMonth, () => {
+    loadDateCounts();
+  });
 
   const calendarDays = computed(() =>
-    buildCalendarDays(visibleMonth.value, selectedDate.value, notes.value, maxEntryDate),
+    buildCalendarDays(visibleMonth.value, selectedDate.value, dateCounts.value, maxEntryDate),
   );
 
   const selectedDateNotes = computed(() =>
-    notes.value
-      .filter((n) => n.date === selectedDate.value)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    notes.value.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   );
 
   const filteredNotes = computed(() =>
@@ -102,42 +152,64 @@ export function useDailyWorkNotes(username?: string) {
     visibleMonth.value = new Date(m.getFullYear(), m.getMonth() + 1, 1);
   }
 
-  function addNote(draft: DailyWorkNoteDraft): boolean {
-    if (!draft.date) return false;
+  async function addNote(draft: DailyWorkNoteDraft): Promise<boolean> {
+    if (!username || !draft.date) return false;
     const noteDate = startOfDay(draft.date);
     if (noteDate > maxEntryDate) return false;
     const trimmedContent = draft.content.trim();
     if (!trimmedContent) return false;
 
-    const nextNote: DailyWorkNote = {
-      id: makeNoteId(),
-      content: trimmedContent,
-      date: formatDate(noteDate),
-      status: draft.status,
-      createdAt: new Date().toISOString(),
-    };
-
-    notes.value = [nextNote, ...notes.value];
-    saveNotes(username, notes.value);
-    selectDate(nextNote.date);
-    statusFilter.value = nextNote.status;
-    return true;
+    isSaving.value = true;
+    error.value = "";
+    try {
+      await createDailyNote(username, {
+        content: trimmedContent,
+        note_date: formatDate(noteDate),
+        status: draft.status,
+      });
+      selectDate(formatDate(noteDate));
+      statusFilter.value = draft.status;
+      await loadNotesByDate();
+      await loadDateCounts();
+      return true;
+    } catch (e) {
+      error.value = friendlyError(e);
+      return false;
+    } finally {
+      isSaving.value = false;
+    }
   }
 
-  function updateNoteStatus(noteId: string, status: DailyWorkStatus) {
-    notes.value = notes.value.map((n) => (n.id === noteId ? { ...n, status } : n));
-    saveNotes(username, notes.value);
+  async function updateNoteStatus(noteId: number, status: DailyWorkStatus) {
+    if (!username) return;
+    error.value = "";
+    try {
+      await updateDailyNoteStatus(noteId, username, status);
+      notes.value = notes.value.map((n) => (n.id === noteId ? { ...n, status } : n));
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
   }
 
-  function removeNote(noteId: string) {
-    notes.value = notes.value.filter((n) => n.id !== noteId);
-    saveNotes(username, notes.value);
+  async function removeNote(noteId: number) {
+    if (!username) return;
+    error.value = "";
+    try {
+      await deleteDailyNote(noteId, username);
+      notes.value = notes.value.filter((n) => n.id !== noteId);
+      await loadDateCounts();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
   }
 
   return {
     addNote,
     calendarDays,
+    error,
     filteredNotes,
+    isLoading,
+    isSaving,
     maxEntryDate,
     monthLabel,
     monthValue,
@@ -159,12 +231,13 @@ export function useDailyWorkNotes(username?: string) {
 function buildCalendarDays(
   month: Date,
   selectedDate: string,
-  notes: DailyWorkNote[],
+  dateCounts: DailyNoteDateCountResult[],
   maxEntryDate: Date,
 ): DailyWorkCalendarDay[] {
   const firstDay = startOfMonth(month);
   const calendarStart = addDays(firstDay, -firstDay.getDay());
   const today = startOfDay(new Date());
+  const countMap = new Map(dateCounts.map((c) => [c.note_date, c.note_count]));
 
   return Array.from({ length: 42 }, (_, index) => {
     const date = addDays(calendarStart, index);
@@ -176,30 +249,9 @@ function buildCalendarDays(
       isFutureDisabled: date > maxEntryDate,
       isSelected: dateValue === selectedDate,
       isToday: isSameDate(date, today),
-      taskCount: notes.filter((n) => n.date === dateValue).length,
+      taskCount: countMap.get(dateValue) ?? 0,
     };
   });
-}
-
-function storageKey(username: string | undefined) {
-  return `pjjyuji.daily-work-notes.${username || "guest"}`;
-}
-
-function loadNotes(username: string | undefined): DailyWorkNote[] {
-  try {
-    const saved = window.localStorage.getItem(storageKey(username));
-    return saved ? (JSON.parse(saved) as DailyWorkNote[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveNotes(username: string | undefined, notes: DailyWorkNote[]) {
-  window.localStorage.setItem(storageKey(username), JSON.stringify(notes));
-}
-
-function makeNoteId() {
-  return `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function startOfDay(date: Date) {

@@ -1,3 +1,9 @@
+//! Hằng số và hàm chuyển đổi dùng chung trong ứng dụng.
+
+/// Chuyển mã phase (process code) thành tên hiển thị tiếng Việt/viết tắt.
+///
+/// Nếu mã không nằm trong danh sách đã biết, sử dụng `fallback` làm tên hiển thị.
+/// Nếu `fallback` cũng rỗng, trả về `"Other (mã)"`.
 pub fn phase_label(code: &str, fallback: &str) -> String {
     match code.trim() {
         "10" => "PG".to_string(),

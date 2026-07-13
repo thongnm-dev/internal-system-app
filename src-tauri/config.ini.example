@@ -1,0 +1,6 @@
+[database]
+host = localhost
+port = 5432
+dbname = management_systems
+user = postgres
+password = postgres
