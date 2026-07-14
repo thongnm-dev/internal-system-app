@@ -45,10 +45,14 @@ function handleLogout() {
   router.push(loginRoute.path);
 }
 
+const AUTH_PAGES = ["/login", "/forgot-password"];
+
+const isAuthPage = computed(() => AUTH_PAGES.includes(route.path));
+
 watch(
   () => route.path,
   () => {
-    if (currentAppRoute.value.requiresAuth && !auth.isAuthenticated) {
+    if (!isAuthPage.value && !auth.isAuthenticated) {
       auth.setReturnPath(route.fullPath);
       router.push(loginRoute.path);
     }
@@ -78,7 +82,7 @@ watch(
     v-else-if="database.hasChecked.value && !database.isConnected.value"
   />
 
-  <template v-else-if="route.path === '/login'">
+  <template v-else-if="isAuthPage">
     <router-view />
   </template>
 

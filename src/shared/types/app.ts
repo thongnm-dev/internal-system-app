@@ -13,7 +13,7 @@ export type MenuKey =
   | "governanceLogs"
   | "settings";
 
-export type AppRouteKey = MenuKey | "login";
+export type AppRouteKey = MenuKey | "login" | "forgotPassword";
 
 export type MessageMode = "info" | "error";
 

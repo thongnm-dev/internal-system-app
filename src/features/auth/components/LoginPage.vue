@@ -1,25 +1,40 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "@/app/stores/auth";
 import { defaultRoute } from "@/app/router/routes";
+import { login as tauriLogin, friendlyError } from "@/tauri/commands";
 
 const router = useRouter();
 const auth = useAuthStore();
 
 const username = ref("");
 const password = ref("");
+const rememberMe = ref(false);
+const loading = ref(false);
 const error = ref("");
 
-function submitLogin() {
+async function submitLogin() {
   if (!username.value.trim() || !password.value.trim()) {
-    error.value = "Please enter username and password.";
+    error.value = "Vui lòng nhập tên đăng nhập và mật khẩu.";
     return;
   }
 
   error.value = "";
-  auth.login({ username: username.value.trim() });
-  router.push(auth.returnPath ?? defaultRoute.path);
+  loading.value = true;
+
+  try {
+    const response = await tauriLogin({
+      username: username.value.trim(),
+      password: password.value.trim(),
+    });
+    auth.setUser(response, rememberMe.value);
+    router.push(auth.returnPath ?? defaultRoute.path);
+  } catch (e) {
+    error.value = friendlyError(e);
+  } finally {
+    loading.value = false;
+  }
 }
 </script>
 
@@ -66,6 +81,15 @@ function submitLogin() {
           </div>
         </label>
 
+        <label class="flex cursor-pointer items-center gap-2 select-none">
+          <input
+            v-model="rememberMe"
+            type="checkbox"
+            class="h-4 w-4 rounded border-divider accent-brand"
+          />
+          <span class="text-sm text-muted">Ghi nhớ thông tin đăng nhập</span>
+        </label>
+
         <p
           v-if="error"
           class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
@@ -74,13 +98,20 @@ function submitLogin() {
         </p>
 
         <button
-          class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
+          :disabled="loading"
+          class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
           type="submit"
         >
-          <i class="pi pi-sign-in" />
-          Login
+          <i :class="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sign-in'" />
+          {{ loading ? "Đang đăng nhập..." : "Login" }}
         </button>
       </form>
+
+      <p class="mt-4 text-center text-sm">
+        <RouterLink to="/forgot-password" class="text-brand hover:underline">
+          Quên mật khẩu?
+        </RouterLink>
+      </p>
     </section>
   </main>
 </template>

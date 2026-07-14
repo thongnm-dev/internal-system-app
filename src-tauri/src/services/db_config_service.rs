@@ -5,7 +5,7 @@
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::database::project_store;
+use crate::database::startup_store;
 use crate::models::db_config::{DatabaseConfig, DatabaseStatus, SaveDatabaseConfigRequest};
 use crate::utils::pgsql_connect::{self, PgConfig};
 
@@ -99,7 +99,7 @@ pub async fn save_config(request: SaveDatabaseConfigRequest) -> AppResult<Databa
     config.save_to_ini()?;
 
     // Khởi tạo bảng + stored procedure với cấu hình vừa lưu.
-    project_store::init().await?;
+    startup_store::init().await?;
 
     Ok(DatabaseStatus {
         configured: true,

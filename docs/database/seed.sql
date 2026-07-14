@@ -10,27 +10,27 @@ INSERT INTO roles (name, description) VALUES
     ('viewer', 'Read-only access to overview and reports');
 
 -- Projects (from Daily Report assigned + optional projects)
-INSERT INTO projects (code, name, client, backlog_key, backlog_url, backlog_space) VALUES
-    ('YUJI', 'PJ Yuji Internal Tool',   'Internal',   'INT',  '', ''),
-    ('HRP',  'HR Portal',               'Operations', 'HRP',  '', ''),
-    ('SALE', 'Sales Dashboard',          'Business',   'SALE', '', ''),
-    ('MOB',  'Mobile Companion App',     'Product',    'MOB',  '', ''),
-    ('OPS',  'Infrastructure Support',   'Platform',   'OPS',  '', '');
+-- INSERT INTO projects (code, name, client, backlog_key, backlog_url, backlog_space) VALUES
+--     ('YUJI', 'PJ Yuji Internal Tool',   'Internal',   'INT',  '', ''),
+--     ('HRP',  'HR Portal',               'Operations', 'HRP',  '', ''),
+--     ('SALE', 'Sales Dashboard',          'Business',   'SALE', '', ''),
+--     ('MOB',  'Mobile Companion App',     'Product',    'MOB',  '', ''),
+--     ('OPS',  'Infrastructure Support',   'Platform',   'OPS',  '', '');
 
 -- Default project tasks (from Daily Report screen)
-INSERT INTO project_tasks (id, project_id, short_name) VALUES
-    ('yuji-planning', (SELECT id FROM projects WHERE code = 'YUJI'), 'Planning and daily coordination'),
-    ('yuji-frontend', (SELECT id FROM projects WHERE code = 'YUJI'), 'Frontend implementation'),
-    ('yuji-review',   (SELECT id FROM projects WHERE code = 'YUJI'), 'Code review and QA support'),
-    ('hrp-maintenance',(SELECT id FROM projects WHERE code = 'HRP'), 'Maintenance requests'),
-    ('hrp-bugfix',    (SELECT id FROM projects WHERE code = 'HRP'),  'Bug fixing'),
-    ('sale-reporting', (SELECT id FROM projects WHERE code = 'SALE'), 'Report screen updates'),
-    ('sale-data',     (SELECT id FROM projects WHERE code = 'SALE'),  'Data reconciliation'),
-    ('sale-meeting',  (SELECT id FROM projects WHERE code = 'SALE'),  'Stakeholder meeting'),
-    ('mob-api',       (SELECT id FROM projects WHERE code = 'MOB'),   'API integration'),
-    ('mob-test',      (SELECT id FROM projects WHERE code = 'MOB'),   'Device testing'),
-    ('ops-monitoring',(SELECT id FROM projects WHERE code = 'OPS'),   'Monitoring and alert handling'),
-    ('ops-release',   (SELECT id FROM projects WHERE code = 'OPS'),   'Release support');
+-- INSERT INTO project_tasks (id, project_id, short_name) VALUES
+--     ('yuji-planning', (SELECT id FROM projects WHERE code = 'YUJI'), 'Planning and daily coordination'),
+--     ('yuji-frontend', (SELECT id FROM projects WHERE code = 'YUJI'), 'Frontend implementation'),
+--     ('yuji-review',   (SELECT id FROM projects WHERE code = 'YUJI'), 'Code review and QA support'),
+--     ('hrp-maintenance',(SELECT id FROM projects WHERE code = 'HRP'), 'Maintenance requests'),
+--     ('hrp-bugfix',    (SELECT id FROM projects WHERE code = 'HRP'),  'Bug fixing'),
+--     ('sale-reporting', (SELECT id FROM projects WHERE code = 'SALE'), 'Report screen updates'),
+--     ('sale-data',     (SELECT id FROM projects WHERE code = 'SALE'),  'Data reconciliation'),
+--     ('sale-meeting',  (SELECT id FROM projects WHERE code = 'SALE'),  'Stakeholder meeting'),
+--     ('mob-api',       (SELECT id FROM projects WHERE code = 'MOB'),   'API integration'),
+--     ('mob-test',      (SELECT id FROM projects WHERE code = 'MOB'),   'Device testing'),
+--     ('ops-monitoring',(SELECT id FROM projects WHERE code = 'OPS'),   'Monitoring and alert handling'),
+--     ('ops-release',   (SELECT id FROM projects WHERE code = 'OPS'),   'Release support');
 
 -- Menu configuration (from Governance Menus screen)
 INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, display_order) VALUES

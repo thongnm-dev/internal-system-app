@@ -5,6 +5,7 @@
 
 include!("modules.rs");
 
+use commands::auth_commands::login;
 use commands::daily_note_commands::{
     create_daily_note, delete_daily_note, get_daily_note_counts, get_daily_notes_by_date,
     get_daily_notes_by_month, update_daily_note_status,
@@ -41,13 +42,15 @@ pub fn run() {
         .setup(|_app| {
             // Khởi tạo database chạy nền để không block UI thread
             tauri::async_runtime::spawn(async {
-                if let Err(e) = database::project_store::init().await {
+                if let Err(e) = database::startup_store::init().await {
                     eprintln!("Failed to initialize database tables: {e}");
                 }
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // === Auth commands ===
+            login,
             // === System commands ===
             get_system_info,
             check_internet_connection,

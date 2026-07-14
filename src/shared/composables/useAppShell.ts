@@ -1,7 +1,10 @@
 import { onMounted, onUnmounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { friendlyError, getSystemInfo } from "@/tauri/commands";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
+import { useAuthStore } from "@/app/stores/auth";
+import { loginRoute } from "@/app/router/routes";
 import type { MessageMode } from "@/shared/types/app";
 import type { SystemInfo } from "@/shared/types/system";
 
@@ -28,6 +31,8 @@ export function useAppShell() {
   const isSidebarCollapsed = ref(false);
   const isBootstrapping = ref(true);
 
+  const router = useRouter();
+  const auth = useAuthStore();
   const network = useNetworkStatus();
   const database = useDatabaseStatus();
 
@@ -96,6 +101,11 @@ export function useAppShell() {
     }
 
     isBootstrapping.value = false;
+
+    if (!auth.isAuthenticated) {
+      router.push(loginRoute.path);
+    }
+
     void setCurrentWindowResizable(true);
     pollTimer = window.setInterval(() => void refreshSystemInfo(), 1000);
   });

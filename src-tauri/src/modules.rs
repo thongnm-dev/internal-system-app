@@ -15,6 +15,8 @@ mod app {
 
 /// Tauri command handlers — điểm vào từ frontend qua IPC invoke.
 mod commands {
+    /// Commands cho module xác thực người dùng.
+    pub mod auth_commands;
     /// Commands cho module ghi chú công việc hằng ngày.
     pub mod daily_note_commands;
     /// Commands cho màn hình daily report (giờ công + task người dùng thêm).
@@ -33,6 +35,8 @@ mod commands {
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
 mod database {
+    /// Data access cho module xác thực người dùng.
+    pub mod auth_store;
     /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.
     pub mod csv_reader;
     /// Data access cho bảng `daily_work_notes` (PostgreSQL).
@@ -43,10 +47,14 @@ mod database {
     pub mod project_store;
     /// Lưu trữ lịch sử import CSV dưới dạng JSON file.
     pub mod report_store;
+    /// Khởi tạo database (tạo bảng + stored procedure) khi app khởi động.
+    pub mod startup_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
 mod models {
+    /// Model cho module xác thực người dùng.
+    pub mod auth;
     /// Model cho module ghi chú công việc hằng ngày.
     pub mod daily_note;
     /// Model cho màn hình daily report (giờ công + task người dùng thêm).
@@ -67,6 +75,8 @@ mod models {
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
 mod services {
+    /// Service cho module xác thực người dùng.
+    pub mod auth_service;
     /// Service cho module ghi chú công việc hằng ngày.
     pub mod daily_note_service;
     /// Service cho màn hình daily report (giờ công + task người dùng thêm).

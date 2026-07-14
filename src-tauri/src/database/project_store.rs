@@ -8,124 +8,118 @@ use crate::app::result::AppResult;
 use crate::models::project::{ProjectDetail, ProjectMember, ProjectSummary};
 use crate::utils::pgsql_connect;
 
-/// Khởi tạo database: tạo bảng và stored procedure nếu chưa tồn tại.
-/// Được gọi một lần khi ứng dụng khởi động.
-pub async fn init() -> AppResult<()> {
-    let client = pgsql_connect::connect().await?;
-    pgsql_connect::ensure_tables(&client).await?;
-    Ok(())
-}
-
 /// Thêm dự án mới vào database.
 ///
 /// Gọi `sp_project_insert` để tạo bản ghi project, sau đó gọi
 /// `sp_project_member_upsert` cho từng thành viên.
-/// Trả về `ProjectDetail` với ID và timestamp được tạo bởi database.
+/// Toàn bộ thao tác chạy trong một transaction.
 pub async fn insert_project(project: &ProjectDetail) -> AppResult<ProjectDetail> {
     let client = pgsql_connect::connect().await?;
 
-    // Gọi stored procedure thêm dự án
-    let row = client
-        .query_one(
-            "SELECT * FROM sp_project_insert($1, $2, $3, $4, $5, $6)",
-            &[
-                &project.code,
-                &project.name,
-                &project.client,
-                &project.backlog_key,
-                &project.backlog_url,
-                &project.backlog_space,
-            ],
-        )
-        .await
-        .map_err(|e| AppError::new(format!("Failed to insert project: {e}")))?;
-
-    let id: i32 = row.get("id");
-
-    // Thêm từng thành viên vào bảng project_members
-    for member in &project.members {
-        client
-            .execute(
-                "SELECT sp_project_member_upsert($1, $2, $3)",
-                &[&id, &member.username, &member.name],
+    pgsql_connect::with_transaction(&client, || async {
+        let row = client
+            .query_one(
+                "SELECT * FROM sp_project_insert($1, $2, $3, $4, $5, $6)",
+                &[
+                    &project.code,
+                    &project.name,
+                    &project.client,
+                    &project.backlog_key,
+                    &project.backlog_url,
+                    &project.backlog_space,
+                ],
             )
             .await
-            .map_err(|e| AppError::new(format!("Failed to insert member: {e}")))?;
-    }
+            .map_err(|e| AppError::new(format!("Failed to insert project: {e}")))?;
 
-    Ok(ProjectDetail {
-        id,
-        code: row.get("code"),
-        name: row.get("name"),
-        client: row.get("client"),
-        backlog_key: row.get("backlog_key"),
-        backlog_url: row.get("backlog_url"),
-        backlog_space: row.get("backlog_space"),
-        is_active: row.get("is_active"),
-        members: project.members.clone(),
-        created_at: row.get("created_at"),
-        updated_at: row.get("updated_at"),
+        let id: i32 = row.get("id");
+
+        for member in &project.members {
+            client
+                .execute(
+                    "SELECT sp_project_member_upsert($1, $2, $3)",
+                    &[&id, &member.username, &member.name],
+                )
+                .await
+                .map_err(|e| AppError::new(format!("Failed to insert member: {e}")))?;
+        }
+
+        Ok(ProjectDetail {
+            id,
+            code: row.get("code"),
+            name: row.get("name"),
+            client: row.get("client"),
+            backlog_key: row.get("backlog_key"),
+            backlog_url: row.get("backlog_url"),
+            backlog_space: row.get("backlog_space"),
+            is_active: row.get("is_active"),
+            members: project.members.clone(),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
     })
+    .await
 }
 
 /// Cập nhật thông tin dự án theo ID.
 ///
 /// Gọi `sp_project_update` để cập nhật bản ghi project,
 /// xóa toàn bộ member cũ rồi thêm lại danh sách mới.
+/// Toàn bộ thao tác chạy trong một transaction.
 pub async fn update_project(project_id: i32, project: &ProjectDetail) -> AppResult<ProjectDetail> {
     let client = pgsql_connect::connect().await?;
 
-    // Cập nhật thông tin cơ bản của dự án
-    let row = client
-        .query_opt(
-            "SELECT * FROM sp_project_update($1, $2, $3, $4, $5, $6, $7)",
-            &[
-                &project_id,
-                &project.code,
-                &project.name,
-                &project.client,
-                &project.backlog_key,
-                &project.backlog_url,
-                &project.backlog_space,
-            ],
-        )
-        .await
-        .map_err(|e| AppError::new(format!("Failed to update project: {e}")))?
-        .ok_or_else(|| AppError::new(format!("Project '{}' not found.", project_id)))?;
-
-    // Xóa toàn bộ thành viên cũ
-    client
-        .execute(
-            "SELECT sp_project_member_delete_by_project($1)",
-            &[&project_id],
-        )
-        .await
-        .map_err(|e| AppError::new(format!("Failed to clear members: {e}")))?;
-
-    // Thêm lại danh sách thành viên mới
-    for member in &project.members {
-        client
-            .execute(
-                "SELECT sp_project_member_upsert($1, $2, $3)",
-                &[&project_id, &member.username, &member.name],
+    pgsql_connect::with_transaction(&client, || async {
+        let row = client
+            .query_opt(
+                "SELECT * FROM sp_project_update($1, $2, $3, $4, $5, $6, $7)",
+                &[
+                    &project_id,
+                    &project.code,
+                    &project.name,
+                    &project.client,
+                    &project.backlog_key,
+                    &project.backlog_url,
+                    &project.backlog_space,
+                ],
             )
             .await
-            .map_err(|e| AppError::new(format!("Failed to insert member: {e}")))?;
-    }
+            .map_err(|e| AppError::new(format!("Failed to update project: {e}")))?
+            .ok_or_else(|| AppError::new(format!("Project '{}' not found.", project_id)))?;
 
-    Ok(ProjectDetail {
-        id: row.get("id"),
-        code: row.get("code"),
-        name: row.get("name"),
-        client: row.get("client"),
-        backlog_key: row.get("backlog_key"),
-        backlog_url: row.get("backlog_url"),
-        backlog_space: row.get("backlog_space"),
-        is_active: row.get("is_active"),
-        members: project.members.clone(),
-        created_at: row.get("created_at"),
-        updated_at: row.get("updated_at"),
+        client
+            .execute(
+                "SELECT sp_project_member_delete_by_project($1)",
+                &[&project_id],
+            )
+            .await
+            .map_err(|e| AppError::new(format!("Failed to clear members: {e}")))?;
+
+        for member in &project.members {
+            client
+                .execute(
+                    "SELECT sp_project_member_upsert($1, $2, $3)",
+                    &[&project_id, &member.username, &member.name],
+                )
+                .await
+                .map_err(|e| AppError::new(format!("Failed to insert member: {e}")))?;
+        }
+
+        Ok(ProjectDetail {
+            id: row.get("id"),
+            code: row.get("code"),
+            name: row.get("name"),
+            client: row.get("client"),
+            backlog_key: row.get("backlog_key"),
+            backlog_url: row.get("backlog_url"),
+            backlog_space: row.get("backlog_space"),
+            is_active: row.get("is_active"),
+            members: project.members.clone(),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        })
     })
+    .await
 }
 
 /// Tìm dự án theo ID, kèm danh sách thành viên.

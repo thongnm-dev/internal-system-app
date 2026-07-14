@@ -148,302 +148,33 @@ pub async fn connect() -> AppResult<Client> {
     Ok(client)
 }
 
-/// Tạo các bảng cần thiết nếu chưa tồn tại, sau đó tạo/cập nhật stored procedure.
+/// Chạy một closure bên trong transaction (BEGIN … COMMIT).
 ///
-/// Được gọi một lần khi ứng dụng khởi động (trong `setup` hook của Tauri).
-pub async fn ensure_tables(client: &Client) -> AppResult<()> {
+/// Nếu closure trả về `Err`, transaction sẽ được ROLLBACK tự động.
+/// Nếu thành công, COMMIT và trả về kết quả.
+pub async fn with_transaction<F, Fut, T>(client: &Client, f: F) -> AppResult<T>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = AppResult<T>>,
+{
     client
-        .batch_execute(
-            "
-            -- Bảng danh sách dự án
-            CREATE TABLE IF NOT EXISTS projects (
-                id            SERIAL       PRIMARY KEY,
-                code          VARCHAR(20)  NOT NULL UNIQUE,
-                name          VARCHAR(200) NOT NULL,
-                client        VARCHAR(200) NOT NULL DEFAULT '',
-                backlog_key   VARCHAR(20)  NOT NULL DEFAULT '',
-                backlog_url   TEXT         NOT NULL DEFAULT '',
-                backlog_space VARCHAR(100) NOT NULL DEFAULT '',
-                is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
-                created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-                updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-            );
-
-            -- Bảng thành viên dự án (quan hệ N-N giữa project và user)
-            CREATE TABLE IF NOT EXISTS project_members (
-                id         SERIAL       PRIMARY KEY,
-                project_id INTEGER      NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-                username   VARCHAR(100) NOT NULL,
-                name       VARCHAR(300) NOT NULL,
-                UNIQUE(project_id, username)
-            );
-
-            -- Bảng ghi chú công việc hằng ngày
-            CREATE TABLE IF NOT EXISTS daily_work_notes (
-                id         SERIAL       PRIMARY KEY,
-                username   VARCHAR(100) NOT NULL,
-                content    TEXT         NOT NULL,
-                note_date  DATE         NOT NULL,
-                status     VARCHAR(15)  NOT NULL DEFAULT 'completed'
-                    CHECK (status IN ('completed', 'incomplete', 'reserved')),
-                created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_daily_notes_user_date
-                ON daily_work_notes(username, note_date);
-
-            -- Bảng ô nhập giờ công của màn hình daily report
-            CREATE TABLE IF NOT EXISTS daily_report_entries (
-                id          SERIAL           PRIMARY KEY,
-                username    VARCHAR(100)     NOT NULL,
-                task_id     VARCHAR(120)     NOT NULL,
-                project_id  VARCHAR(120)     NOT NULL,
-                entry_date  DATE             NOT NULL,
-                comment     TEXT             NOT NULL DEFAULT '',
-                hour        DOUBLE PRECISION NOT NULL DEFAULT 0,
-                is_ot       BOOLEAN          NOT NULL DEFAULT FALSE,
-                regular_ot  DOUBLE PRECISION NOT NULL DEFAULT 0,
-                midnight_ot DOUBLE PRECISION NOT NULL DEFAULT 0,
-                phase       VARCHAR(100)     NOT NULL DEFAULT '',
-                updated_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
-                UNIQUE(username, task_id, entry_date)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_daily_report_entries_user_date
-                ON daily_report_entries(username, entry_date);
-
-            -- Bảng task do người dùng tự thêm trên màn hình daily report
-            CREATE TABLE IF NOT EXISTS daily_report_tasks (
-                id            SERIAL       PRIMARY KEY,
-                username      VARCHAR(100) NOT NULL,
-                task_id       VARCHAR(120) NOT NULL,
-                project_id    VARCHAR(120) NOT NULL,
-                code          VARCHAR(50)  NOT NULL DEFAULT 'TASK',
-                name          VARCHAR(300) NOT NULL,
-                description   TEXT         NOT NULL DEFAULT '',
-                categories    TEXT[]       NOT NULL DEFAULT '{}',
-                assignee      VARCHAR(100) NOT NULL DEFAULT '',
-                estimate_hour VARCHAR(20)  NOT NULL DEFAULT '',
-                due_date      VARCHAR(20)  NOT NULL DEFAULT '',
-                issue_key     VARCHAR(50)  NOT NULL DEFAULT '',
-                created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-                UNIQUE(username, task_id)
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_daily_report_tasks_user
-                ON daily_report_tasks(username, project_id);
-            ",
-        )
+        .batch_execute("BEGIN")
         .await
-        .map_err(|e| AppError::new(format!("Failed to create tables: {e}")))?;
+        .map_err(|e| AppError::new(format!("Failed to begin transaction: {e}")))?;
 
-    ensure_stored_procedures(client).await?;
-
-    Ok(())
-}
-
-/// Tạo hoặc cập nhật toàn bộ stored procedure từ các file SQL
-/// trong thư mục `docs/store-procedure/`.
-///
-/// Sử dụng `include_str!` để nhúng nội dung SQL vào binary tại compile-time,
-/// đảm bảo stored procedure luôn đồng bộ với mã nguồn.
-async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
-    // === Project stored procedures ===
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_project_insert.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_insert: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_select_by_id.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_select_by_id: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_select_list.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_select_list: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_select_code_exists.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_select_code_exists: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_project_update.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_update: {e}")))?;
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_project_delete.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_delete: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_member_upsert.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_member_upsert: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_member_delete_by_project.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_member_delete_by_project: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_member_select.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_member_select: {e}")))?;
-
-    // === Daily Work Notes stored procedures ===
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_insert.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_daily_note_insert: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_select_by_date.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_select_by_date: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_select_by_month.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_select_by_month: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_count_by_month.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_count_by_month: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_update_status.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_update_status: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_delete.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_daily_note_delete: {e}")))?;
-
-    // === Daily Report stored procedures ===
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_entry_upsert.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_entry_upsert: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_entry_delete.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_entry_delete: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_entry_select_by_month.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_entry_select_by_month: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_insert.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_insert: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_select.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_select: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_delete.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_delete: {e}"
-            ))
-        })?;
-
-    Ok(())
+    match f().await {
+        Ok(result) => {
+            client
+                .batch_execute("COMMIT")
+                .await
+                .map_err(|e| AppError::new(format!("Failed to commit transaction: {e}")))?;
+            Ok(result)
+        }
+        Err(e) => {
+            let _ = client.batch_execute("ROLLBACK").await;
+            Err(e)
+        }
+    }
 }
 
 /// Xác định đường dẫn tới file `config.ini`.

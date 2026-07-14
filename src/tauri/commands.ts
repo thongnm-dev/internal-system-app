@@ -27,6 +27,25 @@ async function safeInvoke<T>(command: string, args?: Record<string, unknown>): P
   return invoke<T>(command, args);
 }
 
+// --- Auth ---
+
+export type LoginRequest = {
+  username: string;
+  password: string;
+};
+
+export type LoginResponse = {
+  user_id: number;
+  username: string;
+  full_name: string;
+  email: string;
+  roles: string[];
+};
+
+export function login(request: LoginRequest) {
+  return safeInvoke<LoginResponse>("login", { request });
+}
+
 // --- System ---
 
 export function getSystemInfo() {

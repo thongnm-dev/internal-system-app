@@ -7,10 +7,12 @@ export const router = createRouter({
   routes: vueRoutes,
 });
 
+const PUBLIC_PATHS = ["/login", "/forgot-password"];
+
 router.beforeEach((to) => {
   const auth = useAuthStore();
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  if (!PUBLIC_PATHS.includes(to.path) && !auth.isAuthenticated) {
     auth.setReturnPath(to.fullPath);
     return { path: "/login" };
   }

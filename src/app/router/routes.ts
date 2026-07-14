@@ -98,6 +98,12 @@ export const appRoutes: AppRoute[] = [
     title: "Login",
     subtitle: "Authenticate to continue to protected screens.",
   },
+  {
+    key: "forgotPassword",
+    path: "/forgot-password",
+    title: "Forgot Password",
+    subtitle: "Request a password reset link via email.",
+  },
 ];
 
 export const defaultRoute = appRoutes[0];
@@ -211,5 +217,10 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/login",
     component: () => import("@/features/auth/components/LoginPage.vue"),
     meta: { key: "login" as AppRouteKey },
+  },
+  {
+    path: "/forgot-password",
+    component: () => import("@/features/auth/components/ForgotPasswordPage.vue"),
+    meta: { key: "forgotPassword" as AppRouteKey },
   },
 ];

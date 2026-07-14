@@ -1,8 +1,13 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import type { LoginResponse } from "@/tauri/commands";
 
 type AuthUser = {
+  user_id: number;
   username: string;
+  full_name: string;
+  email: string;
+  roles: string[];
 };
 
 const AUTH_STORAGE_KEY = "pjjyuji.auth.session";
@@ -15,9 +20,19 @@ export const useAuthStore = defineStore("auth", () => {
 
   loadFromStorage();
 
-  function login(payload: { username: string }) {
-    user.value = { username: payload.username };
-    persistToStorage();
+  function setUser(response: LoginResponse, rememberMe: boolean) {
+    user.value = {
+      user_id: response.user_id,
+      username: response.username,
+      full_name: response.full_name,
+      email: response.email,
+      roles: response.roles,
+    };
+    if (rememberMe) {
+      persistToStorage();
+    } else {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
   }
 
   function logout() {
@@ -36,7 +51,7 @@ export const useAuthStore = defineStore("auth", () => {
 
       const parsed = JSON.parse(saved) as Partial<{ user: AuthUser }>;
       if (parsed.user?.username) {
-        user.value = { username: parsed.user.username };
+        user.value = parsed.user;
       }
     } catch {
       // ignore corrupt storage
@@ -57,7 +72,7 @@ export const useAuthStore = defineStore("auth", () => {
     user,
     returnPath,
     isAuthenticated,
-    login,
+    setUser,
     logout,
     setReturnPath,
   };
