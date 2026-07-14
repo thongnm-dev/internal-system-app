@@ -72,6 +72,7 @@ CREATE TABLE projects (
     backlog_url   TEXT         NOT NULL DEFAULT '',
     backlog_space VARCHAR(100) NOT NULL DEFAULT '',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    is_delivered  BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );

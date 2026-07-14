@@ -7,10 +7,12 @@ import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
 import Calendar from "primevue/calendar";
 import { useAuthStore } from "@/app/stores/auth";
+import { friendlyError } from "@/tauri/commands/_base";
 import {
   emptyProjectTaskInput,
   PROJECT_TASK_CATEGORIES,
   useProjectTasks,
+  type ProjectTask,
   type ProjectTaskCategory,
 } from "../composables/useProjectTasks";
 
@@ -22,8 +24,12 @@ const projectId = (route.params.id as string) || "";
 const ctrl = useProjectTasks(projectId);
 
 const isAddDialogOpen = ref(false);
+const editingId = ref<string | null>(null);
 const form = ref(emptyProjectTaskInput(auth.user?.username ?? ""));
+const saving = ref(false);
+const saveError = ref("");
 const canSave = computed(() => form.value.shortName.trim().length > 0);
+const isEditing = computed(() => editingId.value !== null);
 
 function importTask() {
   router.push(`/projects/${encodeURIComponent(projectId)}/tasks/new`);
@@ -39,7 +45,24 @@ function openBacklog(issueKey: string) {
 }
 
 function openAddDialog() {
+  editingId.value = null;
   form.value = emptyProjectTaskInput(auth.user?.username ?? "");
+  saveError.value = "";
+  isAddDialogOpen.value = true;
+}
+
+function openEditDialog(task: ProjectTask) {
+  editingId.value = task.id;
+  form.value = {
+    shortName: task.shortName,
+    description: task.description,
+    categories: [...task.categories],
+    assignee: task.assignee,
+    estimateHour: task.estimateHour,
+    dueDate: task.dueDate,
+    issueKey: task.issueKey,
+  };
+  saveError.value = "";
   isAddDialogOpen.value = true;
 }
 
@@ -50,10 +73,24 @@ function toggleCategory(category: ProjectTaskCategory) {
     : [...list, category];
 }
 
-function saveTask() {
-  if (!canSave.value) return;
-  ctrl.addTask(form.value);
-  isAddDialogOpen.value = false;
+async function saveTask() {
+  if (!canSave.value || saving.value) return;
+  saving.value = true;
+  saveError.value = "";
+  try {
+    const task = editingId.value
+      ? await ctrl.updateTask(editingId.value, form.value)
+      : await ctrl.addTask(form.value);
+    if (!task) {
+      saveError.value = "Cannot save task. The desktop runtime is unavailable.";
+      return;
+    }
+    isAddDialogOpen.value = false;
+  } catch (error) {
+    saveError.value = friendlyError(error);
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 
@@ -139,16 +176,26 @@ function saveTask() {
             <span v-else class="text-muted">-</span>
           </template>
         </Column>
-        <Column header="Action" body-class="text-center" header-class="w-20 text-center">
+        <Column header="Action" body-class="text-center" header-class="w-28 text-center">
           <template #body="{ data }">
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-              type="button"
-              title="Delete task"
-              @click="ctrl.removeTask(data.id)"
-            >
-              <i class="pi pi-trash" />
-            </button>
+            <div class="flex items-center justify-center gap-1">
+              <button
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
+                type="button"
+                title="Edit task"
+                @click="openEditDialog(data)"
+              >
+                <i class="pi pi-pencil" />
+              </button>
+              <button
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
+                type="button"
+                title="Delete task"
+                @click="ctrl.removeTask(data.id)"
+              >
+                <i class="pi pi-trash" />
+              </button>
+            </div>
           </template>
         </Column>
       </DataTable>
@@ -164,7 +211,7 @@ function saveTask() {
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">New Task</h3>
+          <h3 class="font-bold text-ink">{{ isEditing ? "Edit Task" : "New Task" }}</h3>
           <p class="mt-1 text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
         </div>
       </template>
@@ -258,22 +305,25 @@ function saveTask() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="isAddDialogOpen = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="!canSave"
-            @click="saveTask"
-          >
-            Add task
-          </button>
+        <div class="flex flex-col gap-2">
+          <p v-if="saveError" class="text-right text-sm font-semibold text-red-500">{{ saveError }}</p>
+          <div class="flex items-center justify-end gap-2">
+            <button
+              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+              type="button"
+              @click="isAddDialogOpen = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="!canSave || saving"
+              @click="saveTask"
+            >
+              {{ saving ? "Saving…" : isEditing ? "Save changes" : "Add task" }}
+            </button>
+          </div>
         </div>
       </template>
     </Dialog>

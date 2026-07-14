@@ -3,6 +3,7 @@ import { canUseTauriRuntime } from "@/tauri/commands/_base";
 import {
   getProjectDetail,
   createProjectTask,
+  updateProjectTask,
   listProjectTasks,
   deleteProjectTask,
 } from "@/tauri/commands/project";
@@ -119,7 +120,7 @@ export function useProjectTasks(projectId: string) {
       description: input.description.trim(),
       categories: input.categories.slice(),
       assignee: input.assignee.trim(),
-      estimate_hour: input.estimateHour.trim(),
+      estimate_hour: String(input.estimateHour ?? "").trim(),
       due_date: input.dueDate,
       issue_key: input.issueKey.trim(),
     };
@@ -127,6 +128,26 @@ export function useProjectTasks(projectId: string) {
     const result = await createProjectTask(numericId, request);
     const task = toProjectTask(result);
     tasks.value = [...tasks.value, task];
+    return task;
+  }
+
+  async function updateTask(id: string, input: ProjectTaskInput): Promise<ProjectTask | null> {
+    const shortName = input.shortName.trim();
+    if (!shortName || !canUseTauriRuntime()) return null;
+
+    const request: CreateProjectTaskRequest = {
+      short_name: shortName,
+      description: input.description.trim(),
+      categories: input.categories.slice(),
+      assignee: input.assignee.trim(),
+      estimate_hour: String(input.estimateHour ?? "").trim(),
+      due_date: input.dueDate,
+      issue_key: input.issueKey.trim(),
+    };
+
+    const result = await updateProjectTask(id, request);
+    const task = toProjectTask(result);
+    tasks.value = tasks.value.map((t) => (t.id === id ? task : t));
     return task;
   }
 
@@ -142,5 +163,5 @@ export function useProjectTasks(projectId: string) {
     loadTasks();
   });
 
-  return { addTask, loading, project, projectName, projectLabel, projectLoading, removeTask, tasks };
+  return { addTask, updateTask, loading, project, projectName, projectLabel, projectLoading, removeTask, tasks };
 }

@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
 import Calendar from "primevue/calendar";
+import MessageBanner from "@/shared/components/MessageBanner.vue";
 import { useAuthStore } from "@/app/stores/auth";
 import {
   dayTotal,
@@ -28,6 +29,18 @@ import {
 const auth = useAuthStore();
 const router = useRouter();
 const ctrl = useDailyReport(auth.user?.username);
+
+// Estimate (giờ dự kiến hoàn thành task) — parse từ chuỗi, 0 nếu không hợp lệ.
+function taskEstimate(task: DailyReportTask): number {
+  const n = Number(task.estimateHour);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// True khi tổng giờ tích luỹ đã đạt/ vượt estimate — để tô màu badge.
+function taskReachedEstimate(task: DailyReportTask): boolean {
+  const est = taskEstimate(task);
+  return est > 0 && ctrl.cumulativeHours(task.id) >= est;
+}
 
 // --- Editing cell dialog ---
 type EditingCell = {
@@ -88,6 +101,8 @@ function confirmAddProjects() {
 const isAddingTask = ref(false);
 const taskTargetProject = ref<DailyReportProject | null>(null);
 const taskForm = ref<NewTaskInput>(emptyTaskForm());
+const savingTask = ref(false);
+const taskError = ref("");
 
 function emptyTaskForm(): NewTaskInput {
   return {
@@ -105,6 +120,7 @@ function openTaskDialog() {
   if (!contextMenu.value) return;
   taskTargetProject.value = contextMenu.value.project;
   taskForm.value = emptyTaskForm();
+  taskError.value = "";
   contextMenu.value = null;
   isAddingTask.value = true;
 }
@@ -118,11 +134,21 @@ function toggleTaskCategory(category: TaskCategory) {
 
 const canSaveTask = computed(() => taskForm.value.shortName.trim().length > 0);
 
-function saveTask() {
-  if (!taskTargetProject.value || !canSaveTask.value) return;
-  ctrl.addTask(taskTargetProject.value.id, taskForm.value);
-  isAddingTask.value = false;
-  taskTargetProject.value = null;
+async function saveTask() {
+  if (!taskTargetProject.value || !canSaveTask.value || savingTask.value) return;
+  savingTask.value = true;
+  taskError.value = "";
+  try {
+    const task = await ctrl.addTask(taskTargetProject.value.id, taskForm.value);
+    if (!task) {
+      taskError.value = ctrl.error.value || "Cannot save task. Please try again.";
+      return;
+    }
+    isAddingTask.value = false;
+    taskTargetProject.value = null;
+  } finally {
+    savingTask.value = false;
+  }
 }
 
 // --- Context menu ---
@@ -247,6 +273,21 @@ function filteredPickerProjects() {
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+    <!-- Error banner (backend failures — e.g. saving a new task) -->
+    <div v-if="ctrl.error.value" class="flex shrink-0 items-center gap-2 border-b border-divider">
+      <div class="min-w-0 flex-1">
+        <MessageBanner :message="ctrl.error.value" mode="error" />
+      </div>
+      <button
+        class="mr-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-600 hover:bg-red-50"
+        type="button"
+        title="Dismiss"
+        @click="ctrl.error.value = ''"
+      >
+        <i class="pi pi-times text-xs" />
+      </button>
+    </div>
+
     <!-- Top bar: project list + month navigation -->
     <section class="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-divider bg-panel">
       <div class="flex min-w-0 items-center justify-between gap-3 border-r border-divider px-4">
@@ -371,15 +412,44 @@ function filteredPickerProjects() {
               <div
                 v-for="task in project.tasks"
                 :key="task.id"
-                class="flex h-14 items-center border-b border-divider bg-panel px-4"
+                class="flex h-14 items-center gap-2 border-b border-divider bg-panel px-4"
               >
-                <div class="min-w-0 flex-1 pl-3">
-                  <strong class="block truncate text-sm text-ink">{{ task.name }}</strong>
-                  <span class="mt-1 block truncate text-xs font-semibold text-muted">{{ task.code }}</span>
+                <button
+                  class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition"
+                  :class="task.isCompleted
+                    ? 'border-brand bg-brand text-white hover:opacity-80'
+                    : 'border-divider bg-panel text-muted hover:border-brand hover:text-brand'"
+                  type="button"
+                  :title="task.isCompleted ? 'Bỏ delivery' : 'Delivery'"
+                  @click="ctrl.setTaskCompleted(task.id, !task.isCompleted)"
+                >
+                  <i class="pi pi-check text-[10px]" />
+                </button>
+                <div class="min-w-0 flex-1">
+                  <strong
+                    class="block truncate text-sm"
+                    :class="task.isCompleted ? 'text-muted line-through' : 'text-ink'"
+                  >{{ task.name }}</strong>
+                  <div class="mt-1 flex items-center gap-2">
+                    <span class="truncate text-xs font-semibold text-muted">{{ task.code }}</span>
+                    <span
+                      v-if="task.isCompleted"
+                      class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand"
+                    >Delivered</span>
+                  </div>
                 </div>
-                <span class="ml-3 shrink-0 rounded-md bg-canvas px-2 py-1 text-xs font-bold text-secondary">
-                  {{ formatHoursDisplay(ctrl.totalHours(task.id)) }}h
-                </span>
+                <div class="ml-1 flex shrink-0 flex-col items-end gap-0.5">
+                  <span class="rounded-md bg-canvas px-2 py-0.5 text-xs font-bold text-secondary">
+                    {{ formatHoursDisplay(ctrl.totalHours(task.id)) }}h
+                  </span>
+                  <span
+                    class="text-[10px] font-bold tabular-nums"
+                    :class="taskReachedEstimate(task) ? 'text-brand' : 'text-muted'"
+                    :title="taskEstimate(task) ? 'Tổng giờ tích luỹ mọi tháng / estimate' : 'Tổng giờ tích luỹ mọi tháng'"
+                  >
+                    Σ {{ formatHoursDisplay(ctrl.cumulativeHours(task.id)) }}{{ taskEstimate(task) ? ` / ${formatHoursDisplay(taskEstimate(task))}h` : 'h' }}
+                  </span>
+                </div>
               </div>
             </template>
             <div aria-hidden="true" :style="{ height: `${dayRowsScrollbarHeight}px` }" />
@@ -475,6 +545,17 @@ function filteredPickerProjects() {
             step="0.25"
             type="number"
           />
+        </label>
+
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Phase</span>
+          <select
+            v-model="editForm.phase"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+          >
+            <option value="">—</option>
+            <option v-for="p in ctrl.phases.value" :key="p" :value="p">{{ p }}</option>
+          </select>
         </label>
 
         <label class="block">
@@ -743,22 +824,25 @@ function filteredPickerProjects() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="isAddingTask = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="!canSaveTask"
-            @click="saveTask"
-          >
-            Add task
-          </button>
+        <div class="flex flex-col gap-2">
+          <p v-if="taskError" class="text-right text-sm font-semibold text-red-500">{{ taskError }}</p>
+          <div class="flex items-center justify-end gap-2">
+            <button
+              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+              type="button"
+              @click="isAddingTask = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              :disabled="!canSaveTask || savingTask"
+              @click="saveTask"
+            >
+              {{ savingTask ? "Saving…" : "Add task" }}
+            </button>
+          </div>
         </div>
       </template>
     </Dialog>

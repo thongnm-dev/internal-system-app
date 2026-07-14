@@ -144,6 +144,13 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
 
     client
         .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_project_task_update.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_project_task_update: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
             "../../../docs/store-procedure/sp_project_task_delete.sql"
         ))
         .await
@@ -307,6 +314,46 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
                 "Failed to create sp_daily_report_task_delete: {e}"
             ))
         })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_task_set_completed.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_task_set_completed: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_task_hours_total.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_task_hours_total: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_project_task_set_completed.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_project_task_set_completed: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_category_select_list.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_category_select_list: {e}")))?;
 
     client
         .batch_execute(include_str!(

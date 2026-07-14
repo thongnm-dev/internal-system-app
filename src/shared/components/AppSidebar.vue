@@ -34,6 +34,8 @@ const groups: MenuGroup[] = [
     children: [
       { id: "excel2md", icon: "pi-file" },
       { id: "importCsv", icon: "pi-database" },
+      { id: "sqlEditor", icon: "pi-server" },
+      { id: "exploreFaster", icon: "pi-compass" },
     ],
   },
   {

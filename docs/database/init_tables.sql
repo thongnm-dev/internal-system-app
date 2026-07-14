@@ -61,11 +61,14 @@ CREATE TABLE IF NOT EXISTS project_members (
 -- Bảng danh mục công đoạn (process/phase)
 CREATE TABLE IF NOT EXISTS categories (
     id            SERIAL       PRIMARY KEY,
-    process_code  VARCHAR(20)  NOT NULL,
-    phase_name    VARCHAR(200) NOT NULL,
+    process_code  VARCHAR(50)  NOT NULL,
     display_order INTEGER      NOT NULL DEFAULT 0,
     UNIQUE (process_code)
 );
+
+-- Migration cho DB đã tồn tại: gộp về một cột process_code (chứa luôn tên phase).
+ALTER TABLE categories DROP COLUMN IF EXISTS phase_name;
+ALTER TABLE categories ALTER COLUMN process_code TYPE VARCHAR(50);
 
 CREATE INDEX IF NOT EXISTS idx_categories_process
     ON categories(process_code);
@@ -81,8 +84,16 @@ CREATE TABLE IF NOT EXISTS project_tasks (
     due_date      DATE,
     issue_key     VARCHAR(30)  NOT NULL DEFAULT '',
     is_user_added BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_completed  BOOLEAN      NOT NULL DEFAULT FALSE,
+    completed_at  TIMESTAMPTZ,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- Migration cho DB đã tồn tại: bổ sung cột trạng thái hoàn thành (delivery).
+ALTER TABLE project_tasks
+    ADD COLUMN IF NOT EXISTS is_completed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE project_tasks
+    ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_project_tasks_project
     ON project_tasks(project_id);
@@ -145,9 +156,17 @@ CREATE TABLE IF NOT EXISTS daily_report_tasks (
     estimate_hour VARCHAR(20)  NOT NULL DEFAULT '',
     due_date      VARCHAR(20)  NOT NULL DEFAULT '',
     issue_key     VARCHAR(50)  NOT NULL DEFAULT '',
+    is_completed  BOOLEAN      NOT NULL DEFAULT FALSE,
+    completed_at  TIMESTAMPTZ,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     UNIQUE(username, task_id)
 );
+
+-- Migration cho DB đã tồn tại: bổ sung cột trạng thái hoàn thành nếu thiếu.
+ALTER TABLE daily_report_tasks
+    ADD COLUMN IF NOT EXISTS is_completed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE daily_report_tasks
+    ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_daily_report_tasks_user
     ON daily_report_tasks(username, project_id);

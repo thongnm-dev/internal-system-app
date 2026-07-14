@@ -158,6 +158,33 @@ pub async fn create_project_task(
     project_store::insert_task(&task).await
 }
 
+/// Cập nhật task đã có của dự án.
+pub async fn update_project_task(
+    task_id: String,
+    request: CreateProjectTaskRequest,
+) -> AppResult<ProjectTask> {
+    let short_name = request.short_name.trim().to_string();
+    if short_name.is_empty() {
+        return Err(AppError::new("Task short name is required."));
+    }
+
+    let task = ProjectTask {
+        id: task_id,
+        project_id: 0,
+        short_name,
+        description: request.description.trim().to_string(),
+        categories: request.categories,
+        assignee: request.assignee.trim().to_string(),
+        estimate_hour: request.estimate_hour.trim().to_string(),
+        due_date: request.due_date.trim().to_string(),
+        issue_key: request.issue_key.trim().to_string(),
+        is_user_added: true,
+        created_at: String::new(),
+    };
+
+    project_store::update_task(&task).await
+}
+
 /// Lấy danh sách task của dự án.
 pub async fn list_project_tasks(project_id: i32) -> AppResult<Vec<ProjectTask>> {
     project_store::list_tasks_by_project(project_id).await

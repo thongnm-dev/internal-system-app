@@ -36,6 +36,10 @@ export function createProjectTask(projectId: number, request: CreateProjectTaskR
   return safeInvoke<ProjectTaskResult>("create_project_task", { projectId, request });
 }
 
+export function updateProjectTask(taskId: string, request: CreateProjectTaskRequest) {
+  return safeInvoke<ProjectTaskResult>("update_project_task", { taskId, request });
+}
+
 export function listProjectTasks(projectId: number) {
   return safeInvoke<ProjectTaskResult[]>("list_project_tasks", { projectId });
 }

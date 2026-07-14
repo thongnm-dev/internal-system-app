@@ -71,6 +71,17 @@ pub async fn create_project_task(
         .map_err(|e| e.to_string())
 }
 
+/// Cập nhật task đã có.
+#[tauri::command]
+pub async fn update_project_task(
+    task_id: String,
+    request: CreateProjectTaskRequest,
+) -> Result<ProjectTask, String> {
+    project_service::update_project_task(task_id, request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Lấy danh sách task của dự án.
 #[tauri::command]
 pub async fn list_project_tasks(project_id: i32) -> Result<Vec<ProjectTask>, String> {

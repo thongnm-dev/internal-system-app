@@ -273,6 +273,60 @@ pub async fn insert_task(task: &ProjectTask) -> AppResult<ProjectTask> {
     .await
 }
 
+/// Cập nhật task đã có và đồng bộ lại danh sách categories.
+pub async fn update_task(task: &ProjectTask) -> AppResult<ProjectTask> {
+    let client = pgsql_connect::connect().await?;
+
+    let due_date: Option<chrono::NaiveDate> = if task.due_date.is_empty() {
+        None
+    } else {
+        chrono::NaiveDate::parse_from_str(&task.due_date, "%Y-%m-%d").ok()
+    };
+
+    pgsql_connect::with_transaction(&client, || async {
+        let row = client
+            .query_opt(
+                "SELECT * FROM sp_project_task_update($1, $2, $3, $4, $5, $6, $7)",
+                &[
+                    &task.id,
+                    &task.short_name,
+                    &task.description,
+                    &task.assignee,
+                    &task.estimate_hour,
+                    &due_date,
+                    &task.issue_key,
+                ],
+            )
+            .await
+            .map_err(|e| AppError::new(format!("Failed to update project task: {e}")))?;
+
+        let row = row.ok_or_else(|| AppError::new(format!("Task '{}' not found.", task.id)))?;
+
+        client
+            .execute(
+                "SELECT sp_project_task_category_sync($1, $2)",
+                &[&task.id, &task.categories],
+            )
+            .await
+            .map_err(|e| AppError::new(format!("Failed to sync task categories: {e}")))?;
+
+        Ok(ProjectTask {
+            id: row.get("id"),
+            project_id: row.get("project_id"),
+            short_name: row.get("short_name"),
+            description: row.get("description"),
+            assignee: row.get("assignee"),
+            estimate_hour: row.get("estimate_hour"),
+            due_date: row.get("due_date"),
+            issue_key: row.get("issue_key"),
+            is_user_added: row.get("is_user_added"),
+            categories: task.categories.clone(),
+            created_at: row.get("created_at"),
+        })
+    })
+    .await
+}
+
 /// Lấy danh sách task của dự án, kèm categories đã được aggregate thành array.
 pub async fn list_tasks_by_project(project_id: i32) -> AppResult<Vec<ProjectTask>> {
     let client = pgsql_connect::connect().await?;

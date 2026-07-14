@@ -38,7 +38,20 @@ export type DailyReportUserTaskResult = {
   estimate_hour: string;
   due_date: string;
   issue_key: string;
+  is_completed: boolean;
+  completed_at: string;
   created_at: string;
+  is_user_added: boolean;
+};
+
+export type DailyReportTaskHoursResult = {
+  task_id: string;
+  total_hour: number;
+};
+
+export type DailyReportPhaseResult = {
+  process_code: string;
+  display_order: number;
 };
 
 export type DailyReportProjectResult = {

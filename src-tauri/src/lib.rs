@@ -12,8 +12,9 @@ use commands::daily_note_commands::{
 };
 use commands::daily_report_commands::{
     clear_daily_report_entry, create_daily_report_task, delete_daily_report_task,
-    get_daily_report_entries, get_daily_report_projects, get_daily_report_tasks,
-    save_daily_report_entry,
+    get_daily_report_entries, get_daily_report_phases, get_daily_report_projects,
+    get_daily_report_task_hours, get_daily_report_tasks, save_daily_report_entry,
+    set_daily_report_task_completed, set_project_task_completed,
 };
 use commands::db_config_commands::{
     check_database_status, get_database_config, save_database_config, test_database_config,
@@ -25,7 +26,7 @@ use commands::import_commands::{
 use commands::project_commands::{
     create_project, create_project_task, delete_project, delete_project_task,
     get_backlog_project_by_key, get_project_detail, list_project_tasks, list_projects,
-    update_project,
+    update_project, update_project_task,
 };
 use commands::settings_commands::{get_settings, save_settings};
 use commands::system_commands::{check_internet_connection, get_system_info};
@@ -86,6 +87,7 @@ pub fn run() {
             get_backlog_project_by_key,
             // === Project Task commands ===
             create_project_task,
+            update_project_task,
             list_project_tasks,
             delete_project_task,
             // === Daily Work Notes commands ===
@@ -102,6 +104,10 @@ pub fn run() {
             get_daily_report_entries,
             create_daily_report_task,
             get_daily_report_tasks,
+            get_daily_report_task_hours,
+            get_daily_report_phases,
+            set_daily_report_task_completed,
+            set_project_task_completed,
             delete_daily_report_task,
             get_daily_report_projects,
             // === User management commands ===

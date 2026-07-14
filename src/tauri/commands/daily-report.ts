@@ -2,7 +2,9 @@ import { safeInvoke } from "./_base";
 import type {
   CreateDailyReportTaskRequest,
   DailyReportEntryResult,
+  DailyReportPhaseResult,
   DailyReportProjectResult,
+  DailyReportTaskHoursResult,
   DailyReportUserTaskResult,
   SaveDailyReportEntryRequest,
 } from "@/_/types/daily-report";
@@ -23,8 +25,28 @@ export function createDailyReportTask(username: string, request: CreateDailyRepo
   return safeInvoke<DailyReportUserTaskResult>("create_daily_report_task", { username, request });
 }
 
-export function getDailyReportTasks(username: string) {
-  return safeInvoke<DailyReportUserTaskResult[]>("get_daily_report_tasks", { username });
+export function getDailyReportTasks(username: string, year: number, month: number) {
+  return safeInvoke<DailyReportUserTaskResult[]>("get_daily_report_tasks", { username, year, month });
+}
+
+export function getDailyReportTaskHours(username: string) {
+  return safeInvoke<DailyReportTaskHoursResult[]>("get_daily_report_task_hours", { username });
+}
+
+export function setDailyReportTaskCompleted(username: string, taskId: string, isCompleted: boolean) {
+  return safeInvoke<DailyReportUserTaskResult>("set_daily_report_task_completed", {
+    username,
+    taskId,
+    isCompleted,
+  });
+}
+
+export function setProjectTaskCompleted(taskId: string, isCompleted: boolean) {
+  return safeInvoke<boolean>("set_project_task_completed", { taskId, isCompleted });
+}
+
+export function getDailyReportPhases() {
+  return safeInvoke<DailyReportPhaseResult[]>("get_daily_report_phases", {});
 }
 
 export function deleteDailyReportTask(username: string, taskId: string) {

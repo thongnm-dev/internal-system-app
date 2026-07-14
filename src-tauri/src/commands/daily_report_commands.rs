@@ -4,8 +4,8 @@
 //! qua IPC invoke, gọi service tương ứng và trả kết quả về frontend.
 
 use crate::models::daily_report::{
-    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportProject, DailyReportUserTask,
-    SaveDailyReportEntryRequest,
+    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportPhase, DailyReportProject,
+    DailyReportTaskHours, DailyReportUserTask, SaveDailyReportEntryRequest,
 };
 use crate::services::daily_report_service;
 
@@ -66,12 +66,55 @@ pub async fn create_daily_report_task(
         .map_err(|e| e.to_string())
 }
 
-/// Lấy toàn bộ task người dùng tự thêm của user.
+/// Lấy task người dùng tự thêm của user theo tháng đang xem (`year`, `month` 1-12).
 #[tauri::command]
 pub async fn get_daily_report_tasks(
     username: String,
+    year: i32,
+    month: i32,
 ) -> Result<Vec<DailyReportUserTask>, String> {
-    daily_report_service::get_tasks(&username)
+    daily_report_service::get_tasks(&username, year, month)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Tổng số giờ tích luỹ (mọi tháng) gộp theo task, cho user.
+#[tauri::command]
+pub async fn get_daily_report_task_hours(
+    username: String,
+) -> Result<Vec<DailyReportTaskHours>, String> {
+    daily_report_service::get_task_hours_total(&username)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Đánh dấu một task user tự thêm hoàn thành / bỏ hoàn thành.
+#[tauri::command]
+pub async fn set_daily_report_task_completed(
+    username: String,
+    task_id: String,
+    is_completed: bool,
+) -> Result<DailyReportUserTask, String> {
+    daily_report_service::set_task_completed(&username, &task_id, is_completed)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Đánh dấu một project_task delivery / bỏ delivery (task được giao cho user).
+#[tauri::command]
+pub async fn set_project_task_completed(
+    task_id: String,
+    is_completed: bool,
+) -> Result<bool, String> {
+    daily_report_service::set_project_task_completed(&task_id, is_completed)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Danh sách công đoạn (process/phase) cho dropdown phase khi nhập giờ.
+#[tauri::command]
+pub async fn get_daily_report_phases() -> Result<Vec<DailyReportPhase>, String> {
+    daily_report_service::get_phases()
         .await
         .map_err(|e| e.to_string())
 }

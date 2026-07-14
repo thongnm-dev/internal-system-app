@@ -5,6 +5,8 @@ export type MenuKey =
   | "issueBacklog"
   | "importIssues"
   | "excel2md"
+  | "sqlEditor"
+  | "exploreFaster"
   | "dailyWorkNotes"
   | "dailyReport"
   | "importCsv"

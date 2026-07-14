@@ -6,8 +6,8 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::daily_report_store;
 use crate::models::daily_report::{
-    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportProject, DailyReportUserTask,
-    SaveDailyReportEntryRequest,
+    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportPhase, DailyReportProject,
+    DailyReportTaskHours, DailyReportUserTask, SaveDailyReportEntryRequest,
 };
 
 /// Số giờ tối đa cho phép trong một ô nhập (một ngày).
@@ -156,9 +156,53 @@ pub async fn create_task(
     .await
 }
 
-/// Lấy toàn bộ task người dùng tự thêm của một user.
-pub async fn get_tasks(username: &str) -> AppResult<Vec<DailyReportUserTask>> {
-    daily_report_store::select_tasks(username).await
+/// Lấy task người dùng tự thêm của một user theo tháng đang xem.
+/// Validate: `month` phải từ 1 đến 12.
+pub async fn get_tasks(
+    username: &str,
+    year: i32,
+    month: i32,
+) -> AppResult<Vec<DailyReportUserTask>> {
+    if !(1..=12).contains(&month) {
+        return Err(AppError::new("Month must be between 1 and 12."));
+    }
+    daily_report_store::select_tasks(username, year, month).await
+}
+
+/// Tổng số giờ tích luỹ (mọi tháng) gộp theo task, cho một user.
+pub async fn get_task_hours_total(username: &str) -> AppResult<Vec<DailyReportTaskHours>> {
+    daily_report_store::select_task_hours_total(username).await
+}
+
+/// Đánh dấu một task hoàn thành / bỏ hoàn thành. Trả về lỗi nếu không tìm thấy.
+pub async fn set_task_completed(
+    username: &str,
+    task_id: &str,
+    is_completed: bool,
+) -> AppResult<DailyReportUserTask> {
+    let task_id = task_id.trim();
+    if task_id.is_empty() {
+        return Err(AppError::new("Task id is required."));
+    }
+    daily_report_store::set_task_completed(username, task_id, is_completed)
+        .await?
+        .ok_or_else(|| AppError::new(format!("Daily report task '{}' not found.", task_id)))
+}
+
+/// Đánh dấu một project_task delivery / bỏ delivery. Trả về lỗi nếu không tìm thấy.
+pub async fn set_project_task_completed(task_id: &str, is_completed: bool) -> AppResult<bool> {
+    let task_id = task_id.trim();
+    if task_id.is_empty() {
+        return Err(AppError::new("Task id is required."));
+    }
+    daily_report_store::set_project_task_completed(task_id, is_completed)
+        .await?
+        .ok_or_else(|| AppError::new(format!("Project task '{}' not found.", task_id)))
+}
+
+/// Danh sách công đoạn (process/phase) cho dropdown phase khi nhập giờ.
+pub async fn get_phases() -> AppResult<Vec<DailyReportPhase>> {
+    daily_report_store::select_categories().await
 }
 
 /// Xóa một task người dùng tự thêm. Trả về lỗi nếu không tìm thấy.

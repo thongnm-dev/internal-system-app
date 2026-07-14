@@ -47,6 +47,18 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Convert uploaded Excel screen specs into Markdown files.",
   },
   {
+    key: "sqlEditor",
+    path: "/sql-editor",
+    title: "SQL Editor",
+    subtitle: "Write and run SQL queries against the internal database.",
+  },
+  {
+    key: "exploreFaster",
+    path: "/explore-faster",
+    title: "Explore Faster",
+    subtitle: "Quickly browse and explore data across projects and tables.",
+  },
+  {
     key: "dailyWorkNotes",
     path: "/daily-work-notes",
     title: "Daily Work Notes",
@@ -189,6 +201,16 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/excel2md",
     component: () => import("@/features/excel2md/components/excel2mdPage.vue"),
     meta: { key: "excel2md" as MenuKey },
+  },
+  {
+    path: "/sql-editor",
+    component: () => import("@/features/sql-editor/components/SqlEditorPage.vue"),
+    meta: { key: "sqlEditor" as MenuKey },
+  },
+  {
+    path: "/explore-faster",
+    component: () => import("@/features/explore-faster/components/ExploreFasterPage.vue"),
+    meta: { key: "exploreFaster" as MenuKey },
   },
   {
     path: "/daily-work-notes",

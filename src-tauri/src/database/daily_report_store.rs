@@ -5,7 +5,10 @@
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::daily_report::{DailyReportEntry, DailyReportProject, DailyReportUserTask};
+use crate::models::daily_report::{
+    DailyReportEntry, DailyReportPhase, DailyReportProject, DailyReportTaskHours,
+    DailyReportUserTask,
+};
 use crate::utils::pgsql_connect;
 
 // ============================================================================
@@ -136,16 +139,104 @@ pub async fn insert_task(
     Ok(row_to_task(&row))
 }
 
-/// Lấy toàn bộ task người dùng tự thêm của một user.
-pub async fn select_tasks(username: &str) -> AppResult<Vec<DailyReportUserTask>> {
+/// Lấy task người dùng tự thêm của một user, lọc theo tháng đang xem.
+///
+/// Quy tắc lọc nằm trong stored procedure: task tạo trong tháng đang xem hiện
+/// tất cả (kể cả đã hoàn thành); task tạo ở tháng trước chỉ hiện khi chưa hoàn thành.
+pub async fn select_tasks(
+    username: &str,
+    year: i32,
+    month: i32,
+) -> AppResult<Vec<DailyReportUserTask>> {
     let client = pgsql_connect::connect().await?;
 
     let rows = client
-        .query("SELECT * FROM sp_daily_report_task_select($1)", &[&username])
+        .query(
+            "SELECT * FROM sp_daily_report_task_select($1, $2, $3)",
+            &[&username, &year, &month],
+        )
         .await
         .map_err(|e| AppError::new(format!("Failed to query daily report tasks: {e}")))?;
 
     Ok(rows.iter().map(row_to_task).collect())
+}
+
+/// Tổng số giờ tích luỹ (mọi tháng) gộp theo task, cho một user.
+pub async fn select_task_hours_total(username: &str) -> AppResult<Vec<DailyReportTaskHours>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query(
+            "SELECT * FROM sp_daily_report_task_hours_total($1)",
+            &[&username],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to query daily report task hours: {e}")))?;
+
+    Ok(rows
+        .iter()
+        .map(|row| DailyReportTaskHours {
+            task_id: row.get("task_id"),
+            total_hour: row.get("total_hour"),
+        })
+        .collect())
+}
+
+/// Đánh dấu một project_task delivery / bỏ delivery theo id.
+/// Trả về trạng thái mới, hoặc `None` nếu không tìm thấy task.
+pub async fn set_project_task_completed(
+    task_id: &str,
+    is_completed: bool,
+) -> AppResult<Option<bool>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query(
+            "SELECT * FROM sp_project_task_set_completed($1, $2)",
+            &[&task_id, &is_completed],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to update project task status: {e}")))?;
+
+    Ok(rows.first().map(|row| row.get::<_, bool>("is_completed")))
+}
+
+/// Danh sách công đoạn (process/phase) cho dropdown phase.
+pub async fn select_categories() -> AppResult<Vec<DailyReportPhase>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query("SELECT * FROM sp_category_select_list()", &[])
+        .await
+        .map_err(|e| AppError::new(format!("Failed to query categories: {e}")))?;
+
+    Ok(rows
+        .iter()
+        .map(|row| DailyReportPhase {
+            process_code: row.get("process_code"),
+            display_order: row.get("display_order"),
+        })
+        .collect())
+}
+
+/// Đánh dấu task hoàn thành / bỏ hoàn thành theo (username, task_id).
+/// Trả về bản ghi sau khi cập nhật, hoặc `None` nếu không tìm thấy.
+pub async fn set_task_completed(
+    username: &str,
+    task_id: &str,
+    is_completed: bool,
+) -> AppResult<Option<DailyReportUserTask>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query(
+            "SELECT * FROM sp_daily_report_task_set_completed($1, $2, $3)",
+            &[&username, &task_id, &is_completed],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to update daily report task status: {e}")))?;
+
+    Ok(rows.first().map(row_to_task))
 }
 
 /// Xóa một task người dùng tự thêm theo (username, task_id).
@@ -230,7 +321,10 @@ fn row_to_task(row: &tokio_postgres::Row) -> DailyReportUserTask {
         estimate_hour: row.get("estimate_hour"),
         due_date: row.get("due_date"),
         issue_key: row.get("issue_key"),
+        is_completed: row.get("is_completed"),
+        completed_at: row.get::<_, Option<String>>("completed_at").unwrap_or_default(),
         created_at: row.get("created_at"),
+        is_user_added: row.get("is_user_added"),
     }
 }
 

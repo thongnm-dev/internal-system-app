@@ -91,8 +91,32 @@ pub struct DailyReportUserTask {
     pub due_date: String,
     /// Issue key liên kết với backlog.
     pub issue_key: String,
+    /// Đã hoàn thành (delivery) hay chưa. Task chưa xong sẽ mang sang tháng sau.
+    pub is_completed: bool,
+    /// Thời điểm đánh dấu delivery (ISO timestamp dạng text), rỗng nếu chưa.
+    pub completed_at: String,
     /// Thời điểm tạo (ISO timestamp dạng text).
     pub created_at: String,
+    /// Nguồn task: TRUE = user tự thêm (daily_report_tasks),
+    /// FALSE = task dự án được giao (project_tasks). Quyết định lệnh delivery/xoá.
+    pub is_user_added: bool,
+}
+
+/// Một công đoạn (process/phase) cho dropdown khi nhập giờ ở Daily Report.
+/// `process_code` chứa luôn tên phase (PG, UT, Review PG…).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DailyReportPhase {
+    pub process_code: String,
+    pub display_order: i32,
+}
+
+/// Tổng số giờ tích luỹ (mọi tháng) của một task, dùng cho badge tiến độ.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DailyReportTaskHours {
+    /// ID task ở frontend.
+    pub task_id: String,
+    /// Tổng số giờ (cột hour) đã nhập của mọi tháng.
+    pub total_hour: f64,
 }
 
 /// Thông tin project cho màn hình daily report.

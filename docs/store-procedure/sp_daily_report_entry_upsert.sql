@@ -32,6 +32,9 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 AS $$
+-- Cột out của RETURNS TABLE trùng tên cột bảng -> ON CONFLICT bị "ambiguous".
+-- Ưu tiên hiểu định danh là CỘT bảng.
+#variable_conflict use_column
 BEGIN
     RETURN QUERY
     INSERT INTO daily_report_entries (
