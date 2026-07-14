@@ -89,16 +89,15 @@ CREATE TABLE project_members (
 
 CREATE INDEX idx_members_project ON project_members(project_id);
 
-CREATE TABLE project_phases (
+CREATE TABLE categories (
     id            SERIAL       PRIMARY KEY,
-    project_id    INTEGER      NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     process_code  VARCHAR(20)  NOT NULL,
     phase_name    VARCHAR(200) NOT NULL,
     display_order INTEGER      NOT NULL DEFAULT 0,
-    UNIQUE (project_id, process_code)
+    UNIQUE (process_code)
 );
 
-CREATE INDEX idx_phases_project ON project_phases(project_id);
+CREATE INDEX idx_categories_process ON categories(process_code);
 
 CREATE TABLE project_tasks (
     id            VARCHAR(50)  PRIMARY KEY,

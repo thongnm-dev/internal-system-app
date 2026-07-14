@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
+import Calendar from "primevue/calendar";
 import { useAuthStore } from "@/app/stores/auth";
 import {
   dayTotal,
@@ -718,10 +719,14 @@ function filteredPickerProjects() {
           <!-- Due date -->
           <label class="block">
             <span class="text-xs font-bold text-muted">Due Date</span>
-            <input
-              v-model="taskForm.dueDate"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              type="date"
+            <Calendar
+              :model-value="taskForm.dueDate ? new Date(taskForm.dueDate + 'T00:00:00') : null"
+              class="mt-1 w-full"
+              date-format="yy/mm/dd"
+              placeholder="Select date"
+              show-icon
+              show-button-bar
+              @update:model-value="taskForm.dueDate = $event ? `${$event.getFullYear()}-${String($event.getMonth() + 1).padStart(2, '0')}-${String($event.getDate()).padStart(2, '0')}` : ''"
             />
           </label>
 

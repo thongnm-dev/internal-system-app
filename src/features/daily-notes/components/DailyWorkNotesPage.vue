@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import Dialog from "primevue/dialog";
+import Calendar from "primevue/calendar";
 import { useAuthStore } from "@/app/stores/auth";
 import { useDailyWorkNotes } from "../composables/useDailyWorkNotes";
 import type { DailyWorkNoteDraft, DailyWorkStatus } from "../composables/useDailyWorkNotes";
@@ -70,9 +71,6 @@ function parseDateStr(value: string): Date | null {
   return new Date(y, m - 1, d);
 }
 
-function formatMaxDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
 </script>
 
 <template>
@@ -272,12 +270,16 @@ function formatMaxDate(date: Date): string {
       <div class="space-y-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Ngày công việc</span>
-          <input
-            v-model="draftDate"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
-            type="date"
-            :max="formatMaxDate(ctrl.maxEntryDate)"
+          <Calendar
+            :model-value="draftDate ? new Date(draftDate + 'T00:00:00') : null"
+            class="mt-1 w-full"
+            date-format="yy/mm/dd"
+            placeholder="Select date"
+            show-icon
+            show-button-bar
+            :max-date="ctrl.maxEntryDate"
             :disabled="isEditing"
+            @update:model-value="draftDate = $event ? `${$event.getFullYear()}-${String($event.getMonth() + 1).padStart(2, '0')}-${String($event.getDate()).padStart(2, '0')}` : ''"
           />
         </label>
 

@@ -1,26 +1,59 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
-import { useProjectTasks } from "../composables/useProjectTasks";
+import Dialog from "primevue/dialog";
+import Checkbox from "primevue/checkbox";
+import Calendar from "primevue/calendar";
+import { useAuthStore } from "@/app/stores/auth";
+import {
+  emptyProjectTaskInput,
+  PROJECT_TASK_CATEGORIES,
+  useProjectTasks,
+  type ProjectTaskCategory,
+} from "../composables/useProjectTasks";
 
 const route = useRoute();
 const router = useRouter();
-const projectCode = (route.params.id as string) || "";
+const auth = useAuthStore();
+const projectId = (route.params.id as string) || "";
 
-const ctrl = useProjectTasks(projectCode);
+const ctrl = useProjectTasks(projectId);
 
-function addTask() {
-  router.push(`/projects/${encodeURIComponent(projectCode)}/tasks/new`);
+const isAddDialogOpen = ref(false);
+const form = ref(emptyProjectTaskInput(auth.user?.username ?? ""));
+const canSave = computed(() => form.value.shortName.trim().length > 0);
+
+function importTask() {
+  router.push(`/projects/${encodeURIComponent(projectId)}/tasks/new`);
 }
 
 function viewReport() {
-  router.push(`/projects/${encodeURIComponent(projectCode)}/report`);
+  router.push(`/projects/${encodeURIComponent(projectId)}/report`);
 }
 
 function openBacklog(issueKey: string) {
   if (!issueKey) return;
   router.push({ path: "/issue-backlog", query: { keyword: issueKey } });
+}
+
+function openAddDialog() {
+  form.value = emptyProjectTaskInput(auth.user?.username ?? "");
+  isAddDialogOpen.value = true;
+}
+
+function toggleCategory(category: ProjectTaskCategory) {
+  const list = form.value.categories;
+  form.value.categories = list.includes(category)
+    ? list.filter((c) => c !== category)
+    : [...list, category];
+}
+
+function saveTask() {
+  if (!canSave.value) return;
+  ctrl.addTask(form.value);
+  isAddDialogOpen.value = false;
 }
 </script>
 
@@ -29,9 +62,7 @@ function openBacklog(issueKey: string) {
     <section class="flex items-center justify-between gap-4 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="min-w-0">
         <h3 class="truncate font-bold text-ink">Tasks</h3>
-        <p class="mt-1 truncate text-sm text-muted">
-          {{ projectCode }}<template v-if="ctrl.projectName.value"> - {{ ctrl.projectName.value }}</template>
-        </p>
+        <p class="mt-1 truncate text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <button
@@ -42,9 +73,16 @@ function openBacklog(issueKey: string) {
           <i class="pi pi-chart-bar" />Report
         </button>
         <button
+          class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+          type="button"
+          @click="importTask"
+        >
+          <i class="pi pi-upload" />Import task
+        </button>
+        <button
           class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
           type="button"
-          @click="addTask"
+          @click="openAddDialog"
         >
           <i class="pi pi-plus" />Add task
         </button>
@@ -115,5 +153,129 @@ function openBacklog(issueKey: string) {
         </Column>
       </DataTable>
     </section>
+
+    <!-- Add task dialog -->
+    <Dialog
+      :visible="isAddDialogOpen"
+      class="w-full max-w-2xl rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="isAddDialogOpen = $event"
+    >
+      <template #header>
+        <div>
+          <h3 class="font-bold text-ink">New Task</h3>
+          <p class="mt-1 text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
+        </div>
+      </template>
+
+      <div class="space-y-4">
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Short name <span class="text-red-500">*</span></span>
+          <input
+            v-model="form.shortName"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            placeholder="Task short name"
+            autofocus
+          />
+        </label>
+
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Description</span>
+          <textarea
+            v-model="form.description"
+            class="mt-1 min-h-20 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            placeholder="Task description"
+          />
+        </label>
+
+        <div>
+          <span class="text-xs font-bold text-muted">Category</span>
+          <div class="mt-1 flex flex-wrap gap-2">
+            <label
+              v-for="category in PROJECT_TASK_CATEGORIES"
+              :key="category"
+              :class="[
+                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition',
+                form.categories.includes(category)
+                  ? 'border-brand bg-emerald-50 text-brand'
+                  : 'border-divider bg-panel text-secondary hover:border-brand',
+              ]"
+            >
+              <Checkbox
+                :model-value="form.categories.includes(category)"
+                :binary="true"
+                class="h-4 w-4 accent-brand"
+                @update:model-value="toggleCategory(category)"
+              />
+              {{ category }}
+            </label>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Assignee</span>
+            <input
+              v-model="form.assignee"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Username"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Estimate Hour</span>
+            <input
+              v-model="form.estimateHour"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              inputmode="decimal"
+              min="0"
+              step="0.25"
+              type="number"
+              placeholder="0"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Due Date</span>
+            <Calendar
+              :model-value="form.dueDate ? new Date(form.dueDate + 'T00:00:00') : null"
+              class="mt-1 w-full"
+              date-format="yy/mm/dd"
+              placeholder="Select date"
+              show-icon
+              show-button-bar
+              @update:model-value="form.dueDate = $event ? `${$event.getFullYear()}-${String($event.getMonth() + 1).padStart(2, '0')}-${String($event.getDate()).padStart(2, '0')}` : ''"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-bold text-muted">Link Issue Backlog</span>
+            <input
+              v-model="form.issueKey"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              placeholder="Issue Key"
+            />
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            type="button"
+            @click="isAddDialogOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="!canSave"
+            @click="saveTask"
+          >
+            Add task
+          </button>
+        </div>
+      </template>
+    </Dialog>
   </section>
 </template>

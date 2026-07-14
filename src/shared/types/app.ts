@@ -8,6 +8,8 @@ export type MenuKey =
   | "dailyWorkNotes"
   | "dailyReport"
   | "importCsv"
+  | "cloudS3"
+  | "aiChat"
   | "governanceMenus"
   | "governanceUsers"
   | "governanceLogs"

@@ -21,11 +21,13 @@ function defaultMenus(): MenuItemConfig[] {
     { key: "dailyReport", title: "Daily Report", path: "/daily-report", icon: "pi-calendar", group: "—", visible: true, order: 4 },
     { key: "excel2md", title: "Excel to Markdown", path: "/excel2md", icon: "pi-file", group: "Tools", visible: true, order: 5 },
     { key: "importCsv", title: "Import CSV", path: "/import-csv", icon: "pi-database", group: "Tools", visible: true, order: 6 },
-    { key: "projectSkills", title: "Skills", path: "/project-skills", icon: "pi-book", group: "Governance", visible: true, order: 7 },
-    { key: "governanceMenus", title: "Menus", path: "/governance/menus", icon: "pi-bars", group: "Governance", visible: true, order: 8 },
-    { key: "governanceUsers", title: "Users", path: "/governance/users", icon: "pi-users", group: "Governance", visible: true, order: 9 },
-    { key: "governanceLogs", title: "Logs", path: "/governance/logs", icon: "pi-history", group: "Governance", visible: true, order: 10 },
-    { key: "settings", title: "Settings", path: "/settings", icon: "pi-cog", group: "—", visible: true, order: 11 },
+    { key: "cloudS3", title: "S3 Browser", path: "/cloud/s3", icon: "pi-folder-open", group: "Cloud", visible: true, order: 7 },
+    { key: "aiChat", title: "AI Chat", path: "/ai/chat", icon: "pi-comments", group: "AI Agent", visible: true, order: 8 },
+    { key: "projectSkills", title: "Skills", path: "/project-skills", icon: "pi-book", group: "Governance", visible: true, order: 9 },
+    { key: "governanceMenus", title: "Menus", path: "/governance/menus", icon: "pi-bars", group: "Governance", visible: true, order: 10 },
+    { key: "governanceUsers", title: "Users", path: "/governance/users", icon: "pi-users", group: "Governance", visible: true, order: 11 },
+    { key: "governanceLogs", title: "Logs", path: "/governance/logs", icon: "pi-history", group: "Governance", visible: true, order: 12 },
+    { key: "settings", title: "Settings", path: "/settings", icon: "pi-cog", group: "—", visible: true, order: 13 },
   ];
 }
 

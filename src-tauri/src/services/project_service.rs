@@ -7,7 +7,8 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::project_store;
 use crate::models::project::{
-    BacklogProjectLookup, CreateProjectRequest, ProjectDetail, ProjectSummary,
+    BacklogProjectLookup, CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
+    ProjectSummary, ProjectTask,
 };
 
 /// Tạo dự án mới.
@@ -126,4 +127,46 @@ pub async fn delete_project(project_id: i32) -> AppResult<()> {
 /// Hiện tại chưa được cấu hình — luôn trả về lỗi.
 pub fn get_backlog_project_by_key(_project_key: String) -> AppResult<BacklogProjectLookup> {
     Err(AppError::new("Backlog project lookup is not configured."))
+}
+
+/// Tạo task mới cho dự án.
+pub async fn create_project_task(
+    project_id: i32,
+    request: CreateProjectTaskRequest,
+) -> AppResult<ProjectTask> {
+    let short_name = request.short_name.trim().to_string();
+    if short_name.is_empty() {
+        return Err(AppError::new("Task short name is required."));
+    }
+
+    let task_id = format!("task-{}", chrono::Utc::now().timestamp_millis());
+
+    let task = ProjectTask {
+        id: task_id,
+        project_id,
+        short_name,
+        description: request.description.trim().to_string(),
+        categories: request.categories,
+        assignee: request.assignee.trim().to_string(),
+        estimate_hour: request.estimate_hour.trim().to_string(),
+        due_date: request.due_date.trim().to_string(),
+        issue_key: request.issue_key.trim().to_string(),
+        is_user_added: true,
+        created_at: String::new(),
+    };
+
+    project_store::insert_task(&task).await
+}
+
+/// Lấy danh sách task của dự án.
+pub async fn list_project_tasks(project_id: i32) -> AppResult<Vec<ProjectTask>> {
+    project_store::list_tasks_by_project(project_id).await
+}
+
+/// Xóa task theo ID.
+pub async fn delete_project_task(task_id: String) -> AppResult<()> {
+    if !project_store::delete_task(&task_id).await? {
+        return Err(AppError::new(format!("Task '{}' not found.", task_id)));
+    }
+    Ok(())
 }

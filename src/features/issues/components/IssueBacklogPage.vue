@@ -3,6 +3,7 @@ import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
+import Calendar from "primevue/calendar";
 import {
   assignees,
   bugClasses,
@@ -137,20 +138,26 @@ function openImport() {
             <div class="grid gap-3 md:grid-cols-2">
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Create date from</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  type="date"
-                  :value="ctrl.criteria.value.createDateFrom"
-                  @change="ctrl.setField('createDateFrom', ($event.target as HTMLInputElement).value)"
+                <Calendar
+                  :model-value="ctrl.criteria.value.createDateFrom ? new Date(ctrl.criteria.value.createDateFrom + 'T00:00:00') : null"
+                  class="mt-1 w-full"
+                  date-format="yy/mm/dd"
+                  placeholder="Select date"
+                  show-icon
+                  show-button-bar
+                  @update:model-value="ctrl.setField('createDateFrom', $event ? `${$event.getFullYear()}-${String($event.getMonth() + 1).padStart(2, '0')}-${String($event.getDate()).padStart(2, '0')}` : '')"
                 />
               </label>
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Create date to</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  type="date"
-                  :value="ctrl.criteria.value.createDateTo"
-                  @change="ctrl.setField('createDateTo', ($event.target as HTMLInputElement).value)"
+                <Calendar
+                  :model-value="ctrl.criteria.value.createDateTo ? new Date(ctrl.criteria.value.createDateTo + 'T00:00:00') : null"
+                  class="mt-1 w-full"
+                  date-format="yy/mm/dd"
+                  placeholder="Select date"
+                  show-icon
+                  show-button-bar
+                  @update:model-value="ctrl.setField('createDateTo', $event ? `${$event.getFullYear()}-${String($event.getMonth() + 1).padStart(2, '0')}-${String($event.getDate()).padStart(2, '0')}` : '')"
                 />
               </label>
             </div>

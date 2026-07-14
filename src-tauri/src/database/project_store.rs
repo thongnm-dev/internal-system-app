@@ -5,7 +5,7 @@
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::project::{ProjectDetail, ProjectMember, ProjectSummary};
+use crate::models::project::{ProjectDetail, ProjectMember, ProjectSummary, ProjectTask};
 use crate::utils::pgsql_connect;
 
 /// Thêm dự án mới vào database.
@@ -214,6 +214,106 @@ pub async fn code_exists(project_code: &str, exclude_id: Option<i32>) -> AppResu
         .map_err(|e| AppError::new(format!("Failed to check project code: {e}")))?;
 
     Ok(row.get(0))
+}
+
+/// Thêm task mới cho dự án, kèm danh sách categories.
+/// Chạy trong transaction: insert task → sync categories.
+pub async fn insert_task(task: &ProjectTask) -> AppResult<ProjectTask> {
+    let client = pgsql_connect::connect().await?;
+
+    let due_date: Option<chrono::NaiveDate> = if task.due_date.is_empty() {
+        None
+    } else {
+        chrono::NaiveDate::parse_from_str(&task.due_date, "%Y-%m-%d").ok()
+    };
+
+    pgsql_connect::with_transaction(&client, || async {
+        let row = client
+            .query_one(
+                "SELECT * FROM sp_project_task_insert($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                &[
+                    &task.id,
+                    &task.project_id,
+                    &task.short_name,
+                    &task.description,
+                    &task.assignee,
+                    &task.estimate_hour,
+                    &due_date,
+                    &task.issue_key,
+                    &task.is_user_added,
+                ],
+            )
+            .await
+            .map_err(|e| AppError::new(format!("Failed to insert project task: {e}")))?;
+
+        if !task.categories.is_empty() {
+            client
+                .execute(
+                    "SELECT sp_project_task_category_sync($1, $2)",
+                    &[&task.id, &task.categories],
+                )
+                .await
+                .map_err(|e| AppError::new(format!("Failed to sync task categories: {e}")))?;
+        }
+
+        Ok(ProjectTask {
+            id: row.get("id"),
+            project_id: row.get("project_id"),
+            short_name: row.get("short_name"),
+            description: row.get("description"),
+            assignee: row.get("assignee"),
+            estimate_hour: row.get("estimate_hour"),
+            due_date: row.get("due_date"),
+            issue_key: row.get("issue_key"),
+            is_user_added: row.get("is_user_added"),
+            categories: task.categories.clone(),
+            created_at: row.get("created_at"),
+        })
+    })
+    .await
+}
+
+/// Lấy danh sách task của dự án, kèm categories đã được aggregate thành array.
+pub async fn list_tasks_by_project(project_id: i32) -> AppResult<Vec<ProjectTask>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query(
+            "SELECT * FROM sp_project_task_select_by_project($1)",
+            &[&project_id],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to list project tasks: {e}")))?;
+
+    Ok(rows
+        .iter()
+        .map(|row| ProjectTask {
+            id: row.get("id"),
+            project_id: row.get("project_id"),
+            short_name: row.get("short_name"),
+            description: row.get("description"),
+            assignee: row.get("assignee"),
+            estimate_hour: row.get("estimate_hour"),
+            due_date: row.get("due_date"),
+            issue_key: row.get("issue_key"),
+            is_user_added: row.get("is_user_added"),
+            categories: row.get("categories"),
+            created_at: row.get("created_at"),
+        })
+        .collect())
+}
+
+/// Xóa task theo ID. Categories bị xóa tự động nhờ ON DELETE CASCADE.
+pub async fn delete_task(task_id: &str) -> AppResult<bool> {
+    let client = pgsql_connect::connect().await?;
+
+    let row = client
+        .query_one("SELECT sp_project_task_delete($1)", &[&task_id])
+        .await
+        .map_err(|e| AppError::new(format!("Failed to delete project task: {e}")))?;
+
+    let deleted: i32 = row.get(0);
+    Ok(deleted > 0)
 }
 
 /// Load danh sách thành viên của một dự án, sắp xếp theo username.

@@ -23,11 +23,16 @@ use commands::import_commands::{
     preview_monthly_report_csv, search_import_batches,
 };
 use commands::project_commands::{
-    create_project, delete_project, get_backlog_project_by_key, get_project_detail, list_projects,
+    create_project, create_project_task, delete_project, delete_project_task,
+    get_backlog_project_by_key, get_project_detail, list_project_tasks, list_projects,
     update_project,
 };
 use commands::settings_commands::{get_settings, save_settings};
 use commands::system_commands::{check_internet_connection, get_system_info};
+use commands::user_commands::{
+    change_user_password, create_user, delete_user, get_user_detail, list_roles, list_users,
+    update_user,
+};
 use commands::excel2md_commands::excel2md;
 
 /// Khởi chạy ứng dụng Tauri desktop.
@@ -79,6 +84,10 @@ pub fn run() {
             list_projects,
             delete_project,
             get_backlog_project_by_key,
+            // === Project Task commands ===
+            create_project_task,
+            list_project_tasks,
+            delete_project_task,
             // === Daily Work Notes commands ===
             create_daily_note,
             get_daily_notes_by_date,
@@ -94,7 +103,15 @@ pub fn run() {
             create_daily_report_task,
             get_daily_report_tasks,
             delete_daily_report_task,
-            get_daily_report_projects
+            get_daily_report_projects,
+            // === User management commands ===
+            create_user,
+            update_user,
+            get_user_detail,
+            list_users,
+            delete_user,
+            change_user_password,
+            list_roles
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

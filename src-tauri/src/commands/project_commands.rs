@@ -4,7 +4,8 @@
 //! qua IPC invoke, gọi service tương ứng và trả kết quả về frontend.
 
 use crate::models::project::{
-    BacklogProjectLookup, CreateProjectRequest, ProjectDetail, ProjectSummary,
+    BacklogProjectLookup, CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
+    ProjectSummary, ProjectTask,
 };
 use crate::services::project_service;
 
@@ -57,4 +58,31 @@ pub async fn delete_project(project_id: i32) -> Result<(), String> {
 #[tauri::command]
 pub fn get_backlog_project_by_key(project_key: String) -> Result<BacklogProjectLookup, String> {
     project_service::get_backlog_project_by_key(project_key).map_err(|e| e.to_string())
+}
+
+/// Tạo task mới cho dự án.
+#[tauri::command]
+pub async fn create_project_task(
+    project_id: i32,
+    request: CreateProjectTaskRequest,
+) -> Result<ProjectTask, String> {
+    project_service::create_project_task(project_id, request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Lấy danh sách task của dự án.
+#[tauri::command]
+pub async fn list_project_tasks(project_id: i32) -> Result<Vec<ProjectTask>, String> {
+    project_service::list_project_tasks(project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Xóa task theo ID.
+#[tauri::command]
+pub async fn delete_project_task(task_id: String) -> Result<(), String> {
+    project_service::delete_project_task(task_id)
+        .await
+        .map_err(|e| e.to_string())
 }

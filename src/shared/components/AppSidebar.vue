@@ -37,6 +37,20 @@ const groups: MenuGroup[] = [
     ],
   },
   {
+    label: "Cloud",
+    icon: "pi-cloud",
+    children: [
+      { id: "cloudS3", icon: "pi-folder-open" },
+    ],
+  },
+  {
+    label: "AI Agent",
+    icon: "pi-sparkles",
+    children: [
+      { id: "aiChat", icon: "pi-comments" },
+    ],
+  },
+  {
     label: "Governance",
     icon: "pi-shield",
     children: [

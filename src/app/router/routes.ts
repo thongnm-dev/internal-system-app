@@ -65,6 +65,18 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
   {
+    key: "cloudS3",
+    path: "/cloud/s3",
+    title: "S3 Browser",
+    subtitle: "Browse, upload, and manage files in S3-compatible storage buckets.",
+  },
+  {
+    key: "aiChat",
+    path: "/ai/chat",
+    title: "AI Chat",
+    subtitle: "Chat with AI assistants for code review, documentation, and task automation.",
+  },
+  {
     key: "governanceMenus",
     path: "/governance/menus",
     requiresAuth: true,
@@ -192,6 +204,16 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/import-csv",
     component: () => import("@/features/import-csv/components/ImportCsvPage.vue"),
     meta: { key: "importCsv" as MenuKey },
+  },
+  {
+    path: "/cloud/s3",
+    component: () => import("@/features/cloud/components/S3BrowserPage.vue"),
+    meta: { key: "cloudS3" as MenuKey },
+  },
+  {
+    path: "/ai/chat",
+    component: () => import("@/features/ai-agent/components/AiChatPage.vue"),
+    meta: { key: "aiChat" as MenuKey },
   },
   {
     path: "/governance/menus",

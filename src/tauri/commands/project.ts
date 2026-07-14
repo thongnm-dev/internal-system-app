@@ -2,8 +2,10 @@ import { safeInvoke } from "./_base";
 import type {
   BacklogProjectLookup,
   CreateProjectRequest,
+  CreateProjectTaskRequest,
   ProjectDetailResult,
   ProjectSummaryResult,
+  ProjectTaskResult,
 } from "@/_/types/project";
 
 export function createProject(request: CreateProjectRequest) {
@@ -28,4 +30,16 @@ export function deleteProject(projectId: number) {
 
 export function getBacklogProjectByKey(projectKey: string) {
   return safeInvoke<BacklogProjectLookup>("get_backlog_project_by_key", { projectKey });
+}
+
+export function createProjectTask(projectId: number, request: CreateProjectTaskRequest) {
+  return safeInvoke<ProjectTaskResult>("create_project_task", { projectId, request });
+}
+
+export function listProjectTasks(projectId: number) {
+  return safeInvoke<ProjectTaskResult[]>("list_project_tasks", { projectId });
+}
+
+export function deleteProjectTask(taskId: string) {
+  return safeInvoke<void>("delete_project_task", { taskId });
 }

@@ -58,6 +58,45 @@ CREATE TABLE IF NOT EXISTS project_members (
     UNIQUE(project_id, username)
 );
 
+-- Bảng danh mục công đoạn (process/phase)
+CREATE TABLE IF NOT EXISTS categories (
+    id            SERIAL       PRIMARY KEY,
+    process_code  VARCHAR(20)  NOT NULL,
+    phase_name    VARCHAR(200) NOT NULL,
+    display_order INTEGER      NOT NULL DEFAULT 0,
+    UNIQUE (process_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_categories_process
+    ON categories(process_code);
+
+-- Bảng task của dự án
+CREATE TABLE IF NOT EXISTS project_tasks (
+    id            VARCHAR(50)  PRIMARY KEY,
+    project_id    INTEGER      NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    short_name    VARCHAR(200) NOT NULL,
+    description   TEXT         NOT NULL DEFAULT '',
+    assignee      VARCHAR(100) NOT NULL DEFAULT '',
+    estimate_hour VARCHAR(20)  NOT NULL DEFAULT '',
+    due_date      DATE,
+    issue_key     VARCHAR(30)  NOT NULL DEFAULT '',
+    is_user_added BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_tasks_project
+    ON project_tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_assignee
+    ON project_tasks(assignee);
+
+-- Bảng phân loại task (quan hệ N-N giữa task và category)
+CREATE TABLE IF NOT EXISTS project_task_categories (
+    task_id  VARCHAR(50)  NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
+    category VARCHAR(30)  NOT NULL
+        CHECK (category IN ('PG', 'Review PG', 'UT', 'Review UT', 'Other')),
+    PRIMARY KEY (task_id, category)
+);
+
 -- Bảng ghi chú công việc hằng ngày
 CREATE TABLE IF NOT EXISTS daily_work_notes (
     id         SERIAL       PRIMARY KEY,

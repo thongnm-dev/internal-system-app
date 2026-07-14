@@ -9,6 +9,18 @@ INSERT INTO roles (name, description)
 VALUES ('admin', 'Administrator with full access')
 ON CONFLICT (name) DO NOTHING;
 
+INSERT INTO roles (name, description)
+VALUES ('manager', 'Manager with project oversight')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO roles (name, description)
+VALUES ('member', 'Regular team member')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO roles (name, description)
+VALUES ('viewer', 'Read-only access')
+ON CONFLICT (name) DO NOTHING;
+
 -- User admin mặc định (password: ad@123456)
 INSERT INTO users (username, password_hash, full_name, position)
 VALUES (

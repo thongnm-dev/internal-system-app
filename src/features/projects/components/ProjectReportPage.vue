@@ -4,21 +4,27 @@ import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import { useProjectTasks } from "../composables/useProjectTasks";
+import { useProjects } from "../composables/useProjects";
 import { formatHourValue, overtimeMinutes, totalMinutes } from "@/shared/utils/timeMath";
 
 const route = useRoute();
 const router = useRouter();
-const projectCode = (route.params.id as string) || "";
+const projectId = (route.params.id as string) || "";
 
-const ctrl = useProjectTasks(projectCode);
+const ctrl = useProjectTasks(projectId);
+const { result } = useProjects();
+
+const analysisProject = computed(
+  () => result.value?.projects.find((p) => p.project_code === (ctrl.project.value?.code ?? projectId)) ?? null,
+);
 
 const totalHour = computed(() =>
-  ctrl.project.value ? formatHourValue(totalMinutes(ctrl.project.value.totals)) : "-",
+  analysisProject.value ? formatHourValue(totalMinutes(analysisProject.value.totals)) : "-",
 );
 const overtimeHour = computed(() =>
-  ctrl.project.value ? formatHourValue(overtimeMinutes(ctrl.project.value.totals)) : "-",
+  analysisProject.value ? formatHourValue(overtimeMinutes(analysisProject.value.totals)) : "-",
 );
-const phaseCount = computed(() => ctrl.project.value?.phases.length ?? 0);
+const phaseCount = computed(() => analysisProject.value?.phases.length ?? 0);
 
 const estimatedHour = computed(() => {
   const sum = ctrl.tasks.value.reduce((total, task) => total + (Number(task.estimateHour) || 0), 0);
@@ -26,7 +32,7 @@ const estimatedHour = computed(() => {
 });
 
 function goBack() {
-  router.push(`/projects/${encodeURIComponent(projectCode)}/tasks`);
+  router.push(`/projects/${encodeURIComponent(projectId)}/tasks`);
 }
 </script>
 
@@ -35,9 +41,7 @@ function goBack() {
     <section class="flex items-center justify-between gap-4 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="min-w-0">
         <h3 class="truncate font-bold text-ink">Report</h3>
-        <p class="mt-1 truncate text-sm text-muted">
-          {{ projectCode }}<template v-if="ctrl.projectName.value"> - {{ ctrl.projectName.value }}</template>
-        </p>
+        <p class="mt-1 truncate text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
       </div>
       <button
         class="flex h-9 shrink-0 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas"
@@ -48,7 +52,7 @@ function goBack() {
       </button>
     </section>
 
-    <p v-if="!ctrl.project.value" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+    <p v-if="!analysisProject" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
       No analysis data found for this project.
     </p>
 
@@ -82,7 +86,7 @@ function goBack() {
           class="app-data-table"
           empty-message="No phase data."
           :table-style="{ minWidth: '720px' }"
-          :value="ctrl.project.value.phases"
+          :value="analysisProject.phases"
         >
           <Column field="process_code" header="Process" body-class="font-bold text-ink" />
           <Column field="phase_name" header="Phase" />

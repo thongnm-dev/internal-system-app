@@ -1,6 +1,12 @@
-import { computed, ref } from "vue";
-import { useProjects } from "./useProjects";
-import type { ProjectSummary } from "@/shared/types/analysis";
+import { computed, ref, onMounted } from "vue";
+import { canUseTauriRuntime } from "@/tauri/commands/_base";
+import {
+  getProjectDetail,
+  createProjectTask,
+  listProjectTasks,
+  deleteProjectTask,
+} from "@/tauri/commands/project";
+import type { ProjectDetailResult, ProjectTaskResult, CreateProjectTaskRequest } from "@/_/types/project";
 
 export type ProjectTaskCategory = "PG" | "Review PG" | "UT" | "Review UT" | "Other";
 
@@ -20,33 +26,11 @@ export type ProjectTask = {
   assignee: string;
   estimateHour: string;
   dueDate: string;
-  /** Backlog issue key used to map/sync this task with the backlog. */
   issueKey: string;
   createdAt: string;
 };
 
 export type ProjectTaskInput = Omit<ProjectTask, "id" | "createdAt">;
-
-function storageKey(projectCode: string) {
-  return `pjjyuji.project-tasks.${projectCode || "unknown"}`;
-}
-
-function loadTasks(projectCode: string): ProjectTask[] {
-  try {
-    const saved = window.localStorage.getItem(storageKey(projectCode));
-    return saved ? (JSON.parse(saved) as ProjectTask[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistTasks(projectCode: string, tasks: ProjectTask[]) {
-  try {
-    window.localStorage.setItem(storageKey(projectCode), JSON.stringify(tasks));
-  } catch {
-    /* ignore quota / serialization errors */
-  }
-}
 
 export function emptyProjectTaskInput(assignee = ""): ProjectTaskInput {
   return {
@@ -60,43 +44,103 @@ export function emptyProjectTaskInput(assignee = ""): ProjectTaskInput {
   };
 }
 
-/**
- * Project-scoped task store, persisted to localStorage per `project_code`.
- * Kept independent from the Daily Report task store.
- */
-export function useProjectTasks(projectCode: string) {
-  const tasks = ref<ProjectTask[]>(loadTasks(projectCode));
-  const { result } = useProjects();
+function toProjectTask(r: ProjectTaskResult): ProjectTask {
+  return {
+    id: r.id,
+    shortName: r.short_name,
+    description: r.description,
+    categories: r.categories as ProjectTaskCategory[],
+    assignee: r.assignee,
+    estimateHour: r.estimate_hour,
+    dueDate: r.due_date,
+    issueKey: r.issue_key,
+    createdAt: r.created_at,
+  };
+}
 
-  const project = computed<ProjectSummary | null>(
-    () => result.value?.projects.find((p) => p.project_code === projectCode) ?? null,
-  );
+export function useProjectTasks(projectId: string) {
+  const tasks = ref<ProjectTask[]>([]);
+  const project = ref<ProjectDetailResult | null>(null);
+  const projectLoading = ref(false);
+  const loading = ref(false);
 
-  const projectName = computed(() => project.value?.project_name ?? "");
+  const numericId = Number(projectId);
+  const validId = !Number.isNaN(numericId);
 
-  function addTask(input: ProjectTaskInput): ProjectTask | null {
+  const projectName = computed(() => {
+    if (!project.value) return "";
+    const p = project.value;
+    const parts = [p.code, p.name].filter(Boolean);
+    return parts.join(" - ");
+  });
+
+  const projectLabel = computed(() => {
+    if (!project.value) return projectId;
+    const p = project.value;
+    if (p.client) {
+      return `#【${p.client}】${p.code}_${p.name}`;
+    }
+    return `#${p.code}_${p.name}`;
+  });
+
+  async function loadProject() {
+    if (!canUseTauriRuntime() || !validId) return;
+
+    projectLoading.value = true;
+    try {
+      project.value = await getProjectDetail(numericId);
+    } catch {
+      project.value = null;
+    } finally {
+      projectLoading.value = false;
+    }
+  }
+
+  async function loadTasks() {
+    if (!canUseTauriRuntime() || !validId) return;
+
+    loading.value = true;
+    try {
+      const results = await listProjectTasks(numericId);
+      tasks.value = results.map(toProjectTask);
+    } catch {
+      tasks.value = [];
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function addTask(input: ProjectTaskInput): Promise<ProjectTask | null> {
     const shortName = input.shortName.trim();
-    if (!shortName) return null;
-    const task: ProjectTask = {
-      id: `task-${Date.now()}`,
-      shortName,
+    if (!shortName || !canUseTauriRuntime() || !validId) return null;
+
+    const request: CreateProjectTaskRequest = {
+      short_name: shortName,
       description: input.description.trim(),
       categories: input.categories.slice(),
       assignee: input.assignee.trim(),
-      estimateHour: input.estimateHour.trim(),
-      dueDate: input.dueDate,
-      issueKey: input.issueKey.trim(),
-      createdAt: new Date().toISOString(),
+      estimate_hour: input.estimateHour.trim(),
+      due_date: input.dueDate,
+      issue_key: input.issueKey.trim(),
     };
+
+    const result = await createProjectTask(numericId, request);
+    const task = toProjectTask(result);
     tasks.value = [...tasks.value, task];
-    persistTasks(projectCode, tasks.value);
     return task;
   }
 
-  function removeTask(id: string) {
+  async function removeTask(id: string) {
+    if (!canUseTauriRuntime()) return;
+
+    await deleteProjectTask(id);
     tasks.value = tasks.value.filter((t) => t.id !== id);
-    persistTasks(projectCode, tasks.value);
   }
 
-  return { addTask, project, projectName, removeTask, tasks };
+  onMounted(() => {
+    loadProject();
+    loadTasks();
+  });
+
+  return { addTask, loading, project, projectName, projectLabel, projectLoading, removeTask, tasks };
 }

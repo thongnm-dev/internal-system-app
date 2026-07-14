@@ -34,13 +34,6 @@ function goToProjectRoute(suffix: string) {
   router.push(`/projects/${id}${suffix}`);
 }
 
-async function deleteContextProject() {
-  if (!contextMenu.value) return;
-  const id = contextMenu.value.project.id;
-  contextMenu.value = null;
-  await ctrl.removeProject(id);
-}
-
 watch(contextMenu, (val) => {
   if (val) {
     window.addEventListener("click", closeContextMenu);
@@ -88,7 +81,7 @@ function formatDate(value: string) {
         </label>
         <div class="flex items-center justify-end gap-2">
           <button class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas" type="button" @click="ctrl.resetFilters()"><i class="pi pi-refresh" />Reset</button>
-          <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="ctrl.loadProjects()"><i class="pi pi-refresh" />Search</button>
+          <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="ctrl.loadProjects()"><i class="pi pi-search" />Search</button>
         </div>
       </div>
     </Fieldset>
@@ -112,8 +105,6 @@ function formatDate(value: string) {
         <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/tasks/new')"><i class="pi pi-plus" />Add Task</button>
         <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/tasks')"><i class="pi pi-list" />View Tasks</button>
         <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/report')"><i class="pi pi-chart-bar" />View Report</button>
-        <div class="my-1 border-t border-divider" />
-        <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50" type="button" @click="deleteContextProject"><i class="pi pi-trash" />Delete</button>
       </div>
 
       <div class="flex items-center justify-between gap-4 border-t border-divider px-4 py-3">

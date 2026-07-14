@@ -33,6 +33,8 @@ mod commands {
     pub mod settings_commands;
     /// Commands lấy thông tin hệ thống và kiểm tra mạng.
     pub mod system_commands;
+    /// Commands cho module quản lý người dùng.
+    pub mod user_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -53,6 +55,8 @@ mod database {
     pub mod settings_store;
     /// Khởi tạo database (tạo bảng + stored procedure) khi app khởi động.
     pub mod startup_store;
+    /// Data access cho module quản lý người dùng.
+    pub mod user_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -77,6 +81,8 @@ mod models {
     pub mod settings;
     /// Model thông tin hệ thống (username, IP, version).
     pub mod system;
+    /// Model cho module quản lý người dùng.
+    pub mod user;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -103,6 +109,8 @@ mod services {
     pub mod settings_service;
     /// Service lấy thông tin hệ thống.
     pub mod system_service;
+    /// Service cho module quản lý người dùng.
+    pub mod user_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

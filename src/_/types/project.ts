@@ -42,3 +42,27 @@ export type ProjectSummaryResult = {
   member_count: number;
   created_at: string;
 };
+
+export type ProjectTaskResult = {
+  id: string;
+  project_id: number;
+  short_name: string;
+  description: string;
+  categories: string[];
+  assignee: string;
+  estimate_hour: string;
+  due_date: string;
+  issue_key: string;
+  is_user_added: boolean;
+  created_at: string;
+};
+
+export type CreateProjectTaskRequest = {
+  short_name: string;
+  description: string;
+  categories: string[];
+  assignee: string;
+  estimate_hour: string;
+  due_date: string;
+  issue_key: string;
+};

@@ -111,6 +111,44 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         .await
         .map_err(|e| AppError::new(format!("Failed to create sp_project_member_select: {e}")))?;
 
+    // === Project Task stored procedures ===
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_project_task_insert.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_project_task_insert: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_project_task_category_sync.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_project_task_category_sync: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_project_task_select_by_project.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_project_task_select_by_project: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_project_task_delete.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_project_task_delete: {e}")))?;
+
     // === Auth stored procedures ===
 
     client
@@ -280,6 +318,69 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
                 "Failed to create sp_daily_report_project_select: {e}"
             ))
         })?;
+
+    // === User management stored procedures ===
+
+    client
+        .batch_execute(include_str!("../../../docs/store-procedure/sp_user_insert.sql"))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_insert: {e}")))?;
+
+    client
+        .batch_execute(include_str!("../../../docs/store-procedure/sp_user_update.sql"))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_update: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_user_select_by_id.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_select_by_id: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_user_select_list.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_select_list: {e}")))?;
+
+    client
+        .batch_execute(include_str!("../../../docs/store-procedure/sp_user_delete.sql"))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_delete: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_user_change_password.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_change_password: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_user_username_exists.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_user_username_exists: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_user_role_sync.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_user_role_sync: {e}")))?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_role_select_list.sql"
+        ))
+        .await
+        .map_err(|e| AppError::new(format!("Failed to create sp_role_select_list: {e}")))?;
 
     Ok(())
 }

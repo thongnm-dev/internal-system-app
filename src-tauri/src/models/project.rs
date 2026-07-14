@@ -73,3 +73,31 @@ pub struct BacklogProjectLookup {
     pub project_key: String,
     pub project_name: String,
 }
+
+/// Thông tin chi tiết của một task trong dự án.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProjectTask {
+    pub id: String,
+    pub project_id: i32,
+    pub short_name: String,
+    pub description: String,
+    pub categories: Vec<String>,
+    pub assignee: String,
+    pub estimate_hour: String,
+    pub due_date: String,
+    pub issue_key: String,
+    pub is_user_added: bool,
+    pub created_at: String,
+}
+
+/// Dữ liệu request từ frontend khi tạo task mới cho dự án.
+#[derive(Debug, Deserialize)]
+pub struct CreateProjectTaskRequest {
+    pub short_name: String,
+    pub description: String,
+    pub categories: Vec<String>,
+    pub assignee: String,
+    pub estimate_hour: String,
+    pub due_date: String,
+    pub issue_key: String,
+}

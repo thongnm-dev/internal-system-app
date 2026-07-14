@@ -8,3 +8,4 @@ export * from "./excel2md";
 export * from "./project";
 export * from "./daily-note";
 export * from "./daily-report";
+export * from "./user";
