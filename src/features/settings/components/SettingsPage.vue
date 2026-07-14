@@ -2,7 +2,7 @@
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
-const { settings, apiKeyCount, isDirty, save, discard, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey } =
+const { settings, apiKeyCount, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey } =
   useSettings();
 
 const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string }[] = [
@@ -29,6 +29,14 @@ const themeOptions = [
 
 <template>
   <section class="min-h-0 flex-1 overflow-auto">
+    <p v-if="loading" class="flex items-center gap-2 rounded-lg border border-divider bg-panel p-4 text-sm text-muted shadow-sm">
+      <i class="pi pi-spinner animate-spin" />
+      Loading settings...
+    </p>
+    <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+      {{ error }}
+    </p>
+    <template v-if="!loading">
     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
@@ -164,13 +172,15 @@ const themeOptions = [
         </button>
       </template>
       <button
-        class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
-        :disabled="!isDirty"
+        :disabled="!isDirty || loading"
         @click="save"
       >
-        Save changes
+        <i v-if="loading" class="pi pi-spinner animate-spin" />
+        {{ loading ? "Saving..." : "Save changes" }}
       </button>
     </div>
+    </template>
   </section>
 </template>

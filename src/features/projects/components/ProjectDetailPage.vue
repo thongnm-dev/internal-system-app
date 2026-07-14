@@ -5,7 +5,9 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
-import { createProject, updateProject, friendlyError, getBacklogProjectByKey, getProjectDetail, type ProjectMember } from "@/tauri/commands";
+import { friendlyError } from "@/tauri/commands/_base";
+import { createProject, updateProject, getBacklogProjectByKey, getProjectDetail } from "@/tauri/commands/project";
+import type { ProjectMember } from "@/_/types/project";
 
 type ProjectForm = {
   id: number | null;

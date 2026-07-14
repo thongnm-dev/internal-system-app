@@ -1,14 +1,13 @@
 import { computed, ref, watch } from "vue";
+import { friendlyError } from "@/tauri/commands/_base";
 import {
   clearDailyReportEntry,
   createDailyReportTask,
-  friendlyError,
   getDailyReportEntries,
   getDailyReportTasks,
   saveDailyReportEntry,
-  type DailyReportEntryResult,
-  type DailyReportUserTaskResult,
-} from "@/tauri/commands";
+} from "@/tauri/commands/daily-report";
+import type { DailyReportEntryResult, DailyReportUserTaskResult } from "@/_/types/daily-report";
 
 export type TaskCategory = "PG" | "Review PG" | "UT" | "Review UT" | "Other";
 

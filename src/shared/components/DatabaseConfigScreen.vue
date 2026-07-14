@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import Dialog from "primevue/dialog";
-import {
-  friendlyError,
-  getDatabaseConfig,
-  testDatabaseConfig,
-  type DatabaseStatus,
-  type SaveDatabaseConfigRequest,
-} from "@/tauri/commands";
+import { friendlyError } from "@/tauri/commands/_base";
+import { getDatabaseConfig, testDatabaseConfig } from "@/tauri/commands/database-config";
+import type { DatabaseStatus, SaveDatabaseConfigRequest } from "@/_/types/database-config";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 
 const database = useDatabaseStatus();

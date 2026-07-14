@@ -25,6 +25,7 @@ use commands::project_commands::{
     create_project, delete_project, get_backlog_project_by_key, get_project_detail, list_projects,
     update_project,
 };
+use commands::settings_commands::{get_settings, save_settings};
 use commands::system_commands::{check_internet_connection, get_system_info};
 use commands::excel2md_commands::excel2md;
 
@@ -59,6 +60,9 @@ pub fn run() {
             get_database_config,
             test_database_config,
             save_database_config,
+            // === Settings commands ===
+            get_settings,
+            save_settings,
             // === Import CSV commands ===
             preview_monthly_report_csv,
             import_monthly_report_csv,

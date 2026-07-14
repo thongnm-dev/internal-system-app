@@ -1,14 +1,13 @@
 import { computed, ref, watch } from "vue";
+import { friendlyError } from "@/tauri/commands/_base";
 import {
   createDailyNote,
   deleteDailyNote,
   getDailyNoteCounts,
   getDailyNotesByDate,
   updateDailyNoteStatus,
-  friendlyError,
-  type DailyWorkNoteResult,
-  type DailyNoteDateCountResult,
-} from "@/tauri/commands";
+} from "@/tauri/commands/daily-note";
+import type { DailyWorkNoteResult, DailyNoteDateCountResult } from "@/_/types/daily-note";
 
 export type DailyWorkStatus = "completed" | "incomplete" | "reserved";
 

@@ -5,7 +5,7 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
 import { useProjectRegistry } from "../composables/useProjectRegistry";
-import type { ProjectSummaryResult } from "@/tauri/commands";
+import type { ProjectSummaryResult } from "@/_/types/project";
 
 const router = useRouter();
 const ctrl = useProjectRegistry();

@@ -29,6 +29,8 @@ mod commands {
     pub mod import_commands;
     /// Commands cho module quản lý dự án.
     pub mod project_commands;
+    /// Commands cho module cài đặt ứng dụng.
+    pub mod settings_commands;
     /// Commands lấy thông tin hệ thống và kiểm tra mạng.
     pub mod system_commands;
 }
@@ -47,6 +49,8 @@ mod database {
     pub mod project_store;
     /// Lưu trữ lịch sử import CSV dưới dạng JSON file.
     pub mod report_store;
+    /// Lưu trữ cài đặt ứng dụng dưới dạng JSON file.
+    pub mod settings_store;
     /// Khởi tạo database (tạo bảng + stored procedure) khi app khởi động.
     pub mod startup_store;
 }
@@ -69,6 +73,8 @@ mod models {
     pub mod monthly_report;
     /// Model cho module quản lý dự án.
     pub mod project;
+    /// Model cho module cài đặt ứng dụng.
+    pub mod settings;
     /// Model thông tin hệ thống (username, IP, version).
     pub mod system;
 }
@@ -93,6 +99,8 @@ mod services {
     pub mod network_service;
     /// Service cho module quản lý dự án.
     pub mod project_service;
+    /// Service cho module cài đặt ứng dụng.
+    pub mod settings_service;
     /// Service lấy thông tin hệ thống.
     pub mod system_service;
 }

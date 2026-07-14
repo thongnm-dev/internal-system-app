@@ -1,5 +1,8 @@
 import { computed, ref, watch } from "vue";
 import { applyTheme } from "@/shared/config/themeTokens";
+import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { getSettings, saveSettings } from "@/tauri/commands/settings";
+import type { AppSettings as TauriAppSettings, ApiKeySetting as TauriApiKeySetting } from "@/_/types/settings";
 
 export type ThemeMode = "light" | "dark";
 export type LanguageCode = "vi" | "en" | "ja";
@@ -45,7 +48,54 @@ const defaultSettings: StoredSettings = {
   apiKeys: [{ id: "default", name: "", key: "", apiKey: "" }],
 };
 
-function loadSettings(): StoredSettings {
+function fromTauri(ts: TauriAppSettings): StoredSettings {
+  return {
+    user: {
+      username: ts.user.username,
+      password: ts.user.password,
+      fullName: ts.user.full_name,
+      email: ts.user.email,
+      phone: ts.user.phone,
+      address: ts.user.address,
+      position: ts.user.position,
+    },
+    theme: ts.theme === "dark" ? "dark" : "light",
+    language: isLanguageCode(ts.language) ? ts.language : "vi",
+    apiKeys:
+      ts.api_keys.length > 0
+        ? ts.api_keys.map((k: TauriApiKeySetting) => ({
+            id: k.id,
+            name: k.name,
+            key: k.key,
+            apiKey: k.api_key,
+          }))
+        : [{ id: "default", name: "", key: "", apiKey: "" }],
+  };
+}
+
+function toTauriRequest(s: StoredSettings) {
+  return {
+    user: {
+      username: s.user.username,
+      password: s.user.password,
+      full_name: s.user.fullName,
+      email: s.user.email,
+      phone: s.user.phone,
+      address: s.user.address,
+      position: s.user.position,
+    },
+    theme: s.theme,
+    language: s.language,
+    api_keys: s.apiKeys.map((k) => ({
+      id: k.id,
+      name: k.name,
+      key: k.key,
+      api_key: k.apiKey,
+    })),
+  };
+}
+
+function loadSettingsFromLocal(): StoredSettings {
   try {
     const saved = window.localStorage.getItem(SETTINGS_KEY);
     if (!saved) return { ...defaultSettings };
@@ -73,8 +123,10 @@ function cloneSettings(s: StoredSettings): StoredSettings {
 }
 
 export function useSettings() {
-  const savedSnapshot = ref<StoredSettings>(loadSettings());
+  const savedSnapshot = ref<StoredSettings>(loadSettingsFromLocal());
   const settings = ref<StoredSettings>(cloneSettings(savedSnapshot.value));
+  const loading = ref(false);
+  const error = ref<string | null>(null);
 
   const apiKeyCount = computed(
     () => settings.value.apiKeys.filter((k) => k.name.trim() && k.key.trim() && k.apiKey.trim()).length,
@@ -87,13 +139,42 @@ export function useSettings() {
     (theme) => applyTheme(theme),
   );
 
-  function persist() {
-    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings.value));
-    savedSnapshot.value = cloneSettings(settings.value);
+  async function loadFromBackend() {
+    if (!canUseTauriRuntime()) return;
+    loading.value = true;
+    error.value = null;
+    try {
+      const result = await getSettings();
+      const loaded = fromTauri(result);
+      savedSnapshot.value = loaded;
+      settings.value = cloneSettings(loaded);
+    } catch (e) {
+      error.value = friendlyError(e);
+    } finally {
+      loading.value = false;
+    }
   }
 
-  function save() {
-    persist();
+  loadFromBackend();
+
+  async function save() {
+    if (canUseTauriRuntime()) {
+      loading.value = true;
+      error.value = null;
+      try {
+        const result = await saveSettings(toTauriRequest(settings.value));
+        const saved = fromTauri(result);
+        savedSnapshot.value = saved;
+        settings.value = cloneSettings(saved);
+      } catch (e) {
+        error.value = friendlyError(e);
+      } finally {
+        loading.value = false;
+      }
+    } else {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings.value));
+      savedSnapshot.value = cloneSettings(settings.value);
+    }
   }
 
   function discard() {
@@ -130,6 +211,8 @@ export function useSettings() {
     settings,
     apiKeyCount,
     isDirty,
+    loading,
+    error,
     save,
     discard,
     updateUser,

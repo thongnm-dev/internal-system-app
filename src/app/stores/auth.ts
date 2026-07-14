@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import type { LoginResponse } from "@/tauri/commands";
+import type { LoginResponse } from "@/_/types/auth";
 
 type AuthUser = {
   user_id: number;

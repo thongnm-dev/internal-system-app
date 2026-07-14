@@ -1,10 +1,7 @@
 import { computed, ref } from "vue";
-import {
-  deleteProject as deleteProjectCommand,
-  friendlyError,
-  listProjects,
-  type ProjectSummaryResult,
-} from "@/tauri/commands";
+import { friendlyError } from "@/tauri/commands/_base";
+import { deleteProject as deleteProjectCommand, listProjects } from "@/tauri/commands/project";
+import type { ProjectSummaryResult } from "@/_/types/project";
 
 export type ProjectFilters = {
   code: string;

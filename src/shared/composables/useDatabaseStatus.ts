@@ -1,10 +1,7 @@
 import { readonly, ref } from "vue";
-import {
-  canUseTauriRuntime,
-  checkDatabaseStatus,
-  saveDatabaseConfig,
-  type SaveDatabaseConfigRequest,
-} from "@/tauri/commands";
+import { canUseTauriRuntime } from "@/tauri/commands/_base";
+import { checkDatabaseStatus, saveDatabaseConfig } from "@/tauri/commands/database-config";
+import type { SaveDatabaseConfigRequest } from "@/_/types/database-config";
 
 // Module-level singleton state so the startup flow, the config screen and the
 // app shell all observe the same database status.

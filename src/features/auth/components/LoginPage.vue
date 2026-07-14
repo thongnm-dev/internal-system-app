@@ -3,7 +3,8 @@ import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useAuthStore } from "@/app/stores/auth";
 import { defaultRoute } from "@/app/router/routes";
-import { login as tauriLogin, friendlyError } from "@/tauri/commands";
+import { friendlyError } from "@/tauri/commands/_base";
+import { login as tauriLogin } from "@/tauri/commands/auth";
 
 const router = useRouter();
 const auth = useAuthStore();

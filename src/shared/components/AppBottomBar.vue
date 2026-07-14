@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useAuthStore } from "@/app/stores/auth";
 import type { SystemInfo } from "@/shared/types/system";
 
 const props = defineProps<{
   info: SystemInfo;
 }>();
+
+const auth = useAuthStore();
 
 function formatDateTime(value: string): string {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})$/);
@@ -27,7 +30,7 @@ function formatDateTime(value: string): string {
   >
     <span class="status-item flex items-center gap-2" title="Login">
       <i class="pi pi-user shrink-0 text-brand" />
-      <strong class="min-w-0 truncate text-ink">{{ props.info.username }}</strong>
+      <strong class="min-w-0 truncate text-ink">{{ auth.user?.full_name || auth.user?.username || '-' }}</strong>
     </span>
     <span class="status-item flex items-center gap-2" title="Date time">
       <i class="pi pi-clock shrink-0 text-brand" />

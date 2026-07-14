@@ -1,7 +1,8 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
-import { canUseTauriRuntime, convertXlsxSpecToMarkdown, friendlyError } from "@/tauri/commands";
+import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { convertXlsxSpecToMarkdown } from "@/tauri/commands/excel2md";
 import type { MessageMode } from "@/shared/types/app";
 import type { XlsxMarkdownResult } from "@/shared/types/excel2md";
 

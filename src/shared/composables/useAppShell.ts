@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { friendlyError, getSystemInfo } from "@/tauri/commands";
+import { friendlyError } from "@/tauri/commands/_base";
+import { getSystemInfo } from "@/tauri/commands/system";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { useAuthStore } from "@/app/stores/auth";

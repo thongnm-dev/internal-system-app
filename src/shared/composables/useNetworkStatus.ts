@@ -1,5 +1,6 @@
 import { readonly, ref } from "vue";
-import { canUseTauriRuntime, checkInternetConnection } from "@/tauri/commands";
+import { canUseTauriRuntime } from "@/tauri/commands/_base";
+import { checkInternetConnection } from "@/tauri/commands/system";
 
 // Interval between background reachability probes while the app is running.
 const POLL_INTERVAL_MS = 15000;
