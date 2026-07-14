@@ -4,7 +4,7 @@
 //! qua IPC invoke, gọi service tương ứng và trả kết quả về frontend.
 
 use crate::models::daily_report::{
-    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportUserTask,
+    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportProject, DailyReportUserTask,
     SaveDailyReportEntryRequest,
 };
 use crate::services::daily_report_service;
@@ -72,6 +72,20 @@ pub async fn get_daily_report_tasks(
     username: String,
 ) -> Result<Vec<DailyReportUserTask>, String> {
     daily_report_service::get_tasks(&username)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ============================================================================
+// Projects
+// ============================================================================
+
+/// Lấy danh sách project active kèm cờ is_member cho daily report.
+#[tauri::command]
+pub async fn get_daily_report_projects(
+    username: String,
+) -> Result<Vec<DailyReportProject>, String> {
+    daily_report_service::get_projects(&username)
         .await
         .map_err(|e| e.to_string())
 }

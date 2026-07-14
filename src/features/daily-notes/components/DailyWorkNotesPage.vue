@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import Dialog from "primevue/dialog";
 import { useAuthStore } from "@/app/stores/auth";
 import { useDailyWorkNotes } from "../composables/useDailyWorkNotes";
@@ -7,8 +7,6 @@ import type { DailyWorkNoteDraft, DailyWorkStatus } from "../composables/useDail
 
 const auth = useAuthStore();
 const ctrl = useDailyWorkNotes(auth.user?.username);
-
-const isAdding = ref(false);
 
 const statusOptions: { icon: string; label: string; value: DailyWorkStatus }[] = [
   { icon: "pi-check-circle", label: "Hoàn thành", value: "completed" },
@@ -18,27 +16,51 @@ const statusOptions: { icon: string; label: string; value: DailyWorkStatus }[] =
 
 const weekdays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
-// --- Add dialog form state ---
+const dialogVisible = ref(false);
+const editingNoteId = ref<number | null>(null);
 const draftContent = ref("");
 const draftDate = ref<string>(ctrl.selectedDate.value);
 const draftStatus = ref<DailyWorkStatus>("completed");
 
+const isEditing = computed(() => editingNoteId.value !== null);
+
 function openAddDialog() {
+  editingNoteId.value = null;
   draftContent.value = "";
   draftDate.value = ctrl.selectedDate.value;
   draftStatus.value = "completed";
-  isAdding.value = true;
+  dialogVisible.value = true;
+}
+
+function openEditDialog(note: { id: number; content: string; date: string; status: DailyWorkStatus }) {
+  editingNoteId.value = note.id;
+  draftContent.value = note.content;
+  draftDate.value = note.date;
+  draftStatus.value = note.status;
+  dialogVisible.value = true;
 }
 
 async function saveDraft() {
-  const dateValue = draftDate.value ? parseDateStr(draftDate.value) : null;
-  const draft: DailyWorkNoteDraft = {
-    content: draftContent.value,
-    date: dateValue,
-    status: draftStatus.value,
-  };
-  if (await ctrl.addNote(draft)) {
-    isAdding.value = false;
+  if (isEditing.value) {
+    if (await ctrl.updateNoteContent(editingNoteId.value!, draftContent.value)) {
+      const noteId = editingNoteId.value!;
+      const newStatus = draftStatus.value;
+      const currentNote = ctrl.filteredNotes.value.find((n) => n.id === noteId);
+      if (currentNote && currentNote.status !== newStatus) {
+        await ctrl.updateNoteStatus(noteId, newStatus);
+      }
+      dialogVisible.value = false;
+    }
+  } else {
+    const dateValue = draftDate.value ? parseDateStr(draftDate.value) : null;
+    const draft: DailyWorkNoteDraft = {
+      content: draftContent.value,
+      date: dateValue,
+      status: draftStatus.value,
+    };
+    if (await ctrl.addNote(draft)) {
+      dialogVisible.value = false;
+    }
   }
 }
 
@@ -190,14 +212,24 @@ function formatMaxDate(date: Date): string {
                 <p class="min-w-0 whitespace-pre-wrap text-sm font-semibold leading-6 text-ink">
                   {{ note.content }}
                 </p>
-                <button
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-red-200 bg-panel text-red-600 hover:bg-red-50"
-                  type="button"
-                  title="Xóa công việc"
-                  @click="ctrl.removeNote(note.id)"
-                >
-                  <i class="pi pi-trash" />
-                </button>
+                <div class="flex shrink-0 items-center gap-1">
+                  <button
+                    class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
+                    type="button"
+                    title="Chỉnh sửa"
+                    @click="openEditDialog(note)"
+                  >
+                    <i class="pi pi-pencil" />
+                  </button>
+                  <button
+                    class="flex h-9 w-9 items-center justify-center rounded-md border border-red-200 bg-panel text-red-600 hover:bg-red-50"
+                    type="button"
+                    title="Xóa công việc"
+                    @click="ctrl.removeNote(note.id)"
+                  >
+                    <i class="pi pi-trash" />
+                  </button>
+                </div>
               </div>
               <div class="mt-4 flex flex-wrap items-center gap-2">
                 <button
@@ -222,18 +254,18 @@ function formatMaxDate(date: Date): string {
       </section>
     </section>
 
-    <!-- Add note dialog -->
+    <!-- Add / Edit note dialog -->
     <Dialog
-      :visible="isAdding"
+      :visible="dialogVisible"
       class="w-full max-w-xl rounded-lg bg-panel shadow-xl"
       :closable="true"
       modal
-      @update:visible="isAdding = $event"
+      @update:visible="dialogVisible = $event"
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">Thêm công việc</h3>
-          <p class="mt-1 text-sm text-muted">Có thể nhập ngày tương lai tối đa 1 tuần.</p>
+          <h3 class="font-bold text-ink">{{ isEditing ? 'Chỉnh sửa công việc' : 'Thêm công việc' }}</h3>
+          <p v-if="!isEditing" class="mt-1 text-sm text-muted">Có thể nhập ngày tương lai tối đa 1 tuần.</p>
         </div>
       </template>
 
@@ -242,9 +274,10 @@ function formatMaxDate(date: Date): string {
           <span class="text-xs font-bold text-muted">Ngày công việc</span>
           <input
             v-model="draftDate"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
             type="date"
             :max="formatMaxDate(ctrl.maxEntryDate)"
+            :disabled="isEditing"
           />
         </label>
 
@@ -284,7 +317,7 @@ function formatMaxDate(date: Date): string {
           <button
             class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
             type="button"
-            @click="isAdding = false"
+            @click="dialogVisible = false"
           >
             Hủy
           </button>
@@ -294,7 +327,7 @@ function formatMaxDate(date: Date): string {
             :disabled="!draftContent.trim() || !draftDate"
             @click="saveDraft"
           >
-            Lưu công việc
+            {{ isEditing ? 'Cập nhật' : 'Lưu công việc' }}
           </button>
         </div>
       </template>

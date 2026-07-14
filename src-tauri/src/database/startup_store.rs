@@ -175,6 +175,17 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
 
     client
         .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_note_update_content.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_note_update_content: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
             "../../../docs/store-procedure/sp_daily_note_update_status.sql"
         ))
         .await
@@ -256,6 +267,17 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         .map_err(|e| {
             AppError::new(format!(
                 "Failed to create sp_daily_report_task_delete: {e}"
+            ))
+        })?;
+
+    client
+        .batch_execute(include_str!(
+            "../../../docs/store-procedure/sp_daily_report_project_select.sql"
+        ))
+        .await
+        .map_err(|e| {
+            AppError::new(format!(
+                "Failed to create sp_daily_report_project_select: {e}"
             ))
         })?;
 

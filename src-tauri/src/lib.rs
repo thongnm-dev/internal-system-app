@@ -8,11 +8,12 @@ include!("modules.rs");
 use commands::auth_commands::login;
 use commands::daily_note_commands::{
     create_daily_note, delete_daily_note, get_daily_note_counts, get_daily_notes_by_date,
-    get_daily_notes_by_month, update_daily_note_status,
+    get_daily_notes_by_month, update_daily_note_content, update_daily_note_status,
 };
 use commands::daily_report_commands::{
     clear_daily_report_entry, create_daily_report_task, delete_daily_report_task,
-    get_daily_report_entries, get_daily_report_tasks, save_daily_report_entry,
+    get_daily_report_entries, get_daily_report_projects, get_daily_report_tasks,
+    save_daily_report_entry,
 };
 use commands::db_config_commands::{
     check_database_status, get_database_config, save_database_config, test_database_config,
@@ -83,6 +84,7 @@ pub fn run() {
             get_daily_notes_by_date,
             get_daily_notes_by_month,
             get_daily_note_counts,
+            update_daily_note_content,
             update_daily_note_status,
             delete_daily_note,
             // === Daily Report commands ===
@@ -91,7 +93,8 @@ pub fn run() {
             get_daily_report_entries,
             create_daily_report_task,
             get_daily_report_tasks,
-            delete_daily_report_task
+            delete_daily_report_task,
+            get_daily_report_projects
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

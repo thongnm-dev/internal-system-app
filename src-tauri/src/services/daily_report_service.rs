@@ -6,7 +6,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::daily_report_store;
 use crate::models::daily_report::{
-    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportUserTask,
+    CreateDailyReportTaskRequest, DailyReportEntry, DailyReportProject, DailyReportUserTask,
     SaveDailyReportEntryRequest,
 };
 
@@ -170,6 +170,15 @@ pub async fn delete_task(username: &str, task_id: &str) -> AppResult<()> {
         return Err(AppError::new(format!("Daily report task '{}' not found.", task_id)));
     }
     Ok(())
+}
+
+// ============================================================================
+// Projects
+// ============================================================================
+
+/// Lấy danh sách project active kèm cờ is_member cho daily report.
+pub async fn get_projects(username: &str) -> AppResult<Vec<DailyReportProject>> {
+    daily_report_store::select_projects(username).await
 }
 
 /// Giới hạn số giờ về khoảng hợp lệ [0, 24].

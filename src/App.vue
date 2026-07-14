@@ -16,6 +16,7 @@ import NetworkStatusBanner from "@/shared/components/NetworkStatusBanner.vue";
 import AppSidebar from "@/shared/components/AppSidebar.vue";
 import AppHeader from "@/shared/components/AppHeader.vue";
 import AppBottomBar from "@/shared/components/AppBottomBar.vue";
+import AppToast from "@/shared/components/AppToast.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -128,4 +129,6 @@ watch(
       />
     </div>
   </main>
+
+  <AppToast />
 </template>

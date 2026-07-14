@@ -94,10 +94,25 @@ pub async fn count_by_month(
         .collect())
 }
 
-/// Cập nhật trạng thái của một ghi chú (completed / incomplete / reserved).
-///
-/// Kiểm tra cả `id` và `username` để đảm bảo user chỉ sửa note của mình.
-/// Trả về bản ghi sau khi cập nhật, hoặc lỗi nếu không tìm thấy.
+pub async fn update_content(
+    id: i32,
+    username: &str,
+    content: &str,
+) -> AppResult<DailyWorkNote> {
+    let client = pgsql_connect::connect().await?;
+
+    let row = client
+        .query_opt(
+            "SELECT * FROM sp_daily_note_update_content($1, $2, $3)",
+            &[&id, &username, &content],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to update daily note content: {e}")))?
+        .ok_or_else(|| AppError::new(format!("Daily note '{}' not found.", id)))?;
+
+    Ok(row_to_note(&row))
+}
+
 pub async fn update_status(
     id: i32,
     username: &str,

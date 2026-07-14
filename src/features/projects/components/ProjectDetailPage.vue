@@ -7,6 +7,7 @@ import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
 import { friendlyError } from "@/tauri/commands/_base";
 import { createProject, updateProject, getBacklogProjectByKey, getProjectDetail } from "@/tauri/commands/project";
+import { useToast } from "@/shared/composables/useToast";
 import type { ProjectMember } from "@/_/types/project";
 
 type ProjectForm = {
@@ -30,6 +31,7 @@ const memberSearchHelpItems: ProjectMember[] = [
 
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 const projectID = route.params.id ? Number(route.params.id) : null;
 
 const form = ref<ProjectForm>({ ...emptyForm });
@@ -104,9 +106,12 @@ async function saveProject() {
     if (projectID) {
       const updated = await updateProject(projectID, request);
       form.value = { ...form.value, id: updated.id, code: updated.code, name: updated.name };
+      toast.success("Project updated successfully.");
     } else {
-      const created = await createProject(request);
-      router.replace(`/projects/${created.id}`);
+      await createProject(request);
+      form.value = { ...emptyForm };
+      members.value = [];
+      toast.success("Project created successfully.");
     }
   } catch (e) {
     saveError.value = friendlyError(e);

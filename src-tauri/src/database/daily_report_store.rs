@@ -5,7 +5,7 @@
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::daily_report::{DailyReportEntry, DailyReportUserTask};
+use crate::models::daily_report::{DailyReportEntry, DailyReportProject, DailyReportUserTask};
 use crate::utils::pgsql_connect;
 
 // ============================================================================
@@ -163,6 +163,34 @@ pub async fn delete_task(username: &str, task_id: &str) -> AppResult<bool> {
 
     let deleted: i32 = row.get(0);
     Ok(deleted > 0)
+}
+
+// ============================================================================
+// Projects
+// ============================================================================
+
+/// Lấy danh sách project active kèm cờ is_member cho daily report.
+pub async fn select_projects(username: &str) -> AppResult<Vec<DailyReportProject>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query(
+            "SELECT * FROM sp_daily_report_project_select($1)",
+            &[&username],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to query daily report projects: {e}")))?;
+
+    Ok(rows
+        .iter()
+        .map(|row| DailyReportProject {
+            id: row.get("id"),
+            code: row.get("code"),
+            name: row.get("name"),
+            client: row.get("client"),
+            is_member: row.get("is_member"),
+        })
+        .collect())
 }
 
 // ============================================================================

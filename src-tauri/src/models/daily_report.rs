@@ -95,6 +95,17 @@ pub struct DailyReportUserTask {
     pub created_at: String,
 }
 
+/// Thông tin project cho màn hình daily report.
+/// Bao gồm cờ `is_member` cho biết user có phải thành viên của project không.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DailyReportProject {
+    pub id: i32,
+    pub code: String,
+    pub name: String,
+    pub client: String,
+    pub is_member: bool,
+}
+
 /// Dữ liệu request từ frontend khi tạo task người dùng tự thêm.
 #[derive(Debug, Deserialize)]
 pub struct CreateDailyReportTaskRequest {

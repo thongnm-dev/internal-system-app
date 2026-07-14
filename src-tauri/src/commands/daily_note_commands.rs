@@ -56,6 +56,17 @@ pub async fn get_daily_note_counts(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn update_daily_note_content(
+    id: i32,
+    username: String,
+    content: String,
+) -> Result<DailyWorkNote, String> {
+    daily_note_service::update_note_content(id, &username, &content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Cập nhật trạng thái ghi chú (completed / incomplete / reserved).
 /// Kiểm tra `username` để đảm bảo user chỉ sửa note của mình.
 #[tauri::command]

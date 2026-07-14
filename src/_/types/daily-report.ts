@@ -41,6 +41,14 @@ export type DailyReportUserTaskResult = {
   created_at: string;
 };
 
+export type DailyReportProjectResult = {
+  id: number;
+  code: string;
+  name: string;
+  client: string;
+  is_member: boolean;
+};
+
 export type CreateDailyReportTaskRequest = {
   task_id: string;
   project_id: string;

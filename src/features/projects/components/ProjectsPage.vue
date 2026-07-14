@@ -88,7 +88,7 @@ function formatDate(value: string) {
         </label>
         <div class="flex items-center justify-end gap-2">
           <button class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas" type="button" @click="ctrl.resetFilters()"><i class="pi pi-refresh" />Reset</button>
-          <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="ctrl.loadProjects()"><i class="pi pi-refresh" />Reload</button>
+          <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="ctrl.loadProjects()"><i class="pi pi-refresh" />Search</button>
         </div>
       </div>
     </Fieldset>

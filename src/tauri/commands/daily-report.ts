@@ -2,6 +2,7 @@ import { safeInvoke } from "./_base";
 import type {
   CreateDailyReportTaskRequest,
   DailyReportEntryResult,
+  DailyReportProjectResult,
   DailyReportUserTaskResult,
   SaveDailyReportEntryRequest,
 } from "@/_/types/daily-report";
@@ -28,4 +29,8 @@ export function getDailyReportTasks(username: string) {
 
 export function deleteDailyReportTask(username: string, taskId: string) {
   return safeInvoke<void>("delete_daily_report_task", { username, taskId });
+}
+
+export function getDailyReportProjects(username: string) {
+  return safeInvoke<DailyReportProjectResult[]>("get_daily_report_projects", { username });
 }

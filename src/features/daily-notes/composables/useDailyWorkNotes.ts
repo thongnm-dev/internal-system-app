@@ -5,6 +5,7 @@ import {
   deleteDailyNote,
   getDailyNoteCounts,
   getDailyNotesByDate,
+  updateDailyNoteContent,
   updateDailyNoteStatus,
 } from "@/tauri/commands/daily-note";
 import type { DailyWorkNoteResult, DailyNoteDateCountResult } from "@/_/types/daily-note";
@@ -179,6 +180,21 @@ export function useDailyWorkNotes(username?: string) {
     }
   }
 
+  async function updateNoteContent(noteId: number, content: string): Promise<boolean> {
+    if (!username) return false;
+    const trimmed = content.trim();
+    if (!trimmed) return false;
+    error.value = "";
+    try {
+      await updateDailyNoteContent(noteId, username, trimmed);
+      notes.value = notes.value.map((n) => (n.id === noteId ? { ...n, content: trimmed } : n));
+      return true;
+    } catch (e) {
+      error.value = friendlyError(e);
+      return false;
+    }
+  }
+
   async function updateNoteStatus(noteId: number, status: DailyWorkStatus) {
     if (!username) return;
     error.value = "";
@@ -216,6 +232,7 @@ export function useDailyWorkNotes(username?: string) {
     previousMonth,
     removeNote,
     selectDate,
+    updateNoteContent,
     selectMonth,
     selectedDate,
     selectedDateLabel,

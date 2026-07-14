@@ -74,6 +74,18 @@ pub async fn get_date_counts(
     daily_note_store::count_by_month(username, year, month).await
 }
 
+pub async fn update_note_content(
+    id: i32,
+    username: &str,
+    content: &str,
+) -> AppResult<DailyWorkNote> {
+    let content = content.trim().to_string();
+    if content.is_empty() {
+        return Err(AppError::new("Content is required."));
+    }
+    daily_note_store::update_content(id, username, &content).await
+}
+
 /// Cập nhật trạng thái của ghi chú công việc.
 ///
 /// Validate `status` phải hợp lệ. Stored procedure kiểm tra cả `username`

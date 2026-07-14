@@ -21,6 +21,10 @@ export function getDailyNoteCounts(username: string, year: number, month: number
   return safeInvoke<DailyNoteDateCountResult[]>("get_daily_note_counts", { username, year, month });
 }
 
+export function updateDailyNoteContent(id: number, username: string, content: string) {
+  return safeInvoke<DailyWorkNoteResult>("update_daily_note_content", { id, username, content });
+}
+
 export function updateDailyNoteStatus(id: number, username: string, status: string) {
   return safeInvoke<DailyWorkNoteResult>("update_daily_note_status", { id, username, status });
 }
