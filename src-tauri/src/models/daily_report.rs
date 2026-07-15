@@ -107,6 +107,7 @@ pub struct DailyReportUserTask {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DailyReportPhase {
     pub process_code: String,
+    pub process_name: String,
     pub display_order: i32,
 }
 

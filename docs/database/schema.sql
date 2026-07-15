@@ -82,10 +82,11 @@ CREATE TABLE IF NOT EXISTS project_members (
 );
 
 CREATE TABLE IF NOT EXISTS categories (
-    id            SERIAL       PRIMARY KEY,
-    process_code  VARCHAR(50)  NOT NULL,
-    process_name  VARCHAR(200) NOT NULL,
-    display_order INTEGER      NOT NULL DEFAULT 0,
+    id               SERIAL       PRIMARY KEY,
+    process_code     VARCHAR(50)  NOT NULL,
+    process_name     VARCHAR(200) NOT NULL,
+    display_order    INTEGER      NOT NULL DEFAULT 0,
+    is_task_category BOOLEAN      NOT NULL DEFAULT FALSE,
     UNIQUE (process_code)
 );
 
@@ -112,10 +113,9 @@ CREATE INDEX IF NOT EXISTS idx_project_tasks_assignee
     ON project_tasks(assignee);
 
 CREATE TABLE IF NOT EXISTS project_task_categories (
-    task_id  VARCHAR(50)  NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
-    category VARCHAR(30)  NOT NULL
-        CHECK (category IN ('PG', 'Review PG', 'UT', 'Review UT', 'Other')),
-    PRIMARY KEY (task_id, category)
+    task_id     VARCHAR(50) NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
+    category_id INTEGER     NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (task_id, category_id)
 );
 
 -- ============================================================================
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS daily_report_entries (
     midnight_ot DOUBLE PRECISION NOT NULL DEFAULT 0,
     phase       VARCHAR(100)     NOT NULL DEFAULT '',
     updated_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
-    UNIQUE(username, task_id, entry_date)
+    UNIQUE(username, task_id, entry_date, phase)
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_report_entries_user_date

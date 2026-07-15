@@ -67,14 +67,14 @@ pub async fn save_entry(
 
 /// Xóa một ô nhập giờ công (khi người dùng bấm "Clear").
 /// Không báo lỗi nếu ô chưa từng được lưu (idempotent).
-pub async fn clear_entry(username: &str, task_id: &str, entry_date: &str) -> AppResult<()> {
+pub async fn clear_entry(username: &str, task_id: &str, entry_date: &str, phase: &str) -> AppResult<()> {
     if task_id.trim().is_empty() {
         return Err(AppError::new("Task id is required."));
     }
     if entry_date.trim().is_empty() {
         return Err(AppError::new("Entry date is required."));
     }
-    daily_report_store::delete_entry(username, task_id.trim(), entry_date.trim()).await?;
+    daily_report_store::delete_entry(username, task_id.trim(), entry_date.trim(), phase.trim()).await?;
     Ok(())
 }
 
@@ -203,6 +203,11 @@ pub async fn set_project_task_completed(task_id: &str, is_completed: bool) -> Ap
 /// Danh sách công đoạn (process/phase) cho dropdown phase khi nhập giờ.
 pub async fn get_phases() -> AppResult<Vec<DailyReportPhase>> {
     daily_report_store::select_categories().await
+}
+
+/// Danh sách category dùng cho project tasks (is_task_category = TRUE).
+pub async fn get_task_categories() -> AppResult<Vec<DailyReportPhase>> {
+    daily_report_store::select_task_categories().await
 }
 
 /// Xóa một task người dùng tự thêm. Trả về lỗi nếu không tìm thấy.

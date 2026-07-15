@@ -34,13 +34,14 @@ BEGIN
         t.issue_key,
         t.is_user_added,
         COALESCE(
-            ARRAY_AGG(c.category ORDER BY c.category)
-                FILTER (WHERE c.category IS NOT NULL),
+            ARRAY_AGG(cat.process_code ORDER BY cat.process_code)
+                FILTER (WHERE cat.process_code IS NOT NULL),
             '{}'
         )::text[],
         t.created_at::text
     FROM project_tasks t
-    LEFT JOIN project_task_categories c ON c.task_id = t.id
+    LEFT JOIN project_task_categories ptc ON ptc.task_id = t.id
+    LEFT JOIN categories cat ON cat.id = ptc.category_id
     WHERE t.project_id = p_project_id
     GROUP BY t.id, t.project_id, t.short_name, t.description, t.assignee,
              t.estimate_hour, t.due_date, t.issue_key, t.is_user_added, t.created_at

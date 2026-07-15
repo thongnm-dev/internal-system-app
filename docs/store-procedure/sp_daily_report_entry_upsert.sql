@@ -45,7 +45,7 @@ BEGIN
         p_username, p_task_id, p_project_id, p_entry_date, p_comment,
         p_hour, p_is_ot, p_regular_ot, p_midnight_ot, p_phase, NOW()
     )
-    ON CONFLICT (username, task_id, entry_date) DO UPDATE
+    ON CONFLICT (username, task_id, entry_date, phase) DO UPDATE
         SET project_id  = EXCLUDED.project_id,
             comment     = EXCLUDED.comment,
             hour        = EXCLUDED.hour,

@@ -13,8 +13,8 @@ use commands::daily_note_commands::{
 use commands::daily_report_commands::{
     clear_daily_report_entry, create_daily_report_task, delete_daily_report_task,
     get_daily_report_entries, get_daily_report_phases, get_daily_report_projects,
-    get_daily_report_task_hours, get_daily_report_tasks, save_daily_report_entry,
-    set_daily_report_task_completed, set_project_task_completed,
+    get_daily_report_task_hours, get_daily_report_tasks, get_task_categories,
+    save_daily_report_entry, set_daily_report_task_completed, set_project_task_completed,
 };
 use commands::db_config_commands::{
     check_database_status, get_database_config, save_database_config, test_database_config,
@@ -35,6 +35,7 @@ use commands::user_commands::{
     update_user,
 };
 use commands::excel2md_commands::excel2md;
+use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 
 /// Khởi chạy ứng dụng Tauri desktop.
 ///
@@ -106,6 +107,7 @@ pub fn run() {
             get_daily_report_tasks,
             get_daily_report_task_hours,
             get_daily_report_phases,
+            get_task_categories,
             set_daily_report_task_completed,
             set_project_task_completed,
             delete_daily_report_task,
@@ -117,7 +119,11 @@ pub fn run() {
             list_users,
             delete_user,
             change_user_password,
-            list_roles
+            list_roles,
+            // === Menu config commands ===
+            list_menu_configs,
+            save_menu_config,
+            save_all_menu_configs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

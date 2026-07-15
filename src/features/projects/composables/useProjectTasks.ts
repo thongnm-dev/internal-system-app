@@ -7,17 +7,10 @@ import {
   listProjectTasks,
   deleteProjectTask,
 } from "@/tauri/commands/project";
+import { getTaskCategories } from "@/tauri/commands/daily-report";
 import type { ProjectDetailResult, ProjectTaskResult, CreateProjectTaskRequest } from "@/_/types/project";
 
-export type ProjectTaskCategory = "PG" | "Review PG" | "UT" | "Review UT" | "Other";
-
-export const PROJECT_TASK_CATEGORIES: ProjectTaskCategory[] = [
-  "PG",
-  "Review PG",
-  "UT",
-  "Review UT",
-  "Other",
-];
+export type ProjectTaskCategory = string;
 
 export type ProjectTask = {
   id: string;
@@ -62,6 +55,7 @@ function toProjectTask(r: ProjectTaskResult): ProjectTask {
 export function useProjectTasks(projectId: string) {
   const tasks = ref<ProjectTask[]>([]);
   const project = ref<ProjectDetailResult | null>(null);
+  const categories = ref<{ code: string; name: string }[]>([]);
   const projectLoading = ref(false);
   const loading = ref(false);
 
@@ -158,10 +152,21 @@ export function useProjectTasks(projectId: string) {
     tasks.value = tasks.value.filter((t) => t.id !== id);
   }
 
+  async function loadCategories() {
+    if (!canUseTauriRuntime()) return;
+    try {
+      const rows = await getTaskCategories();
+      categories.value = rows.map((r) => ({ code: r.process_code, name: r.process_name }));
+    } catch {
+      categories.value = [];
+    }
+  }
+
   onMounted(() => {
     loadProject();
     loadTasks();
+    loadCategories();
   });
 
-  return { addTask, updateTask, loading, project, projectName, projectLabel, projectLoading, removeTask, tasks };
+  return { addTask, categories, updateTask, loading, project, projectName, projectLabel, projectLoading, removeTask, tasks };
 }

@@ -39,15 +39,15 @@ WHERE u.username = 'admin' AND r.name = 'admin'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- Công đoạn (process/phase) mặc định — dùng cho dropdown Phase ở màn Daily Report.
-INSERT INTO categories (process_code, process_name, display_order)
+INSERT INTO categories (process_code, process_name,is_task_category, display_order)
 VALUES
-    ('10', 'PG',                1),
-    ('11', 'UT',                2),
-    ('48', 'Review PG',         3),
-    ('49', 'Review UT',         4),
-    ('43', 'Bug',               5),
-    ('45', 'Thay đổi qui cách', 6),
-    ('40', 'Other',             7)
+    ('10', 'PG',                true, 1),
+    ('11', 'UT',                true, 2),
+    ('48', 'Review PG',         true, 3),
+    ('49', 'Review UT',         true, 4),
+    ('43', 'Bug',               true, 5),
+    ('45', 'Thay đổi qui cách', true, 6),
+    ('40', 'Other',             false, 7)
 ON CONFLICT (process_code) DO NOTHING;
 
 -- Menu configuration

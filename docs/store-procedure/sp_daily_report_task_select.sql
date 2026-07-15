@@ -12,8 +12,6 @@
 --
 -- Cột is_user_added phân biệt nguồn: TRUE = daily_report_tasks, FALSE = project_tasks.
 -- ============================================================================
-
-DROP FUNCTION IF EXISTS sp_daily_report_task_select(varchar);
 DROP FUNCTION IF EXISTS sp_daily_report_task_select(varchar, integer, integer);
 
 CREATE OR REPLACE FUNCTION sp_daily_report_task_select(
@@ -78,13 +76,13 @@ BEGIN
         pt.id::varchar(120),
         pt.project_id::varchar(120),
         COALESCE(
-            (ARRAY_AGG(c.category ORDER BY c.category) FILTER (WHERE c.category IS NOT NULL))[1],
+            (ARRAY_AGG(cat.process_code ORDER BY cat.process_code) FILTER (WHERE cat.process_code IS NOT NULL))[1],
             'TASK'
         )::varchar(50),
         pt.short_name::varchar(300),
         pt.description,
         COALESCE(
-            ARRAY_AGG(c.category ORDER BY c.category) FILTER (WHERE c.category IS NOT NULL),
+            ARRAY_AGG(cat.process_code ORDER BY cat.process_code) FILTER (WHERE cat.process_code IS NOT NULL),
             '{}'
         )::text[],
         pt.assignee,
@@ -96,7 +94,8 @@ BEGIN
         pt.created_at::text,
         FALSE AS is_user_added
     FROM project_tasks pt
-    LEFT JOIN project_task_categories c ON c.task_id = pt.id
+    LEFT JOIN project_task_categories ptc ON ptc.task_id = pt.id
+    LEFT JOIN categories cat ON cat.id = ptc.category_id
     WHERE pt.assignee = p_username
       AND pt.created_at < v_next_month
       AND (pt.created_at >= v_month_start OR pt.is_completed = FALSE)

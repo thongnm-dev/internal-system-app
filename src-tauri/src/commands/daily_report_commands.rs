@@ -32,8 +32,9 @@ pub async fn clear_daily_report_entry(
     username: String,
     task_id: String,
     entry_date: String,
+    phase: String,
 ) -> Result<(), String> {
-    daily_report_service::clear_entry(&username, &task_id, &entry_date)
+    daily_report_service::clear_entry(&username, &task_id, &entry_date, &phase)
         .await
         .map_err(|e| e.to_string())
 }
@@ -115,6 +116,14 @@ pub async fn set_project_task_completed(
 #[tauri::command]
 pub async fn get_daily_report_phases() -> Result<Vec<DailyReportPhase>, String> {
     daily_report_service::get_phases()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Danh sách category dùng cho project tasks (is_task_category = TRUE).
+#[tauri::command]
+pub async fn get_task_categories() -> Result<Vec<DailyReportPhase>, String> {
+    daily_report_service::get_task_categories()
         .await
         .map_err(|e| e.to_string())
 }

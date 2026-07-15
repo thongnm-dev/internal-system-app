@@ -51,6 +51,7 @@ export type DailyReportTaskHoursResult = {
 
 export type DailyReportPhaseResult = {
   process_code: string;
+  process_name: string;
   display_order: number;
 };
 

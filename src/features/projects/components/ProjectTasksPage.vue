@@ -4,16 +4,14 @@ import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
-import Checkbox from "primevue/checkbox";
+import MultiSelect from "primevue/multiselect";
 import Calendar from "primevue/calendar";
 import { useAuthStore } from "@/app/stores/auth";
 import { friendlyError } from "@/tauri/commands/_base";
 import {
   emptyProjectTaskInput,
-  PROJECT_TASK_CATEGORIES,
   useProjectTasks,
   type ProjectTask,
-  type ProjectTaskCategory,
 } from "../composables/useProjectTasks";
 
 const route = useRoute();
@@ -64,13 +62,6 @@ function openEditDialog(task: ProjectTask) {
   };
   saveError.value = "";
   isAddDialogOpen.value = true;
-}
-
-function toggleCategory(category: ProjectTaskCategory) {
-  const list = form.value.categories;
-  form.value.categories = list.includes(category)
-    ? list.filter((c) => c !== category)
-    : [...list, category];
 }
 
 async function saveTask() {
@@ -236,29 +227,18 @@ async function saveTask() {
           />
         </label>
 
-        <div>
+        <label class="block">
           <span class="text-xs font-bold text-muted">Category</span>
-          <div class="mt-1 flex flex-wrap gap-2">
-            <label
-              v-for="category in PROJECT_TASK_CATEGORIES"
-              :key="category"
-              :class="[
-                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition',
-                form.categories.includes(category)
-                  ? 'border-brand bg-emerald-50 text-brand'
-                  : 'border-divider bg-panel text-secondary hover:border-brand',
-              ]"
-            >
-              <Checkbox
-                :model-value="form.categories.includes(category)"
-                :binary="true"
-                class="h-4 w-4 accent-brand"
-                @update:model-value="toggleCategory(category)"
-              />
-              {{ category }}
-            </label>
-          </div>
-        </div>
+          <MultiSelect
+            v-model="form.categories"
+            :options="ctrl.categories.value"
+            option-label="name"
+            option-value="code"
+            placeholder="Select categories"
+            display="chip"
+            class="mt-1 w-full"
+          />
+        </label>
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">

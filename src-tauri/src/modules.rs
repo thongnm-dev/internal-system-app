@@ -35,6 +35,8 @@ mod commands {
     pub mod system_commands;
     /// Commands cho module quản lý người dùng.
     pub mod user_commands;
+    /// Commands cho module quản lý menu (governance).
+    pub mod menu_config_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -57,6 +59,8 @@ mod database {
     pub mod startup_store;
     /// Data access cho module quản lý người dùng.
     pub mod user_store;
+    /// Data access cho bảng `menu_configs` (PostgreSQL).
+    pub mod menu_config_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -83,6 +87,8 @@ mod models {
     pub mod system;
     /// Model cho module quản lý người dùng.
     pub mod user;
+    /// Model cho module quản lý menu (governance).
+    pub mod menu_config;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -111,6 +117,8 @@ mod services {
     pub mod system_service;
     /// Service cho module quản lý người dùng.
     pub mod user_service;
+    /// Service cho module quản lý menu (governance).
+    pub mod menu_config_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

@@ -92,6 +92,7 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_daily_report_project_select", include_str!("../../../docs/store-procedure/sp_daily_report_project_select.sql")),
         // === Category ===
         ("sp_category_select_list", include_str!("../../../docs/store-procedure/sp_category_select_list.sql")),
+        ("sp_category_select_task_list", include_str!("../../../docs/store-procedure/sp_category_select_task_list.sql")),
         // === User Management ===
         ("sp_user_insert", include_str!("../../../docs/store-procedure/sp_user_insert.sql")),
         ("sp_user_update", include_str!("../../../docs/store-procedure/sp_user_update.sql")),
@@ -102,6 +103,10 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_user_username_exists", include_str!("../../../docs/store-procedure/sp_user_username_exists.sql")),
         ("sp_user_role_sync", include_str!("../../../docs/store-procedure/sp_user_role_sync.sql")),
         ("sp_role_select_list", include_str!("../../../docs/store-procedure/sp_role_select_list.sql")),
+        // === Menu Config ===
+        ("sp_menu_config_select_list", include_str!("../../../docs/store-procedure/sp_menu_config_select_list.sql")),
+        ("sp_menu_config_upsert", include_str!("../../../docs/store-procedure/sp_menu_config_upsert.sql")),
+        ("sp_menu_config_delete_all", include_str!("../../../docs/store-procedure/sp_menu_config_delete_all.sql")),
     ];
 
     let mut errors = Vec::new();

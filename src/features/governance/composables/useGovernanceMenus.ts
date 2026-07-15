@@ -1,54 +1,18 @@
 import { ref, computed } from "vue";
+import type { MenuConfig } from "@/_/types/menu-config";
+import { listMenuConfigs, saveMenuConfig, saveAllMenuConfigs } from "@/tauri/commands/menu-config";
+import { canUseTauriRuntime } from "@/tauri/commands/_base";
 
-export type MenuItemConfig = {
-  key: string;
-  title: string;
-  path: string;
-  icon: string;
-  group: string;
-  visible: boolean;
-  order: number;
-};
-
-const STORAGE_KEY = "pjjyuji.governance.menus";
-
-function defaultMenus(): MenuItemConfig[] {
-  return [
-    { key: "overview", title: "Overview", path: "/overview", icon: "pi-home", group: "—", visible: true, order: 0 },
-    { key: "projects", title: "Projects", path: "/projects", icon: "pi-table", group: "—", visible: true, order: 1 },
-    { key: "issueBacklog", title: "Issue Backlog", path: "/issue-backlog", icon: "pi-list-check", group: "—", visible: true, order: 2 },
-    { key: "dailyWorkNotes", title: "Daily Work Notes", path: "/daily-work-notes", icon: "pi-pencil", group: "—", visible: true, order: 3 },
-    { key: "dailyReport", title: "Daily Report", path: "/daily-report", icon: "pi-calendar", group: "—", visible: true, order: 4 },
-    { key: "excel2md", title: "Excel to Markdown", path: "/excel2md", icon: "pi-file", group: "Tools", visible: true, order: 5 },
-    { key: "importCsv", title: "Import CSV", path: "/import-csv", icon: "pi-database", group: "Tools", visible: true, order: 6 },
-    { key: "cloudS3", title: "S3 Browser", path: "/cloud/s3", icon: "pi-folder-open", group: "Cloud", visible: true, order: 7 },
-    { key: "aiChat", title: "AI Chat", path: "/ai/chat", icon: "pi-comments", group: "AI Agent", visible: true, order: 8 },
-    { key: "projectSkills", title: "Skills", path: "/project-skills", icon: "pi-book", group: "Governance", visible: true, order: 9 },
-    { key: "governanceMenus", title: "Menus", path: "/governance/menus", icon: "pi-bars", group: "Governance", visible: true, order: 10 },
-    { key: "governanceUsers", title: "Users", path: "/governance/users", icon: "pi-users", group: "Governance", visible: true, order: 11 },
-    { key: "governanceLogs", title: "Logs", path: "/governance/logs", icon: "pi-history", group: "Governance", visible: true, order: 12 },
-    { key: "settings", title: "Settings", path: "/settings", icon: "pi-cog", group: "—", visible: true, order: 13 },
-  ];
-}
-
-function load(): MenuItemConfig[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return defaultMenus();
-}
-
-function save(items: MenuItemConfig[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
+export type MenuItemConfig = MenuConfig;
 
 export function useGovernanceMenus() {
-  const items = ref<MenuItemConfig[]>(load());
+  const items = ref<MenuItemConfig[]>([]);
   const editingKey = ref<string | null>(null);
   const draft = ref<MenuItemConfig | null>(null);
   const filterGroup = ref<string>("All");
   const searchQuery = ref("");
+  const loading = ref(false);
+  const error = ref<string | null>(null);
 
   const groups = computed(() => {
     const set = new Set(items.value.map((i) => i.group));
@@ -78,6 +42,38 @@ export function useGovernanceMenus() {
     hidden: items.value.filter((i) => !i.visible).length,
   }));
 
+  async function fetchItems() {
+    loading.value = true;
+    error.value = null;
+    try {
+      if (canUseTauriRuntime()) {
+        items.value = await listMenuConfigs();
+      }
+    } catch (e) {
+      error.value = String(e);
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function persistItem(item: MenuItemConfig) {
+    if (!canUseTauriRuntime()) return;
+    try {
+      await saveMenuConfig(item);
+    } catch (e) {
+      error.value = String(e);
+    }
+  }
+
+  async function persistAll() {
+    if (!canUseTauriRuntime()) return;
+    try {
+      await saveAllMenuConfigs({ items: items.value });
+    } catch (e) {
+      error.value = String(e);
+    }
+  }
+
   function selectItem(key: string) {
     editingKey.value = key;
     const item = items.value.find((i) => i.key === key);
@@ -88,12 +84,12 @@ export function useGovernanceMenus() {
     if (draft.value) draft.value[field] = value;
   }
 
-  function saveDraft() {
+  async function saveDraft() {
     if (!draft.value || !editingKey.value) return;
     const idx = items.value.findIndex((i) => i.key === editingKey.value);
     if (idx >= 0) {
       items.value[idx] = { ...draft.value };
-      save(items.value);
+      await persistItem(items.value[idx]);
     }
   }
 
@@ -101,18 +97,18 @@ export function useGovernanceMenus() {
     if (editingKey.value) selectItem(editingKey.value);
   }
 
-  function toggleVisibility(key: string) {
+  async function toggleVisibility(key: string) {
     const item = items.value.find((i) => i.key === key);
     if (item) {
       item.visible = !item.visible;
-      save(items.value);
+      await persistItem(item);
       if (editingKey.value === key && draft.value) {
         draft.value.visible = item.visible;
       }
     }
   }
 
-  function moveUp(key: string) {
+  async function moveUp(key: string) {
     const sorted = [...items.value].sort((a, b) => a.order - b.order);
     const idx = sorted.findIndex((i) => i.key === key);
     if (idx <= 0) return;
@@ -120,10 +116,10 @@ export function useGovernanceMenus() {
     sorted[idx - 1].order = sorted[idx].order;
     sorted[idx].order = prevOrder;
     items.value = sorted;
-    save(items.value);
+    await persistAll();
   }
 
-  function moveDown(key: string) {
+  async function moveDown(key: string) {
     const sorted = [...items.value].sort((a, b) => a.order - b.order);
     const idx = sorted.findIndex((i) => i.key === key);
     if (idx < 0 || idx >= sorted.length - 1) return;
@@ -131,15 +127,16 @@ export function useGovernanceMenus() {
     sorted[idx + 1].order = sorted[idx].order;
     sorted[idx].order = nextOrder;
     items.value = sorted;
-    save(items.value);
+    await persistAll();
   }
 
-  function resetToDefault() {
-    items.value = defaultMenus();
+  async function resetToDefault() {
     editingKey.value = null;
     draft.value = null;
-    save(items.value);
+    await fetchItems();
   }
+
+  fetchItems();
 
   return {
     items,
@@ -150,6 +147,9 @@ export function useGovernanceMenus() {
     searchQuery,
     groups,
     stats,
+    loading,
+    error,
+    fetchItems,
     selectItem,
     updateDraft,
     saveDraft,

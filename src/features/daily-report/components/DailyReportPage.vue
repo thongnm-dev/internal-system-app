@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
 import Calendar from "primevue/calendar";
+import MultiSelect from "primevue/multiselect";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
 import { useAuthStore } from "@/app/stores/auth";
 import {
@@ -15,15 +16,13 @@ import {
   normalizeEntryForForm,
   projectDayTotal,
   projectTotal,
-  TASK_CATEGORIES,
   useDailyReport,
   type DailyReportDay,
   type DailyReportEntries,
   type DailyReportEntry,
   type DailyReportProject,
-  type DailyReportTask,
+  type DailyReportTaskRow,
   type NewTaskInput,
-  type TaskCategory,
 } from "../composables/useDailyReport";
 
 const auth = useAuthStore();
@@ -31,13 +30,13 @@ const router = useRouter();
 const ctrl = useDailyReport(auth.user?.username);
 
 // Estimate (giờ dự kiến hoàn thành task) — parse từ chuỗi, 0 nếu không hợp lệ.
-function taskEstimate(task: DailyReportTask): number {
+function taskEstimate(task: DailyReportTaskRow): number {
   const n = Number(task.estimateHour);
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 // True khi tổng giờ tích luỹ đã đạt/ vượt estimate — để tô màu badge.
-function taskReachedEstimate(task: DailyReportTask): boolean {
+function taskReachedEstimate(task: DailyReportTaskRow): boolean {
   const est = taskEstimate(task);
   return est > 0 && ctrl.cumulativeHours(task.id) >= est;
 }
@@ -46,15 +45,15 @@ function taskReachedEstimate(task: DailyReportTask): boolean {
 type EditingCell = {
   day: DailyReportDay;
   entry: DailyReportEntry;
-  task: DailyReportTask;
+  task: DailyReportTaskRow;
 };
 
 const editingCell = ref<EditingCell | null>(null);
 const editForm = ref<DailyReportEntry>(emptyEntry());
 
-function openEditDialog(task: DailyReportTask, day: DailyReportDay) {
+function openEditDialog(task: DailyReportTaskRow, day: DailyReportDay) {
   if (!ctrl.isEditable.value) return;
-  const entry = ctrl.entries.value[entryKey(task.id, day.day)];
+  const entry = ctrl.entries.value[entryKey(task.rowId, day.day)];
   const normalized = normalizeEntryForForm(entry);
   editingCell.value = { day, entry: normalized, task };
   editForm.value = { ...normalized };
@@ -62,13 +61,13 @@ function openEditDialog(task: DailyReportTask, day: DailyReportDay) {
 
 function saveEntry() {
   if (!editingCell.value) return;
-  ctrl.updateEntry(editingCell.value.task.id, editingCell.value.day.day, editForm.value);
+  ctrl.updateEntry(editingCell.value.task.rowId, editingCell.value.day.day, editForm.value);
   editingCell.value = null;
 }
 
 function clearEntry() {
   if (!editingCell.value) return;
-  ctrl.updateEntry(editingCell.value.task.id, editingCell.value.day.day, null);
+  ctrl.updateEntry(editingCell.value.task.rowId, editingCell.value.day.day, null);
   editingCell.value = null;
 }
 
@@ -125,12 +124,6 @@ function openTaskDialog() {
   isAddingTask.value = true;
 }
 
-function toggleTaskCategory(category: TaskCategory) {
-  const list = taskForm.value.categories;
-  taskForm.value.categories = list.includes(category)
-    ? list.filter((c) => c !== category)
-    : [...list, category];
-}
 
 const canSaveTask = computed(() => taskForm.value.shortName.trim().length > 0);
 
@@ -408,10 +401,10 @@ function filteredPickerProjects() {
                   {{ formatHoursDisplay(projectTotal(project, ctrl.entries.value)) }}h
                 </span>
               </div>
-              <!-- Task rows -->
+              <!-- Task rows (expanded by category) -->
               <div
                 v-for="task in project.tasks"
-                :key="task.id"
+                :key="task.rowId"
                 class="flex h-14 items-center gap-2 border-b border-divider bg-panel px-4"
               >
                 <button
@@ -431,7 +424,11 @@ function filteredPickerProjects() {
                     :class="task.isCompleted ? 'text-muted line-through' : 'text-ink'"
                   >{{ task.name }}</strong>
                   <div class="mt-1 flex items-center gap-2">
-                    <span class="truncate text-xs font-semibold text-muted">{{ task.code }}</span>
+                    <span
+                      v-if="task.category"
+                      class="shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700"
+                    >{{ task.category }}</span>
+                    <span v-else class="truncate text-xs font-semibold text-muted">{{ task.code }}</span>
                     <span
                       v-if="task.isCompleted"
                       class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand"
@@ -440,7 +437,7 @@ function filteredPickerProjects() {
                 </div>
                 <div class="ml-1 flex shrink-0 flex-col items-end gap-0.5">
                   <span class="rounded-md bg-canvas px-2 py-0.5 text-xs font-bold text-secondary">
-                    {{ formatHoursDisplay(ctrl.totalHours(task.id)) }}h
+                    {{ formatHoursDisplay(ctrl.totalHours(task.rowId)) }}h
                   </span>
                   <span
                     class="text-[10px] font-bold tabular-nums"
@@ -475,10 +472,10 @@ function filteredPickerProjects() {
                 </div>
               </div>
               <!-- Task day cells -->
-              <div v-for="task in project.tasks" :key="task.id" class="flex h-14 border-b border-divider">
+              <div v-for="task in project.tasks" :key="task.rowId" class="flex h-14 border-b border-divider">
                 <div
                   v-for="day in ctrl.days.value"
-                  :key="`${task.id}-${day.day}`"
+                  :key="`${task.rowId}-${day.day}`"
                   :class="[
                     'flex h-14 w-12 shrink-0 items-center justify-center border-r border-divider px-1',
                     day.isWeekend ? 'bg-canvas' : 'bg-panel',
@@ -487,11 +484,11 @@ function filteredPickerProjects() {
                   <button
                     :class="[
                       'flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-emerald-100',
-                      entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0
+                      entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
                         ? 'border-brand bg-emerald-50 text-brand'
                         : 'border-divider bg-panel text-muted',
                       ctrl.isEditable.value
-                        ? entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0
+                        ? entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
                           ? 'hover:bg-emerald-100'
                           : 'hover:border-brand hover:text-brand'
                         : 'cursor-not-allowed opacity-60',
@@ -499,12 +496,12 @@ function filteredPickerProjects() {
                     type="button"
                     :disabled="!ctrl.isEditable.value"
                     :title="ctrl.isEditable.value
-                      ? `${task.name} - ${day.label} ${day.weekday}`
-                      : `${task.name} - ${day.label} ${day.weekday} (read-only)`"
+                      ? `${task.name}${task.category ? ` [${task.category}]` : ''} - ${day.label} ${day.weekday}`
+                      : `${task.name}${task.category ? ` [${task.category}]` : ''} - ${day.label} ${day.weekday} (read-only)`"
                     @click="openEditDialog(task, day)"
                   >
-                    <template v-if="entryHour(ctrl.entries.value[entryKey(task.id, day.day)]) > 0">
-                      {{ formatHoursDisplay(entryHour(ctrl.entries.value[entryKey(task.id, day.day)])) }}
+                    <template v-if="entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0">
+                      {{ formatHoursDisplay(entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)])) }}
                     </template>
                     <i v-else-if="ctrl.isEditable.value" class="pi pi-plus" />
                     <span v-else class="text-muted">-</span>
@@ -528,7 +525,9 @@ function filteredPickerProjects() {
         <div>
           <h3 class="font-bold text-ink">Daily report detail</h3>
           <p v-if="editingCell" class="mt-1 text-sm text-muted">
-            {{ editingCell.task.name }} - {{ editingCell.day.label }} {{ editingCell.day.weekday }}
+            {{ editingCell.task.name }}
+            <span v-if="editingCell.task.category" class="ml-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">{{ editingCell.task.category }}</span>
+            — {{ editingCell.day.label }} {{ editingCell.day.weekday }}
           </p>
         </div>
       </template>
@@ -545,17 +544,6 @@ function filteredPickerProjects() {
             step="0.25"
             type="number"
           />
-        </label>
-
-        <label class="block">
-          <span class="text-xs font-bold text-muted">Phase</span>
-          <select
-            v-model="editForm.phase"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-          >
-            <option value="">—</option>
-            <option v-for="p in ctrl.phases.value" :key="p" :value="p">{{ p }}</option>
-          </select>
         </label>
 
         <label class="block">
@@ -748,29 +736,18 @@ function filteredPickerProjects() {
         </label>
 
         <!-- Task category (multi-select) -->
-        <div>
+        <label class="block">
           <span class="text-xs font-bold text-muted">Phân loại task</span>
-          <div class="mt-1 flex flex-wrap gap-2">
-            <label
-              v-for="category in TASK_CATEGORIES"
-              :key="category"
-              :class="[
-                'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition',
-                taskForm.categories.includes(category)
-                  ? 'border-brand bg-emerald-50 text-brand'
-                  : 'border-divider bg-panel text-secondary hover:border-brand',
-              ]"
-            >
-              <Checkbox
-                :model-value="taskForm.categories.includes(category)"
-                :binary="true"
-                class="h-4 w-4 accent-brand"
-                @update:model-value="toggleTaskCategory(category)"
-              />
-              {{ category }}
-            </label>
-          </div>
-        </div>
+          <MultiSelect
+            v-model="taskForm.categories"
+            :options="ctrl.phases.value"
+            option-label="name"
+            option-value="code"
+            placeholder="Chọn phân loại"
+            display="chip"
+            class="mt-1 w-full"
+          />
+        </label>
 
         <div class="grid grid-cols-2 gap-3">
           <!-- Assignee -->

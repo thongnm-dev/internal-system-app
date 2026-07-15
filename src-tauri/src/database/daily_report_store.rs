@@ -57,14 +57,14 @@ pub async fn upsert_entry(
 
 /// Xóa một ô nhập giờ công theo (username, task_id, entry_date).
 /// Trả về `true` nếu có bản ghi bị xóa.
-pub async fn delete_entry(username: &str, task_id: &str, entry_date: &str) -> AppResult<bool> {
+pub async fn delete_entry(username: &str, task_id: &str, entry_date: &str, phase: &str) -> AppResult<bool> {
     let client = pgsql_connect::connect().await?;
     let date = parse_date(entry_date)?;
 
     let row = client
         .query_one(
-            "SELECT sp_daily_report_entry_delete($1, $2, $3)",
-            &[&username, &task_id, &date],
+            "SELECT sp_daily_report_entry_delete($1, $2, $3, $4)",
+            &[&username, &task_id, &date, &phase],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to delete daily report entry: {e}")))?;
@@ -214,6 +214,26 @@ pub async fn select_categories() -> AppResult<Vec<DailyReportPhase>> {
         .iter()
         .map(|row| DailyReportPhase {
             process_code: row.get("process_code"),
+            process_name: row.get("process_name"),
+            display_order: row.get("display_order"),
+        })
+        .collect())
+}
+
+/// Danh sách category dùng cho project tasks (is_task_category = TRUE).
+pub async fn select_task_categories() -> AppResult<Vec<DailyReportPhase>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query("SELECT * FROM sp_category_select_task_list()", &[])
+        .await
+        .map_err(|e| AppError::new(format!("Failed to query task categories: {e}")))?;
+
+    Ok(rows
+        .iter()
+        .map(|row| DailyReportPhase {
+            process_code: row.get("process_code"),
+            process_name: row.get("process_name"),
             display_order: row.get("display_order"),
         })
         .collect())

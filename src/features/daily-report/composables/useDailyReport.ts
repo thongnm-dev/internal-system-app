@@ -19,9 +19,7 @@ import type {
   DailyReportUserTaskResult,
 } from "@/_/types/daily-report";
 
-export type TaskCategory = "PG" | "Review PG" | "UT" | "Review UT" | "Other";
-
-export const TASK_CATEGORIES: TaskCategory[] = ["PG", "Review PG", "UT", "Review UT", "Other"];
+export type TaskCategory = string;
 
 export type DailyReportTask = {
   id: string;
@@ -36,6 +34,11 @@ export type DailyReportTask = {
   isUserAdded?: boolean;
   isCompleted?: boolean;
   completedAt?: string;
+};
+
+export type DailyReportTaskRow = DailyReportTask & {
+  rowId: string;
+  category: string;
 };
 
 export type NewTaskInput = {
@@ -54,7 +57,7 @@ export type DailyReportProject = {
   name: string;
   client: string;
   isUserAdded?: boolean;
-  tasks: DailyReportTask[];
+  tasks: DailyReportTaskRow[];
 };
 
 export type DailyReportEntry = {
@@ -76,6 +79,25 @@ export type DailyReportDay = {
   isToday: boolean;
 };
 
+export function makeRowId(taskId: string, category: string): string {
+  return `${taskId}|${category}`;
+}
+
+function parseRowId(rowId: string): { taskId: string; category: string } {
+  const idx = rowId.lastIndexOf("|");
+  if (idx < 0) return { taskId: rowId, category: "" };
+  return { taskId: rowId.substring(0, idx), category: rowId.substring(idx + 1) };
+}
+
+function expandTaskByCategory(task: DailyReportTask): DailyReportTaskRow[] {
+  const cats = task.categories?.length ? task.categories : [""];
+  return cats.map((cat) => ({
+    ...task,
+    rowId: makeRowId(task.id, cat),
+    category: cat,
+  }));
+}
+
 export function useDailyReport(username?: string) {
   const assignedProjects = ref<DailyReportProjectResult[]>([]);
   const optionalProjects = ref<DailyReportProjectResult[]>([]);
@@ -86,10 +108,8 @@ export function useDailyReport(username?: string) {
   const selectedMonth = ref(startOfMonth(now));
   const entries = ref<DailyReportEntries>({});
   const userTasks = ref<Record<string, DailyReportTask[]>>({});
-  // Tổng giờ tích luỹ (mọi tháng) theo task_id — cho badge tiến độ so với estimate.
   const taskHoursTotal = ref<Record<string, number>>({});
-  // Danh sách công đoạn (phase) cho dropdown khi nhập giờ. Mỗi phần tử là process_code (tên phase).
-  const phases = ref<string[]>([]);
+  const phases = ref<{ code: string; name: string }[]>([]);
   const isLoading = ref(false);
   const error = ref("");
 
@@ -99,13 +119,14 @@ export function useDailyReport(username?: string) {
 
   function toFrontendProject(p: DailyReportProjectResult, isUserAdded: boolean): DailyReportProject {
     const id = projectIdStr(p);
+    const rawTasks = userTasks.value[id] ?? [];
     return {
       id,
       code: p.code,
       name: p.name,
       client: p.client,
       isUserAdded,
-      tasks: userTasks.value[id] ?? [],
+      tasks: rawTasks.flatMap(expandTaskByCategory),
     };
   }
 
@@ -174,7 +195,8 @@ export function useDailyReport(username?: string) {
     try {
       const rows = await getDailyReportEntries(username, year.value, monthIndex.value + 1);
       entries.value = rows.reduce<DailyReportEntries>((acc, row) => {
-        acc[entryKey(row.task_id, dayOfDate(row.entry_date))] = toFrontendEntry(row);
+        const rowId = makeRowId(row.task_id, row.phase);
+        acc[entryKey(rowId, dayOfDate(row.entry_date))] = toFrontendEntry(row);
         return acc;
       }, {});
     } catch (e) {
@@ -224,7 +246,7 @@ export function useDailyReport(username?: string) {
     if (!username) return;
     try {
       const rows: DailyReportPhaseResult[] = await getDailyReportPhases();
-      phases.value = rows.map((r) => r.process_code);
+      phases.value = rows.map((r) => ({ code: r.process_code, name: r.process_name }));
     } catch (e) {
       error.value = friendlyError(e);
     }
@@ -287,8 +309,6 @@ export function useDailyReport(username?: string) {
           due_date: task.dueDate ?? "",
           issue_key: task.issueKey ?? "",
         });
-        // Reconcile the optimistic entry with the persisted record so the grid
-        // always reflects exactly what the backend stored (id, code, created_at…).
         const persisted = toFrontendTask(saved);
         userTasks.value = {
           ...userTasks.value,
@@ -311,8 +331,8 @@ export function useDailyReport(username?: string) {
     error.value = "";
     const projectId = projectIdOfTask(taskId);
     if (!projectId) return;
-    const task = (userTasks.value[projectId] ?? []).find((t) => t.id === taskId);
-    const isUserAdded = task?.isUserAdded ?? true;
+    const rawTask = (userTasks.value[projectId] ?? []).find((t) => t.id === taskId);
+    const isUserAdded = rawTask?.isUserAdded ?? true;
 
     const applyFlag = (flag: boolean) => {
       userTasks.value = {
@@ -323,12 +343,10 @@ export function useDailyReport(username?: string) {
       };
     };
 
-    // Optimistic toggle; task chỉ thực sự biến mất khỏi carry-over ở lần load sau.
     applyFlag(isCompleted);
     if (!username) return;
 
     try {
-      // Task user tự thêm -> daily_report_tasks; task được giao -> project_tasks.
       if (isUserAdded) {
         await setDailyReportTaskCompleted(username, taskId, isCompleted);
       } else {
@@ -364,17 +382,17 @@ export function useDailyReport(username?: string) {
     if (next <= currentMonth) selectedMonth.value = next;
   }
 
-  // Cập nhật tổng giờ tích luỹ theo delta để badge luôn khớp mà không cần query lại.
   function bumpTaskHours(taskId: string, delta: number) {
     if (delta === 0) return;
     const next = (taskHoursTotal.value[taskId] ?? 0) + delta;
     taskHoursTotal.value = { ...taskHoursTotal.value, [taskId]: next < 0 ? 0 : next };
   }
 
-  async function updateEntry(taskId: string, day: number, value: DailyReportEntry | null) {
+  async function updateEntry(rowId: string, day: number, value: DailyReportEntry | null) {
     if (!isEditable.value) return;
+    const { taskId, category } = parseRowId(rowId);
     const normalized = value ? normalizeEntry(value) : null;
-    const key = entryKey(taskId, day);
+    const key = entryKey(rowId, day);
     const entryDate = formatDate(year.value, monthIndex.value, day);
     const previousHour = entryHour(entries.value[key]);
 
@@ -384,7 +402,7 @@ export function useDailyReport(username?: string) {
       bumpTaskHours(taskId, -previousHour);
       if (username) {
         try {
-          await clearDailyReportEntry(username, taskId, entryDate);
+          await clearDailyReportEntry(username, taskId, entryDate, category);
         } catch (e) {
           error.value = friendlyError(e);
         }
@@ -405,7 +423,7 @@ export function useDailyReport(username?: string) {
           is_ot: normalized.isOt,
           regular_ot: Number(normalized.regularOt) || 0,
           midnight_ot: Number(normalized.midnightOt) || 0,
-          phase: normalized.phase,
+          phase: category,
         });
       } catch (e) {
         error.value = friendlyError(e);
@@ -413,15 +431,14 @@ export function useDailyReport(username?: string) {
     }
   }
 
-  function totalHours(taskId?: string): number {
-    const prefix = taskId ? `${taskId}:` : "";
+  function totalHours(rowId?: string): number {
+    const prefix = rowId ? `${rowId}:` : "";
     return Object.entries(entries.value).reduce((total, [key, value]) => {
-      if (taskId && !key.startsWith(prefix)) return total;
+      if (rowId && !key.startsWith(prefix)) return total;
       return total + entryHour(value);
     }, 0);
   }
 
-  /// Tổng giờ tích luỹ (mọi tháng) của một task, cho badge tiến độ.
   function cumulativeHours(taskId: string): number {
     return taskHoursTotal.value[taskId] ?? 0;
   }
@@ -454,8 +471,8 @@ export function useDailyReport(username?: string) {
   };
 }
 
-export function entryKey(taskId: string, day: number) {
-  return `${taskId}:${day}`;
+export function entryKey(rowId: string, day: number) {
+  return `${rowId}:${day}`;
 }
 
 export function entryHour(entry: DailyReportEntry | string | undefined): number {
@@ -580,7 +597,7 @@ export function formatHoursDisplay(value: number): string {
 }
 
 export function projectDayTotal(project: DailyReportProject, entries: DailyReportEntries, day: number): number {
-  return project.tasks.reduce((t, task) => t + entryHour(entries[entryKey(task.id, day)]), 0);
+  return project.tasks.reduce((t, task) => t + entryHour(entries[entryKey(task.rowId, day)]), 0);
 }
 
 export function projectTotal(project: DailyReportProject, entries: DailyReportEntries): number {
@@ -588,7 +605,7 @@ export function projectTotal(project: DailyReportProject, entries: DailyReportEn
     (t, task) =>
       t +
       Object.entries(entries).reduce(
-        (tt, [key, val]) => (key.startsWith(`${task.id}:`) ? tt + entryHour(val) : tt),
+        (tt, [key, val]) => (key.startsWith(`${task.rowId}:`) ? tt + entryHour(val) : tt),
         0,
       ),
     0,
