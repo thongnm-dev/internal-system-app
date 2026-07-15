@@ -215,6 +215,7 @@ pub async fn select_categories() -> AppResult<Vec<DailyReportPhase>> {
         .map(|row| DailyReportPhase {
             process_code: row.get("process_code"),
             process_name: row.get("process_name"),
+            short_name: row.get("short_name"),
             display_order: row.get("display_order"),
         })
         .collect())
@@ -234,6 +235,7 @@ pub async fn select_task_categories() -> AppResult<Vec<DailyReportPhase>> {
         .map(|row| DailyReportPhase {
             process_code: row.get("process_code"),
             process_name: row.get("process_name"),
+            short_name: row.get("short_name"),
             display_order: row.get("display_order"),
         })
         .collect())

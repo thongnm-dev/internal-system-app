@@ -71,7 +71,6 @@ function saveAndClose() {
       <table class="w-full text-sm">
         <thead class="sticky top-0 z-10 bg-panel">
           <tr class="border-b border-divider text-left text-xs font-bold uppercase text-muted">
-            <th class="px-4 py-3">Order</th>
             <th class="px-4 py-3">Menu</th>
             <th class="px-4 py-3">Path</th>
             <th class="px-4 py-3">Group</th>
@@ -86,7 +85,6 @@ function saveAndClose() {
             class="cursor-pointer border-b border-divider transition hover:bg-canvas"
             @click="openEdit(item.key)"
           >
-            <td class="px-4 py-2.5 font-mono text-xs text-muted">{{ item.order }}</td>
             <td class="px-4 py-2.5">
               <div class="flex items-center gap-2">
                 <i :class="`pi ${item.icon} text-muted`" />

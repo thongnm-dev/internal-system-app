@@ -108,6 +108,7 @@ pub struct DailyReportUserTask {
 pub struct DailyReportPhase {
     pub process_code: String,
     pub process_name: String,
+    pub short_name: String,
     pub display_order: i32,
 }
 

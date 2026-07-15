@@ -9,6 +9,7 @@ import {
   getDailyReportTaskHours,
   getDailyReportTasks,
   saveDailyReportEntry,
+  deleteDailyReportTask,
   setDailyReportTaskCompleted,
   setProjectTaskCompleted,
 } from "@/tauri/commands/daily-report";
@@ -39,12 +40,13 @@ export type DailyReportTask = {
 export type DailyReportTaskRow = DailyReportTask & {
   rowId: string;
   category: string;
+  categoryLabel: string;
 };
 
 export type NewTaskInput = {
   shortName: string;
   description: string;
-  categories: TaskCategory[];
+  category: TaskCategory;
   assignee: string;
   estimateHour: string;
   dueDate: string;
@@ -89,12 +91,16 @@ function parseRowId(rowId: string): { taskId: string; category: string } {
   return { taskId: rowId.substring(0, idx), category: rowId.substring(idx + 1) };
 }
 
-function expandTaskByCategory(task: DailyReportTask): DailyReportTaskRow[] {
+function expandTaskByCategory(
+  task: DailyReportTask,
+  phaseMap: Map<string, string>,
+): DailyReportTaskRow[] {
   const cats = task.categories?.length ? task.categories : [""];
   return cats.map((cat) => ({
     ...task,
     rowId: makeRowId(task.id, cat),
     category: cat,
+    categoryLabel: phaseMap.get(cat) ?? cat,
   }));
 }
 
@@ -109,7 +115,7 @@ export function useDailyReport(username?: string) {
   const entries = ref<DailyReportEntries>({});
   const userTasks = ref<Record<string, DailyReportTask[]>>({});
   const taskHoursTotal = ref<Record<string, number>>({});
-  const phases = ref<{ code: string; name: string }[]>([]);
+  const phases = ref<{ code: string; name: string; shortName: string }[]>([]);
   const isLoading = ref(false);
   const error = ref("");
 
@@ -120,13 +126,14 @@ export function useDailyReport(username?: string) {
   function toFrontendProject(p: DailyReportProjectResult, isUserAdded: boolean): DailyReportProject {
     const id = projectIdStr(p);
     const rawTasks = userTasks.value[id] ?? [];
+    const phaseMap = new Map(phases.value.map((ph) => [ph.code, ph.shortName]));
     return {
       id,
       code: p.code,
       name: p.name,
       client: p.client,
       isUserAdded,
-      tasks: rawTasks.flatMap(expandTaskByCategory),
+      tasks: rawTasks.flatMap((t) => expandTaskByCategory(t, phaseMap)),
     };
   }
 
@@ -246,7 +253,7 @@ export function useDailyReport(username?: string) {
     if (!username) return;
     try {
       const rows: DailyReportPhaseResult[] = await getDailyReportPhases();
-      phases.value = rows.map((r) => ({ code: r.process_code, name: r.process_name }));
+      phases.value = rows.map((r) => ({ code: r.process_code, name: r.process_name, shortName: r.short_name }));
     } catch (e) {
       error.value = friendlyError(e);
     }
@@ -276,15 +283,15 @@ export function useDailyReport(username?: string) {
     error.value = "";
     const shortName = input.shortName.trim();
     if (!shortName) return null;
-    const categories = input.categories.slice();
+    const categories = input.category ? [input.category] : [];
     const task: DailyReportTask = {
       id: `${projectId}-task-${Date.now()}`,
-      code: categories[0] ?? "TASK",
+      code: input.category || "TASK",
       name: shortName,
       description: input.description.trim(),
       categories,
       assignee: input.assignee.trim() || (username ?? ""),
-      estimateHour: input.estimateHour.trim(),
+      estimateHour: String(input.estimateHour ?? "").trim(),
       dueDate: input.dueDate,
       issueKey: input.issueKey.trim(),
       isUserAdded: true,
@@ -355,6 +362,78 @@ export function useDailyReport(username?: string) {
     } catch (e) {
       error.value = friendlyError(e);
       applyFlag(!isCompleted);
+    }
+  }
+
+  async function updateTask(projectId: string, taskId: string, input: NewTaskInput): Promise<DailyReportTask | null> {
+    error.value = "";
+    const shortName = input.shortName.trim();
+    if (!shortName) return null;
+    const tasks = userTasks.value[projectId] ?? [];
+    const existing = tasks.find((t) => t.id === taskId);
+    if (!existing) return null;
+    const categories = input.category ? [input.category] : [];
+    const updated: DailyReportTask = {
+      ...existing,
+      code: input.category || existing.code,
+      name: shortName,
+      description: input.description.trim(),
+      categories,
+      assignee: input.assignee.trim() || existing.assignee || (username ?? ""),
+      estimateHour: String(input.estimateHour ?? "").trim(),
+      dueDate: input.dueDate,
+      issueKey: input.issueKey.trim(),
+    };
+    userTasks.value = {
+      ...userTasks.value,
+      [projectId]: tasks.map((t) => (t.id === taskId ? updated : t)),
+    };
+    if (username) {
+      try {
+        const saved = await createDailyReportTask(username, {
+          task_id: taskId,
+          project_id: projectId,
+          code: updated.code,
+          name: updated.name,
+          description: updated.description ?? "",
+          categories,
+          assignee: updated.assignee ?? "",
+          estimate_hour: updated.estimateHour ?? "",
+          due_date: updated.dueDate ?? "",
+          issue_key: updated.issueKey ?? "",
+        });
+        const persisted = toFrontendTask(saved);
+        userTasks.value = {
+          ...userTasks.value,
+          [projectId]: (userTasks.value[projectId] ?? []).map((t) => (t.id === taskId ? persisted : t)),
+        };
+        return persisted;
+      } catch (e) {
+        userTasks.value = { ...userTasks.value, [projectId]: tasks };
+        error.value = friendlyError(e);
+        throw new Error(error.value);
+      }
+    }
+    return updated;
+  }
+
+  async function removeTask(projectId: string, taskId: string) {
+    const tasks = userTasks.value[projectId] ?? [];
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) throw new Error("Task không tồn tại.");
+    if (!task.isUserAdded) throw new Error("Chỉ có thể xóa task được thêm nhanh.");
+    if (totalHours(taskId) > 0) throw new Error("Không thể xóa task đã phát sinh số giờ.");
+    error.value = "";
+    try {
+      if (username) await deleteDailyReportTask(username, taskId);
+      userTasks.value = {
+        ...userTasks.value,
+        [projectId]: tasks.filter((t) => t.id !== taskId),
+      };
+    } catch (e) {
+      const msg = friendlyError(e);
+      error.value = msg;
+      throw new Error(msg);
     }
   }
 
@@ -462,7 +541,9 @@ export function useDailyReport(username?: string) {
     previousMonth,
     projects,
     removeProject,
+    removeTask,
     selectMonth,
+    updateTask,
     selectedProject,
     selectedProjectId,
     setTaskCompleted,
@@ -559,18 +640,18 @@ function parseMonthValue(value: string) {
 }
 
 function normalizeEntry(value: DailyReportEntry): DailyReportEntry | null {
-  const trimmed = value.hour.trim();
-  if (!trimmed) return null;
-  const numeric = Number(trimmed);
+  const hourStr = String(value.hour ?? "").trim();
+  if (!hourStr) return null;
+  const numeric = Number(hourStr);
   if (!Number.isFinite(numeric) || numeric < 0) return null;
   const isOt = value.isOt;
   return {
-    comment: value.comment.trim(),
+    comment: String(value.comment ?? "").trim(),
     hour: String(Math.min(numeric, 24)),
     isOt,
-    midnightOt: isOt ? normalizeOptionalHour(value.midnightOt) : "",
-    phase: value.phase.trim(),
-    regularOt: isOt ? normalizeOptionalHour(value.regularOt) : "",
+    midnightOt: isOt ? normalizeOptionalHour(String(value.midnightOt ?? "")) : "",
+    phase: String(value.phase ?? "").trim(),
+    regularOt: isOt ? normalizeOptionalHour(String(value.regularOt ?? "")) : "",
   };
 }
 
@@ -593,7 +674,7 @@ export function emptyEntry(): DailyReportEntry {
 }
 
 export function formatHoursDisplay(value: number): string {
-  return Number.isInteger(value) ? value.toLocaleString("en-US") : value.toFixed(2);
+  return Number.isInteger(value) ? value.toLocaleString("en-US") : String(parseFloat(value.toFixed(2)));
 }
 
 export function projectDayTotal(project: DailyReportProject, entries: DailyReportEntries, day: number): number {

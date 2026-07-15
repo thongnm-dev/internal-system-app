@@ -21,6 +21,11 @@ const projectId = (route.params.id as string) || "";
 
 const ctrl = useProjectTasks(projectId);
 
+const categoryNameMap = computed(() => new Map(ctrl.categories.value.map((c) => [c.code, c.name])));
+function categoryName(code: string) {
+  return categoryNameMap.value.get(code) ?? code;
+}
+
 const isAddDialogOpen = ref(false);
 const editingId = ref<string | null>(null);
 const form = ref(emptyProjectTaskInput(auth.user?.username ?? ""));
@@ -139,7 +144,7 @@ async function saveTask() {
                 :key="category"
                 class="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-brand"
               >
-                {{ category }}
+                {{ categoryName(category) }}
               </span>
               <span v-if="!data.categories.length" class="text-muted">-</span>
             </div>

@@ -55,7 +55,7 @@ function toProjectTask(r: ProjectTaskResult): ProjectTask {
 export function useProjectTasks(projectId: string) {
   const tasks = ref<ProjectTask[]>([]);
   const project = ref<ProjectDetailResult | null>(null);
-  const categories = ref<{ code: string; name: string }[]>([]);
+  const categories = ref<{ code: string; name: string; shortName: string }[]>([]);
   const projectLoading = ref(false);
   const loading = ref(false);
 
@@ -156,7 +156,7 @@ export function useProjectTasks(projectId: string) {
     if (!canUseTauriRuntime()) return;
     try {
       const rows = await getTaskCategories();
-      categories.value = rows.map((r) => ({ code: r.process_code, name: r.process_name }));
+      categories.value = rows.map((r) => ({ code: r.process_code, name: r.process_name, shortName: r.short_name }));
     } catch {
       categories.value = [];
     }

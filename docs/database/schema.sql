@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS categories (
     id               SERIAL       PRIMARY KEY,
     process_code     VARCHAR(50)  NOT NULL,
     process_name     VARCHAR(200) NOT NULL,
+    short_name     VARCHAR(200) NOT NULL,
     display_order    INTEGER      NOT NULL DEFAULT 0,
     is_task_category BOOLEAN      NOT NULL DEFAULT FALSE,
     UNIQUE (process_code)

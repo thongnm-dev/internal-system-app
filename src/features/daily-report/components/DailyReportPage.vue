@@ -4,8 +4,9 @@ import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
 import Checkbox from "primevue/checkbox";
 import Calendar from "primevue/calendar";
-import MultiSelect from "primevue/multiselect";
+import Select from "primevue/select";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
+import { useToast } from "@/shared/composables/useToast";
 import { useAuthStore } from "@/app/stores/auth";
 import {
   dayTotal,
@@ -27,6 +28,7 @@ import {
 
 const auth = useAuthStore();
 const router = useRouter();
+const toast = useToast();
 const ctrl = useDailyReport(auth.user?.username);
 
 // Estimate (giờ dự kiến hoàn thành task) — parse từ chuỗi, 0 nếu không hợp lệ.
@@ -51,8 +53,12 @@ type EditingCell = {
 const editingCell = ref<EditingCell | null>(null);
 const editForm = ref<DailyReportEntry>(emptyEntry());
 
+function isRowDisabled(task: DailyReportTaskRow): boolean {
+  return !ctrl.isEditable.value || !!task.isCompleted;
+}
+
 function openEditDialog(task: DailyReportTaskRow, day: DailyReportDay) {
-  if (!ctrl.isEditable.value) return;
+  if (isRowDisabled(task)) return;
   const entry = ctrl.entries.value[entryKey(task.rowId, day.day)];
   const normalized = normalizeEntryForForm(entry);
   editingCell.value = { day, entry: normalized, task };
@@ -96,18 +102,21 @@ function confirmAddProjects() {
   isAddingProject.value = false;
 }
 
-// --- New task dialog ---
-const isAddingTask = ref(false);
+// --- Task dialog (add / edit) ---
+const isTaskDialogOpen = ref(false);
 const taskTargetProject = ref<DailyReportProject | null>(null);
+const editingTaskId = ref<string | null>(null);
 const taskForm = ref<NewTaskInput>(emptyTaskForm());
 const savingTask = ref(false);
 const taskError = ref("");
+
+const isEditingTask = computed(() => editingTaskId.value !== null);
 
 function emptyTaskForm(): NewTaskInput {
   return {
     shortName: "",
     description: "",
-    categories: [],
+    category: "",
     assignee: auth.user?.username ?? "",
     estimateHour: "",
     dueDate: "",
@@ -118,12 +127,29 @@ function emptyTaskForm(): NewTaskInput {
 function openTaskDialog() {
   if (!contextMenu.value) return;
   taskTargetProject.value = contextMenu.value.project;
+  editingTaskId.value = null;
   taskForm.value = emptyTaskForm();
   taskError.value = "";
   contextMenu.value = null;
-  isAddingTask.value = true;
+  isTaskDialogOpen.value = true;
 }
 
+function openEditTaskDialog(project: DailyReportProject, task: DailyReportTaskRow) {
+  taskTargetProject.value = project;
+  editingTaskId.value = task.id;
+  taskForm.value = {
+    shortName: task.name,
+    description: task.description ?? "",
+    category: (task.categories?.[0]) ?? "",
+    assignee: task.assignee ?? auth.user?.username ?? "",
+    estimateHour: task.estimateHour ?? "",
+    dueDate: task.dueDate ?? "",
+    issueKey: task.issueKey ?? "",
+  };
+  taskError.value = "";
+  taskContextMenu.value = null;
+  isTaskDialogOpen.value = true;
+}
 
 const canSaveTask = computed(() => taskForm.value.shortName.trim().length > 0);
 
@@ -132,13 +158,25 @@ async function saveTask() {
   savingTask.value = true;
   taskError.value = "";
   try {
-    const task = await ctrl.addTask(taskTargetProject.value.id, taskForm.value);
-    if (!task) {
-      taskError.value = ctrl.error.value || "Cannot save task. Please try again.";
-      return;
+    if (editingTaskId.value) {
+      const task = await ctrl.updateTask(taskTargetProject.value.id, editingTaskId.value, taskForm.value);
+      if (!task) {
+        taskError.value = ctrl.error.value || "Cannot update task. Please try again.";
+        return;
+      }
+      toast.success("Đã cập nhật task thành công.");
+    } else {
+      const task = await ctrl.addTask(taskTargetProject.value.id, taskForm.value);
+      if (!task) {
+        taskError.value = ctrl.error.value || "Cannot save task. Please try again.";
+        return;
+      }
     }
-    isAddingTask.value = false;
+    isTaskDialogOpen.value = false;
     taskTargetProject.value = null;
+    editingTaskId.value = null;
+  } catch (e) {
+    taskError.value = e instanceof Error ? e.message : String(e);
   } finally {
     savingTask.value = false;
   }
@@ -199,6 +237,71 @@ onUnmounted(() => {
   window.removeEventListener("click", closeContextMenu);
   window.removeEventListener("contextmenu", closeContextMenu);
   window.removeEventListener("keydown", closeContextMenu);
+  window.removeEventListener("click", closeTaskContextMenu);
+  window.removeEventListener("contextmenu", closeTaskContextMenu);
+  window.removeEventListener("keydown", closeTaskContextMenu);
+});
+
+// --- Task context menu ---
+type TaskContextMenuState = {
+  project: DailyReportProject;
+  task: DailyReportTaskRow;
+  x: number;
+  y: number;
+};
+
+const taskContextMenu = ref<TaskContextMenuState | null>(null);
+const taskDeleteConfirm = ref<{ project: DailyReportProject; task: DailyReportTaskRow } | null>(null);
+const deletingTask = ref(false);
+
+function openTaskContextMenu(project: DailyReportProject, task: DailyReportTaskRow, event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  contextMenu.value = null;
+  taskContextMenu.value = { project, task, x: event.clientX, y: event.clientY };
+}
+
+function closeTaskContextMenu() {
+  taskContextMenu.value = null;
+}
+
+function openTaskBacklog(task: DailyReportTaskRow) {
+  taskContextMenu.value = null;
+  router.push({ path: "/issue-backlog", query: { task: task.id } });
+}
+
+function confirmDeleteTask() {
+  if (!taskContextMenu.value) return;
+  const { project, task } = taskContextMenu.value;
+  taskContextMenu.value = null;
+  taskDeleteConfirm.value = { project, task };
+}
+
+async function executeDeleteTask() {
+  if (!taskDeleteConfirm.value || deletingTask.value) return;
+  const { project, task } = taskDeleteConfirm.value;
+  deletingTask.value = true;
+  taskDeleteConfirm.value = null;
+  try {
+    await ctrl.removeTask(project.id, task.id);
+    toast.success("Đã xóa task thành công.");
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : String(e));
+  } finally {
+    deletingTask.value = false;
+  }
+}
+
+watch(taskContextMenu, (val) => {
+  if (val) {
+    window.addEventListener("click", closeTaskContextMenu);
+    window.addEventListener("contextmenu", closeTaskContextMenu);
+    window.addEventListener("keydown", closeTaskContextMenu);
+  } else {
+    window.removeEventListener("click", closeTaskContextMenu);
+    window.removeEventListener("contextmenu", closeTaskContextMenu);
+    window.removeEventListener("keydown", closeTaskContextMenu);
+  }
 });
 
 // --- Scroll sync ---
@@ -403,9 +506,10 @@ function filteredPickerProjects() {
               </div>
               <!-- Task rows (expanded by category) -->
               <div
-                v-for="task in project.tasks"
+                v-for="(task, tIdx) in project.tasks"
                 :key="task.rowId"
-                class="flex h-14 items-center gap-2 border-b border-divider bg-panel px-4"
+                :class="['flex h-14 items-center gap-2 border-b border-divider px-4', tIdx % 2 === 0 ? 'bg-panel' : 'bg-canvas']"
+                @contextmenu="openTaskContextMenu(project, task, $event)"
               >
                 <button
                   class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition"
@@ -422,13 +526,9 @@ function filteredPickerProjects() {
                   <strong
                     class="block truncate text-sm"
                     :class="task.isCompleted ? 'text-muted line-through' : 'text-ink'"
-                  >{{ task.name }}</strong>
+                  >{{ task.categoryLabel ? `【${task.categoryLabel}】` : '' }}{{ task.name }}</strong>
                   <div class="mt-1 flex items-center gap-2">
-                    <span
-                      v-if="task.category"
-                      class="shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700"
-                    >{{ task.category }}</span>
-                    <span v-else class="truncate text-xs font-semibold text-muted">{{ task.code }}</span>
+                    <span v-if="!task.category" class="truncate text-xs font-semibold text-muted">{{ task.code }}</span>
                     <span
                       v-if="task.isCompleted"
                       class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand"
@@ -472,13 +572,13 @@ function filteredPickerProjects() {
                 </div>
               </div>
               <!-- Task day cells -->
-              <div v-for="task in project.tasks" :key="task.rowId" class="flex h-14 border-b border-divider">
+              <div v-for="(task, tIdx) in project.tasks" :key="task.rowId" class="flex h-14 border-b border-divider">
                 <div
                   v-for="day in ctrl.days.value"
                   :key="`${task.rowId}-${day.day}`"
                   :class="[
                     'flex h-14 w-12 shrink-0 items-center justify-center border-r border-divider px-1',
-                    day.isWeekend ? 'bg-canvas' : 'bg-panel',
+                    day.isWeekend ? 'bg-canvas' : (tIdx % 2 === 0 ? 'bg-panel' : 'bg-canvas'),
                   ]"
                 >
                   <button
@@ -487,23 +587,23 @@ function filteredPickerProjects() {
                       entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
                         ? 'border-brand bg-emerald-50 text-brand'
                         : 'border-divider bg-panel text-muted',
-                      ctrl.isEditable.value
-                        ? entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
+                      isRowDisabled(task)
+                        ? 'cursor-not-allowed opacity-60'
+                        : entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
                           ? 'hover:bg-emerald-100'
-                          : 'hover:border-brand hover:text-brand'
-                        : 'cursor-not-allowed opacity-60',
+                          : 'hover:border-brand hover:text-brand',
                     ]"
                     type="button"
-                    :disabled="!ctrl.isEditable.value"
-                    :title="ctrl.isEditable.value
-                      ? `${task.name}${task.category ? ` [${task.category}]` : ''} - ${day.label} ${day.weekday}`
-                      : `${task.name}${task.category ? ` [${task.category}]` : ''} - ${day.label} ${day.weekday} (read-only)`"
+                    :disabled="isRowDisabled(task)"
+                    :title="isRowDisabled(task)
+                      ? `${task.categoryLabel ? `【${task.categoryLabel}】` : ''}${task.name} - ${day.label} ${day.weekday} (${task.isCompleted ? 'completed' : 'read-only'})`
+                      : `${task.categoryLabel ? `【${task.categoryLabel}】` : ''}${task.name} - ${day.label} ${day.weekday}`"
                     @click="openEditDialog(task, day)"
                   >
                     <template v-if="entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0">
                       {{ formatHoursDisplay(entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)])) }}
                     </template>
-                    <i v-else-if="ctrl.isEditable.value" class="pi pi-plus" />
+                    <i v-else-if="!isRowDisabled(task)" class="pi pi-plus" />
                     <span v-else class="text-muted">-</span>
                   </button>
                 </div>
@@ -525,8 +625,7 @@ function filteredPickerProjects() {
         <div>
           <h3 class="font-bold text-ink">Daily report detail</h3>
           <p v-if="editingCell" class="mt-1 text-sm text-muted">
-            {{ editingCell.task.name }}
-            <span v-if="editingCell.task.category" class="ml-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">{{ editingCell.task.category }}</span>
+            {{ editingCell.task.categoryLabel ? `【${editingCell.task.categoryLabel}】` : '' }}{{ editingCell.task.name }}
             — {{ editingCell.day.label }} {{ editingCell.day.weekday }}
           </p>
         </div>
@@ -544,6 +643,9 @@ function filteredPickerProjects() {
             step="0.25"
             type="number"
           />
+          <span v-if="Number(editForm.hour) > 0" class="mt-1 block text-xs tabular-nums text-muted">
+            = {{ Math.round(Number(editForm.hour) * 60) }} phút
+          </span>
         </label>
 
         <label class="block">
@@ -696,17 +798,17 @@ function filteredPickerProjects() {
       </template>
     </Dialog>
 
-    <!-- New task dialog -->
+    <!-- Task dialog (add / edit) -->
     <Dialog
-      :visible="isAddingTask"
+      :visible="isTaskDialogOpen"
       class="w-full max-w-lg rounded-lg bg-panel shadow-xl"
       :style="{ maxHeight: '90vh' }"
       modal
-      @update:visible="isAddingTask = $event"
+      @update:visible="isTaskDialogOpen = $event"
     >
       <template #header>
         <div class="min-w-0">
-          <h3 class="truncate font-bold text-ink">New Task</h3>
+          <h3 class="truncate font-bold text-ink">{{ isEditingTask ? 'Chỉnh sửa Task' : 'New Task' }}</h3>
           <p v-if="taskTargetProject" class="mt-1 truncate text-sm text-muted">
             {{ taskTargetProject.code }} - {{ taskTargetProject.name }}
           </p>
@@ -735,16 +837,15 @@ function filteredPickerProjects() {
           />
         </label>
 
-        <!-- Task category (multi-select) -->
+        <!-- Task category -->
         <label class="block">
           <span class="text-xs font-bold text-muted">Phân loại task</span>
-          <MultiSelect
-            v-model="taskForm.categories"
+          <Select
+            v-model="taskForm.category"
             :options="ctrl.phases.value"
             option-label="name"
             option-value="code"
             placeholder="Chọn phân loại"
-            display="chip"
             class="mt-1 w-full"
           />
         </label>
@@ -807,7 +908,7 @@ function filteredPickerProjects() {
             <button
               class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
               type="button"
-              @click="isAddingTask = false"
+              @click="isTaskDialogOpen = false"
             >
               Cancel
             </button>
@@ -817,7 +918,7 @@ function filteredPickerProjects() {
               :disabled="!canSaveTask || savingTask"
               @click="saveTask"
             >
-              {{ savingTask ? "Saving…" : "Add task" }}
+              {{ savingTask ? "Saving…" : isEditingTask ? "Cập nhật" : "Add task" }}
             </button>
           </div>
         </div>
@@ -838,7 +939,7 @@ function filteredPickerProjects() {
         @click="openTaskDialog"
       >
         <i class="pi pi-plus" />
-        <span class="min-w-0 truncate">Thêm task</span>
+        <span class="min-w-0 truncate">Thêm nhanh task</span>
       </button>
       <button
         class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
@@ -852,17 +953,76 @@ function filteredPickerProjects() {
         <i class="pi pi-upload" />
         <span class="min-w-0 truncate">Import task</span>
       </button>
-      <template v-if="contextMenu.canDelete">
-        <div class="my-1 border-t border-divider" />
-        <button
-          class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold text-red-600 hover:bg-red-50"
-          type="button"
-          @click="deleteProject"
-        >
-          <i class="pi pi-trash" />
-          <span class="min-w-0 truncate">Xóa project</span>
-        </button>
-      </template>
     </div>
+
+    <!-- Task context menu -->
+    <div
+      v-if="taskContextMenu"
+      class="fixed z-[60] w-52 overflow-hidden rounded-md border border-divider bg-panel py-1 text-sm text-secondary shadow-xl"
+      :style="{ left: `${taskContextMenu.x}px`, top: `${taskContextMenu.y}px` }"
+      @click.stop
+      @contextmenu.prevent
+    >
+      <button
+        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
+        type="button"
+        @click="openEditTaskDialog(taskContextMenu.project, taskContextMenu.task)"
+      >
+        <i class="pi pi-pencil" />
+        <span class="min-w-0 truncate">Chỉnh sửa task</span>
+      </button>
+      <button
+        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
+        type="button"
+        @click="openTaskBacklog(taskContextMenu.task)"
+      >
+        <i class="pi pi-folder-open" />
+        <span class="min-w-0 truncate">Xem backlog</span>
+      </button>
+      <button
+        v-if="!taskContextMenu.task.isCompleted && ctrl.totalHours(taskContextMenu.task.rowId) === 0"
+        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold text-red-500 hover:bg-red-50"
+        type="button"
+        @click="confirmDeleteTask"
+      >
+        <i class="pi pi-trash" />
+        <span class="min-w-0 truncate">Xóa task</span>
+      </button>
+    </div>
+
+    <!-- Delete task confirm dialog -->
+    <Dialog
+      :visible="!!taskDeleteConfirm"
+      class="w-full max-w-sm rounded-lg bg-panel shadow-xl"
+      modal
+      @update:visible="taskDeleteConfirm = null"
+    >
+      <template #header>
+        <h3 class="font-bold text-ink">Xác nhận xóa task</h3>
+      </template>
+      <p class="text-sm text-secondary">
+        Bạn có chắc muốn xóa task
+        <strong class="text-ink">{{ taskDeleteConfirm?.task.name }}</strong>?
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <button
+            class="rounded-md border border-divider bg-panel px-4 py-2 text-sm font-semibold text-secondary hover:bg-canvas"
+            type="button"
+            @click="taskDeleteConfirm = null"
+          >
+            Hủy
+          </button>
+          <button
+            class="rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+            type="button"
+            :disabled="deletingTask"
+            @click="executeDeleteTask"
+          >
+            Xóa
+          </button>
+        </div>
+      </template>
+    </Dialog>
   </section>
 </template>
