@@ -1,10 +1,19 @@
-import { computed, ref } from "vue";
-
-type IssueStatus = "All" | "Open" | "In Progress" | "Review" | "Resolved" | "Closed";
+import { computed, ref, watch } from "vue";
+import { listProjects } from "@/tauri/commands/project";
+import {
+  backlogListStatuses,
+  backlogListCategories,
+  backlogListIssueTypes,
+  type BacklogStatus,
+  type BacklogCategory,
+  type BacklogIssueType,
+} from "@/tauri/commands/backlog";
+import type { ProjectSummaryResult } from "@/_/types/project";
+import { canUseTauriRuntime } from "@/tauri/commands/_base";
 
 export type BacklogSearchCriteria = {
   project: string;
-  status: IssueStatus;
+  status: string[];
   issueType: string;
   category: string;
   assignee: string;
@@ -21,9 +30,9 @@ export type IssueBacklogItem = {
   issueKey: string;
   subject: string;
   assignee: string;
-  status: Exclude<IssueStatus, "All">;
+  status: string;
   hours: number;
-  priority: "Critical" | "High" | "Medium" | "Low";
+  priority: string;
   createDate: string;
   createUser: string;
   project: string;
@@ -31,16 +40,9 @@ export type IssueBacklogItem = {
   bugClass: string;
 };
 
-export const statusOptions: IssueStatus[] = ["All", "Open", "In Progress", "Review", "Resolved", "Closed"];
-export const projects = ["Billing Portal", "Internal Extension", "Mobile Gateway", "Reporting Hub"];
-export const issueTypes = ["Bug", "Task", "Story", "Improvement"];
-export const categories = ["Backend", "Frontend", "Database", "Integration", "Operation"];
-export const assignees = ["An Nguyen", "Bao Tran", "Chi Le", "Dung Pham", "Linh Ho"];
-export const bugClasses = ["Functional", "UI", "Performance", "Security", "Data"];
-
 const initialCriteria: BacklogSearchCriteria = {
   project: "",
-  status: "All",
+  status: [],
   issueType: "",
   category: "",
   assignee: "",
@@ -51,85 +53,16 @@ const initialCriteria: BacklogSearchCriteria = {
   bugClass: "",
 };
 
-const backlogItems: IssueBacklogItem[] = [
-  {
-    id: 1,
-    issueType: "Bug",
-    issueKey: "INT-1042",
-    subject: "Import CSV preview shows duplicated monthly totals",
-    assignee: "An Nguyen",
-    status: "Open",
-    hours: 6.5,
-    priority: "High",
-    createDate: "2026-05-14",
-    createUser: "Minh Hoang",
-    project: "Internal Extension",
-    category: "Backend",
-    bugClass: "Data",
-  },
-  {
-    id: 2,
-    issueType: "Task",
-    issueKey: "BIL-883",
-    subject: "Add payment reconciliation audit export",
-    assignee: "Bao Tran",
-    status: "In Progress",
-    hours: 12,
-    priority: "Medium",
-    createDate: "2026-05-12",
-    createUser: "Hana Ito",
-    project: "Billing Portal",
-    category: "Backend",
-    bugClass: "",
-  },
-  {
-    id: 3,
-    issueType: "Bug",
-    issueKey: "MOB-512",
-    subject: "Token refresh fails after switching network",
-    assignee: "Chi Le",
-    status: "Review",
-    hours: 4,
-    priority: "Critical",
-    createDate: "2026-05-10",
-    createUser: "Quang Pham",
-    project: "Mobile Gateway",
-    category: "Integration",
-    bugClass: "Security",
-  },
-  {
-    id: 4,
-    issueType: "Story",
-    issueKey: "REP-219",
-    subject: "Create team workload dashboard summary",
-    assignee: "Dung Pham",
-    status: "Resolved",
-    hours: 18,
-    priority: "High",
-    createDate: "2026-05-09",
-    createUser: "Linh Ho",
-    project: "Reporting Hub",
-    category: "Frontend",
-    bugClass: "",
-  },
-  {
-    id: 5,
-    issueType: "Improvement",
-    issueKey: "INT-1019",
-    subject: "Tighten keyboard flow in daily report input grid",
-    assignee: "Linh Ho",
-    status: "Closed",
-    hours: 3.5,
-    priority: "Low",
-    createDate: "2026-05-04",
-    createUser: "An Nguyen",
-    project: "Internal Extension",
-    category: "Frontend",
-    bugClass: "UI",
-  },
-];
+export const projects = ref<ProjectSummaryResult[]>([]);
+export const statusOptions = ref<string[]>([]);
+export const issueTypes = ref<string[]>([]);
+export const categories = ref<string[]>([]);
+export const assignees = ref<string[]>([]);
+export const bugClasses = ref<string[]>([]);
+export const uniqueCreateUsers = ref<string[]>([]);
 
-export const uniqueCreateUsers = Array.from(new Set(backlogItems.map((i) => i.createUser))).sort();
+const lookupLoading = ref(false);
+const lookupError = ref("");
 
 function normalize(value: string) {
   return value.trim().toLocaleLowerCase();
@@ -143,7 +76,7 @@ function matchesCriteria(item: IssueBacklogItem, criteria: BacklogSearchCriteria
 
   return (
     (!criteria.project || item.project === criteria.project) &&
-    (criteria.status === "All" || item.status === criteria.status) &&
+    (criteria.status.length === 0 || criteria.status.includes(item.status)) &&
     (!criteria.issueType || item.issueType === criteria.issueType) &&
     (!criteria.category || item.category === criteria.category) &&
     (!criteria.assignee || item.assignee === criteria.assignee) &&
@@ -156,32 +89,127 @@ function matchesCriteria(item: IssueBacklogItem, criteria: BacklogSearchCriteria
 }
 
 export function statusTone(status: string) {
-  if (status === "Open") return "bg-blue-100 text-blue-800";
-  if (status === "In Progress") return "bg-amber-100 text-amber-800";
-  if (status === "Review") return "bg-indigo-100 text-indigo-800";
-  if (status === "Resolved") return "bg-emerald-100 text-emerald-800";
+  const s = status.toLocaleLowerCase();
+  if (s.includes("open")) return "bg-blue-100 text-blue-800";
+  if (s.includes("progress") || s.includes("処理中")) return "bg-amber-100 text-amber-800";
+  if (s.includes("review") || s.includes("処理済み")) return "bg-indigo-100 text-indigo-800";
+  if (s.includes("resolved") || s.includes("完了")) return "bg-emerald-100 text-emerald-800";
+  if (s.includes("closed") || s.includes("close")) return "bg-slate-100 text-slate-700";
   return "bg-slate-100 text-slate-700";
 }
 
 export function priorityTone(priority: string) {
-  if (priority === "Critical") return "bg-red-100 text-red-800";
-  if (priority === "High") return "bg-orange-100 text-orange-800";
-  if (priority === "Medium") return "bg-sky-100 text-sky-800";
+  const p = priority.toLocaleLowerCase();
+  if (p.includes("critical") || p === "高") return "bg-red-100 text-red-800";
+  if (p.includes("high")) return "bg-orange-100 text-orange-800";
+  if (p.includes("medium") || p === "中") return "bg-sky-100 text-sky-800";
   return "bg-slate-100 text-slate-700";
+}
+
+async function loadProjects() {
+  if (!canUseTauriRuntime()) return;
+  try {
+    const list = await listProjects();
+    projects.value = list.filter((p) => p.is_active);
+  } catch {
+    projects.value = [];
+  }
+}
+
+function resolveBacklogKey(projectCode: string): string | null {
+  if (!projectCode) return null;
+  const proj = projects.value.find((p) => p.code === projectCode);
+  if (!proj) return null;
+  // We need the backlog_key from ProjectDetail, but ProjectSummary doesn't have it.
+  // The backlog_key is part of the full detail. We'll load it separately.
+  return null;
+}
+
+async function loadProjectLookups(backlogKey: string) {
+  if (!backlogKey) {
+    statusOptions.value = ["All"];
+    issueTypes.value = [];
+    categories.value = [];
+    lookupError.value = "";
+    return;
+  }
+
+  lookupLoading.value = true;
+  lookupError.value = "";
+
+  try {
+    const [statuses, types, cats] = await Promise.all([
+      backlogListStatuses(backlogKey),
+      backlogListIssueTypes(backlogKey),
+      backlogListCategories(backlogKey),
+    ]);
+
+    statusOptions.value = statuses.map((s: BacklogStatus) => s.name);
+    issueTypes.value = types.map((t: BacklogIssueType) => t.name);
+    categories.value = cats.map((c: BacklogCategory) => c.name);
+  } catch (e) {
+    lookupError.value = String(e);
+    statusOptions.value = ["All"];
+    issueTypes.value = [];
+    categories.value = [];
+  } finally {
+    lookupLoading.value = false;
+  }
 }
 
 export function useIssueBacklog(initialProject = "") {
   const startingCriteria: BacklogSearchCriteria = { ...initialCriteria, project: initialProject };
   const criteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
   const appliedCriteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
+  const backlogItems = ref<IssueBacklogItem[]>([]);
 
-  const filteredItems = computed(() => backlogItems.filter((item) => matchesCriteria(item, appliedCriteria.value)));
+  const filteredItems = computed(() => backlogItems.value.filter((item) => matchesCriteria(item, appliedCriteria.value)));
 
   const canOpenImport = computed(() => Boolean(criteria.value.project));
+
+  const projectBacklogKeys = ref<Map<string, string>>(new Map());
+
+  async function loadProjectBacklogKey(projectCode: string): Promise<string> {
+    if (projectBacklogKeys.value.has(projectCode)) {
+      return projectBacklogKeys.value.get(projectCode)!;
+    }
+
+    const proj = projects.value.find((p) => p.code === projectCode);
+    if (!proj) return "";
+
+    try {
+      const { getProjectDetail } = await import("@/tauri/commands/project");
+      const detail = await getProjectDetail(proj.id);
+      const key = detail.backlog_key || "";
+      projectBacklogKeys.value.set(projectCode, key);
+      return key;
+    } catch {
+      return "";
+    }
+  }
 
   function setField<Field extends keyof BacklogSearchCriteria>(field: Field, value: BacklogSearchCriteria[Field]) {
     criteria.value = { ...criteria.value, [field]: value };
   }
+
+  watch(
+    () => criteria.value.project,
+    async (projectCode) => {
+      criteria.value = { ...criteria.value, status: [], issueType: "", category: "" };
+
+      if (!projectCode) {
+        await loadProjectLookups("");
+        return;
+      }
+
+      const backlogKey = await loadProjectBacklogKey(projectCode);
+      if (backlogKey) {
+        await loadProjectLookups(backlogKey);
+      } else {
+        await loadProjectLookups("");
+      }
+    },
+  );
 
   function search() {
     appliedCriteria.value = { ...criteria.value };
@@ -190,7 +218,16 @@ export function useIssueBacklog(initialProject = "") {
   function reset() {
     criteria.value = { ...initialCriteria };
     appliedCriteria.value = { ...initialCriteria };
+    loadProjectLookups("");
   }
 
-  return { criteria, filteredItems, canOpenImport, setField, search, reset };
+  loadProjects();
+
+  if (initialProject) {
+    loadProjectBacklogKey(initialProject).then((key) => {
+      if (key) loadProjectLookups(key);
+    });
+  }
+
+  return { criteria, filteredItems, canOpenImport, setField, search, reset, lookupLoading, lookupError };
 }

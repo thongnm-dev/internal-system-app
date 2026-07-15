@@ -7,7 +7,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::project_store;
 use crate::models::project::{
-    BacklogProjectLookup, CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
+    CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
     ProjectSummary, ProjectTask,
 };
 
@@ -41,8 +41,8 @@ pub async fn create_project(request: CreateProjectRequest) -> AppResult<ProjectD
         name,
         client: request.client.unwrap_or_default(),
         backlog_key: request.backlog_key.unwrap_or_default(),
-        backlog_url: request.backlog_url.unwrap_or_default(),
-        backlog_space: request.backlog_space.unwrap_or_default(),
+        backlog_code: request.backlog_code.unwrap_or_default(),
+        backlog_name: request.backlog_name.unwrap_or_default(),
         is_active: true,
         members: request.members,
         created_at: String::new(), // Database tự sinh timestamp
@@ -89,8 +89,8 @@ pub async fn update_project(
         name,
         client: request.client.unwrap_or_default(),
         backlog_key: request.backlog_key.unwrap_or_default(),
-        backlog_url: request.backlog_url.unwrap_or_default(),
-        backlog_space: request.backlog_space.unwrap_or_default(),
+        backlog_code: request.backlog_code.unwrap_or_default(),
+        backlog_name: request.backlog_name.unwrap_or_default(),
         is_active: existing.is_active,
         members: request.members,
         created_at: existing.created_at,
@@ -121,12 +121,6 @@ pub async fn delete_project(project_id: i32) -> AppResult<()> {
         )));
     }
     Ok(())
-}
-
-/// Tra cứu dự án từ Backlog API theo project key.
-/// Hiện tại chưa được cấu hình — luôn trả về lỗi.
-pub fn get_backlog_project_by_key(_project_key: String) -> AppResult<BacklogProjectLookup> {
-    Err(AppError::new("Backlog project lookup is not configured."))
 }
 
 /// Tạo task mới cho dự án.

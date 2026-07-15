@@ -11,7 +11,7 @@ export type UserProfile = {
 export type ApiKeySetting = {
   id: string;
   name: string;
-  key: string;
+  key_label: string;
   api_key: string;
 };
 
@@ -23,6 +23,7 @@ export type AppSettings = {
 };
 
 export type SaveSettingsRequest = {
+  user_id: number;
   user: UserProfile;
   theme: string;
   language: string;

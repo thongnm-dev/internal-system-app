@@ -25,10 +25,10 @@ pub struct ProjectDetail {
     pub client: String,
     /// Mã project trên Backlog (nếu có liên kết).
     pub backlog_key: String,
-    /// URL trang Backlog của dự án.
-    pub backlog_url: String,
-    /// Tên space Backlog chứa dự án.
-    pub backlog_space: String,
+    /// Mã số (ID) dự án trên Backlog.
+    pub backlog_code: String,
+    /// Tên dự án trên Backlog.
+    pub backlog_name: String,
     /// Trạng thái hoạt động (true = đang hoạt động).
     pub is_active: bool,
     /// Danh sách thành viên tham gia dự án.
@@ -61,17 +61,9 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub client: Option<String>,
     pub backlog_key: Option<String>,
-    pub backlog_url: Option<String>,
-    pub backlog_space: Option<String>,
+    pub backlog_code: Option<String>,
+    pub backlog_name: Option<String>,
     pub members: Vec<ProjectMember>,
-}
-
-/// Kết quả tra cứu dự án từ Backlog API theo project key.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BacklogProjectLookup {
-    pub project_id: String,
-    pub project_key: String,
-    pub project_name: String,
 }
 
 /// Thông tin chi tiết của một task trong dự án.

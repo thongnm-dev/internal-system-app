@@ -37,6 +37,8 @@ mod commands {
     pub mod user_commands;
     /// Commands cho module quản lý menu (governance).
     pub mod menu_config_commands;
+    /// Commands cho Backlog API integration.
+    pub mod backlog_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -53,14 +55,14 @@ mod database {
     pub mod project_store;
     /// Lưu trữ lịch sử import CSV dưới dạng JSON file.
     pub mod report_store;
-    /// Lưu trữ cài đặt ứng dụng dưới dạng JSON file.
-    pub mod settings_store;
     /// Khởi tạo database (tạo bảng + stored procedure) khi app khởi động.
     pub mod startup_store;
     /// Data access cho module quản lý người dùng.
     pub mod user_store;
     /// Data access cho bảng `menu_configs` (PostgreSQL).
     pub mod menu_config_store;
+    /// Data access cho bảng `api_keys` (PostgreSQL).
+    pub mod api_key_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -89,6 +91,8 @@ mod models {
     pub mod user;
     /// Model cho module quản lý menu (governance).
     pub mod menu_config;
+    /// Model cho Backlog API responses.
+    pub mod backlog;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -119,6 +123,8 @@ mod services {
     pub mod user_service;
     /// Service cho module quản lý menu (governance).
     pub mod menu_config_service;
+    /// Service cho Backlog API integration.
+    pub mod backlog_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

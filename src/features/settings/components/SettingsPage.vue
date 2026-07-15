@@ -5,8 +5,8 @@ import type { UserSettings } from "../composables/useSettings";
 const { settings, apiKeyCount, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey } =
   useSettings();
 
-const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string }[] = [
-  { key: "username", label: "Username", placeholder: "username" },
+const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string; disabled?: boolean }[] = [
+  { key: "username", label: "Username", placeholder: "username", disabled: true },
   { key: "password", label: "Password", type: "password", placeholder: "password" },
   { key: "fullName", label: "Name", placeholder: "full name" },
   { key: "email", label: "Mail", type: "email", placeholder: "mail@example.com" },
@@ -48,9 +48,11 @@ const themeOptions = [
           <label v-for="field in userFields" :key="field.key" :class="field.key === 'address' ? 'col-span-2' : undefined">
             <span class="text-xs font-bold text-muted">{{ field.label }}</span>
             <input
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              :class="['mt-1 h-10 w-full rounded-md border border-divider px-3 text-sm outline-none',
+                field.disabled ? 'bg-canvas text-muted cursor-not-allowed' : 'bg-panel text-ink focus:border-brand focus:ring-2 focus:ring-emerald-100']"
               :placeholder="field.placeholder"
               :type="field.type ?? 'text'"
+              :disabled="field.disabled"
               :value="settings.user[field.key]"
               @input="updateUser(field.key, ($event.target as HTMLInputElement).value)"
             />
@@ -134,10 +136,10 @@ const themeOptions = [
           />
           <input
             class="h-10 rounded-md border border-divider bg-panel px-3 font-mono text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            placeholder="KEY *"
+            placeholder="KEY LABEL *"
             type="text"
-            :value="ak.key"
-            @input="updateApiKey(ak.id, 'key', ($event.target as HTMLInputElement).value.toUpperCase())"
+            :value="ak.keyLabel"
+            @input="updateApiKey(ak.id, 'keyLabel', ($event.target as HTMLInputElement).value.toUpperCase())"
           />
           <input
             class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"

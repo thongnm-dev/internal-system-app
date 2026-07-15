@@ -15,13 +15,18 @@ import {
   useIssueBacklog,
   statusTone,
   priorityTone,
-  type BacklogSearchCriteria,
 } from "../composables/useIssueBacklog";
 
 const route = useRoute();
 const router = useRouter();
 const initialProject = (route.query.project as string) || "";
 const ctrl = useIssueBacklog(initialProject);
+
+function toggleStatus(s: string) {
+  const current = ctrl.criteria.value.status;
+  const next = current.includes(s) ? current.filter((v) => v !== s) : [...current, s];
+  ctrl.setField("status", next);
+}
 
 function openImport() {
   if (ctrl.criteria.value.project) {
@@ -42,45 +47,41 @@ function openImport() {
           <label class="block min-w-0">
             <span class="text-xs font-bold text-muted">Project</span>
             <select
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
               :value="ctrl.criteria.value.project"
               @change="ctrl.setField('project', ($event.target as HTMLSelectElement).value)"
             >
               <option value="">All projects</option>
-              <option
-                v-if="ctrl.criteria.value.project && !projects.includes(ctrl.criteria.value.project)"
-                :value="ctrl.criteria.value.project"
-              >
-                {{ ctrl.criteria.value.project }}
-              </option>
-              <option v-for="p in projects" :key="p" :value="p">{{ p }}</option>
+              <option v-for="p in projects" :key="p.code" :value="p.code">{{ p.name }}</option>
             </select>
           </label>
 
-          <label class="block min-w-0">
+          <div class="block min-w-0">
             <span class="text-xs font-bold text-muted">Status</span>
-            <div class="mt-1 grid h-10 min-w-0 grid-cols-6 gap-1 rounded-md border border-divider bg-panel p-1 text-xs leading-none">
+            <div class="mt-1 flex h-10 min-w-0 flex-wrap items-center gap-1 rounded-md border border-divider bg-panel p-1 text-sm leading-none">
               <button
                 v-for="s in statusOptions"
                 :key="s"
                 :class="[
-                  'flex min-w-0 items-center justify-center truncate rounded px-1.5 py-0 text-xs font-normal transition',
-                  ctrl.criteria.value.status === s ? 'bg-brand text-white' : 'hover:bg-canvas',
+                  'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
+                  ctrl.criteria.value.status.includes(s) ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
                 type="button"
-                @click="ctrl.setField('status', s)"
+                :disabled="ctrl.lookupLoading.value"
+                @click="toggleStatus(s)"
               >
                 {{ s }}
               </button>
             </div>
-          </label>
+          </div>
         </div>
 
         <div class="grid gap-3 lg:grid-cols-2">
           <label class="block min-w-0">
             <span class="text-xs font-bold text-muted">Issue Type</span>
             <select
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              :disabled="ctrl.lookupLoading.value"
               :value="ctrl.criteria.value.issueType"
               @change="ctrl.setField('issueType', ($event.target as HTMLSelectElement).value)"
             >
@@ -92,7 +93,8 @@ function openImport() {
             <label class="block min-w-0">
               <span class="text-xs font-bold text-muted">Category</span>
               <select
-                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                :disabled="ctrl.lookupLoading.value"
                 :value="ctrl.criteria.value.category"
                 @change="ctrl.setField('category', ($event.target as HTMLSelectElement).value)"
               >
@@ -103,7 +105,7 @@ function openImport() {
             <label class="block min-w-0">
               <span class="text-xs font-bold text-muted">Assignee</span>
               <select
-                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                 :value="ctrl.criteria.value.assignee"
                 @change="ctrl.setField('assignee', ($event.target as HTMLSelectElement).value)"
               >
@@ -165,7 +167,7 @@ function openImport() {
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Create user</span>
                 <select
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                   :value="ctrl.criteria.value.createUser"
                   @change="ctrl.setField('createUser', ($event.target as HTMLSelectElement).value)"
                 >
@@ -176,7 +178,7 @@ function openImport() {
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Bug class</span>
                 <select
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
                   :value="ctrl.criteria.value.bugClass"
                   @change="ctrl.setField('bugClass', ($event.target as HTMLSelectElement).value)"
                 >

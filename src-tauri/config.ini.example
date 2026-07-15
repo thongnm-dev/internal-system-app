@@ -4,3 +4,7 @@ port = 5432
 dbname = management_systems
 user = postgres
 password = postgres
+
+[backlog]
+ALX_BACKLOG_URL=https://alxvn.backlog.com/api/v2/
+ALX_BACKLOG_APIKEY=Zzk9uKj2kX6K96kLg3BeSj1WPs5L8PyIQ6HcSfCe4bwHmEhl69s2veKO2lN2OzoS

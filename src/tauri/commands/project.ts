@@ -29,7 +29,7 @@ export function deleteProject(projectId: number) {
 }
 
 export function getBacklogProjectByKey(projectKey: string) {
-  return safeInvoke<BacklogProjectLookup>("get_backlog_project_by_key", { projectKey });
+  return safeInvoke<BacklogProjectLookup>("backlog_get_project_lookup", { projectKey });
 }
 
 export function createProjectTask(projectId: number, request: CreateProjectTaskRequest) {

@@ -12,8 +12,8 @@ RETURNS TABLE (
     name          VARCHAR(200),
     client        VARCHAR(200),
     backlog_key   VARCHAR(20),
-    backlog_url   TEXT,
-    backlog_space VARCHAR(100),
+    backlog_code  TEXT,
+    backlog_name  VARCHAR(100),
     is_active     BOOLEAN,
     created_at    TEXT,
     updated_at    TEXT
@@ -27,9 +27,9 @@ BEGIN
         p.code,
         p.name,
         p.client,
-        p.backlog_key,
-        p.backlog_url,
-        p.backlog_space,
+        p.project_backlog_key   AS backlog_key,
+        p.project_backlog_code::text  AS backlog_code,
+        p.project_backlog_name  AS backlog_name,
         p.is_active,
         p.created_at::text,
         p.updated_at::text

@@ -2,6 +2,8 @@ import { computed, ref, watch } from "vue";
 import { applyTheme } from "@/shared/config/themeTokens";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { getSettings, saveSettings } from "@/tauri/commands/settings";
+import { useAuthStore } from "@/app/stores/auth";
+import { useToast } from "@/shared/composables/useToast";
 import type { AppSettings as TauriAppSettings, ApiKeySetting as TauriApiKeySetting } from "@/_/types/settings";
 
 export type ThemeMode = "light" | "dark";
@@ -20,7 +22,7 @@ export type UserSettings = {
 export type ApiKeySetting = {
   id: string;
   name: string;
-  key: string;
+  keyLabel: string;
   apiKey: string;
 };
 
@@ -45,7 +47,7 @@ const defaultSettings: StoredSettings = {
   },
   theme: "light",
   language: "vi",
-  apiKeys: [{ id: "default", name: "", key: "", apiKey: "" }],
+  apiKeys: [],
 };
 
 function fromTauri(ts: TauriAppSettings): StoredSettings {
@@ -61,20 +63,18 @@ function fromTauri(ts: TauriAppSettings): StoredSettings {
     },
     theme: ts.theme === "dark" ? "dark" : "light",
     language: isLanguageCode(ts.language) ? ts.language : "vi",
-    apiKeys:
-      ts.api_keys.length > 0
-        ? ts.api_keys.map((k: TauriApiKeySetting) => ({
-            id: k.id,
-            name: k.name,
-            key: k.key,
-            apiKey: k.api_key,
-          }))
-        : [{ id: "default", name: "", key: "", apiKey: "" }],
+    apiKeys: ts.api_keys.map((k: TauriApiKeySetting) => ({
+      id: k.id,
+      name: k.name,
+      keyLabel: k.key_label,
+      apiKey: k.api_key,
+    })),
   };
 }
 
-function toTauriRequest(s: StoredSettings) {
+function toTauriRequest(s: StoredSettings, userId: number) {
   return {
+    user_id: userId,
     user: {
       username: s.user.username,
       password: s.user.password,
@@ -89,7 +89,7 @@ function toTauriRequest(s: StoredSettings) {
     api_keys: s.apiKeys.map((k) => ({
       id: k.id,
       name: k.name,
-      key: k.key,
+      key_label: k.keyLabel,
       api_key: k.apiKey,
     })),
   };
@@ -104,10 +104,7 @@ function loadSettingsFromLocal(): StoredSettings {
       user: { ...defaultSettings.user, ...parsed.user },
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: isLanguageCode(parsed.language) ? parsed.language : defaultSettings.language,
-      apiKeys:
-        Array.isArray(parsed.apiKeys) && parsed.apiKeys.length > 0
-          ? parsed.apiKeys.map((k) => ({ ...k, key: k.key ?? "" }))
-          : [...defaultSettings.apiKeys],
+      apiKeys: Array.isArray(parsed.apiKeys) ? parsed.apiKeys : [],
     };
   } catch {
     return { ...defaultSettings };
@@ -123,13 +120,17 @@ function cloneSettings(s: StoredSettings): StoredSettings {
 }
 
 export function useSettings() {
+  const authStore = useAuthStore();
+  const toast = useToast();
   const savedSnapshot = ref<StoredSettings>(loadSettingsFromLocal());
   const settings = ref<StoredSettings>(cloneSettings(savedSnapshot.value));
   const loading = ref(false);
   const error = ref<string | null>(null);
 
+  const userId = computed(() => authStore.user?.user_id ?? 0);
+
   const apiKeyCount = computed(
-    () => settings.value.apiKeys.filter((k) => k.name.trim() && k.key.trim() && k.apiKey.trim()).length,
+    () => settings.value.apiKeys.filter((k) => k.name.trim() && k.apiKey.trim()).length,
   );
 
   const isDirty = computed(() => JSON.stringify(settings.value) !== JSON.stringify(savedSnapshot.value));
@@ -140,11 +141,11 @@ export function useSettings() {
   );
 
   async function loadFromBackend() {
-    if (!canUseTauriRuntime()) return;
+    if (!canUseTauriRuntime() || !userId.value) return;
     loading.value = true;
     error.value = null;
     try {
-      const result = await getSettings();
+      const result = await getSettings(userId.value);
       const loaded = fromTauri(result);
       savedSnapshot.value = loaded;
       settings.value = cloneSettings(loaded);
@@ -162,12 +163,14 @@ export function useSettings() {
       loading.value = true;
       error.value = null;
       try {
-        const result = await saveSettings(toTauriRequest(settings.value));
+        const result = await saveSettings(toTauriRequest(settings.value, userId.value));
         const saved = fromTauri(result);
         savedSnapshot.value = saved;
         settings.value = cloneSettings(saved);
+        toast.success("Settings saved successfully.");
       } catch (e) {
         error.value = friendlyError(e);
+        toast.error(error.value);
       } finally {
         loading.value = false;
       }
@@ -199,12 +202,11 @@ export function useSettings() {
   }
 
   function addApiKey() {
-    settings.value.apiKeys.push({ id: crypto.randomUUID(), name: "", key: "", apiKey: "" });
+    settings.value.apiKeys.push({ id: crypto.randomUUID(), name: "", keyLabel: "", apiKey: "" });
   }
 
   function removeApiKey(id: string) {
-    const next = settings.value.apiKeys.filter((k) => k.id !== id);
-    settings.value.apiKeys = next.length > 0 ? next : [{ id: "default", name: "", key: "", apiKey: "" }];
+    settings.value.apiKeys = settings.value.apiKeys.filter((k) => k.id !== id);
   }
 
   return {

@@ -8,8 +8,8 @@ CREATE OR REPLACE FUNCTION sp_project_insert(
     p_name          VARCHAR(200),
     p_client        VARCHAR(200) DEFAULT '',
     p_backlog_key   VARCHAR(20)  DEFAULT '',
-    p_backlog_url   TEXT         DEFAULT '',
-    p_backlog_space VARCHAR(100) DEFAULT ''
+    p_backlog_code  TEXT         DEFAULT '0',
+    p_backlog_name  VARCHAR(100) DEFAULT ''
 )
 RETURNS TABLE (
     id            INTEGER,
@@ -17,8 +17,8 @@ RETURNS TABLE (
     name          VARCHAR(200),
     client        VARCHAR(200),
     backlog_key   VARCHAR(20),
-    backlog_url   TEXT,
-    backlog_space VARCHAR(100),
+    backlog_code  TEXT,
+    backlog_name  VARCHAR(100),
     is_active     BOOLEAN,
     created_at    TEXT,
     updated_at    TEXT
@@ -27,16 +27,16 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    INSERT INTO projects (code, name, client, backlog_key, backlog_url, backlog_space)
-    VALUES (p_code, p_name, p_client, p_backlog_key, p_backlog_url, p_backlog_space)
+    INSERT INTO projects (code, name, client, project_backlog_key, project_backlog_code, project_backlog_name)
+    VALUES (p_code, p_name, p_client, p_backlog_key, p_backlog_code::numeric, p_backlog_name)
     RETURNING
         projects.id,
         projects.code,
         projects.name,
         projects.client,
-        projects.backlog_key,
-        projects.backlog_url,
-        projects.backlog_space,
+        projects.project_backlog_key   AS backlog_key,
+        projects.project_backlog_code::text  AS backlog_code,
+        projects.project_backlog_name  AS backlog_name,
         projects.is_active,
         projects.created_at::text,
         projects.updated_at::text;

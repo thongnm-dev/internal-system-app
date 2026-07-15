@@ -35,14 +35,14 @@ impl Default for UserProfile {
     }
 }
 
-/// Một API key được cấu hình.
+/// Một API key được cấu hình (lưu trong bảng `api_keys`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ApiKeySetting {
     pub id: String,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
-    pub key: String,
+    pub key_label: String,
     #[serde(default)]
     pub api_key: String,
 }
@@ -69,12 +69,7 @@ fn default_language() -> String {
 }
 
 fn default_api_keys() -> Vec<ApiKeySetting> {
-    vec![ApiKeySetting {
-        id: "default".to_string(),
-        name: String::new(),
-        key: String::new(),
-        api_key: String::new(),
-    }]
+    vec![]
 }
 
 impl Default for AppSettings {
@@ -91,6 +86,7 @@ impl Default for AppSettings {
 /// Request lưu cài đặt từ frontend.
 #[derive(Debug, Deserialize)]
 pub struct SaveSettingsRequest {
+    pub user_id: i32,
     pub user: UserProfile,
     pub theme: String,
     pub language: String,

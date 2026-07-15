@@ -4,7 +4,7 @@
 //! qua IPC invoke, gọi service tương ứng và trả kết quả về frontend.
 
 use crate::models::project::{
-    BacklogProjectLookup, CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
+    CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
     ProjectSummary, ProjectTask,
 };
 use crate::services::project_service;
@@ -51,13 +51,6 @@ pub async fn delete_project(project_id: i32) -> Result<(), String> {
     project_service::delete_project(project_id)
         .await
         .map_err(|e| e.to_string())
-}
-
-/// Tra cứu dự án từ Backlog API theo `project_key`.
-/// Hiện tại chưa cấu hình — luôn trả về lỗi.
-#[tauri::command]
-pub fn get_backlog_project_by_key(project_key: String) -> Result<BacklogProjectLookup, String> {
-    project_service::get_backlog_project_by_key(project_key).map_err(|e| e.to_string())
 }
 
 /// Tạo task mới cho dự án.

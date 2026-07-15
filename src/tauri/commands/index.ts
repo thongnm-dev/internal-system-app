@@ -9,3 +9,4 @@ export * from "./project";
 export * from "./daily-note";
 export * from "./daily-report";
 export * from "./user";
+export * from "./backlog";

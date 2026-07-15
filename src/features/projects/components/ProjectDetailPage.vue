@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
@@ -16,11 +16,11 @@ type ProjectForm = {
   name: string;
   client: string;
   backlogKey: string;
-  backlogUrl: string;
-  backlogSpace: string;
+  backlogCode: string;
+  backlogName: string;
 };
 
-const emptyForm: ProjectForm = { id: null, code: "", name: "", client: "", backlogKey: "", backlogUrl: "", backlogSpace: "" };
+const emptyForm: ProjectForm = { id: null, code: "", name: "", client: "", backlogKey: "", backlogCode: "", backlogName: "" };
 const memberSearchHelpItems: ProjectMember[] = [
   { username: "thongnm", name: "Thong Nguyen" },
   { username: "annatn", name: "Anna Tran" },
@@ -78,8 +78,8 @@ onMounted(async () => {
       name: project.name,
       client: project.client,
       backlogKey: project.backlog_key,
-      backlogUrl: project.backlog_url,
-      backlogSpace: project.backlog_space,
+      backlogCode: project.backlog_code,
+      backlogName: project.backlog_name,
     };
     members.value = project.members;
   } catch (e) {
@@ -99,8 +99,8 @@ async function saveProject() {
       name: form.value.name,
       client: form.value.client || undefined,
       backlog_key: form.value.backlogKey || undefined,
-      backlog_url: form.value.backlogUrl || undefined,
-      backlog_space: form.value.backlogSpace || undefined,
+      backlog_code: form.value.backlogCode || undefined,
+      backlog_name: form.value.backlogName || undefined,
       members: members.value,
     };
     if (projectID) {
@@ -120,35 +120,31 @@ async function saveProject() {
   }
 }
 
-async function fetchBacklogProject(key: string) {
-  const trimmed = key.trim();
+function reloadBacklogProject() {
+  const trimmed = form.value.backlogKey.trim();
   if (!trimmed) {
     backlogLookupError.value = "";
-    form.value = { ...form.value, backlogUrl: "", backlogSpace: "" };
+    form.value = { ...form.value, backlogCode: "", backlogName: "" };
     return;
   }
   isBacklogLookupLoading.value = true;
   backlogLookupError.value = "";
-  try {
-    const project = await getBacklogProjectByKey(trimmed);
-    form.value = { ...form.value, backlogKey: project.project_key, backlogUrl: "", backlogSpace: project.project_name };
-  } catch (e) {
-    form.value = { ...form.value, backlogUrl: "", backlogSpace: "" };
-    backlogLookupError.value = friendlyError(e);
-  } finally {
-    isBacklogLookupLoading.value = false;
-  }
+  getBacklogProjectByKey(trimmed)
+    .then((project) => {
+      form.value = {
+        ...form.value,
+        backlogCode: String(project.projectId),
+        backlogName: project.projectName,
+      };
+    })
+    .catch((e) => {
+      form.value = { ...form.value, backlogName: "", backlogCode: "" };
+      backlogLookupError.value = friendlyError(e);
+    })
+    .finally(() => {
+      isBacklogLookupLoading.value = false;
+    });
 }
-
-function reloadBacklogProject() {
-  fetchBacklogProject(form.value.backlogKey);
-}
-
-let backlogLookupTimeout: number | undefined;
-watch(() => form.value.backlogKey, (key) => {
-  clearTimeout(backlogLookupTimeout);
-  backlogLookupTimeout = window.setTimeout(() => fetchBacklogProject(key), 500);
-});
 </script>
 
 <template>
@@ -203,12 +199,12 @@ watch(() => form.value.backlogKey, (key) => {
                 </div>
               </div>
               <label>
-                <span class="text-xs font-bold text-muted">Backlog Space</span>
-                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" :placeholder="isBacklogLookupLoading ? 'Loading...' : 'Backlog space'" :value="form.backlogSpace" @input="updateForm('backlogSpace', ($event.target as HTMLInputElement).value)" />
+                <span class="text-xs font-bold text-muted">Backlog Code</span>
+                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-canvas px-3 text-sm text-muted outline-none" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :value="form.backlogCode" />
               </label>
               <label class="md:col-span-2">
-                <span class="text-xs font-bold text-muted">Backlog URL</span>
-                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="https://xxx.backlog.com/..." :value="form.backlogUrl" @input="updateForm('backlogUrl', ($event.target as HTMLInputElement).value)" />
+                <span class="text-xs font-bold text-muted">Backlog Name</span>
+                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-canvas px-3 text-sm text-muted outline-none" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :value="form.backlogName" />
               </label>
               <p v-if="backlogLookupError" class="text-sm text-red-600 md:col-span-2">{{ backlogLookupError }}</p>
             </div>

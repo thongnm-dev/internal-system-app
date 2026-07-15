@@ -25,7 +25,7 @@ use commands::import_commands::{
 };
 use commands::project_commands::{
     create_project, create_project_task, delete_project, delete_project_task,
-    get_backlog_project_by_key, get_project_detail, list_project_tasks, list_projects,
+    get_project_detail, list_project_tasks, list_projects,
     update_project, update_project_task,
 };
 use commands::settings_commands::{get_settings, save_settings};
@@ -33,6 +33,11 @@ use commands::system_commands::{check_internet_connection, get_system_info};
 use commands::user_commands::{
     change_user_password, create_user, delete_user, get_user_detail, list_roles, list_users,
     update_user,
+};
+use commands::backlog_commands::{
+    backlog_get_issue, backlog_get_project, backlog_get_project_lookup, backlog_get_space,
+    backlog_list_categories, backlog_list_issue_types, backlog_list_issues,
+    backlog_list_milestones, backlog_list_project_users, backlog_list_statuses,
 };
 use commands::excel2md_commands::excel2md;
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
@@ -85,7 +90,6 @@ pub fn run() {
             get_project_detail,
             list_projects,
             delete_project,
-            get_backlog_project_by_key,
             // === Project Task commands ===
             create_project_task,
             update_project_task,
@@ -123,7 +127,18 @@ pub fn run() {
             // === Menu config commands ===
             list_menu_configs,
             save_menu_config,
-            save_all_menu_configs
+            save_all_menu_configs,
+            // === Backlog API commands ===
+            backlog_get_space,
+            backlog_get_project,
+            backlog_list_issue_types,
+            backlog_list_statuses,
+            backlog_list_categories,
+            backlog_list_milestones,
+            backlog_list_project_users,
+            backlog_list_issues,
+            backlog_get_issue,
+            backlog_get_project_lookup
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

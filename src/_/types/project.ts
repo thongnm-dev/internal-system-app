@@ -9,8 +9,8 @@ export type ProjectDetailResult = {
   name: string;
   client: string;
   backlog_key: string;
-  backlog_url: string;
-  backlog_space: string;
+  backlog_code: string;
+  backlog_name: string;
   is_active: boolean;
   members: ProjectMember[];
   created_at: string;
@@ -18,9 +18,9 @@ export type ProjectDetailResult = {
 };
 
 export type BacklogProjectLookup = {
-  project_id: string | number;
-  project_key: string;
-  project_name: string;
+  projectId: string | number;
+  projectKey: string;
+  projectName: string;
 };
 
 export type CreateProjectRequest = {
@@ -28,8 +28,8 @@ export type CreateProjectRequest = {
   name: string;
   client?: string;
   backlog_key?: string;
-  backlog_url?: string;
-  backlog_space?: string;
+  backlog_code?: string;
+  backlog_name?: string;
   members: ProjectMember[];
 };
 
