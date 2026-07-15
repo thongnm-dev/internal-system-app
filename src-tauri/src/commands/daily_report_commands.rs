@@ -32,9 +32,9 @@ pub async fn clear_daily_report_entry(
     username: String,
     task_id: String,
     entry_date: String,
-    phase: String,
+    category_id: i32,
 ) -> Result<(), String> {
-    daily_report_service::clear_entry(&username, &task_id, &entry_date, &phase)
+    daily_report_service::clear_entry(&username, &task_id, &entry_date, category_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -93,10 +93,10 @@ pub async fn get_daily_report_task_hours(
 #[tauri::command]
 pub async fn set_daily_report_task_completed(
     username: String,
-    task_id: String,
+    task_id: i32,
     is_completed: bool,
 ) -> Result<DailyReportUserTask, String> {
-    daily_report_service::set_task_completed(&username, &task_id, is_completed)
+    daily_report_service::set_task_completed(&username, task_id, is_completed)
         .await
         .map_err(|e| e.to_string())
 }
@@ -146,9 +146,9 @@ pub async fn get_daily_report_projects(
 #[tauri::command]
 pub async fn delete_daily_report_task(
     username: String,
-    task_id: String,
+    task_id: i32,
 ) -> Result<(), String> {
-    daily_report_service::delete_task(&username, &task_id)
+    daily_report_service::delete_task(&username, task_id)
         .await
         .map_err(|e| e.to_string())
 }

@@ -108,59 +108,14 @@ CREATE TABLE IF NOT EXISTS project_tasks (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_project_tasks_project
-    ON project_tasks(project_id);
-CREATE INDEX IF NOT EXISTS idx_project_tasks_assignee
-    ON project_tasks(assignee);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_project ON project_tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_assignee ON project_tasks(assignee);
 
 CREATE TABLE IF NOT EXISTS project_task_categories (
     task_id     VARCHAR(50) NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
     category_id INTEGER     NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     PRIMARY KEY (task_id, category_id)
 );
-
--- ============================================================================
--- ISSUES
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS issues (
-    id                  SERIAL       PRIMARY KEY,
-    project_id          INTEGER      NOT NULL REFERENCES projects(id),
-    issue_key           VARCHAR(30)  NOT NULL UNIQUE,
-    issue_type          VARCHAR(30)  NOT NULL
-        CHECK (issue_type IN ('Bug', 'Task', 'Story', 'Improvement')),
-    subject             TEXT         NOT NULL,
-    description         TEXT         NOT NULL DEFAULT '',
-    assignee            VARCHAR(100) NOT NULL DEFAULT '',
-    status              VARCHAR(20)  NOT NULL DEFAULT 'Open'
-        CHECK (status IN ('Open', 'In Progress', 'Review', 'Resolved', 'Closed')),
-    priority            VARCHAR(10)  NOT NULL DEFAULT 'Medium'
-        CHECK (priority IN ('Critical', 'High', 'Medium', 'Low')),
-    category            VARCHAR(30)  NOT NULL DEFAULT ''
-        CHECK (category IN ('', 'Backend', 'Frontend', 'Database', 'Integration', 'Operation')),
-    bug_class           VARCHAR(30)  NOT NULL DEFAULT ''
-        CHECK (bug_class IN ('', 'Functional', 'UI', 'Performance', 'Security', 'Data')),
-    estimated_hours     NUMERIC(8,2) NOT NULL DEFAULT 0,
-    actual_hours        NUMERIC(8,2) NOT NULL DEFAULT 0,
-    start_date          DATE,
-    due_date            DATE,
-    version             VARCHAR(50)  NOT NULL DEFAULT '',
-    milestones          VARCHAR(200) NOT NULL DEFAULT '',
-    parent_issue_key    VARCHAR(30),
-    bug_types           VARCHAR(100) NOT NULL DEFAULT '',
-    bug_severity_levels VARCHAR(100) NOT NULL DEFAULT '',
-    test_phase          VARCHAR(100) NOT NULL DEFAULT '',
-    create_user         VARCHAR(100) NOT NULL DEFAULT '',
-    created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_issues_project  ON issues(project_id);
-CREATE INDEX IF NOT EXISTS idx_issues_status   ON issues(status);
-CREATE INDEX IF NOT EXISTS idx_issues_assignee ON issues(assignee);
-CREATE INDEX IF NOT EXISTS idx_issues_type     ON issues(issue_type);
-CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority);
-CREATE INDEX IF NOT EXISTS idx_issues_date     ON issues(created_at);
 
 -- ============================================================================
 -- DAILY WORK
@@ -190,9 +145,9 @@ CREATE TABLE IF NOT EXISTS daily_report_entries (
     is_ot       BOOLEAN          NOT NULL DEFAULT FALSE,
     regular_ot  DOUBLE PRECISION NOT NULL DEFAULT 0,
     midnight_ot DOUBLE PRECISION NOT NULL DEFAULT 0,
-    phase       VARCHAR(100)     NOT NULL DEFAULT '',
+    category_id INTEGER          NOT NULL DEFAULT 0,
     updated_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
-    UNIQUE(username, task_id, entry_date, phase)
+    UNIQUE(username, task_id, entry_date, category_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_report_entries_user_date
@@ -201,20 +156,17 @@ CREATE INDEX IF NOT EXISTS idx_daily_report_entries_user_date
 CREATE TABLE IF NOT EXISTS daily_report_tasks (
     id            SERIAL       PRIMARY KEY,
     username      VARCHAR(100) NOT NULL,
-    task_id       VARCHAR(120) NOT NULL,
     project_id    VARCHAR(120) NOT NULL,
-    code          VARCHAR(50)  NOT NULL DEFAULT 'TASK',
     name          VARCHAR(300) NOT NULL,
     description   TEXT         NOT NULL DEFAULT '',
-    categories    TEXT[]       NOT NULL DEFAULT '{}',
+    category_id   INTEGER      NOT NULL DEFAULT 0,
     assignee      VARCHAR(100) NOT NULL DEFAULT '',
     estimate_hour VARCHAR(20)  NOT NULL DEFAULT '',
     due_date      VARCHAR(20)  NOT NULL DEFAULT '',
     issue_key     VARCHAR(50)  NOT NULL DEFAULT '',
     is_completed  BOOLEAN      NOT NULL DEFAULT FALSE,
     completed_at  TIMESTAMPTZ,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    UNIQUE(username, task_id)
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_report_tasks_user
@@ -345,9 +297,6 @@ CREATE OR REPLACE TRIGGER trg_users_updated_at
 
 CREATE OR REPLACE TRIGGER trg_projects_updated_at
     BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-
-CREATE OR REPLACE TRIGGER trg_issues_updated_at
-    BEFORE UPDATE ON issues FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE OR REPLACE TRIGGER trg_skills_updated_at
     BEFORE UPDATE ON skills FOR EACH ROW EXECUTE FUNCTION update_updated_at();

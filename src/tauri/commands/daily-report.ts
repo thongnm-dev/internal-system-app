@@ -13,8 +13,8 @@ export function saveDailyReportEntry(username: string, request: SaveDailyReportE
   return safeInvoke<DailyReportEntryResult>("save_daily_report_entry", { username, request });
 }
 
-export function clearDailyReportEntry(username: string, taskId: string, entryDate: string, phase: string) {
-  return safeInvoke<void>("clear_daily_report_entry", { username, taskId, entryDate, phase });
+export function clearDailyReportEntry(username: string, taskId: string, entryDate: string, categoryId: number) {
+  return safeInvoke<void>("clear_daily_report_entry", { username, taskId, entryDate, categoryId });
 }
 
 export function getDailyReportEntries(username: string, year: number, month: number) {
@@ -33,7 +33,7 @@ export function getDailyReportTaskHours(username: string) {
   return safeInvoke<DailyReportTaskHoursResult[]>("get_daily_report_task_hours", { username });
 }
 
-export function setDailyReportTaskCompleted(username: string, taskId: string, isCompleted: boolean) {
+export function setDailyReportTaskCompleted(username: string, taskId: number, isCompleted: boolean) {
   return safeInvoke<DailyReportUserTaskResult>("set_daily_report_task_completed", {
     username,
     taskId,
@@ -53,7 +53,7 @@ export function getTaskCategories() {
   return safeInvoke<DailyReportPhaseResult[]>("get_task_categories", {});
 }
 
-export function deleteDailyReportTask(username: string, taskId: string) {
+export function deleteDailyReportTask(username: string, taskId: number) {
   return safeInvoke<void>("delete_daily_report_task", { username, taskId });
 }
 

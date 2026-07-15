@@ -28,7 +28,7 @@ pub async fn upsert_entry(
     is_ot: bool,
     regular_ot: f64,
     midnight_ot: f64,
-    phase: &str,
+    category_id: i32,
 ) -> AppResult<DailyReportEntry> {
     let client = pgsql_connect::connect().await?;
     let date = parse_date(entry_date)?;
@@ -46,7 +46,7 @@ pub async fn upsert_entry(
                 &is_ot,
                 &regular_ot,
                 &midnight_ot,
-                &phase,
+                &category_id,
             ],
         )
         .await
@@ -57,14 +57,14 @@ pub async fn upsert_entry(
 
 /// Xóa một ô nhập giờ công theo (username, task_id, entry_date).
 /// Trả về `true` nếu có bản ghi bị xóa.
-pub async fn delete_entry(username: &str, task_id: &str, entry_date: &str, phase: &str) -> AppResult<bool> {
+pub async fn delete_entry(username: &str, task_id: &str, entry_date: &str, category_id: i32) -> AppResult<bool> {
     let client = pgsql_connect::connect().await?;
     let date = parse_date(entry_date)?;
 
     let row = client
         .query_one(
             "SELECT sp_daily_report_entry_delete($1, $2, $3, $4)",
-            &[&username, &task_id, &date, &phase],
+            &[&username, &task_id, &date, &category_id],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to delete daily report entry: {e}")))?;
@@ -100,13 +100,12 @@ pub async fn select_entries_by_month(
 /// Trả về bản ghi sau khi lưu.
 #[allow(clippy::too_many_arguments)]
 pub async fn insert_task(
+    id: i32,
     username: &str,
-    task_id: &str,
     project_id: &str,
-    code: &str,
     name: &str,
     description: &str,
-    categories: &[String],
+    category_id: i32,
     assignee: &str,
     estimate_hour: &str,
     due_date: &str,
@@ -114,19 +113,18 @@ pub async fn insert_task(
 ) -> AppResult<DailyReportUserTask> {
     let client = pgsql_connect::connect().await?;
 
-    let categories_vec = categories.to_vec();
+    let id_param: Option<i32> = if id > 0 { Some(id) } else { None };
 
     let row = client
         .query_one(
-            "SELECT * FROM sp_daily_report_task_insert($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            "SELECT * FROM sp_daily_report_task_insert($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
             &[
+                &id_param,
                 &username,
-                &task_id,
                 &project_id,
-                &code,
                 &name,
                 &description,
-                &categories_vec,
+                &category_id,
                 &assignee,
                 &estimate_hour,
                 &due_date,
@@ -213,6 +211,7 @@ pub async fn select_categories() -> AppResult<Vec<DailyReportPhase>> {
     Ok(rows
         .iter()
         .map(|row| DailyReportPhase {
+            id: row.get("id"),
             process_code: row.get("process_code"),
             process_name: row.get("process_name"),
             short_name: row.get("short_name"),
@@ -233,6 +232,7 @@ pub async fn select_task_categories() -> AppResult<Vec<DailyReportPhase>> {
     Ok(rows
         .iter()
         .map(|row| DailyReportPhase {
+            id: row.get("id"),
             process_code: row.get("process_code"),
             process_name: row.get("process_name"),
             short_name: row.get("short_name"),
@@ -245,7 +245,7 @@ pub async fn select_task_categories() -> AppResult<Vec<DailyReportPhase>> {
 /// Trả về bản ghi sau khi cập nhật, hoặc `None` nếu không tìm thấy.
 pub async fn set_task_completed(
     username: &str,
-    task_id: &str,
+    task_id: i32,
     is_completed: bool,
 ) -> AppResult<Option<DailyReportUserTask>> {
     let client = pgsql_connect::connect().await?;
@@ -261,9 +261,9 @@ pub async fn set_task_completed(
     Ok(rows.first().map(row_to_task))
 }
 
-/// Xóa một task người dùng tự thêm theo (username, task_id).
+/// Xóa một task người dùng tự thêm theo (username, id).
 /// Trả về `true` nếu có bản ghi bị xóa.
-pub async fn delete_task(username: &str, task_id: &str) -> AppResult<bool> {
+pub async fn delete_task(username: &str, task_id: i32) -> AppResult<bool> {
     let client = pgsql_connect::connect().await?;
 
     let row = client
@@ -323,22 +323,22 @@ fn row_to_entry(row: &tokio_postgres::Row) -> DailyReportEntry {
         is_ot: row.get("is_ot"),
         regular_ot: row.get("regular_ot"),
         midnight_ot: row.get("midnight_ot"),
-        phase: row.get("phase"),
+        category_id: row.get("category_id"),
         updated_at: row.get("updated_at"),
     }
 }
 
 /// Chuyển đổi một row thành `DailyReportUserTask`.
 fn row_to_task(row: &tokio_postgres::Row) -> DailyReportUserTask {
+    let id: i32 = row.try_get("id").unwrap_or(0);
     DailyReportUserTask {
-        id: row.get("id"),
+        id,
         username: row.get("username"),
-        task_id: row.get("task_id"),
+        task_id: row.try_get("task_id").unwrap_or_else(|_| id.to_string()),
         project_id: row.get("project_id"),
-        code: row.get("code"),
         name: row.get("name"),
         description: row.get("description"),
-        categories: row.get("categories"),
+        category_id: row.get("category_id"),
         assignee: row.get("assignee"),
         estimate_hour: row.get("estimate_hour"),
         due_date: row.get("due_date"),

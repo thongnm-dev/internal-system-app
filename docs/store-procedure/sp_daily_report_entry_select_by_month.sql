@@ -3,6 +3,8 @@
 -- Select all daily report entries for a user within a given month (YYYY-MM).
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS sp_daily_report_entry_select_by_month(varchar, integer, integer);
+
 CREATE OR REPLACE FUNCTION sp_daily_report_entry_select_by_month(
     p_username VARCHAR(100),
     p_year     INTEGER,
@@ -19,7 +21,7 @@ RETURNS TABLE (
     is_ot       BOOLEAN,
     regular_ot  DOUBLE PRECISION,
     midnight_ot DOUBLE PRECISION,
-    phase       VARCHAR(100),
+    category_id INTEGER,
     updated_at  TEXT
 )
 LANGUAGE plpgsql
@@ -43,7 +45,7 @@ BEGIN
         e.is_ot,
         e.regular_ot,
         e.midnight_ot,
-        e.phase,
+        e.category_id,
         e.updated_at::text
     FROM daily_report_entries e
     WHERE e.username = p_username

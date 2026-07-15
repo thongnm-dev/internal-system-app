@@ -24,10 +24,10 @@ export type TaskCategory = string;
 
 export type DailyReportTask = {
   id: string;
-  code: string;
+  dbId: number;
+  categoryId: number;
   name: string;
   description?: string;
-  categories?: TaskCategory[];
   assignee?: string;
   estimateHour?: string;
   dueDate?: string;
@@ -67,7 +67,7 @@ export type DailyReportEntry = {
   hour: string;
   isOt: boolean;
   midnightOt: string;
-  phase: string;
+  categoryId: number;
   regularOt: string;
 };
 
@@ -91,17 +91,18 @@ function parseRowId(rowId: string): { taskId: string; category: string } {
   return { taskId: rowId.substring(0, idx), category: rowId.substring(idx + 1) };
 }
 
-function expandTaskByCategory(
+function taskToRow(
   task: DailyReportTask,
   phaseMap: Map<string, string>,
-): DailyReportTaskRow[] {
-  const cats = task.categories?.length ? task.categories : [""];
-  return cats.map((cat) => ({
+  idToCodeMap: Map<number, string>,
+): DailyReportTaskRow {
+  const code = idToCodeMap.get(task.categoryId) ?? "";
+  return {
     ...task,
-    rowId: makeRowId(task.id, cat),
-    category: cat,
-    categoryLabel: phaseMap.get(cat) ?? cat,
-  }));
+    rowId: makeRowId(task.id, code),
+    category: code,
+    categoryLabel: phaseMap.get(code) ?? code,
+  };
 }
 
 export function useDailyReport(username?: string) {
@@ -115,7 +116,9 @@ export function useDailyReport(username?: string) {
   const entries = ref<DailyReportEntries>({});
   const userTasks = ref<Record<string, DailyReportTask[]>>({});
   const taskHoursTotal = ref<Record<string, number>>({});
-  const phases = ref<{ code: string; name: string; shortName: string }[]>([]);
+  const phases = ref<{ id: number; code: string; name: string; shortName: string }[]>([]);
+  const categoryIdToCode = computed(() => new Map(phases.value.map((p) => [p.id, p.code])));
+  const categoryCodeToId = computed(() => new Map(phases.value.map((p) => [p.code, p.id])));
   const isLoading = ref(false);
   const error = ref("");
 
@@ -133,7 +136,7 @@ export function useDailyReport(username?: string) {
       name: p.name,
       client: p.client,
       isUserAdded,
-      tasks: rawTasks.flatMap((t) => expandTaskByCategory(t, phaseMap)),
+      tasks: rawTasks.map((t) => taskToRow(t, phaseMap, categoryIdToCode.value)),
     };
   }
 
@@ -202,7 +205,7 @@ export function useDailyReport(username?: string) {
     try {
       const rows = await getDailyReportEntries(username, year.value, monthIndex.value + 1);
       entries.value = rows.reduce<DailyReportEntries>((acc, row) => {
-        const rowId = makeRowId(row.task_id, row.phase);
+        const rowId = makeRowId(row.task_id, categoryIdToCode.value.get(row.category_id) ?? "");
         acc[entryKey(rowId, dayOfDate(row.entry_date))] = toFrontendEntry(row);
         return acc;
       }, {});
@@ -253,7 +256,7 @@ export function useDailyReport(username?: string) {
     if (!username) return;
     try {
       const rows: DailyReportPhaseResult[] = await getDailyReportPhases();
-      phases.value = rows.map((r) => ({ code: r.process_code, name: r.process_name, shortName: r.short_name }));
+      phases.value = rows.map((r) => ({ id: r.id, code: r.process_code, name: r.process_name, shortName: r.short_name }));
     } catch (e) {
       error.value = friendlyError(e);
     }
@@ -283,55 +286,31 @@ export function useDailyReport(username?: string) {
     error.value = "";
     const shortName = input.shortName.trim();
     if (!shortName) return null;
-    const categories = input.category ? [input.category] : [];
-    const task: DailyReportTask = {
-      id: `${projectId}-task-${Date.now()}`,
-      code: input.category || "TASK",
-      name: shortName,
-      description: input.description.trim(),
-      categories,
-      assignee: input.assignee.trim() || (username ?? ""),
-      estimateHour: String(input.estimateHour ?? "").trim(),
-      dueDate: input.dueDate,
-      issueKey: input.issueKey.trim(),
-      isUserAdded: true,
-    };
-    const existing = userTasks.value[projectId] ?? [];
-    userTasks.value = { ...userTasks.value, [projectId]: [...existing, task] };
-    if (!visibleOptionalIds.value.includes(projectId) && optionalProjects.value.some((p) => projectIdStr(p) === projectId)) {
-      visibleOptionalIds.value = [...visibleOptionalIds.value, projectId];
-    }
 
-    if (username) {
-      try {
-        const saved = await createDailyReportTask(username, {
-          task_id: task.id,
-          project_id: projectId,
-          code: task.code,
-          name: task.name,
-          description: task.description ?? "",
-          categories,
-          assignee: task.assignee ?? "",
-          estimate_hour: task.estimateHour ?? "",
-          due_date: task.dueDate ?? "",
-          issue_key: task.issueKey ?? "",
-        });
-        const persisted = toFrontendTask(saved);
-        userTasks.value = {
-          ...userTasks.value,
-          [projectId]: (userTasks.value[projectId] ?? []).map((t) => (t.id === task.id ? persisted : t)),
-        };
-        return persisted;
-      } catch (e) {
-        error.value = friendlyError(e);
-        userTasks.value = {
-          ...userTasks.value,
-          [projectId]: (userTasks.value[projectId] ?? []).filter((t) => t.id !== task.id),
-        };
-        return null;
+    if (!username) return null;
+
+    try {
+      const saved = await createDailyReportTask(username, {
+        project_id: projectId,
+        name: shortName,
+        description: input.description.trim(),
+        category_id: categoryCodeToId.value.get(input.category) ?? 0,
+        assignee: input.assignee.trim() || username,
+        estimate_hour: String(input.estimateHour ?? "").trim(),
+        due_date: input.dueDate,
+        issue_key: input.issueKey.trim(),
+      });
+      const persisted = toFrontendTask(saved);
+      const existing = userTasks.value[projectId] ?? [];
+      userTasks.value = { ...userTasks.value, [projectId]: [...existing, persisted] };
+      if (!visibleOptionalIds.value.includes(projectId) && optionalProjects.value.some((p) => projectIdStr(p) === projectId)) {
+        visibleOptionalIds.value = [...visibleOptionalIds.value, projectId];
       }
+      return persisted;
+    } catch (e) {
+      error.value = friendlyError(e);
+      return null;
     }
-    return task;
   }
 
   async function setTaskCompleted(taskId: string, isCompleted: boolean) {
@@ -355,7 +334,7 @@ export function useDailyReport(username?: string) {
 
     try {
       if (isUserAdded) {
-        await setDailyReportTaskCompleted(username, taskId, isCompleted);
+        await setDailyReportTaskCompleted(username, rawTask!.dbId, isCompleted);
       } else {
         await setProjectTaskCompleted(taskId, isCompleted);
       }
@@ -365,6 +344,22 @@ export function useDailyReport(username?: string) {
     }
   }
 
+  function migrateEntryKeys(taskId: string, oldCategory: string, newCategory: string) {
+    if (oldCategory === newCategory) return;
+    const oldRowId = makeRowId(taskId, oldCategory);
+    const newRowId = makeRowId(taskId, newCategory);
+    const updated = { ...entries.value };
+    const oldPrefix = `${oldRowId}:`;
+    for (const key of Object.keys(updated)) {
+      if (key.startsWith(oldPrefix)) {
+        const day = key.substring(oldPrefix.length);
+        updated[`${newRowId}:${day}`] = updated[key];
+        delete updated[key];
+      }
+    }
+    entries.value = updated;
+  }
+
   async function updateTask(projectId: string, taskId: string, input: NewTaskInput): Promise<DailyReportTask | null> {
     error.value = "";
     const shortName = input.shortName.trim();
@@ -372,31 +367,32 @@ export function useDailyReport(username?: string) {
     const tasks = userTasks.value[projectId] ?? [];
     const existing = tasks.find((t) => t.id === taskId);
     if (!existing) return null;
-    const categories = input.category ? [input.category] : [];
+    const oldCategory = categoryIdToCode.value.get(existing.categoryId) ?? "";
+    const newCategory = input.category ?? "";
+    const newCategoryId = categoryCodeToId.value.get(newCategory) ?? 0;
     const updated: DailyReportTask = {
       ...existing,
-      code: input.category || existing.code,
       name: shortName,
       description: input.description.trim(),
-      categories,
+      categoryId: newCategoryId,
       assignee: input.assignee.trim() || existing.assignee || (username ?? ""),
       estimateHour: String(input.estimateHour ?? "").trim(),
       dueDate: input.dueDate,
       issueKey: input.issueKey.trim(),
     };
+    migrateEntryKeys(taskId, oldCategory, newCategory);
     userTasks.value = {
       ...userTasks.value,
       [projectId]: tasks.map((t) => (t.id === taskId ? updated : t)),
     };
-    if (username) {
+    if (username && existing.isUserAdded) {
       try {
         const saved = await createDailyReportTask(username, {
-          task_id: taskId,
+          id: existing.dbId,
           project_id: projectId,
-          code: updated.code,
           name: updated.name,
           description: updated.description ?? "",
-          categories,
+          category_id: newCategoryId,
           assignee: updated.assignee ?? "",
           estimate_hour: updated.estimateHour ?? "",
           due_date: updated.dueDate ?? "",
@@ -409,6 +405,7 @@ export function useDailyReport(username?: string) {
         };
         return persisted;
       } catch (e) {
+        migrateEntryKeys(taskId, newCategory, oldCategory);
         userTasks.value = { ...userTasks.value, [projectId]: tasks };
         error.value = friendlyError(e);
         throw new Error(error.value);
@@ -425,7 +422,7 @@ export function useDailyReport(username?: string) {
     if (totalHours(taskId) > 0) throw new Error("Không thể xóa task đã phát sinh số giờ.");
     error.value = "";
     try {
-      if (username) await deleteDailyReportTask(username, taskId);
+      if (username) await deleteDailyReportTask(username, task.dbId);
       userTasks.value = {
         ...userTasks.value,
         [projectId]: tasks.filter((t) => t.id !== taskId),
@@ -481,7 +478,7 @@ export function useDailyReport(username?: string) {
       bumpTaskHours(taskId, -previousHour);
       if (username) {
         try {
-          await clearDailyReportEntry(username, taskId, entryDate, category);
+          await clearDailyReportEntry(username, taskId, entryDate, categoryCodeToId.value.get(category) ?? 0);
         } catch (e) {
           error.value = friendlyError(e);
         }
@@ -502,7 +499,7 @@ export function useDailyReport(username?: string) {
           is_ot: normalized.isOt,
           regular_ot: Number(normalized.regularOt) || 0,
           midnight_ot: Number(normalized.midnightOt) || 0,
-          phase: category,
+          category_id: categoryCodeToId.value.get(category) ?? 0,
         });
       } catch (e) {
         error.value = friendlyError(e);
@@ -567,7 +564,7 @@ function toFrontendEntry(row: DailyReportEntryResult): DailyReportEntry {
     hour: numToStr(row.hour),
     isOt: row.is_ot,
     midnightOt: row.is_ot ? numToStr(row.midnight_ot) : "",
-    phase: row.phase ?? "",
+    categoryId: row.category_id ?? 0,
     regularOt: row.is_ot ? numToStr(row.regular_ot) : "",
   };
 }
@@ -575,10 +572,10 @@ function toFrontendEntry(row: DailyReportEntryResult): DailyReportEntry {
 function toFrontendTask(row: DailyReportUserTaskResult): DailyReportTask {
   return {
     id: row.task_id,
-    code: row.code,
+    dbId: row.id,
+    categoryId: row.category_id ?? 0,
     name: row.name,
     description: row.description,
-    categories: (row.categories ?? []) as TaskCategory[],
     assignee: row.assignee,
     estimateHour: row.estimate_hour,
     dueDate: row.due_date,
@@ -650,7 +647,7 @@ function normalizeEntry(value: DailyReportEntry): DailyReportEntry | null {
     hour: String(Math.min(numeric, 24)),
     isOt,
     midnightOt: isOt ? normalizeOptionalHour(String(value.midnightOt ?? "")) : "",
-    phase: String(value.phase ?? "").trim(),
+    categoryId: value.categoryId ?? 0,
     regularOt: isOt ? normalizeOptionalHour(String(value.regularOt ?? "")) : "",
   };
 }
@@ -670,7 +667,7 @@ export function normalizeEntryForForm(entry: DailyReportEntry | string | undefin
 }
 
 export function emptyEntry(): DailyReportEntry {
-  return { comment: "", hour: "", isOt: false, midnightOt: "", phase: "", regularOt: "" };
+  return { comment: "", hour: "", isOt: false, midnightOt: "", categoryId: 0, regularOt: "" };
 }
 
 export function formatHoursDisplay(value: number): string {

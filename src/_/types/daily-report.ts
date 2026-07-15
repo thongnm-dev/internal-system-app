@@ -9,7 +9,7 @@ export type DailyReportEntryResult = {
   is_ot: boolean;
   regular_ot: number;
   midnight_ot: number;
-  phase: string;
+  category_id: number;
   updated_at: string;
 };
 
@@ -22,7 +22,7 @@ export type SaveDailyReportEntryRequest = {
   is_ot: boolean;
   regular_ot: number;
   midnight_ot: number;
-  phase: string;
+  category_id: number;
 };
 
 export type DailyReportUserTaskResult = {
@@ -30,10 +30,9 @@ export type DailyReportUserTaskResult = {
   username: string;
   task_id: string;
   project_id: string;
-  code: string;
   name: string;
   description: string;
-  categories: string[];
+  category_id: number;
   assignee: string;
   estimate_hour: string;
   due_date: string;
@@ -50,6 +49,7 @@ export type DailyReportTaskHoursResult = {
 };
 
 export type DailyReportPhaseResult = {
+  id: number;
   process_code: string;
   process_name: string;
   short_name: string;
@@ -65,12 +65,11 @@ export type DailyReportProjectResult = {
 };
 
 export type CreateDailyReportTaskRequest = {
-  task_id: string;
+  id?: number;
   project_id: string;
-  code: string;
   name: string;
   description: string;
-  categories: string[];
+  category_id: number;
   assignee: string;
   estimate_hour: string;
   due_date: string;

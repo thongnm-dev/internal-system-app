@@ -140,7 +140,7 @@ function openEditTaskDialog(project: DailyReportProject, task: DailyReportTaskRo
   taskForm.value = {
     shortName: task.name,
     description: task.description ?? "",
-    category: (task.categories?.[0]) ?? "",
+    category: task.category ?? "",
     assignee: task.assignee ?? auth.user?.username ?? "",
     estimateHour: task.estimateHour ?? "",
     dueDate: task.dueDate ?? "",
@@ -528,7 +528,6 @@ function filteredPickerProjects() {
                     :class="task.isCompleted ? 'text-muted line-through' : 'text-ink'"
                   >{{ task.categoryLabel ? `【${task.categoryLabel}】` : '' }}{{ task.name }}</strong>
                   <div class="mt-1 flex items-center gap-2">
-                    <span v-if="!task.category" class="truncate text-xs font-semibold text-muted">{{ task.code }}</span>
                     <span
                       v-if="task.isCompleted"
                       class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand"
@@ -851,16 +850,6 @@ function filteredPickerProjects() {
         </label>
 
         <div class="grid grid-cols-2 gap-3">
-          <!-- Assignee -->
-          <label class="block">
-            <span class="text-xs font-bold text-muted">Assignee</span>
-            <input
-              v-model="taskForm.assignee"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              placeholder="Username"
-            />
-          </label>
-
           <!-- Estimate hour -->
           <label class="block">
             <span class="text-xs font-bold text-muted">Estimate Hour</span>
@@ -964,6 +953,7 @@ function filteredPickerProjects() {
       @contextmenu.prevent
     >
       <button
+        v-if="taskContextMenu.task.isUserAdded"
         class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
         type="button"
         @click="openEditTaskDialog(taskContextMenu.project, taskContextMenu.task)"

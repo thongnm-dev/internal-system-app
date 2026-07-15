@@ -2,8 +2,10 @@
 -- sp_daily_report_task_select
 -- Lấy task cho màn Daily Report của một user, gộp từ HAI nguồn:
 --   (1) daily_report_tasks : task user tự thêm ngay trên Daily Report.
+--       Dùng id (SERIAL) làm task_id.
 --   (2) project_tasks       : task thật của dự án được GIAO cho user (assignee = user),
---                             kèm category tags từ project_task_categories.
+--                             kèm category từ project_task_categories.
+--                             Mỗi (task, category) trả về một dòng riêng.
 --
 -- Cùng áp quy tắc theo tháng đang xem (p_year, p_month):
 --   * Task tạo trong tháng đang xem  -> hiện tất cả (kể cả đã delivery) để xem giờ.
@@ -20,14 +22,12 @@ CREATE OR REPLACE FUNCTION sp_daily_report_task_select(
     p_month    INTEGER
 )
 RETURNS TABLE (
-    id            INTEGER,
     username      VARCHAR(100),
     task_id       VARCHAR(120),
     project_id    VARCHAR(120),
-    code          VARCHAR(50),
     name          VARCHAR(300),
     description   TEXT,
-    categories    TEXT[],
+    category_id   INTEGER,
     assignee      VARCHAR(100),
     estimate_hour VARCHAR(20),
     due_date      VARCHAR(20),
@@ -46,14 +46,12 @@ BEGIN
     RETURN QUERY
     -- (1) Task user tự thêm trên Daily Report
     SELECT
-        t.id,
         t.username,
-        t.task_id,
+        t.id::varchar(120) AS task_id,
         t.project_id,
-        t.code,
         t.name,
         t.description,
-        t.categories,
+        t.category_id,
         t.assignee,
         t.estimate_hour,
         t.due_date,
@@ -69,22 +67,14 @@ BEGIN
 
     UNION ALL
 
-    -- (2) Task dự án được giao cho user
+    -- (2) Task dự án được giao cho user — one row per (task, category)
     SELECT
-        0::integer,
         p_username::varchar(100),
         pt.id::varchar(120),
         pt.project_id::varchar(120),
-        COALESCE(
-            (ARRAY_AGG(cat.process_code ORDER BY cat.process_code) FILTER (WHERE cat.process_code IS NOT NULL))[1],
-            'TASK'
-        )::varchar(50),
         pt.short_name::varchar(300),
         pt.description,
-        COALESCE(
-            ARRAY_AGG(cat.process_code ORDER BY cat.process_code) FILTER (WHERE cat.process_code IS NOT NULL),
-            '{}'
-        )::text[],
+        COALESCE(ptc.category_id, 0),
         pt.assignee,
         pt.estimate_hour,
         COALESCE(pt.due_date::text, '')::varchar(20),
@@ -95,14 +85,10 @@ BEGIN
         FALSE AS is_user_added
     FROM project_tasks pt
     LEFT JOIN project_task_categories ptc ON ptc.task_id = pt.id
-    LEFT JOIN categories cat ON cat.id = ptc.category_id
     WHERE pt.assignee = p_username
       AND pt.created_at < v_next_month
       AND (pt.created_at >= v_month_start OR pt.is_completed = FALSE)
-    GROUP BY pt.id, pt.project_id, pt.short_name, pt.description, pt.assignee,
-             pt.estimate_hour, pt.due_date, pt.issue_key, pt.is_completed,
-             pt.completed_at, pt.created_at
 
-    ORDER BY 4, 15;  -- project_id, created_at
+    ORDER BY project_id, created_at;
 END;
 $$;

@@ -30,8 +30,8 @@ pub struct DailyReportEntry {
     pub regular_ot: f64,
     /// Số giờ OT khuya (chỉ có ý nghĩa khi `is_ot = true`).
     pub midnight_ot: f64,
-    /// Phase / công đoạn liên quan.
-    pub phase: String,
+    /// ID phân loại (category) liên quan.
+    pub category_id: i32,
     /// Thời điểm cập nhật gần nhất (ISO timestamp dạng text).
     pub updated_at: String,
 }
@@ -59,30 +59,28 @@ pub struct SaveDailyReportEntryRequest {
     /// Số giờ OT khuya.
     #[serde(default)]
     pub midnight_ot: f64,
-    /// Phase / công đoạn.
+    /// ID phân loại (category).
     #[serde(default)]
-    pub phase: String,
+    pub category_id: i32,
 }
 
 /// Một task do người dùng tự thêm vào project trên màn hình daily report.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DailyReportUserTask {
-    /// ID bản ghi (auto-increment từ PostgreSQL).
+    /// ID bản ghi (auto-increment từ PostgreSQL), dùng làm key task.
     pub id: i32,
     /// Tên đăng nhập của người tạo task.
     pub username: String,
-    /// ID task ở frontend (unique theo user).
+    /// ID task dạng chuỗi (= id::text cho user task, = project_task.id cho project task).
     pub task_id: String,
     /// ID project chứa task.
     pub project_id: String,
-    /// Mã task viết tắt (thường là category đầu tiên hoặc "TASK").
-    pub code: String,
     /// Tên (short name) của task.
     pub name: String,
     /// Mô tả chi tiết.
     pub description: String,
-    /// Danh sách phân loại (PG, Review PG, UT, ...).
-    pub categories: Vec<String>,
+    /// ID phân loại (category).
+    pub category_id: i32,
     /// Username người được giao.
     pub assignee: String,
     /// Số giờ ước lượng (giữ dạng chuỗi để khớp form frontend).
@@ -106,6 +104,7 @@ pub struct DailyReportUserTask {
 /// `process_code` chứa luôn tên phase (PG, UT, Review PG…).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DailyReportPhase {
+    pub id: i32,
     pub process_code: String,
     pub process_name: String,
     pub short_name: String,
@@ -132,24 +131,22 @@ pub struct DailyReportProject {
     pub is_member: bool,
 }
 
-/// Dữ liệu request từ frontend khi tạo task người dùng tự thêm.
+/// Dữ liệu request từ frontend khi tạo/cập nhật task người dùng tự thêm.
 #[derive(Debug, Deserialize)]
 pub struct CreateDailyReportTaskRequest {
-    /// ID task ở frontend (bắt buộc).
-    pub task_id: String,
+    /// ID task (khi cập nhật). None hoặc 0 = tạo mới.
+    #[serde(default)]
+    pub id: i32,
     /// ID project chứa task (bắt buộc).
     pub project_id: String,
-    /// Mã task viết tắt.
-    #[serde(default)]
-    pub code: String,
     /// Tên (short name) của task (bắt buộc).
     pub name: String,
     /// Mô tả chi tiết.
     #[serde(default)]
     pub description: String,
-    /// Danh sách phân loại.
+    /// ID phân loại (category).
     #[serde(default)]
-    pub categories: Vec<String>,
+    pub category_id: i32,
     /// Username người được giao.
     #[serde(default)]
     pub assignee: String,

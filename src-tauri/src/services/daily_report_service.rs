@@ -60,21 +60,21 @@ pub async fn save_entry(
         is_ot,
         regular_ot,
         midnight_ot,
-        request.phase.trim(),
+        request.category_id,
     )
     .await
 }
 
 /// Xóa một ô nhập giờ công (khi người dùng bấm "Clear").
 /// Không báo lỗi nếu ô chưa từng được lưu (idempotent).
-pub async fn clear_entry(username: &str, task_id: &str, entry_date: &str, phase: &str) -> AppResult<()> {
+pub async fn clear_entry(username: &str, task_id: &str, entry_date: &str, category_id: i32) -> AppResult<()> {
     if task_id.trim().is_empty() {
         return Err(AppError::new("Task id is required."));
     }
     if entry_date.trim().is_empty() {
         return Err(AppError::new("Entry date is required."));
     }
-    daily_report_store::delete_entry(username, task_id.trim(), entry_date.trim(), phase.trim()).await?;
+    daily_report_store::delete_entry(username, task_id.trim(), entry_date.trim(), category_id).await?;
     Ok(())
 }
 
@@ -104,11 +104,6 @@ pub async fn create_task(
     username: &str,
     request: CreateDailyReportTaskRequest,
 ) -> AppResult<DailyReportUserTask> {
-    let task_id = request.task_id.trim();
-    if task_id.is_empty() {
-        return Err(AppError::new("Task id is required."));
-    }
-
     let project_id = request.project_id.trim();
     if project_id.is_empty() {
         return Err(AppError::new("Project id is required."));
@@ -119,35 +114,18 @@ pub async fn create_task(
         return Err(AppError::new("Task name is required."));
     }
 
-    let categories: Vec<String> = request
-        .categories
-        .iter()
-        .map(|c| c.trim().to_string())
-        .filter(|c| !c.is_empty())
-        .collect();
-
-    let code = {
-        let trimmed = request.code.trim();
-        if !trimmed.is_empty() {
-            trimmed.to_string()
-        } else {
-            categories.first().cloned().unwrap_or_else(|| "TASK".to_string())
-        }
-    };
-
     let assignee = {
         let trimmed = request.assignee.trim();
         if trimmed.is_empty() { username } else { trimmed }
     };
 
     daily_report_store::insert_task(
+        request.id,
         username,
-        task_id,
         project_id,
-        &code,
         name,
         request.description.trim(),
-        &categories,
+        request.category_id,
         assignee,
         request.estimate_hour.trim(),
         request.due_date.trim(),
@@ -177,11 +155,10 @@ pub async fn get_task_hours_total(username: &str) -> AppResult<Vec<DailyReportTa
 /// Đánh dấu một task hoàn thành / bỏ hoàn thành. Trả về lỗi nếu không tìm thấy.
 pub async fn set_task_completed(
     username: &str,
-    task_id: &str,
+    task_id: i32,
     is_completed: bool,
 ) -> AppResult<DailyReportUserTask> {
-    let task_id = task_id.trim();
-    if task_id.is_empty() {
+    if task_id <= 0 {
         return Err(AppError::new("Task id is required."));
     }
     daily_report_store::set_task_completed(username, task_id, is_completed)
@@ -211,11 +188,11 @@ pub async fn get_task_categories() -> AppResult<Vec<DailyReportPhase>> {
 }
 
 /// Xóa một task người dùng tự thêm. Trả về lỗi nếu không tìm thấy.
-pub async fn delete_task(username: &str, task_id: &str) -> AppResult<()> {
-    if task_id.trim().is_empty() {
+pub async fn delete_task(username: &str, task_id: i32) -> AppResult<()> {
+    if task_id <= 0 {
         return Err(AppError::new("Task id is required."));
     }
-    if !daily_report_store::delete_task(username, task_id.trim()).await? {
+    if !daily_report_store::delete_task(username, task_id).await? {
         return Err(AppError::new(format!("Daily report task '{}' not found.", task_id)));
     }
     Ok(())
