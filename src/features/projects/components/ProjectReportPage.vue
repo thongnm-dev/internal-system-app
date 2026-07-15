@@ -89,7 +89,7 @@ function goBack() {
           :value="analysisProject.phases"
         >
           <Column field="process_code" header="Process" body-class="font-bold text-ink" />
-          <Column field="phase_name" header="Phase" />
+          <Column field="process_name" header="Phase" />
           <Column header="Rows" body-class="num" header-class="num">
             <template #body="{ data }">{{ data.row_count.toLocaleString("en-US") }}</template>
           </Column>

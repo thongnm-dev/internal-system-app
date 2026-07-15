@@ -91,7 +91,7 @@ function onRowClick(event: { data: ProjectTableRow }) {
             <span class="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">
               {{ data.phase.process_code }}
             </span>
-            {{ data.phase.phase_name }}
+            {{ data.phase.process_name }}
           </template>
         </template>
       </Column>

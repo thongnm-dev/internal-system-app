@@ -9,23 +9,32 @@ use crate::utils::pgsql_connect;
 use tokio_postgres::Client;
 
 /// Khởi tạo database: kết nối, tạo bảng, tạo stored procedure, seed dữ liệu.
+///
+/// Tạo bảng trước (fail-fast nếu lỗi), sau đó chạy stored procedures và seed data
+/// độc lập — nếu một số SP fail thì các SP còn lại và seed data vẫn được thực thi.
 pub async fn init() -> AppResult<()> {
     let client = pgsql_connect::connect().await?;
-    ensure_tables(&client).await?;
-    seed_data(&client).await?;
-    Ok(())
-}
 
-/// Tạo các bảng cần thiết nếu chưa tồn tại, sau đó tạo/cập nhật stored procedure.
-async fn ensure_tables(client: &Client) -> AppResult<()> {
     client
-        .batch_execute(include_str!("../../../docs/database/init_tables.sql"))
+        .batch_execute(include_str!("../../../docs/database/schema.sql"))
         .await
         .map_err(|e| AppError::new(format!("Failed to create tables: {e}")))?;
 
-    ensure_stored_procedures(client).await?;
+    let mut errors = Vec::new();
 
-    Ok(())
+    if let Err(e) = ensure_stored_procedures(&client).await {
+        errors.push(e.to_string());
+    }
+
+    if let Err(e) = seed_data(&client).await {
+        errors.push(e.to_string());
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::new(errors.join("\n")))
+    }
 }
 
 /// Seed dữ liệu mặc định: tạo role admin và user admin nếu chưa tồn tại.
@@ -38,396 +47,74 @@ async fn seed_data(client: &Client) -> AppResult<()> {
     Ok(())
 }
 
-/// Tạo hoặc cập nhật toàn bộ stored procedure từ các file SQL
-/// trong thư mục `docs/store-procedure/`.
+/// Tạo hoặc cập nhật toàn bộ stored procedure từ các file SQL.
 ///
-/// Sử dụng `include_str!` để nhúng nội dung SQL vào binary tại compile-time,
-/// đảm bảo stored procedure luôn đồng bộ với mã nguồn.
+/// Thực thi tất cả SP và thu thập lỗi thay vì dừng lại ở SP đầu tiên bị lỗi.
 async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
-    // === Project stored procedures ===
+    let procedures: &[(&str, &str)] = &[
+        // === Project ===
+        ("sp_project_insert", include_str!("../../../docs/store-procedure/sp_project_insert.sql")),
+        ("sp_project_select_by_id", include_str!("../../../docs/store-procedure/sp_project_select_by_id.sql")),
+        ("sp_project_select_list", include_str!("../../../docs/store-procedure/sp_project_select_list.sql")),
+        ("sp_project_select_code_exists", include_str!("../../../docs/store-procedure/sp_project_select_code_exists.sql")),
+        ("sp_project_update", include_str!("../../../docs/store-procedure/sp_project_update.sql")),
+        ("sp_project_delete", include_str!("../../../docs/store-procedure/sp_project_delete.sql")),
+        ("sp_project_member_upsert", include_str!("../../../docs/store-procedure/sp_project_member_upsert.sql")),
+        ("sp_project_member_delete_by_project", include_str!("../../../docs/store-procedure/sp_project_member_delete_by_project.sql")),
+        ("sp_project_member_select", include_str!("../../../docs/store-procedure/sp_project_member_select.sql")),
+        // === Project Task ===
+        ("sp_project_task_insert", include_str!("../../../docs/store-procedure/sp_project_task_insert.sql")),
+        ("sp_project_task_category_sync", include_str!("../../../docs/store-procedure/sp_project_task_category_sync.sql")),
+        ("sp_project_task_select_by_project", include_str!("../../../docs/store-procedure/sp_project_task_select_by_project.sql")),
+        ("sp_project_task_update", include_str!("../../../docs/store-procedure/sp_project_task_update.sql")),
+        ("sp_project_task_delete", include_str!("../../../docs/store-procedure/sp_project_task_delete.sql")),
+        ("sp_project_task_set_completed", include_str!("../../../docs/store-procedure/sp_project_task_set_completed.sql")),
+        // === Auth ===
+        ("sp_auth_find_user_by_username", include_str!("../../../docs/store-procedure/sp_auth_find_user_by_username.sql")),
+        ("sp_auth_get_user_roles", include_str!("../../../docs/store-procedure/sp_auth_get_user_roles.sql")),
+        // === Daily Work Notes ===
+        ("sp_daily_note_insert", include_str!("../../../docs/store-procedure/sp_daily_note_insert.sql")),
+        ("sp_daily_note_select_by_date", include_str!("../../../docs/store-procedure/sp_daily_note_select_by_date.sql")),
+        ("sp_daily_note_select_by_month", include_str!("../../../docs/store-procedure/sp_daily_note_select_by_month.sql")),
+        ("sp_daily_note_count_by_month", include_str!("../../../docs/store-procedure/sp_daily_note_count_by_month.sql")),
+        ("sp_daily_note_update_content", include_str!("../../../docs/store-procedure/sp_daily_note_update_content.sql")),
+        ("sp_daily_note_update_status", include_str!("../../../docs/store-procedure/sp_daily_note_update_status.sql")),
+        ("sp_daily_note_delete", include_str!("../../../docs/store-procedure/sp_daily_note_delete.sql")),
+        // === Daily Report ===
+        ("sp_daily_report_entry_upsert", include_str!("../../../docs/store-procedure/sp_daily_report_entry_upsert.sql")),
+        ("sp_daily_report_entry_delete", include_str!("../../../docs/store-procedure/sp_daily_report_entry_delete.sql")),
+        ("sp_daily_report_entry_select_by_month", include_str!("../../../docs/store-procedure/sp_daily_report_entry_select_by_month.sql")),
+        ("sp_daily_report_task_insert", include_str!("../../../docs/store-procedure/sp_daily_report_task_insert.sql")),
+        ("sp_daily_report_task_select", include_str!("../../../docs/store-procedure/sp_daily_report_task_select.sql")),
+        ("sp_daily_report_task_delete", include_str!("../../../docs/store-procedure/sp_daily_report_task_delete.sql")),
+        ("sp_daily_report_task_set_completed", include_str!("../../../docs/store-procedure/sp_daily_report_task_set_completed.sql")),
+        ("sp_daily_report_task_hours_total", include_str!("../../../docs/store-procedure/sp_daily_report_task_hours_total.sql")),
+        ("sp_daily_report_project_select", include_str!("../../../docs/store-procedure/sp_daily_report_project_select.sql")),
+        // === Category ===
+        ("sp_category_select_list", include_str!("../../../docs/store-procedure/sp_category_select_list.sql")),
+        // === User Management ===
+        ("sp_user_insert", include_str!("../../../docs/store-procedure/sp_user_insert.sql")),
+        ("sp_user_update", include_str!("../../../docs/store-procedure/sp_user_update.sql")),
+        ("sp_user_select_by_id", include_str!("../../../docs/store-procedure/sp_user_select_by_id.sql")),
+        ("sp_user_select_list", include_str!("../../../docs/store-procedure/sp_user_select_list.sql")),
+        ("sp_user_delete", include_str!("../../../docs/store-procedure/sp_user_delete.sql")),
+        ("sp_user_change_password", include_str!("../../../docs/store-procedure/sp_user_change_password.sql")),
+        ("sp_user_username_exists", include_str!("../../../docs/store-procedure/sp_user_username_exists.sql")),
+        ("sp_user_role_sync", include_str!("../../../docs/store-procedure/sp_user_role_sync.sql")),
+        ("sp_role_select_list", include_str!("../../../docs/store-procedure/sp_role_select_list.sql")),
+    ];
 
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_project_insert.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_insert: {e}")))?;
+    let mut errors = Vec::new();
 
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_select_by_id.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_select_by_id: {e}")))?;
+    for (name, sql) in procedures {
+        if let Err(e) = client.batch_execute(sql).await {
+            errors.push(format!("Failed to create {name}: {e}"));
+        }
+    }
 
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_select_list.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_select_list: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_select_code_exists.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_select_code_exists: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_project_update.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_update: {e}")))?;
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_project_delete.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_delete: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_member_upsert.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_member_upsert: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_member_delete_by_project.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_member_delete_by_project: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_member_select.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_member_select: {e}")))?;
-
-    // === Project Task stored procedures ===
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_task_insert.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_task_insert: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_task_category_sync.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_task_category_sync: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_task_select_by_project.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_task_select_by_project: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_task_update.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_task_update: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_task_delete.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_project_task_delete: {e}")))?;
-
-    // === Auth stored procedures ===
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_auth_find_user_by_username.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_auth_find_user_by_username: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_auth_get_user_roles.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_auth_get_user_roles: {e}")))?;
-
-    // === Daily Work Notes stored procedures ===
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_insert.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_daily_note_insert: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_select_by_date.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_select_by_date: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_select_by_month.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_select_by_month: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_count_by_month.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_count_by_month: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_update_content.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_update_content: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_update_status.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_note_update_status: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_note_delete.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_daily_note_delete: {e}")))?;
-
-    // === Daily Report stored procedures ===
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_entry_upsert.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_entry_upsert: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_entry_delete.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_entry_delete: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_entry_select_by_month.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_entry_select_by_month: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_insert.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_insert: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_select.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_select: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_delete.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_delete: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_set_completed.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_set_completed: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_task_hours_total.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_task_hours_total: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_project_task_set_completed.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_project_task_set_completed: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_category_select_list.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_category_select_list: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_daily_report_project_select.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_daily_report_project_select: {e}"
-            ))
-        })?;
-
-    // === User management stored procedures ===
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_user_insert.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_insert: {e}")))?;
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_user_update.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_update: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_user_select_by_id.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_select_by_id: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_user_select_list.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_select_list: {e}")))?;
-
-    client
-        .batch_execute(include_str!("../../../docs/store-procedure/sp_user_delete.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_delete: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_user_change_password.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_change_password: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_user_username_exists.sql"
-        ))
-        .await
-        .map_err(|e| {
-            AppError::new(format!(
-                "Failed to create sp_user_username_exists: {e}"
-            ))
-        })?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_user_role_sync.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_user_role_sync: {e}")))?;
-
-    client
-        .batch_execute(include_str!(
-            "../../../docs/store-procedure/sp_role_select_list.sql"
-        ))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create sp_role_select_list: {e}")))?;
-
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::new(errors.join("\n")))
+    }
 }

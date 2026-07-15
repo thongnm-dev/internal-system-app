@@ -10,7 +10,7 @@ RETURNS TABLE (
     full_name     VARCHAR(200),
     email         VARCHAR(255),
     phone         VARCHAR(50),
-    position      VARCHAR(100),
+    "position"    VARCHAR(100),
     is_active     BOOLEAN,
     roles         TEXT,
     created_at    TEXT,

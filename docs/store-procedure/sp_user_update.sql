@@ -19,7 +19,7 @@ RETURNS TABLE (
     email         VARCHAR(255),
     phone         VARCHAR(50),
     address       TEXT,
-    position      VARCHAR(100),
+    "position"    VARCHAR(100),
     is_active     BOOLEAN,
     created_at    TEXT,
     updated_at    TEXT
