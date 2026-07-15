@@ -2,6 +2,7 @@ import type { App } from "vue";
 import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
 import Aura from "@primevue/themes/aura";
+import Tooltip from "primevue/tooltip";
 
 export function registerPlugins(app: App) {
   app.use(createPinia());
@@ -14,4 +15,5 @@ export function registerPlugins(app: App) {
     },
     ripple: true,
   });
+  app.directive("tooltip", Tooltip);
 }
