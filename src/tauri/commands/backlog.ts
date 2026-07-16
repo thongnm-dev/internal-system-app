@@ -47,3 +47,70 @@ export function backlogListCategories(projectKey: string) {
 export function backlogListProjectUsers(projectKey: string) {
   return safeInvoke<BacklogUser[]>("backlog_list_project_users", { projectKey });
 }
+
+export type BacklogPriority = {
+  id: number;
+  name: string;
+};
+
+export type BacklogIssue = {
+  id: number;
+  projectId: number;
+  issueKey: string;
+  keyId: number;
+  issueType: BacklogIssueType | null;
+  summary: string;
+  description: string | null;
+  priority: BacklogPriority | null;
+  status: BacklogStatus | null;
+  assignee: BacklogUser | null;
+  category: BacklogCategory[] | null;
+  milestone: unknown[] | null;
+  startDate: string | null;
+  dueDate: string | null;
+  estimatedHours: number | null;
+  actualHours: number | null;
+  parentIssueId: number | null;
+  createdUser: BacklogUser | null;
+  created: string | null;
+  updated: string | null;
+};
+
+export type BacklogIssueQuery = {
+  projectKey: string;
+  count?: number;
+  offset?: number;
+  statusIds?: number[];
+  assigneeIds?: number[];
+  issueTypeIds?: number[];
+  categoryIds?: number[];
+  milestoneIds?: number[];
+  priorityIds?: number[];
+  keyword?: string;
+  sort?: string;
+  order?: string;
+  parentIssueId?: number;
+};
+
+export type BacklogIssueList = {
+  issues: BacklogIssue[];
+  totalCount: number;
+};
+
+export type BacklogProjectLookup = {
+  projectId: string;
+  projectKey: string;
+  projectName: string;
+};
+
+export function backlogListIssues(query: BacklogIssueQuery) {
+  return safeInvoke<BacklogIssueList>("backlog_list_issues", { query });
+}
+
+export function backlogGetProjectLookup(projectKey: string) {
+  return safeInvoke<BacklogProjectLookup>("backlog_get_project_lookup", { projectKey });
+}
+
+export function backlogListPriorities() {
+  return safeInvoke<BacklogPriority[]>("backlog_list_priorities");
+}

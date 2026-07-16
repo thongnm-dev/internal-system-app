@@ -35,9 +35,9 @@ use commands::user_commands::{
     update_user,
 };
 use commands::backlog_commands::{
-    backlog_get_issue, backlog_get_project, backlog_get_project_lookup, backlog_get_space,
+    backlog_get_issue, backlog_get_project, backlog_get_project_lookup,
     backlog_list_categories, backlog_list_issue_types, backlog_list_issues,
-    backlog_list_milestones, backlog_list_project_users, backlog_list_statuses,
+    backlog_list_priorities, backlog_list_project_users, backlog_list_statuses,
 };
 use commands::excel2md_commands::excel2md;
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
@@ -129,12 +129,11 @@ pub fn run() {
             save_menu_config,
             save_all_menu_configs,
             // === Backlog API commands ===
-            backlog_get_space,
             backlog_get_project,
             backlog_list_issue_types,
             backlog_list_statuses,
             backlog_list_categories,
-            backlog_list_milestones,
+            backlog_list_priorities,
             backlog_list_project_users,
             backlog_list_issues,
             backlog_get_issue,

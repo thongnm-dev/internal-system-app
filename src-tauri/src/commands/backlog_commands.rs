@@ -7,13 +7,6 @@ use crate::models::backlog::*;
 use crate::services::backlog_service;
 
 #[tauri::command]
-pub async fn backlog_get_space() -> Result<BacklogSpace, String> {
-    backlog_service::get_space()
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub async fn backlog_get_project(project_key: String) -> Result<BacklogProject, String> {
     backlog_service::get_project(&project_key)
         .await
@@ -46,10 +39,8 @@ pub async fn backlog_list_categories(
 }
 
 #[tauri::command]
-pub async fn backlog_list_milestones(
-    project_key: String,
-) -> Result<Vec<BacklogMilestone>, String> {
-    backlog_service::list_milestones(&project_key)
+pub async fn backlog_list_priorities() -> Result<Vec<BacklogPriority>, String> {
+    backlog_service::list_priorities()
         .await
         .map_err(|e| e.to_string())
 }

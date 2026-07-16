@@ -4,9 +4,16 @@ import {
   backlogListStatuses,
   backlogListCategories,
   backlogListIssueTypes,
+  backlogListProjectUsers,
+  backlogListPriorities,
+  backlogListIssues,
+  backlogGetProjectLookup,
   type BacklogStatus,
   type BacklogCategory,
   type BacklogIssueType,
+  type BacklogUser,
+  type BacklogPriority,
+  type BacklogIssue,
 } from "@/tauri/commands/backlog";
 import type { ProjectSummaryResult } from "@/_/types/project";
 import { canUseTauriRuntime } from "@/tauri/commands/_base";
@@ -14,6 +21,7 @@ import { canUseTauriRuntime } from "@/tauri/commands/_base";
 export type BacklogSearchCriteria = {
   project: string;
   status: string[];
+  notClosed: boolean;
   issueType: string;
   category: string;
   assignee: string;
@@ -21,7 +29,7 @@ export type BacklogSearchCriteria = {
   createDateFrom: string;
   createDateTo: string;
   createUser: string;
-  bugClass: string;
+  priorityFilter: string;
 };
 
 export type IssueBacklogItem = {
@@ -37,12 +45,12 @@ export type IssueBacklogItem = {
   createUser: string;
   project: string;
   category: string;
-  bugClass: string;
 };
 
 const initialCriteria: BacklogSearchCriteria = {
   project: "",
   status: [],
+  notClosed: false,
   issueType: "",
   category: "",
   assignee: "",
@@ -50,7 +58,7 @@ const initialCriteria: BacklogSearchCriteria = {
   createDateFrom: "",
   createDateTo: "",
   createUser: "",
-  bugClass: "",
+  priorityFilter: "",
 };
 
 export const projects = ref<ProjectSummaryResult[]>([]);
@@ -58,34 +66,38 @@ export const statusOptions = ref<string[]>([]);
 export const issueTypes = ref<string[]>([]);
 export const categories = ref<string[]>([]);
 export const assignees = ref<string[]>([]);
-export const bugClasses = ref<string[]>([]);
+export const priorityOptions = ref<string[]>([]);
 export const uniqueCreateUsers = ref<string[]>([]);
 
 const lookupLoading = ref(false);
 const lookupError = ref("");
 
-function normalize(value: string) {
-  return value.trim().toLocaleLowerCase();
+const statusLookup = ref<BacklogStatus[]>([]);
+const issueTypeLookup = ref<BacklogIssueType[]>([]);
+const categoryLookup = ref<BacklogCategory[]>([]);
+const userLookup = ref<BacklogUser[]>([]);
+const priorityLookup = ref<BacklogPriority[]>([]);
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  return dateStr.substring(0, 10);
 }
 
-function matchesCriteria(item: IssueBacklogItem, criteria: BacklogSearchCriteria) {
-  const keyword = normalize(criteria.keyword);
-  const matchesKeyword =
-    !keyword ||
-    normalize([item.issueKey, item.subject, item.assignee, item.createUser, item.project, item.category].join(" ")).includes(keyword);
-
-  return (
-    (!criteria.project || item.project === criteria.project) &&
-    (criteria.status.length === 0 || criteria.status.includes(item.status)) &&
-    (!criteria.issueType || item.issueType === criteria.issueType) &&
-    (!criteria.category || item.category === criteria.category) &&
-    (!criteria.assignee || item.assignee === criteria.assignee) &&
-    matchesKeyword &&
-    (!criteria.createDateFrom || item.createDate >= criteria.createDateFrom) &&
-    (!criteria.createDateTo || item.createDate <= criteria.createDateTo) &&
-    (!criteria.createUser || item.createUser === criteria.createUser) &&
-    (!criteria.bugClass || item.bugClass === criteria.bugClass)
-  );
+function mapIssue(issue: BacklogIssue): IssueBacklogItem {
+  return {
+    id: issue.id,
+    issueType: issue.issueType?.name ?? "",
+    issueKey: issue.issueKey,
+    subject: issue.summary,
+    assignee: issue.assignee?.name ?? "",
+    status: issue.status?.name ?? "",
+    hours: issue.actualHours ?? issue.estimatedHours ?? 0,
+    priority: issue.priority?.name ?? "",
+    createDate: formatDate(issue.created),
+    createUser: issue.createdUser?.name ?? "",
+    project: issue.issueKey.split("-")[0] ?? "",
+    category: issue.category?.[0]?.name ?? "",
+  };
 }
 
 export function statusTone(status: string) {
@@ -116,20 +128,18 @@ async function loadProjects() {
   }
 }
 
-function resolveBacklogKey(projectCode: string): string | null {
-  if (!projectCode) return null;
-  const proj = projects.value.find((p) => p.code === projectCode);
-  if (!proj) return null;
-  // We need the backlog_key from ProjectDetail, but ProjectSummary doesn't have it.
-  // The backlog_key is part of the full detail. We'll load it separately.
-  return null;
-}
-
 async function loadProjectLookups(backlogKey: string) {
   if (!backlogKey) {
-    statusOptions.value = ["All"];
+    statusOptions.value = [];
     issueTypes.value = [];
     categories.value = [];
+    assignees.value = [];
+    priorityOptions.value = [];
+    statusLookup.value = [];
+    issueTypeLookup.value = [];
+    categoryLookup.value = [];
+    userLookup.value = [];
+    priorityLookup.value = [];
     lookupError.value = "";
     return;
   }
@@ -138,20 +148,37 @@ async function loadProjectLookups(backlogKey: string) {
   lookupError.value = "";
 
   try {
-    const [statuses, types, cats] = await Promise.all([
+    const [statuses, types, cats, users, prios] = await Promise.all([
       backlogListStatuses(backlogKey),
       backlogListIssueTypes(backlogKey),
       backlogListCategories(backlogKey),
+      backlogListProjectUsers(backlogKey),
+      backlogListPriorities(),
     ]);
+
+    statusLookup.value = statuses;
+    issueTypeLookup.value = types;
+    categoryLookup.value = cats;
+    userLookup.value = users;
+    priorityLookup.value = prios;
 
     statusOptions.value = statuses.map((s: BacklogStatus) => s.name);
     issueTypes.value = types.map((t: BacklogIssueType) => t.name);
     categories.value = cats.map((c: BacklogCategory) => c.name);
+    assignees.value = users.map((u: BacklogUser) => u.name);
+    priorityOptions.value = prios.map((p: BacklogPriority) => p.name);
   } catch (e) {
     lookupError.value = String(e);
-    statusOptions.value = ["All"];
+    statusOptions.value = [];
     issueTypes.value = [];
     categories.value = [];
+    assignees.value = [];
+    priorityOptions.value = [];
+    statusLookup.value = [];
+    issueTypeLookup.value = [];
+    categoryLookup.value = [];
+    userLookup.value = [];
+    priorityLookup.value = [];
   } finally {
     lookupLoading.value = false;
   }
@@ -162,29 +189,45 @@ export function useIssueBacklog(initialProject = "") {
   const criteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
   const appliedCriteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
   const backlogItems = ref<IssueBacklogItem[]>([]);
+  const searching = ref(false);
+  const searchError = ref("");
+  const totalCount = ref(0);
+  const first = ref(0);
+  const pageSize = ref(20);
 
-  const filteredItems = computed(() => backlogItems.value.filter((item) => matchesCriteria(item, appliedCriteria.value)));
+  const filteredItems = computed(() => backlogItems.value);
 
   const canOpenImport = computed(() => Boolean(criteria.value.project));
 
   const projectBacklogKeys = ref<Map<string, string>>(new Map());
+  const projectIds = ref<Map<string, string>>(new Map());
 
-  async function loadProjectBacklogKey(projectCode: string): Promise<string> {
+  async function resolveProjectInfo(projectCode: string): Promise<{ backlogKey: string; projectId: string }> {
     if (projectBacklogKeys.value.has(projectCode)) {
-      return projectBacklogKeys.value.get(projectCode)!;
+      return {
+        backlogKey: projectBacklogKeys.value.get(projectCode)!,
+        projectId: projectIds.value.get(projectCode) || "",
+      };
     }
 
     const proj = projects.value.find((p) => p.code === projectCode);
-    if (!proj) return "";
+    if (!proj) return { backlogKey: "", projectId: "" };
 
     try {
       const { getProjectDetail } = await import("@/tauri/commands/project");
       const detail = await getProjectDetail(proj.id);
       const key = detail.backlog_key || "";
       projectBacklogKeys.value.set(projectCode, key);
-      return key;
+
+      if (key) {
+        const lookup = await backlogGetProjectLookup(key);
+        projectIds.value.set(projectCode, lookup.projectId);
+        return { backlogKey: key, projectId: lookup.projectId };
+      }
+
+      return { backlogKey: key, projectId: "" };
     } catch {
-      return "";
+      return { backlogKey: "", projectId: "" };
     }
   }
 
@@ -195,14 +238,14 @@ export function useIssueBacklog(initialProject = "") {
   watch(
     () => criteria.value.project,
     async (projectCode) => {
-      criteria.value = { ...criteria.value, status: [], issueType: "", category: "" };
+      criteria.value = { ...criteria.value, status: [], notClosed: false, issueType: "", category: "", assignee: "", priorityFilter: "" };
 
       if (!projectCode) {
         await loadProjectLookups("");
         return;
       }
 
-      const backlogKey = await loadProjectBacklogKey(projectCode);
+      const { backlogKey } = await resolveProjectInfo(projectCode);
       if (backlogKey) {
         await loadProjectLookups(backlogKey);
       } else {
@@ -211,23 +254,116 @@ export function useIssueBacklog(initialProject = "") {
     },
   );
 
-  function search() {
+  async function fetchPage(offset: number, count: number) {
+    const c = appliedCriteria.value;
+
+    const { projectId } = await resolveProjectInfo(c.project);
+    if (!projectId) {
+      searchError.value = "Could not resolve project ID for Backlog API.";
+      backlogItems.value = [];
+      totalCount.value = 0;
+      return;
+    }
+
+    searching.value = true;
+    searchError.value = "";
+
+    try {
+      let statusIds: number[] | undefined;
+      if (c.notClosed) {
+        statusIds = statusLookup.value
+          .filter((s) => {
+            const n = s.name.toLowerCase();
+            return !(n.includes("closed") || n.includes("close") || n === "完了");
+          })
+          .map((s) => s.id);
+      } else if (c.status.length > 0) {
+        statusIds = c.status
+          .map((name) => statusLookup.value.find((s) => s.name === name)?.id)
+          .filter((id): id is number => id !== undefined);
+      }
+
+      const issueTypeIds = c.issueType
+        ? [issueTypeLookup.value.find((t) => t.name === c.issueType)?.id].filter((id): id is number => id !== undefined)
+        : undefined;
+
+      const categoryIds = c.category
+        ? [categoryLookup.value.find((cat) => cat.name === c.category)?.id].filter((id): id is number => id !== undefined)
+        : undefined;
+
+      const assigneeIds = c.assignee
+        ? [userLookup.value.find((u) => u.name === c.assignee)?.id].filter((id): id is number => id !== undefined)
+        : undefined;
+
+      const priorityIds = c.priorityFilter
+        ? [priorityLookup.value.find((p) => p.name === c.priorityFilter)?.id].filter((id): id is number => id !== undefined)
+        : undefined;
+
+      const result = await backlogListIssues({
+        projectKey: projectId,
+        count,
+        offset,
+        statusIds: statusIds?.length ? statusIds : undefined,
+        issueTypeIds: issueTypeIds?.length ? issueTypeIds : undefined,
+        categoryIds: categoryIds?.length ? categoryIds : undefined,
+        assigneeIds: assigneeIds?.length ? assigneeIds : undefined,
+        priorityIds: priorityIds?.length ? priorityIds : undefined,
+        keyword: c.keyword || undefined,
+        sort: "created",
+        order: "desc",
+      });
+
+      backlogItems.value = result.issues.map(mapIssue);
+      totalCount.value = result.totalCount;
+
+      const createUserSet = new Set(backlogItems.value.map((i) => i.createUser).filter(Boolean));
+      uniqueCreateUsers.value = [...createUserSet].sort();
+    } catch (e) {
+      searchError.value = String(e);
+      backlogItems.value = [];
+      totalCount.value = 0;
+    } finally {
+      searching.value = false;
+    }
+  }
+
+  async function search() {
     appliedCriteria.value = { ...criteria.value };
+    first.value = 0;
+
+    if (!appliedCriteria.value.project) {
+      backlogItems.value = [];
+      totalCount.value = 0;
+      searchError.value = "";
+      return;
+    }
+
+    await fetchPage(0, pageSize.value);
+  }
+
+  async function onPage(event: { first: number; rows: number }) {
+    first.value = event.first;
+    pageSize.value = event.rows;
+    await fetchPage(event.first, event.rows);
   }
 
   function reset() {
     criteria.value = { ...initialCriteria };
     appliedCriteria.value = { ...initialCriteria };
+    backlogItems.value = [];
+    totalCount.value = 0;
+    first.value = 0;
+    searchError.value = "";
     loadProjectLookups("");
   }
 
   loadProjects();
 
   if (initialProject) {
-    loadProjectBacklogKey(initialProject).then((key) => {
-      if (key) loadProjectLookups(key);
+    resolveProjectInfo(initialProject).then(({ backlogKey }) => {
+      if (backlogKey) loadProjectLookups(backlogKey);
     });
   }
 
-  return { criteria, filteredItems, canOpenImport, setField, search, reset, lookupLoading, lookupError };
+  return { criteria, filteredItems, canOpenImport, setField, search, onPage, reset, lookupLoading, lookupError, searching, searchError, totalCount, first, pageSize };
 }

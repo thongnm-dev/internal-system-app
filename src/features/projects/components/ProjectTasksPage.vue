@@ -134,6 +134,11 @@ async function saveTask() {
         scroll-height="flex"
         :table-style="{ minWidth: '980px' }"
         :value="ctrl.tasks.value"
+        paginator
+        :rows="20"
+        :rows-per-page-options="[20, 50, 100]"
+        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+        current-page-report-template="Showing {first} to {last} of {totalRecords}"
       >
         <Column field="shortName" header="Short name" body-class="font-bold text-ink" />
         <Column header="Category">

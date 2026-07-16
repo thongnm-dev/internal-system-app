@@ -1,20 +1,6 @@
 //! Các kiểu dữ liệu (model) cho Backlog API responses.
 
 use serde::{Deserialize, Serialize};
-
-/// Thông tin space từ Backlog API.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BacklogSpace {
-    pub space_key: String,
-    pub name: String,
-    pub owner_id: i64,
-    pub lang: Option<String>,
-    pub timezone: Option<String>,
-    pub created: Option<String>,
-    pub updated: Option<String>,
-}
-
 /// Thông tin dự án từ Backlog API.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -133,6 +119,7 @@ pub struct BacklogIssueQuery {
     pub issue_type_ids: Option<Vec<i64>>,
     pub category_ids: Option<Vec<i64>>,
     pub milestone_ids: Option<Vec<i64>>,
+    pub priority_ids: Option<Vec<i64>>,
     pub keyword: Option<String>,
     pub sort: Option<String>,
     pub order: Option<String>,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from "vue";
+import { ref, watch, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
@@ -9,15 +9,7 @@ import type { ProjectSummaryResult } from "@/_/types/project";
 
 const router = useRouter();
 const ctrl = useProjectRegistry();
-const page = ref(1);
-const pageSize = 10;
 const contextMenu = ref<{ project: ProjectSummaryResult; x: number; y: number } | null>(null);
-
-const pageCount = computed(() => Math.max(1, Math.ceil(ctrl.filteredProjects.value.length / pageSize)));
-const visibleProjects = computed(() => ctrl.filteredProjects.value.slice((page.value - 1) * pageSize, page.value * pageSize));
-
-watch(() => [ctrl.filters.value.code, ctrl.filters.value.name, ctrl.filters.value.keyword], () => { page.value = 1; });
-watch(pageCount, (c) => { page.value = Math.min(page.value, c); });
 
 function openContextMenu(event: { originalEvent: Event; data: ProjectSummaryResult }) {
   const mouseEvent = event.originalEvent as MouseEvent;
@@ -92,7 +84,22 @@ function formatDate(value: string) {
         <span class="text-xs text-muted">{{ ctrl.filteredProjects.value.length.toLocaleString("en-US") }} projects</span>
       </div>
       <p v-if="ctrl.loadError.value" class="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{{ ctrl.loadError.value }}</p>
-      <DataTable class="app-data-table min-h-0" :empty-message="ctrl.isLoading.value ? 'Loading...' : 'No projects match the search conditions.'" :row-class="() => 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '980px' }" :value="visibleProjects" @row-click="(e: any) => router.push(`/projects/${e.data.id}`)" @row-contextmenu="openContextMenu">
+      <DataTable
+        class="app-data-table min-h-0"
+        :empty-message="ctrl.isLoading.value ? 'Loading...' : 'No projects match the search conditions.'"
+        :row-class="() => 'cursor-pointer'"
+        scrollable
+        scroll-height="flex"
+        :table-style="{ minWidth: '980px' }"
+        :value="ctrl.filteredProjects.value"
+        paginator
+        :rows="20"
+        :rows-per-page-options="[20, 50, 100]"
+        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        @row-click="(e: any) => router.push(`/projects/${e.data.id}`)"
+        @row-contextmenu="openContextMenu"
+      >
         <Column field="code" header="Code" body-class="font-bold text-ink"><template #body="{ data }">{{ data.code || '-' }}</template></Column>
         <Column field="name" header="Name"><template #body="{ data }">{{ data.name || '-' }}</template></Column>
         <Column field="client" header="Client"><template #body="{ data }">{{ data.client || '-' }}</template></Column>
@@ -105,14 +112,6 @@ function formatDate(value: string) {
         <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/tasks/new')"><i class="pi pi-plus" />Add Task</button>
         <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/tasks')"><i class="pi pi-list" />View Tasks</button>
         <button class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas" type="button" @click="goToProjectRoute('/report')"><i class="pi pi-chart-bar" />View Report</button>
-      </div>
-
-      <div class="flex items-center justify-between gap-4 border-t border-divider px-4 py-3">
-        <span class="text-sm text-muted">Page {{ page.toLocaleString("en-US") }} / {{ pageCount.toLocaleString("en-US") }}</span>
-        <div class="flex items-center gap-2">
-          <button class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50" :disabled="page <= 1" type="button" @click="page = Math.max(1, page - 1)"><i class="pi pi-chevron-left" /></button>
-          <button class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50" :disabled="page >= pageCount" type="button" @click="page = Math.min(pageCount, page + 1)"><i class="pi pi-chevron-right" /></button>
-        </div>
       </div>
     </section>
   </section>

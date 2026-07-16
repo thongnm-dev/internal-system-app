@@ -118,11 +118,6 @@ impl BacklogClient {
     }
 }
 
-pub async fn get_space() -> AppResult<BacklogSpace> {
-    let client = BacklogClient::resolve().await?;
-    client.get("space", &[]).await
-}
-
 pub async fn get_project(project_key: &str) -> AppResult<BacklogProject> {
     let client = BacklogClient::resolve().await?;
     client
@@ -151,11 +146,9 @@ pub async fn list_categories(project_key: &str) -> AppResult<Vec<BacklogCategory
         .await
 }
 
-pub async fn list_milestones(project_key: &str) -> AppResult<Vec<BacklogMilestone>> {
+pub async fn list_priorities() -> AppResult<Vec<BacklogPriority>> {
     let client = BacklogClient::resolve().await?;
-    client
-        .get(&format!("projects/{project_key}/versions"), &[])
-        .await
+    client.get("priorities", &[]).await
 }
 
 pub async fn list_project_users(project_key: &str) -> AppResult<Vec<BacklogUser>> {
@@ -200,6 +193,11 @@ pub async fn list_issues(query: BacklogIssueQuery) -> AppResult<BacklogIssueList
     if let Some(ref ids) = query.milestone_ids {
         for id in ids {
             params.push(("milestoneId[]".to_string(), id.to_string()));
+        }
+    }
+    if let Some(ref ids) = query.priority_ids {
+        for id in ids {
+            params.push(("priorityId[]".to_string(), id.to_string()));
         }
     }
     if let Some(ref kw) = query.keyword {
@@ -249,6 +247,11 @@ pub async fn list_issues(query: BacklogIssueQuery) -> AppResult<BacklogIssueList
     if let Some(ref ids) = query.milestone_ids {
         for id in ids {
             count_params.push(("milestoneId[]".to_string(), id.to_string()));
+        }
+    }
+    if let Some(ref ids) = query.priority_ids {
+        for id in ids {
+            count_params.push(("priorityId[]".to_string(), id.to_string()));
         }
     }
     if let Some(ref kw) = query.keyword {

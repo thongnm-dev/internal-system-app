@@ -6,7 +6,7 @@ import Fieldset from "primevue/fieldset";
 import Calendar from "primevue/calendar";
 import {
   assignees,
-  bugClasses,
+  priorityOptions,
   categories,
   issueTypes,
   projects,
@@ -23,9 +23,20 @@ const initialProject = (route.query.project as string) || "";
 const ctrl = useIssueBacklog(initialProject);
 
 function toggleStatus(s: string) {
+  ctrl.setField("notClosed", false);
   const current = ctrl.criteria.value.status;
   const next = current.includes(s) ? current.filter((v) => v !== s) : [...current, s];
   ctrl.setField("status", next);
+}
+
+function selectAll() {
+  ctrl.setField("notClosed", false);
+  ctrl.setField("status", []);
+}
+
+function selectNotClosed() {
+  ctrl.setField("status", []);
+  ctrl.setField("notClosed", true);
 }
 
 function openImport() {
@@ -60,17 +71,39 @@ function openImport() {
             <span class="text-xs font-bold text-muted">Status</span>
             <div class="mt-1 flex h-10 min-w-0 flex-wrap items-center gap-1 rounded-md border border-divider bg-panel p-1 text-sm leading-none">
               <button
+                :class="[
+                  'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
+                  ctrl.criteria.value.status.length === 0 && !ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
+                ]"
+                type="button"
+                :disabled="ctrl.lookupLoading.value"
+                @click="selectAll()"
+              >
+                All
+              </button>
+              <button
                 v-for="s in statusOptions"
                 :key="s"
                 :class="[
                   'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
-                  ctrl.criteria.value.status.includes(s) ? 'bg-brand text-white' : 'hover:bg-canvas',
+                  !ctrl.criteria.value.notClosed && ctrl.criteria.value.status.includes(s) ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
                 type="button"
                 :disabled="ctrl.lookupLoading.value"
                 @click="toggleStatus(s)"
               >
                 {{ s }}
+              </button>
+              <button
+                :class="[
+                  'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
+                  ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
+                ]"
+                type="button"
+                :disabled="ctrl.lookupLoading.value || statusOptions.length === 0"
+                @click="selectNotClosed()"
+              >
+                Not Closed
               </button>
             </div>
           </div>
@@ -176,14 +209,14 @@ function openImport() {
                 </select>
               </label>
               <label class="block min-w-0">
-                <span class="text-xs font-bold text-muted">Bug class</span>
+                <span class="text-xs font-bold text-muted">Priority</span>
                 <select
                   class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  :value="ctrl.criteria.value.bugClass"
-                  @change="ctrl.setField('bugClass', ($event.target as HTMLSelectElement).value)"
+                  :value="ctrl.criteria.value.priorityFilter"
+                  @change="ctrl.setField('priorityFilter', ($event.target as HTMLSelectElement).value)"
                 >
-                  <option value="">All bug classes</option>
-                  <option v-for="b in bugClasses" :key="b" :value="b">{{ b }}</option>
+                  <option value="">All priorities</option>
+                  <option v-for="p in priorityOptions" :key="p" :value="p">{{ p }}</option>
                 </select>
               </label>
             </div>
@@ -191,6 +224,15 @@ function openImport() {
         </Fieldset>
 
         <div class="flex items-center justify-end gap-2">
+          <button
+            class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            type="button"
+            title="Reset search conditions"
+            @click="ctrl.reset()"
+          >
+            <i class="pi pi-refresh" />
+            Reset
+          </button>
           <button
             class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
@@ -202,31 +244,27 @@ function openImport() {
             Import
           </button>
           <button
-            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
+            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
             title="Search"
+            :disabled="ctrl.searching.value || !ctrl.criteria.value.project"
             @click="ctrl.search()"
           >
-            <i class="pi pi-search" />
-            Search
-          </button>
-          <button
-            class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            title="Reset search conditions"
-            @click="ctrl.reset()"
-          >
-            <i class="pi pi-refresh" />
-            Reset
+            <i :class="ctrl.searching.value ? 'pi pi-spinner pi-spin' : 'pi pi-search'" />
+            {{ ctrl.searching.value ? 'Searching...' : 'Search' }}
           </button>
         </div>
       </div>
     </Fieldset>
 
+    <div v-if="ctrl.searchError.value" class="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+      {{ ctrl.searchError.value }}
+    </div>
+
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
         <h3 class="font-bold">Issue backlog list</h3>
-        <span class="text-xs text-muted">{{ ctrl.filteredItems.value.length.toLocaleString("en-US") }} issues</span>
+        <span class="text-xs text-muted">{{ ctrl.totalCount.value.toLocaleString("en-US") }} issues</span>
       </div>
 
       <DataTable
@@ -236,6 +274,16 @@ function openImport() {
         scroll-height="flex"
         :table-style="{ minWidth: '1180px' }"
         :value="ctrl.filteredItems.value"
+        lazy
+        paginator
+        :first="ctrl.first.value"
+        :rows="ctrl.pageSize.value"
+        :total-records="ctrl.totalCount.value"
+        :rows-per-page-options="[20, 50, 100]"
+        :loading="ctrl.searching.value"
+        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        @page="ctrl.onPage($event)"
       >
         <Column field="issueType" header="Issue Type" body-class="whitespace-nowrap" />
         <Column field="issueKey" header="Issue Key" body-class="whitespace-nowrap font-bold text-ink" />
