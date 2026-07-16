@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import { vueRoutes } from "./routes";
 import { useAuthStore } from "@/app/stores/auth";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -20,4 +21,10 @@ router.beforeEach((to) => {
   if (to.path === "/login" && auth.isAuthenticated) {
     return { path: auth.returnPath ?? "/overview" };
   }
+
+  useGlobalLoading().start();
+});
+
+router.afterEach(() => {
+  useGlobalLoading().stop();
 });

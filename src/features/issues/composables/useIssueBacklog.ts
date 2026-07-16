@@ -17,6 +17,7 @@ import {
 } from "@/tauri/commands/backlog";
 import type { ProjectSummaryResult } from "@/_/types/project";
 import { canUseTauriRuntime } from "@/tauri/commands/_base";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 
 export type BacklogSearchCriteria = {
   project: string;
@@ -189,7 +190,6 @@ export function useIssueBacklog(initialProject = "") {
   const criteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
   const appliedCriteria = ref<BacklogSearchCriteria>({ ...startingCriteria });
   const backlogItems = ref<IssueBacklogItem[]>([]);
-  const searching = ref(false);
   const searchError = ref("");
   const totalCount = ref(0);
   const first = ref(0);
@@ -254,6 +254,8 @@ export function useIssueBacklog(initialProject = "") {
     },
   );
 
+  const globalLoading = useGlobalLoading();
+
   async function fetchPage(offset: number, count: number) {
     const c = appliedCriteria.value;
 
@@ -265,7 +267,6 @@ export function useIssueBacklog(initialProject = "") {
       return;
     }
 
-    searching.value = true;
     searchError.value = "";
 
     try {
@@ -322,8 +323,6 @@ export function useIssueBacklog(initialProject = "") {
       searchError.value = String(e);
       backlogItems.value = [];
       totalCount.value = 0;
-    } finally {
-      searching.value = false;
     }
   }
 
@@ -338,13 +337,13 @@ export function useIssueBacklog(initialProject = "") {
       return;
     }
 
-    await fetchPage(0, pageSize.value);
+    await globalLoading.run(() => fetchPage(0, pageSize.value));
   }
 
   async function onPage(event: { first: number; rows: number }) {
     first.value = event.first;
     pageSize.value = event.rows;
-    await fetchPage(event.first, event.rows);
+    await globalLoading.run(() => fetchPage(event.first, event.rows));
   }
 
   function reset() {
@@ -365,5 +364,5 @@ export function useIssueBacklog(initialProject = "") {
     });
   }
 
-  return { criteria, filteredItems, canOpenImport, setField, search, onPage, reset, lookupLoading, lookupError, searching, searchError, totalCount, first, pageSize };
+  return { criteria, filteredItems, canOpenImport, setField, search, onPage, reset, lookupLoading, lookupError, searchError, totalCount, first, pageSize };
 }

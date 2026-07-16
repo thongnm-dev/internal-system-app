@@ -7,6 +7,7 @@ export type AppRoute = {
   requiresAuth?: boolean;
   title: string;
   subtitle: string;
+  breadcrumbs?: string[];
 };
 
 export const appRoutes: AppRoute[] = [
@@ -140,7 +141,25 @@ export function routeByKey(key: MenuKey): AppRoute {
 export function routeByPath(path: string): AppRoute {
   const pathname = path.split("?")[0];
 
-  if (pathname.startsWith("/projects/")) return routeByKey("projects");
+  if (pathname.startsWith("/projects/")) {
+    const base = routeByKey("projects");
+    if (/^\/projects\/[^/]+\/tasks\/new$/.test(pathname)) {
+      return { ...base, title: "Import Tasks", subtitle: "Import tasks from CSV or Backlog into the project.", breadcrumbs: ["Projects", "Import Tasks"] };
+    }
+    if (/^\/projects\/[^/]+\/tasks$/.test(pathname)) {
+      return { ...base, title: "Project Tasks", subtitle: "Manage tasks assigned to this project.", breadcrumbs: ["Projects", "Tasks"] };
+    }
+    if (/^\/projects\/[^/]+\/report$/.test(pathname)) {
+      return { ...base, title: "Project Report", subtitle: "View monthly report for this project.", breadcrumbs: ["Projects", "Report"] };
+    }
+    if (pathname === "/projects/new") {
+      return { ...base, title: "New Project", subtitle: "Create a new project.", breadcrumbs: ["Projects", "New"] };
+    }
+    if (/^\/projects\/[^/]+$/.test(pathname)) {
+      return { ...base, title: "Project Detail", subtitle: "View and edit project information.", breadcrumbs: ["Projects", "Detail"] };
+    }
+    return base;
+  }
 
   return appRoutes.find((r) => r.path === pathname) ?? defaultRoute;
 }

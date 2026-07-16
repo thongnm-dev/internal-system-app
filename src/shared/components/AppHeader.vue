@@ -27,8 +27,16 @@ function toggleTheme() {
       <p class="mt-2 text-sm text-secondary">{{ route.subtitle }}</p>
       <nav class="mt-3 flex items-center gap-2 text-xs font-semibold text-muted" aria-label="Breadcrumb">
         <span>Home</span>
-        <span class="text-divider">/</span>
-        <span class="text-brand">{{ route.title }}</span>
+        <template v-if="route.breadcrumbs?.length">
+          <template v-for="(crumb, i) in route.breadcrumbs" :key="i">
+            <span class="text-divider">/</span>
+            <span :class="i === route.breadcrumbs.length - 1 ? 'text-brand' : ''">{{ crumb }}</span>
+          </template>
+        </template>
+        <template v-else>
+          <span class="text-divider">/</span>
+          <span class="text-brand">{{ route.title }}</span>
+        </template>
       </nav>
       <button
         v-if="canGoBack"

@@ -1,5 +1,6 @@
 import { ref, computed } from "vue";
 import { canUseTauriRuntime } from "@/tauri/commands/_base";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import {
   listUsers,
   listRoles,
@@ -13,6 +14,7 @@ import type { UserSummary, CreateUserRequest, UpdateUserRequest } from "@/_/type
 export type UserStatus = "active" | "inactive";
 
 export function useGovernanceUsers() {
+  const globalLoading = useGlobalLoading();
   const users = ref<UserSummary[]>([]);
   const availableRoles = ref<string[]>([]);
   const loading = ref(false);
@@ -152,6 +154,7 @@ export function useGovernanceUsers() {
     if (!draft.value.username.trim() || !draft.value.fullName.trim()) return false;
 
     error.value = "";
+    globalLoading.start();
     try {
       if (isCreating.value) {
         if (!draft.value.password.trim()) {
@@ -186,6 +189,8 @@ export function useGovernanceUsers() {
     } catch (e) {
       error.value = String(e);
       return false;
+    } finally {
+      globalLoading.stop();
     }
   }
 
@@ -214,8 +219,7 @@ export function useGovernanceUsers() {
   }
 
   function init() {
-    loadUsers();
-    loadRoles();
+    globalLoading.run(() => Promise.all([loadUsers(), loadRoles()]));
   }
 
   return {

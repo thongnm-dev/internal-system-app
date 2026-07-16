@@ -27,6 +27,7 @@ import {
   type ProjectTaskInput,
 } from "../composables/useProjectTasks";
 import { useToast } from "@/shared/composables/useToast";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 
 const route = useRoute();
 const router = useRouter();
@@ -35,6 +36,7 @@ const projectId = (route.params.id as string) || "";
 
 const ctrl = useProjectTasks(projectId);
 const toast = useToast();
+const globalLoading = useGlobalLoading();
 
 // --- Backlog import dialog ---
 type BacklogRow = {
@@ -66,11 +68,7 @@ const blMatchedUser = ref<BacklogUser | null>(null);
 const blSelectedStatuses = ref<number[]>([]);
 const blSelectedIssueType = ref("");
 const blSelectedCategory = ref("");
-
-const blNotClosedActive = computed(() => {
-  const notClosed = blStatusOptions.value.filter((s) => !isClosedStatus(s.name));
-  return notClosed.length > 0 && blSelectedStatuses.value.length === notClosed.length && notClosed.every((s) => blSelectedStatuses.value.includes(s.id));
-});
+const blNotClosed = ref(false);
 
 function isClosedStatus(name: string) {
   const n = name.toLowerCase();
@@ -96,6 +94,7 @@ function mapBacklogIssue(issue: BacklogIssue): BacklogRow {
 }
 
 function toggleBlStatus(id: number) {
+  blNotClosed.value = false;
   const idx = blSelectedStatuses.value.indexOf(id);
   if (idx >= 0) {
     blSelectedStatuses.value = blSelectedStatuses.value.filter((v) => v !== id);
@@ -105,7 +104,8 @@ function toggleBlStatus(id: number) {
 }
 
 function selectBlNotClosed() {
-  blSelectedStatuses.value = blStatusOptions.value.filter((s) => !isClosedStatus(s.name)).map((s) => s.id);
+  blSelectedStatuses.value = [];
+  blNotClosed.value = true;
 }
 
 async function openBacklogDialog() {
@@ -117,50 +117,52 @@ async function openBacklogDialog() {
   backlogRows.value = [];
   backlogProjectName.value = "";
 
-  try {
-    const numericId = Number(projectId);
-    if (Number.isNaN(numericId)) throw new Error("Invalid project ID");
+  await globalLoading.run(async () => {
+    try {
+      const numericId = Number(projectId);
+      if (Number.isNaN(numericId)) throw new Error("Invalid project ID");
 
-    const detail = await getProjectDetail(numericId);
-    const backlogKey = detail.backlog_key;
-    if (!backlogKey) throw new Error("Project has no Backlog key configured.");
+      const detail = await getProjectDetail(numericId);
+      const backlogKey = detail.backlog_key;
+      if (!backlogKey) throw new Error("Project has no Backlog key configured.");
 
-    backlogProjectName.value = detail.name || detail.code;
+      backlogProjectName.value = detail.name || detail.code;
 
-    const [statuses, issueTypesList, cats, users, lookup] = await Promise.all([
-      backlogListStatuses(backlogKey),
-      backlogListIssueTypes(backlogKey),
-      backlogListCategories(backlogKey),
-      backlogListProjectUsers(backlogKey),
-      backlogGetProjectLookup(backlogKey),
-    ]);
+      const [statuses, issueTypesList, cats, users, lookup] = await Promise.all([
+        backlogListStatuses(backlogKey),
+        backlogListIssueTypes(backlogKey),
+        backlogListCategories(backlogKey),
+        backlogListProjectUsers(backlogKey),
+        backlogGetProjectLookup(backlogKey),
+      ]);
 
-    blStatusOptions.value = statuses;
-    blIssueTypeOptions.value = issueTypesList;
-    blCategoryOptions.value = cats;
-    blUserOptions.value = users;
-    blProjectId.value = lookup.projectId.toString();
+      blStatusOptions.value = statuses;
+      blIssueTypeOptions.value = issueTypesList;
+      blCategoryOptions.value = cats;
+      blUserOptions.value = users;
+      blProjectId.value = lookup.projectId.toString();
 
-    const username = auth.user?.username ?? "";
-    const matched = users.find(
-      (u: BacklogUser) =>
-        u.userId === username ||
-        u.name.toLowerCase() === username.toLowerCase() ||
-        u.mailAddress?.split("@")[0]?.toLowerCase() === username.toLowerCase(),
-    );
-    blMatchedUser.value = matched ?? null;
+      const username = auth.user?.username ?? "";
+      const matched = users.find(
+        (u: BacklogUser) =>
+          u.userId === username ||
+          u.name.toLowerCase() === username.toLowerCase() ||
+          u.mailAddress?.split("@")[0]?.toLowerCase() === username.toLowerCase(),
+      );
+      blMatchedUser.value = matched ?? null;
 
-    const notClosedIds = statuses.filter((s: BacklogStatus) => !isClosedStatus(s.name)).map((s: BacklogStatus) => s.id);
-    blSelectedStatuses.value = notClosedIds;
-    blSelectedIssueType.value = "";
-    blSelectedCategory.value = "";
+      blSelectedStatuses.value = [];
+      blNotClosed.value = true;
+      blSelectedIssueType.value = "";
+      blSelectedCategory.value = "";
 
-    await searchBacklog();
-  } catch (e) {
-    backlogError.value = String(e);
-  } finally {
-    backlogLoading.value = false;
-  }
+      await searchBacklog();
+    } catch (e) {
+      backlogError.value = String(e);
+    } finally {
+      backlogLoading.value = false;
+    }
+  });
 }
 
 async function searchBacklog() {
@@ -168,6 +170,7 @@ async function searchBacklog() {
   backlogError.value = "";
   backlogRows.value = [];
 
+  globalLoading.start();
   try {
     const issueTypeIds = blSelectedIssueType.value
       ? [blIssueTypeOptions.value.find((t) => t.name === blSelectedIssueType.value)?.id].filter((id): id is number => id !== undefined)
@@ -179,11 +182,15 @@ async function searchBacklog() {
 
     const assigneeIds = blMatchedUser.value ? [blMatchedUser.value.id] : undefined;
 
+    const statusIds = blNotClosed.value
+      ? blStatusOptions.value.filter((s) => !isClosedStatus(s.name)).map((s) => s.id)
+      : blSelectedStatuses.value;
+
     const result = await backlogListIssues({
       projectKey: blProjectId.value,
       count: 100,
       offset: 0,
-      statusIds: blSelectedStatuses.value.length ? blSelectedStatuses.value : undefined,
+      statusIds: statusIds.length ? statusIds : undefined,
       issueTypeIds: issueTypeIds?.length ? issueTypeIds : undefined,
       categoryIds: categoryIds?.length ? categoryIds : undefined,
       assigneeIds,
@@ -196,6 +203,7 @@ async function searchBacklog() {
     backlogError.value = String(e);
   } finally {
     backlogSearching.value = false;
+    globalLoading.stop();
   }
 }
 
@@ -348,17 +356,19 @@ function splitCsvLine(line: string): string[] {
 
 async function importSelected() {
   const selected = parsed.value.filter((r) => r._selected);
-  for (const row of selected) {
-    await ctrl.addTask({
-      shortName: row.shortName,
-      description: row.description,
-      categories: row.categories,
-      assignee: row.assignee,
-      estimateHour: row.estimateHour,
-      dueDate: row.dueDate,
-      issueKey: row.issueKey,
-    });
-  }
+  await globalLoading.run(async () => {
+    for (const row of selected) {
+      await ctrl.addTask({
+        shortName: row.shortName,
+        description: row.description,
+        categories: row.categories,
+        assignee: row.assignee,
+        estimateHour: row.estimateHour,
+        dueDate: row.dueDate,
+        issueKey: row.issueKey,
+      });
+    }
+  });
   toast.success(`Imported ${selected.length} task${selected.length !== 1 ? "s" : ""} successfully.`);
   goBack();
 }
@@ -514,17 +524,17 @@ async function importSelected() {
                 <button
                   :class="[
                     'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
-                    blSelectedStatuses.length === 0 ? 'bg-brand text-white' : 'hover:bg-canvas',
+                    blSelectedStatuses.length === 0 && !blNotClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                   ]"
                   type="button"
-                  @click="blSelectedStatuses = []"
+                  @click="blSelectedStatuses = []; blNotClosed = false"
                 >All</button>
                 <button
                   v-for="s in blStatusOptions"
                   :key="s.id"
                   :class="[
                     'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
-                    blSelectedStatuses.includes(s.id) ? 'bg-brand text-white' : 'hover:bg-canvas',
+                    !blNotClosed && blSelectedStatuses.includes(s.id) ? 'bg-brand text-white' : 'hover:bg-canvas',
                   ]"
                   type="button"
                   @click="toggleBlStatus(s.id)"
@@ -532,7 +542,7 @@ async function importSelected() {
                 <button
                   :class="[
                     'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
-                    blNotClosedActive ? 'bg-brand text-white' : 'hover:bg-canvas',
+                    blNotClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                   ]"
                   type="button"
                   :disabled="blStatusOptions.length === 0"

@@ -30,10 +30,12 @@ import {
   type BacklogPriority as BacklogPriorityModel,
 } from "@/tauri/commands/backlog";
 import { useToast } from "@/shared/composables/useToast";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const globalLoading = useGlobalLoading();
 const initialProject = (route.query.project as string) || "";
 const ctrl = useIssueBacklog(initialProject);
 
@@ -196,6 +198,7 @@ async function executeImport() {
   importError.value = "";
   importProgress.value = { done: 0, total: selected.length };
 
+  globalLoading.start();
   try {
     const proj = projects.value.find((p) => p.code === projectCode);
     if (!proj) throw new Error("Project not found.");
@@ -252,6 +255,7 @@ async function executeImport() {
     importError.value = String(e);
   } finally {
     importing.value = false;
+    globalLoading.stop();
   }
 }
 </script>
@@ -457,11 +461,11 @@ async function executeImport() {
             class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
             title="Search"
-            :disabled="ctrl.searching.value || !ctrl.criteria.value.project"
+            :disabled="!ctrl.criteria.value.project"
             @click="ctrl.search()"
           >
-            <i :class="ctrl.searching.value ? 'pi pi-spinner pi-spin' : 'pi pi-search'" />
-            {{ ctrl.searching.value ? 'Searching...' : 'Search' }}
+            <i class="pi pi-search" />
+            Search
           </button>
         </div>
       </div>
@@ -490,7 +494,6 @@ async function executeImport() {
         :rows="ctrl.pageSize.value"
         :total-records="ctrl.totalCount.value"
         :rows-per-page-options="[20, 50, 100]"
-        :loading="ctrl.searching.value"
         paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
         current-page-report-template="Showing {first} to {last} of {totalRecords}"
         @page="ctrl.onPage($event)"

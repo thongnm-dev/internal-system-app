@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue";
 import { friendlyError } from "@/tauri/commands/_base";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import {
   clearDailyReportEntry,
   createDailyReportTask,
@@ -106,6 +107,7 @@ function taskToRow(
 }
 
 export function useDailyReport(username?: string) {
+  const globalLoading = useGlobalLoading();
   const assignedProjects = ref<DailyReportProjectResult[]>([]);
   const optionalProjects = ref<DailyReportProjectResult[]>([]);
   const visibleOptionalIds = ref<string[]>([]);
@@ -262,17 +264,14 @@ export function useDailyReport(username?: string) {
     }
   }
 
-  loadProjects().then(() => {
-    loadUserTasks();
-    loadEntries();
-    loadTaskHours();
+  globalLoading.run(async () => {
+    await loadProjects();
+    await Promise.all([loadUserTasks(), loadEntries(), loadTaskHours()]);
   });
   loadPhases();
 
   watch(selectedMonth, () => {
-    loadUserTasks();
-    loadEntries();
-    loadTaskHours();
+    globalLoading.run(() => Promise.all([loadUserTasks(), loadEntries(), loadTaskHours()]));
   });
 
   function addProject(projectId: string) {

@@ -6,7 +6,7 @@ import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { installNavigationHistory, markMenuNavigation } from "@/shared/composables/useNavigationHistory";
 import { useAuthStore } from "@/app/stores/auth";
-import { appRoutes, defaultRoute, loginRoute } from "@/app/router/routes";
+import { appRoutes, defaultRoute, loginRoute, routeByPath } from "@/app/router/routes";
 import type { MenuKey } from "@/shared/types/app";
 import StartupScreen from "@/shared/components/StartupScreen.vue";
 import ConnectionErrorScreen from "@/shared/components/ConnectionErrorScreen.vue";
@@ -17,6 +17,7 @@ import AppSidebar from "@/shared/components/AppSidebar.vue";
 import AppHeader from "@/shared/components/AppHeader.vue";
 import AppBottomBar from "@/shared/components/AppBottomBar.vue";
 import AppToast from "@/shared/components/AppToast.vue";
+import GlobalLoading from "@/shared/components/GlobalLoading.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -30,7 +31,7 @@ installNavigationHistory(router);
 const activeMenu = computed<MenuKey>(() => (route.meta.key as MenuKey) ?? "overview");
 
 const currentAppRoute = computed(() => {
-  return appRoutes.find((r) => r.key === route.meta.key) ?? defaultRoute;
+  return routeByPath(route.path);
 });
 
 function handleMenuChange(key: MenuKey) {
@@ -130,5 +131,6 @@ watch(
     </div>
   </main>
 
+  <GlobalLoading />
   <AppToast />
 </template>
