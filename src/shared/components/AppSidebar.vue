@@ -53,6 +53,7 @@ const groups: MenuGroup[] = [
     icon: "pi-sparkles",
     children: [
       { id: "aiChat", icon: "pi-comments" },
+      { id: "aiUsage", icon: "pi-chart-bar" },
     ],
   },
   {

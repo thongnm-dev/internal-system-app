@@ -108,6 +108,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Chat with AI assistants for code review, documentation, and task automation.",
   },
   {
+    key: "aiUsage",
+    path: "/ai/usage",
+    title: "AI Usage",
+    subtitle: "Track AI usage, token consumption, and cost statistics across the team.",
+  },
+  {
     key: "governanceMenus",
     path: "/governance/menus",
     requiresAuth: true,
@@ -288,6 +294,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/ai/chat",
     component: () => import("@/features/ai-agent/components/AiChatPage.vue"),
     meta: { key: "aiChat" as MenuKey },
+  },
+  {
+    path: "/ai/usage",
+    component: () => import("@/features/ai-agent/components/AiUsagePage.vue"),
+    meta: { key: "aiUsage" as MenuKey },
   },
   {
     path: "/governance/menus",

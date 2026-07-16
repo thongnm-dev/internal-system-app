@@ -46,6 +46,10 @@ use commands::explorer_commands::{
     explorer_get_drives, explorer_open, explorer_read_dir, explorer_search,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
+use commands::ai_usage_commands::{
+    ai_usage_add_account, ai_usage_delete_account, ai_usage_list_accounts,
+};
+use commands::ai_chat_commands::ai_chat_complete;
 use commands::s3_commands::{
     s3_create_folder, s3_delete_objects, s3_download_objects, s3_list_objects,
     s3_test_connection, s3_upload_file,
@@ -165,7 +169,13 @@ pub fn run() {
             explorer_read_dir,
             explorer_search,
             explorer_open,
-            explorer_get_drives
+            explorer_get_drives,
+            // === AI Usage commands ===
+            ai_usage_add_account,
+            ai_usage_list_accounts,
+            ai_usage_delete_account,
+            // === AI Chat commands ===
+            ai_chat_complete
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -47,6 +47,10 @@ mod commands {
     pub mod collect_commands;
     /// Commands cho file explorer nhanh.
     pub mod explorer_commands;
+    /// Commands cho module AI Usage (quản lý account AI).
+    pub mod ai_usage_commands;
+    /// Commands cho module AI Chat (gọi API các nhà cung cấp LLM).
+    pub mod ai_chat_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -109,6 +113,10 @@ mod models {
     pub mod collect;
     /// Model cho file explorer nhanh.
     pub mod explorer;
+    /// Model cho module AI Usage (quản lý account AI).
+    pub mod ai_usage;
+    /// Model cho module AI Chat (hội thoại với các nhà cung cấp LLM).
+    pub mod ai_chat;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -151,6 +159,10 @@ mod services {
     pub mod collect_folders_service;
     /// Service cho file explorer nhanh (đọc thư mục, tìm kiếm file).
     pub mod explorer_service;
+    /// Service cho module AI Usage — lưu tạm danh sách account AI trong bộ nhớ.
+    pub mod ai_usage_service;
+    /// Service cho module AI Chat — gọi API các nhà cung cấp LLM.
+    pub mod ai_chat_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

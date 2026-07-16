@@ -14,6 +14,7 @@ export type MenuKey =
   | "cloudS3Upload"
   | "cloudS3Download"
   | "aiChat"
+  | "aiUsage"
   | "governanceMenus"
   | "governanceUsers"
   | "governanceLogs"
