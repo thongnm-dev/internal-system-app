@@ -6,7 +6,7 @@ import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { installNavigationHistory, markMenuNavigation } from "@/shared/composables/useNavigationHistory";
 import { useAuthStore } from "@/app/stores/auth";
-import { appRoutes, defaultRoute, loginRoute, routeByPath } from "@/app/router/routes";
+import { appRoutes, loginRoute, routeByPath } from "@/app/router/routes";
 import type { MenuKey } from "@/shared/types/app";
 import StartupScreen from "@/shared/components/StartupScreen.vue";
 import ConnectionErrorScreen from "@/shared/components/ConnectionErrorScreen.vue";

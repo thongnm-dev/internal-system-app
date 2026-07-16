@@ -41,6 +41,10 @@ use commands::backlog_commands::{
 };
 use commands::excel2md_commands::excel2md;
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
+use commands::s3_commands::{
+    s3_create_folder, s3_delete_objects, s3_download_objects, s3_list_objects, s3_load_config,
+    s3_test_connection, s3_upload_file,
+};
 
 /// Khởi chạy ứng dụng Tauri desktop.
 ///
@@ -138,7 +142,15 @@ pub fn run() {
             backlog_list_issues,
             backlog_get_issue,
             backlog_get_project_lookup,
-            backlog_create_issue
+            backlog_create_issue,
+            // === S3 commands ===
+            s3_load_config,
+            s3_test_connection,
+            s3_list_objects,
+            s3_download_objects,
+            s3_upload_file,
+            s3_delete_objects,
+            s3_create_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

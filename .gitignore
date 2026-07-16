@@ -16,3 +16,4 @@ src/**/*.d.ts.map
 
 src-tauri/target/
 src-tauri/config.ini
+**miniapp/**

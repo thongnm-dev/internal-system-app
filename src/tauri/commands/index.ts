@@ -10,3 +10,4 @@ export * from "./daily-note";
 export * from "./daily-report";
 export * from "./user";
 export * from "./backlog";
+export * from "./s3";

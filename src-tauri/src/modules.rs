@@ -39,6 +39,8 @@ mod commands {
     pub mod menu_config_commands;
     /// Commands cho Backlog API integration.
     pub mod backlog_commands;
+    /// Commands cho S3 browser (list, download, upload, delete).
+    pub mod s3_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -93,6 +95,8 @@ mod models {
     pub mod menu_config;
     /// Model cho Backlog API responses.
     pub mod backlog;
+    /// Model cho S3 browser (config, object, operation result).
+    pub mod s3;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -125,6 +129,8 @@ mod services {
     pub mod menu_config_service;
     /// Service cho Backlog API integration.
     pub mod backlog_service;
+    /// Service cho S3 browser operations.
+    pub mod s3_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

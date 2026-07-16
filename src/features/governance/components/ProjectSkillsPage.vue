@@ -97,18 +97,6 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
       </div>
 
       <div class="flex flex-wrap items-end justify-between gap-2 xl:justify-end">
-        <span class="min-w-20 rounded-md border border-divider bg-panel px-3 py-2 text-right">
-          <span class="block text-[11px] font-bold uppercase text-muted">Skills</span>
-          <span class="block text-sm font-extrabold text-ink">{{ ctrl.stats.value.total.toLocaleString("en-US") }}</span>
-        </span>
-        <span class="min-w-20 rounded-md border border-divider bg-panel px-3 py-2 text-right">
-          <span class="block text-[11px] font-bold uppercase text-muted">Active</span>
-          <span class="block text-sm font-extrabold text-ink">{{ ctrl.stats.value.active.toLocaleString("en-US") }}</span>
-        </span>
-        <span class="min-w-20 rounded-md border border-divider bg-panel px-3 py-2 text-right">
-          <span class="block text-[11px] font-bold uppercase text-muted">Drafts</span>
-          <span class="block text-sm font-extrabold text-ink">{{ ctrl.stats.value.draft.toLocaleString("en-US") }}</span>
-        </span>
         <button
           class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
           type="button"
