@@ -7,7 +7,7 @@ import MessageBanner from "@/shared/components/MessageBanner.vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
-import type { S3Object } from "@/shared/types/s3";
+import type { S3Object } from "@/_/types/s3";
 
 const ctrl = useS3Browser();
 const toast = useToast();

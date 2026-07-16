@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import type { MessageMode } from "@/shared/types/app";
+import type { MessageMode } from "@/_/types/app";
 
 export type SkillSortKey = "featured" | "downloads" | "stars" | "installs" | "updated" | "newest" | "name";
 export type SkillViewMode = "list" | "grid";

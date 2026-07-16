@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from "@/app/stores/auth";
-import type { SystemInfo } from "@/shared/types/system";
+import type { SystemInfo } from "@/_/types/system";
 
 const props = defineProps<{
   info: SystemInfo;

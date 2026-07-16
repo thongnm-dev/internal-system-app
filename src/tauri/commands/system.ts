@@ -1,5 +1,5 @@
 import { safeInvoke } from "./_base";
-import type { SystemInfo } from "@/shared/types/system";
+import type { SystemInfo } from "@/_/types/system";
 
 export function getSystemInfo() {
   return safeInvoke<SystemInfo>("get_system_info");

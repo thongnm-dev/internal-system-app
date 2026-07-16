@@ -1,5 +1,5 @@
 import { computed, ref, watch } from "vue";
-import type { MessageMode } from "@/shared/types/app";
+import type { MessageMode } from "@/_/types/app";
 
 export type IssueCsvRow = {
   actualHours: string;

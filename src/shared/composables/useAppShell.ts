@@ -6,8 +6,8 @@ import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { useAuthStore } from "@/app/stores/auth";
 import { loginRoute } from "@/app/router/routes";
-import type { MessageMode } from "@/shared/types/app";
-import type { SystemInfo } from "@/shared/types/system";
+import type { MessageMode } from "@/_/types/app";
+import type { SystemInfo } from "@/_/types/system";
 
 const BOOTSTRAP_MIN_DURATION_MS = 900;
 

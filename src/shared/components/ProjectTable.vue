@@ -9,7 +9,7 @@ import type {
   PhaseSummary,
   ProjectSummary,
   SelectedPhaseDetail,
-} from "@/shared/types/analysis";
+} from "@/_/types/analysis";
 
 type ProjectTableRow =
   | { id: string; kind: "project"; project: ProjectSummary; phase: null; totals: MinuteTotals }

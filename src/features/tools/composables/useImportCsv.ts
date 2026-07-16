@@ -3,8 +3,8 @@ import { onMounted, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { importMonthlyReportCsv, listImportBatches, previewMonthlyReportCsv } from "@/tauri/commands/import-csv";
-import type { MessageMode } from "@/shared/types/app";
-import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult } from "@/shared/types/import-csv";
+import type { MessageMode } from "@/_/types/app";
+import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult } from "@/_/types/import-csv";
 
 function defaultReportName(path: string) {
   const fileName = path.split(/[\\/]/).pop() ?? path;

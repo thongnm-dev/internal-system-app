@@ -1,4 +1,4 @@
-import type { MinuteTotals } from "@/shared/types/analysis";
+import type { MinuteTotals } from "@/_/types/analysis";
 
 export function emptyTotals(): MinuteTotals {
   return {

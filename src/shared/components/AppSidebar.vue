@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { appRoutes } from "@/app/router/routes";
-import type { MenuKey } from "@/shared/types/app";
+import type { MenuKey } from "@/_/types/app";
 
 const props = defineProps<{
   activeMenu: MenuKey;
@@ -43,6 +43,8 @@ const groups: MenuGroup[] = [
     icon: "pi-cloud",
     children: [
       { id: "cloudS3", icon: "pi-folder-open" },
+      { id: "cloudS3Upload", icon: "pi-upload" },
+      { id: "cloudS3Download", icon: "pi-download" },
     ],
   },
   {

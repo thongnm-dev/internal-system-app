@@ -10,8 +10,8 @@ import type {
   AnalysisResult,
   ProjectSummary,
   SelectedPhaseDetail,
-} from "@/shared/types/analysis";
-import type { ImportCsvPreviewResult } from "@/shared/types/import-csv";
+} from "@/_/types/analysis";
+import type { ImportCsvPreviewResult } from "@/_/types/import-csv";
 
 const ctrl = useImportCsv();
 const isDetailDialogOpen = ref(false);

@@ -3,8 +3,8 @@ import { ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { convertXlsxSpecToMarkdown } from "@/tauri/commands/excel2md";
-import type { MessageMode } from "@/shared/types/app";
-import type { XlsxMarkdownResult } from "@/shared/types/excel2md";
+import type { MessageMode } from "@/_/types/app";
+import type { XlsxMarkdownResult } from "@/_/types/excel2md";
 
 function defaultMarkdownPath(path: string) {
   return path.trim() ? path.replace(/\.[^.\\/]+$/i, ".md") : "";

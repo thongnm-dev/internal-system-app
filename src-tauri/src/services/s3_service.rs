@@ -9,7 +9,7 @@ use aws_sdk_s3::Client;
 use ini::Ini;
 use std::path::Path;
 
-pub fn load_config_from_ini() -> AppResult<S3Config> {
+pub(crate) fn load_config_from_ini() -> AppResult<S3Config> {
     let path = pgsql_connect::config_path();
     let ini = Ini::load_from_file(&path).map_err(|e| {
         AppError::new(format!("Failed to load config.ini at {}: {e}", path.display()))
@@ -56,7 +56,8 @@ fn build_client(config: &S3Config) -> AppResult<(Client, String)> {
     Ok((client, config.bucket.clone()))
 }
 
-pub async fn test_connection(config: S3Config) -> AppResult<String> {
+pub async fn test_connection() -> AppResult<String> {
+    let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
     client
         .head_bucket()
@@ -67,7 +68,8 @@ pub async fn test_connection(config: S3Config) -> AppResult<String> {
     Ok(format!("Connected to bucket '{bucket}' successfully."))
 }
 
-pub async fn list_objects(config: S3Config, prefix: String) -> AppResult<S3ListResult> {
+pub async fn list_objects(prefix: String) -> AppResult<S3ListResult> {
+    let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
 
     let mut request = client
@@ -138,10 +140,10 @@ pub async fn list_objects(config: S3Config, prefix: String) -> AppResult<S3ListR
 }
 
 pub async fn download_objects(
-    config: S3Config,
     keys: Vec<String>,
     destination_dir: String,
 ) -> AppResult<S3OperationResult> {
+    let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
     let dest = Path::new(&destination_dir);
     let mut processed: u32 = 0;
@@ -273,10 +275,10 @@ async fn list_all_objects_recursive(
 }
 
 pub async fn upload_file(
-    config: S3Config,
     local_path: String,
     s3_key: String,
 ) -> AppResult<S3OperationResult> {
+    let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
     let path = Path::new(&local_path);
 
@@ -306,9 +308,9 @@ pub async fn upload_file(
 }
 
 pub async fn delete_objects(
-    config: S3Config,
     keys: Vec<String>,
 ) -> AppResult<S3OperationResult> {
+    let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
     let mut processed: u32 = 0;
     let mut failed: u32 = 0;
@@ -367,9 +369,9 @@ pub async fn delete_objects(
 }
 
 pub async fn create_folder(
-    config: S3Config,
     prefix: String,
 ) -> AppResult<S3OperationResult> {
+    let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
 
     let folder_key = if prefix.ends_with('/') {

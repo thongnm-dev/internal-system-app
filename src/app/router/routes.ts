@@ -1,5 +1,5 @@
 import type { RouteRecordRaw } from "vue-router";
-import type { AppRouteKey, MenuKey } from "@/shared/types/app";
+import type { AppRouteKey, MenuKey } from "@/_/types/app";
 
 export type AppRoute = {
   key: AppRouteKey;
@@ -82,6 +82,18 @@ export const appRoutes: AppRoute[] = [
     path: "/cloud/s3",
     title: "S3 Browser",
     subtitle: "Browse, upload, and manage files in S3-compatible storage buckets.",
+  },
+  {
+    key: "cloudS3Upload",
+    path: "/cloud/s3-upload",
+    title: "S3 Upload",
+    subtitle: "Upload files and folders to S3 storage destinations.",
+  },
+  {
+    key: "cloudS3Download",
+    path: "/cloud/s3-download",
+    title: "S3 Download",
+    subtitle: "Download files from S3 storage to local directories.",
   },
   {
     key: "aiChat",
@@ -250,6 +262,16 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/cloud/s3",
     component: () => import("@/features/cloud/components/S3BrowserPage.vue"),
     meta: { key: "cloudS3" as MenuKey },
+  },
+  {
+    path: "/cloud/s3-upload",
+    component: () => import("@/features/cloud/components/S3UploadPage.vue"),
+    meta: { key: "cloudS3Upload" as MenuKey },
+  },
+  {
+    path: "/cloud/s3-download",
+    component: () => import("@/features/cloud/components/S3DownloadPage.vue"),
+    meta: { key: "cloudS3Download" as MenuKey },
   },
   {
     path: "/ai/chat",

@@ -1,7 +1,6 @@
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import {
-  s3LoadConfig,
   s3TestConnection,
   s3ListObjects,
   s3DownloadObjects,
@@ -10,25 +9,14 @@ import {
   s3CreateFolder,
 } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { S3Config, S3Object, S3OperationResult } from "@/shared/types/s3";
-import type { MessageMode } from "@/shared/types/app";
-
-function emptyConfig(): S3Config {
-  return {
-    accessKeyId: "",
-    secretAccessKey: "",
-    region: "ap-northeast-1",
-    bucket: "",
-    endpointUrl: null,
-  };
-}
+import type { S3Object, S3OperationResult } from "@/_/types/s3";
+import type { MessageMode } from "@/_/types/app";
 
 export function useS3Browser() {
-  const config = reactive<S3Config>(emptyConfig());
-  const configLoaded = ref(false);
   const objects = ref<S3Object[]>([]);
   const currentPrefix = ref("");
   const prefixHistory = ref<string[]>([]);
+  const bucketName = ref("");
   const isConnected = ref(false);
   const isLoading = ref(false);
   const isTesting = ref(false);
@@ -36,11 +24,11 @@ export function useS3Browser() {
   const isDownloading = ref(false);
   const isDeleting = ref(false);
   const selectedKeys = ref<Set<string>>(new Set());
-  const message = ref("Loading S3 configuration from config.ini...");
+  const message = ref("Connecting to S3...");
   const messageMode = ref<MessageMode>("info");
 
   const breadcrumbs = computed(() => {
-    const parts: { label: string; prefix: string }[] = [{ label: config.bucket || "Bucket", prefix: "" }];
+    const parts: { label: string; prefix: string }[] = [{ label: bucketName.value || "Bucket", prefix: "" }];
     if (!currentPrefix.value) return parts;
 
     const segments = currentPrefix.value.split("/").filter(Boolean);
@@ -61,23 +49,12 @@ export function useS3Browser() {
     if (!canUseTauriRuntime()) return;
     isLoading.value = true;
     try {
-      const loaded = await s3LoadConfig();
-      Object.assign(config, loaded);
-      configLoaded.value = true;
-
-      if (!config.accessKeyId || !config.secretAccessKey || !config.bucket) {
-        message.value = "S3 credentials are not configured in config.ini.";
-        messageMode.value = "error";
-        return;
-      }
-
-      await s3TestConnection({ ...config });
+      const result = await s3TestConnection();
       isConnected.value = true;
-      message.value = `Connected to '${config.bucket}'.`;
+      message.value = result;
       messageMode.value = "info";
       await refresh();
     } catch (e) {
-      configLoaded.value = true;
       message.value = friendlyError(e);
       messageMode.value = "error";
       isConnected.value = false;
@@ -96,7 +73,7 @@ export function useS3Browser() {
     }
     isTesting.value = true;
     try {
-      const result = await s3TestConnection({ ...config });
+      const result = await s3TestConnection();
       message.value = result;
       messageMode.value = "info";
     } catch (e) {
@@ -115,11 +92,11 @@ export function useS3Browser() {
     }
     isLoading.value = true;
     try {
-      await s3TestConnection({ ...config });
+      await s3TestConnection();
       isConnected.value = true;
       currentPrefix.value = "";
       prefixHistory.value = [];
-      message.value = `Connected to '${config.bucket}'.`;
+      message.value = "Connected successfully.";
       messageMode.value = "info";
       await refresh();
     } catch (e) {
@@ -146,7 +123,7 @@ export function useS3Browser() {
     isLoading.value = true;
     selectedKeys.value = new Set();
     try {
-      const result = await s3ListObjects({ ...config }, currentPrefix.value);
+      const result = await s3ListObjects(currentPrefix.value);
       objects.value = result.objects;
     } catch (e) {
       message.value = friendlyError(e);
@@ -221,7 +198,7 @@ export function useS3Browser() {
 
     isDownloading.value = true;
     try {
-      const result = await s3DownloadObjects({ ...config }, keys, dir as string);
+      const result = await s3DownloadObjects(keys, dir as string);
       message.value = result.message;
       messageMode.value = result.success ? "info" : "error";
       return result;
@@ -246,7 +223,7 @@ export function useS3Browser() {
 
     isDownloading.value = true;
     try {
-      const result = await s3DownloadObjects({ ...config }, [key], dir as string);
+      const result = await s3DownloadObjects([key], dir as string);
       message.value = result.message;
       messageMode.value = result.success ? "info" : "error";
       return result;
@@ -278,7 +255,7 @@ export function useS3Browser() {
 
     isUploading.value = true;
     try {
-      const result = await s3UploadFile({ ...config }, localPath, s3Key);
+      const result = await s3UploadFile(localPath, s3Key);
       message.value = result.message;
       messageMode.value = result.success ? "info" : "error";
       if (result.success) await refresh();
@@ -298,7 +275,7 @@ export function useS3Browser() {
 
     isDeleting.value = true;
     try {
-      const result = await s3DeleteObjects({ ...config }, keys);
+      const result = await s3DeleteObjects(keys);
       message.value = result.message;
       messageMode.value = result.success ? "info" : "error";
       if (result.success) {
@@ -318,7 +295,7 @@ export function useS3Browser() {
   async function deleteSingle(key: string): Promise<S3OperationResult | null> {
     isDeleting.value = true;
     try {
-      const result = await s3DeleteObjects({ ...config }, [key]);
+      const result = await s3DeleteObjects([key]);
       message.value = result.message;
       messageMode.value = result.success ? "info" : "error";
       if (result.success) {
@@ -342,7 +319,7 @@ export function useS3Browser() {
     const prefix = currentPrefix.value + name.trim();
     isLoading.value = true;
     try {
-      const result = await s3CreateFolder({ ...config }, prefix);
+      const result = await s3CreateFolder(prefix);
       message.value = result.message;
       messageMode.value = result.success ? "info" : "error";
       if (result.success) await refresh();
@@ -357,8 +334,6 @@ export function useS3Browser() {
   }
 
   return {
-    config,
-    configLoaded,
     objects,
     currentPrefix,
     isConnected,

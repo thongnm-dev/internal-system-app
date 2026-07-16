@@ -11,6 +11,8 @@ export type MenuKey =
   | "dailyReport"
   | "importCsv"
   | "cloudS3"
+  | "cloudS3Upload"
+  | "cloudS3Download"
   | "aiChat"
   | "governanceMenus"
   | "governanceUsers"
