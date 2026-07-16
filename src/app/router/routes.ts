@@ -63,7 +63,7 @@ export const appRoutes: AppRoute[] = [
     key: "exploreFaster",
     path: "/explore-faster",
     title: "Explore Faster",
-    subtitle: "Quickly browse and explore data across projects and tables.",
+    subtitle: "Fast file browser — navigate folders and search documents quickly.",
   },
   {
     key: "dailyWorkNotes",

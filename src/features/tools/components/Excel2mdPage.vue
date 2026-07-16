@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { useExcel2md } from "../composables/useExcel2md";
-import MessageBanner from "@/shared/components/MessageBanner.vue";
 
 const ctrl = useExcel2md();
 </script>
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <div class="grid grid-cols-[minmax(0,1fr)_320px] gap-4">
+    <div class="grid grid-cols-1 gap-4">
       <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-file-excel text-xl text-brand" />
@@ -68,23 +67,7 @@ const ctrl = useExcel2md();
           </button>
         </div>
       </section>
-
-      <aside class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-        <span class="text-sm font-bold text-muted">Last conversion</span>
-        <strong class="mt-2 block truncate text-lg leading-tight text-ink">
-          {{ ctrl.result.value?.output_file_name ?? "-" }}
-        </strong>
-        <p class="mt-2 text-xs text-muted">
-          {{ ctrl.result.value ? ctrl.result.value.output_path : "No Markdown file created yet." }}
-        </p>
-        <div v-if="ctrl.result.value" class="mt-4 flex items-center gap-2 text-sm font-bold text-brand">
-          <i class="pi pi-check-circle" />
-          Ready
-        </div>
-      </aside>
     </div>
-
-    <MessageBanner :message="ctrl.message.value" :mode="ctrl.messageMode.value" />
 
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">

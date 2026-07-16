@@ -471,21 +471,6 @@ async function executeSyncDailyReport() {
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
-    <!-- Error banner (backend failures — e.g. saving a new task) -->
-    <div v-if="ctrl.error.value" class="flex shrink-0 items-center gap-2 border-b border-divider">
-      <div class="min-w-0 flex-1">
-        <MessageBanner :message="ctrl.error.value" mode="error" />
-      </div>
-      <button
-        class="mr-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-600 hover:bg-red-50"
-        type="button"
-        title="Dismiss"
-        @click="ctrl.error.value = ''"
-      >
-        <i class="pi pi-times text-xs" />
-      </button>
-    </div>
-
     <!-- Top bar: project list + month navigation -->
     <section class="grid h-[76px] shrink-0 grid-cols-[380px_minmax(0,1fr)] border-b border-divider bg-panel">
       <div class="flex min-w-0 items-center justify-between gap-3 border-r border-divider px-4">
@@ -1089,7 +1074,7 @@ async function executeSyncDailyReport() {
         <span class="min-w-0 truncate">Xem backlog</span>
       </button>
       <button
-        v-if="!taskContextMenu.task.isCompleted && ctrl.totalHours(taskContextMenu.task.rowId) === 0"
+        v-if="taskContextMenu.task.isUserAdded && !taskContextMenu.task.isCompleted"
         class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold text-red-500 hover:bg-red-50"
         type="button"
         @click="confirmDeleteTask"

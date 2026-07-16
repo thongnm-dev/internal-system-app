@@ -45,6 +45,8 @@ mod commands {
     pub mod sync_commands;
     /// Commands cho công cụ collect/copy file (gom tài liệu nguồn).
     pub mod collect_commands;
+    /// Commands cho file explorer nhanh.
+    pub mod explorer_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -105,6 +107,8 @@ mod models {
     pub mod sync;
     /// Model cho công cụ collect/copy file.
     pub mod collect;
+    /// Model cho file explorer nhanh.
+    pub mod explorer;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -145,6 +149,8 @@ mod services {
     pub mod collect_service;
     /// Service copy file theo danh sách folder.
     pub mod collect_folders_service;
+    /// Service cho file explorer nhanh (đọc thư mục, tìm kiếm file).
+    pub mod explorer_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

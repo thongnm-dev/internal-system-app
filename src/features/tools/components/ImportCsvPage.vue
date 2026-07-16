@@ -77,7 +77,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <div class="grid grid-cols-[minmax(0,1fr)_320px] gap-4">
+    <div class="grid grid-cols-1 gap-4">
       <div class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-database text-xl text-brand" />
@@ -90,16 +90,9 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <button class="flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60" type="button" :disabled="ctrl.isImporting.value" @click="ctrl.previewCsv()"><i class="pi pi-file-import" />Import</button>
         </div>
       </div>
-      <div class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-        <span class="text-sm font-bold text-muted">Current import</span>
-        <strong class="mt-2 block text-2xl leading-tight text-ink">{{ ctrl.result.value ? ctrl.result.value.row_count.toLocaleString("en-US") : "-" }}</strong>
-        <p class="mt-1 text-sm text-muted">saved rows</p>
-      </div>
     </div>
 
-    <MessageBanner :message="ctrl.message.value" :mode="ctrl.messageMode.value" />
-
-    <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-4 overflow-hidden">
+    <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden">
       <!-- Preview -->
       <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <div class="flex items-start justify-between gap-3 border-b border-divider px-4 py-3">
@@ -125,22 +118,6 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <Column header="Total (hour)" body-class="num font-bold text-brand" header-class="num"><template #body="{ data }">{{ formatHourValue(totalMinutes(data.totals)) }}</template></Column>
         </DataTable>
       </section>
-
-      <!-- Import History -->
-      <aside class="min-h-0 overflow-auto rounded-lg border border-divider bg-panel p-4 shadow-sm">
-        <h3 class="font-bold">Recent imports</h3>
-        <div class="mt-4 space-y-3">
-          <p v-if="ctrl.batches.value.length === 0" class="text-sm text-muted">No import history.</p>
-          <div v-for="batch in ctrl.batches.value" :key="batch.id" class="border-b border-stone-100 pb-3 last:border-b-0">
-            <div class="flex items-center justify-between gap-3">
-              <span class="min-w-0 truncate text-sm font-bold">{{ batch.source_file_name }}</span>
-              <span class="text-xs font-bold text-brand">#{{ batch.id }}</span>
-            </div>
-            <p class="mt-1 text-xs text-muted">{{ batch.imported_at }}</p>
-            <p class="mt-1 text-xs text-muted">{{ batch.row_count.toLocaleString("en-US") }} rows / {{ formatHourValue(batch.total_minutes) }} hours</p>
-          </div>
-        </div>
-      </aside>
     </div>
 
     <!-- Detail Dialog -->

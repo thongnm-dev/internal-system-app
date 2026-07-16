@@ -426,10 +426,15 @@ export function useDailyReport(username?: string) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) throw new Error("Task không tồn tại.");
     if (!task.isUserAdded) throw new Error("Chỉ có thể xóa task được thêm nhanh.");
-    if (totalHours(taskId) > 0) throw new Error("Không thể xóa task đã phát sinh số giờ.");
     error.value = "";
     try {
       if (username) await deleteDailyReportTask(username, task.dbId);
+      const rowId = makeRowId(taskId, categoryIdToCode.value.get(task.categoryId) ?? "");
+      const prefix = `${rowId}:`;
+      const cleaned = Object.fromEntries(
+        Object.entries(entries.value).filter(([key]) => !key.startsWith(prefix)),
+      );
+      entries.value = cleaned;
       userTasks.value = {
         ...userTasks.value,
         [projectId]: tasks.filter((t) => t.id !== taskId),

@@ -330,11 +330,15 @@ fn row_to_entry(row: &tokio_postgres::Row) -> DailyReportEntry {
 
 /// Chuyển đổi một row thành `DailyReportUserTask`.
 fn row_to_task(row: &tokio_postgres::Row) -> DailyReportUserTask {
-    let id: i32 = row.try_get("id").unwrap_or(0);
+    let task_id: String = row.try_get("task_id").unwrap_or_default();
+    let id: i32 = row
+        .try_get("id")
+        .unwrap_or_else(|_| task_id.parse::<i32>().unwrap_or(0));
+    let task_id = if task_id.is_empty() { id.to_string() } else { task_id };
     DailyReportUserTask {
         id,
         username: row.get("username"),
-        task_id: row.try_get("task_id").unwrap_or_else(|_| id.to_string()),
+        task_id,
         project_id: row.get("project_id"),
         name: row.get("name"),
         description: row.get("description"),

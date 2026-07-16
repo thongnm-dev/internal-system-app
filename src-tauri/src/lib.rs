@@ -42,6 +42,9 @@ use commands::backlog_commands::{
 use commands::excel2md_commands::excel2md;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
+use commands::explorer_commands::{
+    explorer_get_drives, explorer_open, explorer_read_dir, explorer_search,
+};
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::s3_commands::{
     s3_create_folder, s3_delete_objects, s3_download_objects, s3_list_objects,
@@ -157,7 +160,12 @@ pub fn run() {
             // === Collect/Copy tools commands ===
             collect_load_ini,
             collect_run,
-            collect_by_folders
+            collect_by_folders,
+            // === Explorer commands ===
+            explorer_read_dir,
+            explorer_search,
+            explorer_open,
+            explorer_get_drives
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
