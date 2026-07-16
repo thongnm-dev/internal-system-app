@@ -76,3 +76,12 @@ pub async fn backlog_get_project_lookup(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn backlog_create_issue(
+    request: BacklogCreateIssueRequest,
+) -> Result<BacklogIssue, String> {
+    backlog_service::create_issue(request)
+        .await
+        .map_err(|e| e.to_string())
+}

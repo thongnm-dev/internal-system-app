@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
+import Checkbox from "primevue/checkbox";
 import Fieldset from "primevue/fieldset";
 import Calendar from "primevue/calendar";
+import Dialog from "primevue/dialog";
 import {
   assignees,
   priorityOptions,
@@ -16,9 +19,21 @@ import {
   statusTone,
   priorityTone,
 } from "../composables/useIssueBacklog";
+import { canUseTauriRuntime } from "@/tauri/commands/_base";
+import { getProjectDetail } from "@/tauri/commands/project";
+import {
+  backlogGetProjectLookup,
+  backlogListIssueTypes,
+  backlogListPriorities,
+  backlogCreateIssue,
+  type BacklogIssueType as BacklogIssueTypeModel,
+  type BacklogPriority as BacklogPriorityModel,
+} from "@/tauri/commands/backlog";
+import { useToast } from "@/shared/composables/useToast";
 
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 const initialProject = (route.query.project as string) || "";
 const ctrl = useIssueBacklog(initialProject);
 
@@ -39,9 +54,204 @@ function selectNotClosed() {
   ctrl.setField("notClosed", true);
 }
 
-function openImport() {
-  if (ctrl.criteria.value.project) {
-    router.push({ path: "/import-issues", query: { project: ctrl.criteria.value.project } });
+// --- Import to Backlog dialog ---
+type ImportRow = {
+  subject: string;
+  description: string;
+  issueType: string;
+  assignee: string;
+  startDate: string;
+  dueDate: string;
+  estimatedHours: string;
+  actualHours: string;
+  categories: string;
+  version: string;
+  milestones: string;
+  priority: string;
+  parentIssue: string;
+  _selected: boolean;
+  _row: number;
+};
+
+const importDialogVisible = ref(false);
+const importRows = ref<ImportRow[]>([]);
+const importError = ref("");
+const importing = ref(false);
+const importProgress = ref({ done: 0, total: 0 });
+const fileInput = ref<HTMLInputElement | null>(null);
+const importSelectedCount = computed(() => importRows.value.filter((r) => r._selected).length);
+
+const CSV_HEADERS = [
+  "Subject", "Description", "Issue Type", "Assignee",
+  "Start Date", "Due Date", "Estimated Hours", "Actual Hours",
+  "Categories", "Version", "Milestones", "Priority",
+  "Parent issue",
+] as const;
+
+function openImportDialog() {
+  importDialogVisible.value = true;
+  importRows.value = [];
+  importError.value = "";
+}
+
+function triggerImportFile() {
+  fileInput.value?.click();
+}
+
+function handleImportFile(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  importError.value = "";
+  importRows.value = [];
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const text = reader.result as string;
+      const rows = parseImportCsv(text);
+      if (rows.length === 0) {
+        importError.value = "No valid rows found in the CSV file.";
+        return;
+      }
+      importRows.value = rows;
+    } catch (e) {
+      importError.value = String(e);
+    }
+  };
+  reader.onerror = () => { importError.value = "Failed to read the file."; };
+  reader.readAsText(file);
+  if (fileInput.value) fileInput.value.value = "";
+}
+
+function parseImportCsv(text: string): ImportRow[] {
+  const records = parseCsvRecords(text);
+  const [headers, ...dataRows] = records.filter((r) => r.some((c) => c.trim()));
+  if (!headers) return [];
+
+  const normalized = headers.map((h) => h.trim());
+  const hasHeaders = CSV_HEADERS.every((h, i) => normalized[i] === h);
+  if (!hasHeaders) {
+    throw new Error(`CSV headers do not match the Backlog import template. Expected: ${CSV_HEADERS.join(", ")}`);
+  }
+
+  return dataRows.map((cols, i) => ({
+    subject: (cols[0] ?? "").trim(),
+    description: (cols[1] ?? "").trim(),
+    issueType: (cols[2] ?? "").trim(),
+    assignee: (cols[3] ?? "").trim(),
+    startDate: (cols[4] ?? "").trim(),
+    dueDate: (cols[5] ?? "").trim(),
+    estimatedHours: (cols[6] ?? "").trim(),
+    actualHours: (cols[7] ?? "").trim(),
+    categories: (cols[8] ?? "").trim(),
+    version: (cols[9] ?? "").trim(),
+    milestones: (cols[10] ?? "").trim(),
+    priority: (cols[11] ?? "").trim(),
+    parentIssue: (cols[12] ?? "").trim(),
+    _selected: true,
+    _row: i + 2,
+  })).filter((r) => r.subject);
+}
+
+function parseCsvRecords(content: string): string[][] {
+  const records: string[][] = [];
+  let cell = "";
+  let record: string[] = [];
+  let isQuoted = false;
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    const next = content[i + 1];
+    if (ch === '"') {
+      if (isQuoted && next === '"') { cell += '"'; i++; }
+      else { isQuoted = !isQuoted; }
+      continue;
+    }
+    if (ch === "," && !isQuoted) { record.push(cell); cell = ""; continue; }
+    if ((ch === "\n" || ch === "\r") && !isQuoted) {
+      if (ch === "\r" && next === "\n") i++;
+      record.push(cell); records.push(record); record = []; cell = "";
+      continue;
+    }
+    cell += ch;
+  }
+  record.push(cell);
+  records.push(record);
+  return records;
+}
+
+function toggleImportAll(checked: boolean) {
+  importRows.value.forEach((r) => (r._selected = checked));
+}
+
+async function executeImport() {
+  if (!canUseTauriRuntime()) return;
+  const projectCode = ctrl.criteria.value.project;
+  if (!projectCode) { importError.value = "Please select a project first."; return; }
+
+  const selected = importRows.value.filter((r) => r._selected);
+  if (!selected.length) return;
+
+  importing.value = true;
+  importError.value = "";
+  importProgress.value = { done: 0, total: selected.length };
+
+  try {
+    const proj = projects.value.find((p) => p.code === projectCode);
+    if (!proj) throw new Error("Project not found.");
+
+    const detail = await getProjectDetail(proj.id);
+    const backlogKey = detail.backlog_key;
+    if (!backlogKey) throw new Error("Project has no Backlog key configured.");
+
+    const [lookup, typesList, prioList] = await Promise.all([
+      backlogGetProjectLookup(backlogKey),
+      backlogListIssueTypes(backlogKey),
+      backlogListPriorities(),
+    ]);
+
+    const projectId = Number(lookup.projectId);
+    const typeMap = new Map(typesList.map((t: BacklogIssueTypeModel) => [t.name, t.id]));
+    const prioMap = new Map(prioList.map((p: BacklogPriorityModel) => [p.name, p.id]));
+
+    const defaultTypeId = typesList[0]?.id;
+    const defaultPrioId = prioList.find((p: BacklogPriorityModel) => p.name === "Normal")?.id ?? prioList[0]?.id;
+    if (!defaultTypeId || !defaultPrioId) throw new Error("Could not resolve default issue type or priority.");
+
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const row of selected) {
+      try {
+        await backlogCreateIssue({
+          projectId,
+          summary: row.subject,
+          issueTypeId: typeMap.get(row.issueType) ?? defaultTypeId,
+          priorityId: prioMap.get(row.priority) ?? defaultPrioId,
+          description: row.description || undefined,
+          startDate: row.startDate || undefined,
+          dueDate: row.dueDate || undefined,
+          estimatedHours: row.estimatedHours ? Number(row.estimatedHours) : undefined,
+          actualHours: row.actualHours ? Number(row.actualHours) : undefined,
+        });
+        successCount++;
+      } catch (e) {
+        errors.push(`Row ${row._row} (${row.subject}): ${e}`);
+      }
+      importProgress.value = { done: importProgress.value.done + 1, total: selected.length };
+    }
+
+    if (errors.length > 0) {
+      importError.value = `${successCount} created, ${errors.length} failed:\n${errors.slice(0, 5).join("\n")}`;
+      toast.info(`Imported ${successCount}/${selected.length} issues.`);
+    } else {
+      toast.success(`Imported ${successCount} issue${successCount !== 1 ? "s" : ""} to Backlog successfully.`);
+      importDialogVisible.value = false;
+    }
+  } catch (e) {
+    importError.value = String(e);
+  } finally {
+    importing.value = false;
   }
 }
 </script>
@@ -237,8 +447,8 @@ function openImport() {
             class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
             :disabled="!ctrl.canOpenImport.value"
-            :title="ctrl.canOpenImport.value ? 'Import issues for selected project' : 'Select a project before importing issues'"
-            @click="openImport"
+            :title="ctrl.canOpenImport.value ? 'Import issues to Backlog' : 'Select a project before importing'"
+            @click="openImportDialog"
           >
             <i class="pi pi-file-import" />
             Import
@@ -306,5 +516,117 @@ function openImport() {
         <Column field="createUser" header="Create User" body-class="whitespace-nowrap" />
       </DataTable>
     </section>
+
+    <!-- Import to Backlog dialog -->
+    <Dialog
+      v-model:visible="importDialogVisible"
+      header="Import Issues to Backlog"
+      modal
+      maximizable
+      :style="{ width: '960px' }"
+      :content-style="{ padding: '0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
+    >
+      <!-- File upload -->
+      <div class="border-b border-divider px-4 py-3">
+        <div class="flex items-center gap-3">
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".csv"
+            class="hidden"
+            @change="handleImportFile"
+          />
+          <button
+            class="flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
+            type="button"
+            @click="triggerImportFile"
+          >
+            <i class="pi pi-upload" />
+            Choose CSV file
+          </button>
+          <span class="text-xs text-muted">
+            Backlog CSV format: <code class="rounded bg-canvas px-1">Subject</code>,
+            <code class="rounded bg-canvas px-1">Description</code>,
+            <code class="rounded bg-canvas px-1">Issue Type</code>,
+            <code class="rounded bg-canvas px-1">Priority</code>, ...
+          </span>
+        </div>
+        <p v-if="importError" class="mt-3 whitespace-pre-line rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+          {{ importError }}
+        </p>
+        <div v-if="importing" class="mt-3">
+          <div class="flex items-center gap-2 text-sm text-muted">
+            <i class="pi pi-spin pi-spinner text-brand" />
+            Importing {{ importProgress.done }} / {{ importProgress.total }}...
+          </div>
+          <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-canvas">
+            <div class="h-full rounded-full bg-brand transition-all" :style="{ width: `${importProgress.total ? (importProgress.done / importProgress.total) * 100 : 0}%` }" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div v-if="importRows.length === 0 && !importError" class="flex flex-1 items-center justify-center p-12">
+        <p class="text-sm text-muted">Upload a CSV file to preview issues.</p>
+      </div>
+
+      <!-- Preview table -->
+      <template v-if="importRows.length > 0">
+        <div class="flex items-center gap-3 border-b border-divider px-4 py-2">
+          <Checkbox
+            :model-value="importRows.length > 0 && importSelectedCount === importRows.length"
+            :binary="true"
+            class="h-4 w-4 accent-brand"
+            @update:model-value="toggleImportAll($event as boolean)"
+          />
+          <span class="text-sm font-bold text-ink">{{ importSelectedCount }} / {{ importRows.length }} selected</span>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-auto">
+          <DataTable
+            class="app-data-table"
+            :value="importRows"
+            :table-style="{ minWidth: '900px' }"
+          >
+            <Column header="" header-class="w-12" body-class="text-center w-12">
+              <template #body="{ data }">
+                <Checkbox v-model="data._selected" :binary="true" class="h-4 w-4 accent-brand" />
+              </template>
+            </Column>
+            <Column field="_row" header="Row" header-class="w-14" body-class="font-mono text-xs text-muted w-14" />
+            <Column field="subject" header="Subject" body-class="font-bold text-ink max-w-[260px] truncate" />
+            <Column field="issueType" header="Type" header-class="w-24" body-class="whitespace-nowrap text-xs" />
+            <Column field="assignee" header="Assignee" header-class="w-28" body-class="whitespace-nowrap" />
+            <Column field="priority" header="Priority" header-class="w-20" body-class="whitespace-nowrap text-xs" />
+            <Column header="Est." header-class="w-16 num" body-class="num">
+              <template #body="{ data }">{{ data.estimatedHours || '-' }}</template>
+            </Column>
+            <Column field="startDate" header="Start" header-class="w-24" body-class="whitespace-nowrap text-xs" />
+            <Column field="dueDate" header="Due" header-class="w-24" body-class="whitespace-nowrap text-xs" />
+          </DataTable>
+        </div>
+      </template>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            type="button"
+            @click="importDialogVisible = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="importSelectedCount === 0 || importing"
+            @click="executeImport"
+          >
+            <i class="pi pi-file-import" />
+            Import {{ importSelectedCount }} issue{{ importSelectedCount !== 1 ? 's' : '' }}
+          </button>
+        </div>
+      </template>
+    </Dialog>
   </section>
 </template>

@@ -88,6 +88,35 @@ impl BacklogClient {
         })
     }
 
+    async fn post<T: DeserializeOwned>(&self, path: &str, form: &[(String, String)]) -> AppResult<T> {
+        let url = format!("{}/api/v2/{}", self.base_url, path.trim_start_matches('/'));
+
+        let mut params = vec![("apiKey".to_string(), self.api_key.clone())];
+        params.extend_from_slice(form);
+
+        let response = self
+            .client
+            .post(&url)
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| AppError::new(format!("Request to Backlog failed: {e}")))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::new(format!(
+                "Backlog API error {}: {body}",
+                status.as_u16()
+            )));
+        }
+
+        response
+            .json::<T>()
+            .await
+            .map_err(|e| AppError::new(format!("Failed to parse Backlog response: {e}")))
+    }
+
     async fn get<T: DeserializeOwned>(&self, path: &str, query: &[(&str, &str)]) -> AppResult<T> {
         let url = format!("{}/api/v2/{}", self.base_url, path.trim_start_matches('/'));
 
@@ -287,4 +316,55 @@ pub async fn get_project_lookup(project_key: &str) -> AppResult<BacklogProjectLo
         project_key: project.project_key,
         project_name: project.name,
     })
+}
+
+pub async fn create_issue(req: BacklogCreateIssueRequest) -> AppResult<BacklogIssue> {
+    let client = BacklogClient::resolve().await?;
+
+    let mut params: Vec<(String, String)> = vec![
+        ("projectId".to_string(), req.project_id.to_string()),
+        ("summary".to_string(), req.summary),
+        ("issueTypeId".to_string(), req.issue_type_id.to_string()),
+        ("priorityId".to_string(), req.priority_id.to_string()),
+    ];
+
+    if let Some(ref desc) = req.description {
+        if !desc.is_empty() {
+            params.push(("description".to_string(), desc.clone()));
+        }
+    }
+    if let Some(id) = req.assignee_id {
+        params.push(("assigneeId".to_string(), id.to_string()));
+    }
+    if let Some(ref d) = req.start_date {
+        if !d.is_empty() {
+            params.push(("startDate".to_string(), d.clone()));
+        }
+    }
+    if let Some(ref d) = req.due_date {
+        if !d.is_empty() {
+            params.push(("dueDate".to_string(), d.clone()));
+        }
+    }
+    if let Some(h) = req.estimated_hours {
+        params.push(("estimatedHours".to_string(), h.to_string()));
+    }
+    if let Some(h) = req.actual_hours {
+        params.push(("actualHours".to_string(), h.to_string()));
+    }
+    if let Some(ref ids) = req.category_id {
+        for id in ids {
+            params.push(("categoryId[]".to_string(), id.to_string()));
+        }
+    }
+    if let Some(ref ids) = req.milestone_id {
+        for id in ids {
+            params.push(("milestoneId[]".to_string(), id.to_string()));
+        }
+    }
+    if let Some(id) = req.parent_issue_id {
+        params.push(("parentIssueId".to_string(), id.to_string()));
+    }
+
+    client.post("issues", &params).await
 }

@@ -114,3 +114,23 @@ export function backlogGetProjectLookup(projectKey: string) {
 export function backlogListPriorities() {
   return safeInvoke<BacklogPriority[]>("backlog_list_priorities");
 }
+
+export type BacklogCreateIssueRequest = {
+  projectId: number;
+  summary: string;
+  issueTypeId: number;
+  priorityId: number;
+  description?: string;
+  assigneeId?: number;
+  startDate?: string;
+  dueDate?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  categoryId?: number[];
+  milestoneId?: number[];
+  parentIssueId?: number;
+};
+
+export function backlogCreateIssue(request: BacklogCreateIssueRequest) {
+  return safeInvoke<BacklogIssue>("backlog_create_issue", { request });
+}

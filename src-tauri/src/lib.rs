@@ -35,7 +35,7 @@ use commands::user_commands::{
     update_user,
 };
 use commands::backlog_commands::{
-    backlog_get_issue, backlog_get_project, backlog_get_project_lookup,
+    backlog_create_issue, backlog_get_issue, backlog_get_project, backlog_get_project_lookup,
     backlog_list_categories, backlog_list_issue_types, backlog_list_issues,
     backlog_list_priorities, backlog_list_project_users, backlog_list_statuses,
 };
@@ -137,7 +137,8 @@ pub fn run() {
             backlog_list_project_users,
             backlog_list_issues,
             backlog_get_issue,
-            backlog_get_project_lookup
+            backlog_get_project_lookup,
+            backlog_create_issue
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

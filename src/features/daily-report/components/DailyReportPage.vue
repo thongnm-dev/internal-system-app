@@ -755,8 +755,8 @@ function filteredPickerProjects() {
             v-for="project in filteredPickerProjects()"
             :key="project.id"
             :class="[
-              'flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 hover:border-brand hover:bg-emerald-50',
-              selectedProjectIds.includes(project.id) ? 'border-brand bg-emerald-50' : 'border-divider bg-panel',
+              'flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 hover:border-brand hover:bg-brand/10',
+              selectedProjectIds.includes(project.id) ? 'border-brand bg-brand/10' : 'border-divider bg-panel',
             ]"
           >
             <Checkbox

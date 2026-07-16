@@ -152,3 +152,22 @@ pub struct BacklogProjectLookup {
     pub project_key: String,
     pub project_name: String,
 }
+
+/// Tham số tạo issue mới trên Backlog.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklogCreateIssueRequest {
+    pub project_id: i64,
+    pub summary: String,
+    pub issue_type_id: i64,
+    pub priority_id: i64,
+    pub description: Option<String>,
+    pub assignee_id: Option<i64>,
+    pub start_date: Option<String>,
+    pub due_date: Option<String>,
+    pub estimated_hours: Option<f64>,
+    pub actual_hours: Option<f64>,
+    pub category_id: Option<Vec<i64>>,
+    pub milestone_id: Option<Vec<i64>>,
+    pub parent_issue_id: Option<i64>,
+}
