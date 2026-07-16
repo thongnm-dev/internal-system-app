@@ -13,6 +13,24 @@ import type { UserSummary, CreateUserRequest, UpdateUserRequest } from "@/_/type
 
 export type UserStatus = "active" | "inactive";
 
+interface UserFilters {
+  username: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: string;
+  status: string;
+}
+
+const defaultFilters = (): UserFilters => ({
+  username: "",
+  fullName: "",
+  email: "",
+  phone: "",
+  role: "All",
+  status: "All",
+});
+
 export function useGovernanceUsers() {
   const globalLoading = useGlobalLoading();
   const users = ref<UserSummary[]>([]);
@@ -34,9 +52,7 @@ export function useGovernanceUsers() {
   } | null>(null);
 
   const isCreating = ref(false);
-  const searchQuery = ref("");
-  const filterRole = ref("All");
-  const filterStatus = ref("All");
+  const filters = ref<UserFilters>(defaultFilters());
 
   const roles = computed(() => {
     const set = new Set(users.value.flatMap((u) => u.roles));
@@ -47,33 +63,43 @@ export function useGovernanceUsers() {
 
   const filteredUsers = computed(() => {
     let list = [...users.value];
+    const f = filters.value;
 
-    if (filterRole.value !== "All") {
-      list = list.filter((u) => u.roles.includes(filterRole.value));
+    if (f.role !== "All") {
+      list = list.filter((u) => u.roles.includes(f.role));
     }
-    if (filterStatus.value !== "All") {
-      const isActive = filterStatus.value === "active";
+    if (f.status !== "All") {
+      const isActive = f.status === "active";
       list = list.filter((u) => u.is_active === isActive);
     }
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase();
-      list = list.filter(
-        (u) =>
-          u.username.toLowerCase().includes(q) ||
-          u.full_name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
-          u.position.toLowerCase().includes(q),
-      );
+    if (f.username) {
+      const q = f.username.toLowerCase();
+      list = list.filter((u) => u.username.toLowerCase().includes(q));
+    }
+    if (f.fullName) {
+      const q = f.fullName.toLowerCase();
+      list = list.filter((u) => u.full_name.toLowerCase().includes(q));
+    }
+    if (f.email) {
+      const q = f.email.toLowerCase();
+      list = list.filter((u) => u.email.toLowerCase().includes(q));
+    }
+    if (f.phone) {
+      const q = f.phone.toLowerCase();
+      list = list.filter((u) => u.phone.toLowerCase().includes(q));
     }
 
     return list.sort((a, b) => a.id - b.id);
   });
 
-  const stats = computed(() => ({
-    total: users.value.length,
-    active: users.value.filter((u) => u.is_active).length,
-    inactive: users.value.filter((u) => !u.is_active).length,
-  }));
+  function resetFilters() {
+    filters.value = defaultFilters();
+  }
+
+  function search() {
+    // filtering is reactive via filteredUsers computed — this is a no-op trigger
+    // but kept as an explicit action point for future server-side search
+  }
 
   async function loadUsers() {
     if (!canUseTauriRuntime()) return;
@@ -230,12 +256,9 @@ export function useGovernanceUsers() {
     error,
     draft,
     isCreating,
-    searchQuery,
-    filterRole,
-    filterStatus,
+    filters,
     roles,
     statuses,
-    stats,
     startCreate,
     selectUser,
     updateDraft,
@@ -243,6 +266,8 @@ export function useGovernanceUsers() {
     saveDraft,
     removeUser,
     resetPassword,
+    resetFilters,
+    search,
     loadUsers,
     init,
   };

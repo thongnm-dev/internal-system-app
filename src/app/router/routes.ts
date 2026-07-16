@@ -203,7 +203,7 @@ export const vueRoutes: RouteRecordRaw[] = [
   },
   {
     path: "/project-skills",
-    component: () => import("@/features/skills/components/ProjectSkillsPage.vue"),
+    component: () => import("@/features/governance/components/ProjectSkillsPage.vue"),
     meta: { key: "projectSkills" as MenuKey },
   },
   {
@@ -218,17 +218,17 @@ export const vueRoutes: RouteRecordRaw[] = [
   },
   {
     path: "/excel2md",
-    component: () => import("@/features/excel2md/components/excel2mdPage.vue"),
+    component: () => import("@/features/tools/components/Excel2mdPage.vue"),
     meta: { key: "excel2md" as MenuKey },
   },
   {
     path: "/sql-editor",
-    component: () => import("@/features/sql-editor/components/SqlEditorPage.vue"),
+    component: () => import("@/features/tools/components/SqlEditorPage.vue"),
     meta: { key: "sqlEditor" as MenuKey },
   },
   {
     path: "/explore-faster",
-    component: () => import("@/features/explore-faster/components/ExploreFasterPage.vue"),
+    component: () => import("@/features/tools/components/ExploreFasterPage.vue"),
     meta: { key: "exploreFaster" as MenuKey },
   },
   {
@@ -243,7 +243,7 @@ export const vueRoutes: RouteRecordRaw[] = [
   },
   {
     path: "/import-csv",
-    component: () => import("@/features/import-csv/components/ImportCsvPage.vue"),
+    component: () => import("@/features/tools/components/ImportCsvPage.vue"),
     meta: { key: "importCsv" as MenuKey },
   },
   {
