@@ -48,6 +48,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Convert uploaded Excel screen specs into Markdown files.",
   },
   {
+    key: "copyTools",
+    path: "/copy-tools",
+    title: "Copy Tools",
+    subtitle: "Collect and copy source documents by keyword or folder list.",
+  },
+  {
     key: "sqlEditor",
     path: "/sql-editor",
     title: "SQL Editor",
@@ -232,6 +238,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/excel2md",
     component: () => import("@/features/tools/components/Excel2mdPage.vue"),
     meta: { key: "excel2md" as MenuKey },
+  },
+  {
+    path: "/copy-tools",
+    component: () => import("@/features/tools/components/CopyToolsPage.vue"),
+    meta: { key: "copyTools" as MenuKey },
   },
   {
     path: "/sql-editor",

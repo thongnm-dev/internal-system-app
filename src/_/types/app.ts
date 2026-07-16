@@ -17,6 +17,7 @@ export type MenuKey =
   | "governanceMenus"
   | "governanceUsers"
   | "governanceLogs"
+  | "copyTools"
   | "settings";
 
 export type AppRouteKey = MenuKey | "login" | "forgotPassword";

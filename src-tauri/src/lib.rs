@@ -40,6 +40,8 @@ use commands::backlog_commands::{
     backlog_list_priorities, backlog_list_project_users, backlog_list_statuses,
 };
 use commands::excel2md_commands::excel2md;
+use commands::sync_commands::sync_daily_report;
+use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::s3_commands::{
     s3_create_folder, s3_delete_objects, s3_download_objects, s3_list_objects,
@@ -149,7 +151,13 @@ pub fn run() {
             s3_download_objects,
             s3_upload_file,
             s3_delete_objects,
-            s3_create_folder
+            s3_create_folder,
+            // === Sync commands ===
+            sync_daily_report,
+            // === Collect/Copy tools commands ===
+            collect_load_ini,
+            collect_run,
+            collect_by_folders
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -8,6 +8,7 @@ import Select from "primevue/select";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
 import { useToast } from "@/shared/composables/useToast";
 import { useAuthStore } from "@/app/stores/auth";
+import { syncDailyReport, type SyncResult } from "@/tauri/commands/sync";
 import {
   dayTotal,
   emptyEntry,
@@ -365,6 +366,107 @@ function filteredPickerProjects() {
   if (!kw) return available;
   return available.filter((p) => `${p.code} ${p.name}`.toLowerCase().includes(kw));
 }
+
+// --- Sync dialog ---
+type SyncRow = {
+  projectCode: string;
+  projectName: string;
+  taskName: string;
+  processCode: string;
+  categoryLabel: string;
+  hour: number;
+  comment: string;
+  regularOt: number;
+  midnightOt: number;
+};
+
+const isSyncDialogOpen = ref(false);
+const syncDate = ref<Date>(new Date());
+
+function formatDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function openSyncDialog() {
+  syncDate.value = new Date();
+  syncResult.value = null;
+  isSyncing.value = false;
+  isSyncDialogOpen.value = true;
+}
+
+const syncRows = computed<SyncRow[]>(() => {
+  const sd = syncDate.value;
+  if (!sd) return [];
+  const selectedYear = sd.getFullYear();
+  const selectedMonthIdx = sd.getMonth();
+  const selectedDay = sd.getDate();
+
+  const currentYear = ctrl.days.value.length > 0 ? Number(ctrl.monthValue.value.split("-")[0]) : 0;
+  const currentMonthIdx = ctrl.days.value.length > 0 ? Number(ctrl.monthValue.value.split("-")[1]) - 1 : -1;
+  if (selectedYear !== currentYear || selectedMonthIdx !== currentMonthIdx) return [];
+
+  const rows: SyncRow[] = [];
+  for (const project of ctrl.projects.value) {
+    for (const task of project.tasks) {
+      const key = entryKey(task.rowId, selectedDay);
+      const entry = ctrl.entries.value[key];
+      const hour = entryHour(entry);
+      if (hour <= 0) continue;
+      const parsed = typeof entry === "string" ? null : entry;
+      rows.push({
+        projectCode: project.code,
+        projectName: project.name,
+        taskName: task.name,
+        processCode: task.category || "",
+        categoryLabel: task.categoryLabel || "",
+        hour,
+        comment: parsed?.comment ?? "",
+        regularOt: Number(parsed?.regularOt) || 0,
+        midnightOt: Number(parsed?.midnightOt) || 0,
+      });
+    }
+  }
+  return rows;
+});
+
+const syncTotalHours = computed(() => syncRows.value.reduce((sum, r) => sum + r.hour, 0));
+
+const isSyncing = ref(false);
+const syncResult = ref<SyncResult | null>(null);
+
+async function executeSyncDailyReport() {
+  if (isSyncing.value || syncRows.value.length === 0) return;
+  isSyncing.value = true;
+  syncResult.value = null;
+  try {
+    const result = await syncDailyReport({
+      date: formatDateStr(syncDate.value),
+      entries: syncRows.value.map((r) => ({
+        project_code: r.projectCode,
+        project_name: r.projectName,
+        task_name: r.taskName,
+        process_code: r.processCode,
+        category_label: r.categoryLabel,
+        hour: r.hour,
+        comment: r.comment,
+        regular_ot: r.regularOt,
+        midnight_ot: r.midnightOt,
+      })),
+    });
+    syncResult.value = result;
+    if (result.success) {
+      toast.success(result.message);
+    } else {
+      toast.error(result.message);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    syncResult.value = { success: false, message: msg, synced_count: 0, total_count: syncRows.value.length };
+    toast.error(msg);
+  } finally {
+    isSyncing.value = false;
+  }
+}
 </script>
 
 <template>
@@ -423,6 +525,23 @@ function filteredPickerProjects() {
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
+          <button
+            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
+            type="button"
+            title="Làm mới"
+            @click="ctrl.reload()"
+          >
+            <i class="pi pi-refresh text-sm" />
+          </button>
+          <button
+            class="flex h-9 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-sm font-semibold text-secondary hover:bg-canvas"
+            type="button"
+            title="Đồng bộ hệ thống nội bộ"
+            @click="openSyncDialog"
+          >
+            <i class="pi pi-sync text-xs" />
+            <span>Đồng bộ</span>
+          </button>
           <button
             class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
             type="button"
@@ -1010,6 +1129,107 @@ function filteredPickerProjects() {
             @click="executeDeleteTask"
           >
             Xóa
+          </button>
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Sync dialog -->
+    <Dialog
+      :visible="isSyncDialogOpen"
+      class="w-full max-w-2xl rounded-lg bg-panel shadow-xl"
+      :style="{ maxHeight: '86vh' }"
+      modal
+      @update:visible="isSyncDialogOpen = $event"
+    >
+      <template #header>
+        <div class="min-w-0">
+          <h3 class="truncate font-bold text-ink">Đồng bộ hệ thống nội bộ</h3>
+          <p class="mt-1 truncate text-sm text-muted">Xác nhận dữ liệu trước khi đồng bộ lên hệ thống công ty.</p>
+        </div>
+      </template>
+
+      <div class="space-y-4">
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Ngày đồng bộ</span>
+          <Calendar
+            v-model="syncDate"
+            dateFormat="yy-mm-dd"
+            showIcon
+            class="mt-1 w-44"
+            inputClass="h-10 text-sm font-bold"
+          />
+        </label>
+
+        <div v-if="syncResult" :class="['rounded-md border px-4 py-3', syncResult.success ? 'border-brand/30 bg-brand/10' : 'border-red-500/30 bg-red-500/10']">
+          <div class="flex items-center gap-2">
+            <i :class="['pi text-sm', syncResult.success ? 'pi-check-circle text-brand' : 'pi-times-circle text-red-500']" />
+            <span :class="['text-sm font-bold', syncResult.success ? 'text-brand' : 'text-red-500']">{{ syncResult.message }}</span>
+          </div>
+        </div>
+
+        <div v-if="syncRows.length === 0" class="rounded-md border border-divider bg-canvas px-4 py-8 text-center">
+          <i class="pi pi-inbox mb-2 text-3xl text-muted" />
+          <p class="text-sm text-muted">Không có dữ liệu cho ngày này.</p>
+          <p class="mt-1 text-xs text-muted">Chọn ngày khác hoặc kiểm tra daily report đã nhập giờ chưa.</p>
+        </div>
+
+        <div v-else class="overflow-hidden rounded-md border border-divider">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-divider bg-canvas text-left">
+                <th class="px-3 py-2 font-bold text-muted">Dự án</th>
+                <th class="px-3 py-2 font-bold text-muted">Task</th>
+                <th class="px-3 py-2 text-center font-bold text-muted">Giờ</th>
+                <th class="px-3 py-2 font-bold text-muted">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(row, idx) in syncRows"
+                :key="idx"
+                :class="idx % 2 === 0 ? 'bg-panel' : 'bg-canvas'"
+                class="border-b border-divider last:border-b-0"
+              >
+                <td class="max-w-[140px] truncate px-3 py-2 font-semibold text-ink" :title="`${row.projectCode} - ${row.projectName}`">
+                  {{ row.projectCode }}
+                </td>
+                <td class="max-w-[200px] truncate px-3 py-2 text-secondary">
+                  <span v-if="row.categoryLabel" class="text-muted">【{{ row.categoryLabel }}】</span>{{ row.taskName }}
+                </td>
+                <td class="px-3 py-2 text-center font-bold tabular-nums text-brand">{{ formatHoursDisplay(row.hour) }}h</td>
+                <td class="max-w-[160px] truncate px-3 py-2 text-muted" :title="row.comment">{{ row.comment || "—" }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-brand bg-brand/10">
+                <td class="px-3 py-2 font-bold text-ink" colspan="2">Tổng cộng ({{ syncRows.length }} mục)</td>
+                <td class="px-3 py-2 text-center font-extrabold tabular-nums text-brand">{{ formatHoursDisplay(syncTotalHours) }}h</td>
+                <td class="px-3 py-2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            type="button"
+            @click="isSyncDialogOpen = false"
+          >
+            Đóng
+          </button>
+          <button
+            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="syncRows.length === 0 || isSyncing"
+            @click="executeSyncDailyReport"
+          >
+            <i v-if="isSyncing" class="pi pi-spin pi-spinner mr-1.5 text-xs" />
+            <i v-else class="pi pi-sync mr-1.5 text-xs" />
+            {{ isSyncing ? "Đang đồng bộ…" : "Đồng bộ" }}
           </button>
         </div>
       </template>

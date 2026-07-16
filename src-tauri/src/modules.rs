@@ -41,6 +41,10 @@ mod commands {
     pub mod backlog_commands;
     /// Commands cho S3 browser (list, download, upload, delete).
     pub mod s3_commands;
+    /// Commands cho đồng bộ dữ liệu lên hệ thống nội bộ (Selenium).
+    pub mod sync_commands;
+    /// Commands cho công cụ collect/copy file (gom tài liệu nguồn).
+    pub mod collect_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -97,6 +101,10 @@ mod models {
     pub mod backlog;
     /// Model cho S3 browser (config, object, operation result).
     pub mod s3;
+    /// Model cho đồng bộ dữ liệu (Selenium daily report sync).
+    pub mod sync;
+    /// Model cho công cụ collect/copy file.
+    pub mod collect;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -131,6 +139,12 @@ mod services {
     pub mod backlog_service;
     /// Service cho S3 browser operations.
     pub mod s3_service;
+    /// Service đồng bộ dữ liệu lên hệ thống nội bộ (Selenium automation).
+    pub mod sync_service;
+    /// Service gom/copy file (collect input) theo keyword hoặc danh sách.
+    pub mod collect_service;
+    /// Service copy file theo danh sách folder.
+    pub mod collect_folders_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

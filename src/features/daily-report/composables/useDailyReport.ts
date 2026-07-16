@@ -270,6 +270,14 @@ export function useDailyReport(username?: string) {
   });
   loadPhases();
 
+  async function reload() {
+    await globalLoading.run(async () => {
+      await loadProjects();
+      await Promise.all([loadUserTasks(), loadEntries(), loadTaskHours()]);
+    });
+    await loadPhases();
+  }
+
   watch(selectedMonth, () => {
     globalLoading.run(() => Promise.all([loadUserTasks(), loadEntries(), loadTaskHours()]));
   });
@@ -521,6 +529,7 @@ export function useDailyReport(username?: string) {
   return {
     addProject,
     addTask,
+    reload,
     availableProjects,
     canGoNextMonth,
     cumulativeHours,
