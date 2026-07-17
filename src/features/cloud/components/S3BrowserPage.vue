@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onUnmounted } from "vue";
 import { useS3Browser } from "../composables/useS3Browser";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
@@ -7,7 +7,9 @@ import MessageBanner from "@/shared/components/MessageBanner.vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
-import type { S3Object } from "@/_/types/s3";
+import { open } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import type { S3Object, LocalFileEntry } from "@/_/types/s3";
 
 const ctrl = useS3Browser();
 const toast = useToast();
@@ -20,6 +22,98 @@ const confirmDeleteTarget = ref<{ keys: string[]; label: string } | null>(null);
 const isOperating = computed(
   () => ctrl.isLoading.value || ctrl.isUploading.value || ctrl.isDownloading.value || ctrl.isDeleting.value,
 );
+
+// --- Upload Folder ---
+const showUploadFolder = ref(false);
+const folderPath = ref("");
+const scannedFiles = ref<LocalFileEntry[]>([]);
+const isScanning = ref(false);
+const isDragOver = ref(false);
+let unlistenDrop: (() => void) | null = null;
+
+const folderDisplayName = computed(() => {
+  if (!folderPath.value) return "";
+  const parts = folderPath.value.replace(/\\/g, "/").split("/");
+  return parts[parts.length - 1] || parts[parts.length - 2] || folderPath.value;
+});
+
+async function openUploadFolderDialog() {
+  showUploadFolder.value = true;
+  folderPath.value = "";
+  scannedFiles.value = [];
+  try {
+    const unlisten = await getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === "drop" && showUploadFolder.value) {
+        const paths = event.payload.paths;
+        if (paths.length > 0) handleDroppedPath(paths[0]);
+      }
+      if (event.payload.type === "over" && showUploadFolder.value) {
+        isDragOver.value = true;
+      }
+      if (event.payload.type !== "drop" && event.payload.type !== "over" && showUploadFolder.value) {
+        isDragOver.value = false;
+      }
+    });
+    unlistenDrop = unlisten;
+  } catch {
+    // Tauri drag-drop not available, browse button still works
+  }
+}
+
+function closeUploadFolderDialog() {
+  showUploadFolder.value = false;
+  folderPath.value = "";
+  scannedFiles.value = [];
+  isDragOver.value = false;
+  if (unlistenDrop) {
+    unlistenDrop();
+    unlistenDrop = null;
+  }
+}
+
+onUnmounted(() => {
+  if (unlistenDrop) {
+    unlistenDrop();
+    unlistenDrop = null;
+  }
+});
+
+async function handleDroppedPath(path: string) {
+  isDragOver.value = false;
+  folderPath.value = path;
+  isScanning.value = true;
+  scannedFiles.value = await ctrl.scanLocalFolder(path);
+  isScanning.value = false;
+}
+
+async function browseFolder() {
+  try {
+    const dir = await open({ directory: true, title: "Chọn thư mục để tải lên" });
+    if (!dir) return;
+    await handleDroppedPath(dir as string);
+  } catch {
+    // User cancelled
+  }
+}
+
+function clearFolder() {
+  folderPath.value = "";
+  scannedFiles.value = [];
+}
+
+async function executeUploadFolder() {
+  if (!folderPath.value || scannedFiles.value.length === 0) return;
+  globalLoading.start();
+  try {
+    const result = await ctrl.uploadFolder(folderPath.value);
+    if (result?.success) {
+      toast.success(`Uploaded ${result.processed} file(s) successfully.`);
+      closeUploadFolderDialog();
+    }
+  } finally {
+    globalLoading.stop();
+  }
+}
 
 function formatSize(bytes: number): string {
   if (bytes === 0) return "—";
@@ -170,6 +264,13 @@ function contextCopyKey() {
             >
               <i :class="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'" />
               Upload
+            </button>
+            <button
+              class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isOperating"
+              @click="openUploadFolderDialog()"
+            >
+              <i class="pi pi-folder-open" /> Upload Folder
             </button>
             <button
               class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
@@ -388,6 +489,95 @@ function contextCopyKey() {
             @click="executeDelete()"
           >
             Delete
+          </button>
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Upload Folder Dialog -->
+    <Dialog
+      :visible="showUploadFolder"
+      class="w-full max-w-lg rounded-lg bg-panel shadow-xl"
+      :closable="!ctrl.isUploading.value"
+      modal
+      @update:visible="(v: boolean) => { if (!v) closeUploadFolderDialog(); }"
+    >
+      <template #header>
+        <h3 class="font-bold text-ink">Upload Folder</h3>
+      </template>
+
+      <!-- Drop Zone (no folder selected yet) -->
+      <div
+        v-if="!folderPath"
+        class="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-8 py-10 transition-colors"
+        :class="isDragOver ? 'border-brand bg-brand/5' : 'border-divider'"
+      >
+        <i class="pi pi-cloud-upload text-4xl text-muted" />
+        <p class="text-sm font-semibold text-secondary">Kéo thả thư mục vào đây</p>
+        <span class="text-xs text-muted">hoặc</span>
+        <button
+          class="h-8 rounded-md border border-divider bg-panel px-4 text-xs font-bold text-secondary hover:bg-canvas"
+          @click="browseFolder()"
+        >
+          Chọn thư mục
+        </button>
+      </div>
+
+      <!-- Folder selected: show preview -->
+      <div v-else class="flex flex-col gap-3">
+        <div class="flex items-center gap-2 rounded-md bg-canvas px-3 py-2">
+          <i class="pi pi-folder text-amber-500" />
+          <span class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{{ folderDisplayName }}</span>
+          <button
+            v-if="!ctrl.isUploading.value"
+            class="flex h-6 w-6 items-center justify-center rounded text-muted hover:text-ink"
+            @click="clearFolder()"
+          >
+            <i class="pi pi-times text-xs" />
+          </button>
+        </div>
+
+        <!-- Scanning spinner -->
+        <div v-if="isScanning" class="flex items-center justify-center gap-2 py-4">
+          <i class="pi pi-spinner pi-spin text-brand" />
+          <span class="text-xs text-muted">Scanning files...</span>
+        </div>
+
+        <!-- File list -->
+        <div v-else-if="scannedFiles.length > 0" class="max-h-60 overflow-y-auto rounded-md border border-divider">
+          <div
+            v-for="file in scannedFiles"
+            :key="file.fullPath"
+            class="flex items-center gap-2 border-b border-divider px-3 py-1.5 last:border-b-0"
+          >
+            <i class="pi pi-file text-xs text-muted" />
+            <span class="min-w-0 flex-1 truncate text-xs text-secondary">{{ file.relativePath }}</span>
+            <span class="whitespace-nowrap text-xs text-muted">{{ formatSize(file.size) }}</span>
+          </div>
+        </div>
+
+        <!-- Empty folder -->
+        <div v-else class="py-4 text-center text-xs text-muted">Thư mục không chứa tập tin nào.</div>
+
+        <p v-if="scannedFiles.length > 0" class="text-xs text-muted">{{ scannedFiles.length }} tập tin</p>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            :disabled="ctrl.isUploading.value"
+            @click="closeUploadFolderDialog()"
+          >
+            Cancel
+          </button>
+          <button
+            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!folderPath || scannedFiles.length === 0 || ctrl.isUploading.value || isScanning"
+            @click="executeUploadFolder()"
+          >
+            <i v-if="ctrl.isUploading.value" class="pi pi-spinner pi-spin mr-1" />
+            Upload
           </button>
         </div>
       </template>

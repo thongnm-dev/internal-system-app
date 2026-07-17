@@ -1,4 +1,4 @@
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
 use crate::services::s3_service;
 
 #[tauri::command]
@@ -48,6 +48,23 @@ pub async fn s3_delete_objects(
 #[tauri::command]
 pub async fn s3_create_folder(prefix: String) -> Result<S3OperationResult, String> {
     s3_service::create_folder(prefix)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_scan_local_folder(folder_path: String) -> Result<Vec<LocalFileEntry>, String> {
+    s3_service::scan_local_folder(folder_path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_upload_folder(
+    folder_path: String,
+    s3_prefix: String,
+) -> Result<S3OperationResult, String> {
+    s3_service::upload_folder(folder_path, s3_prefix)
         .await
         .map_err(|e| e.to_string())
 }

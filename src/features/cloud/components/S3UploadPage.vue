@@ -90,10 +90,6 @@ function handleCloseModal() {
   openModal.value = false;
 }
 
-function getStorageName(code: string): string {
-  const storage = deleteOptions.value.find((s) => s.code === code);
-  return storage?.name || storage?.nameAlias || code;
-}
 </script>
 
 <template>

@@ -54,6 +54,13 @@ export interface ScannedFile {
   fileSize: number;
 }
 
+export interface LocalFileEntry {
+  name: string;
+  relativePath: string;
+  fullPath: string;
+  size: number;
+}
+
 export interface DeleteUploadedItem {
   awsCd: string;
   bugNo: string;

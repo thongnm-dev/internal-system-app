@@ -1,5 +1,5 @@
 import { safeInvoke } from "./_base";
-import type { AwsStorage, DeleteUploadedItem, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest } from "@/_/types/s3";
+import type { AwsStorage, DeleteUploadedItem, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest } from "@/_/types/s3";
 
 export function s3TestConnection() {
   return safeInvoke<string>("s3_test_connection");
@@ -39,6 +39,14 @@ export function s3UploadFiles(files: UploadFileRequest[], storageName: string, s
 
 export function s3ListDeleteOptions(destinationCode: string) {
   return safeInvoke<AwsStorage[]>("s3_list_delete_options", { destinationCode });
+}
+
+export function s3ScanLocalFolder(folderPath: string) {
+  return safeInvoke<LocalFileEntry[]>("s3_scan_local_folder", { folderPath });
+}
+
+export function s3UploadFolderToS3(folderPath: string, s3Prefix: string) {
+  return safeInvoke<S3OperationResult>("s3_upload_folder", { folderPath, s3Prefix });
 }
 
 export function s3DeleteUploadedItems(items: DeleteUploadedItem[]) {

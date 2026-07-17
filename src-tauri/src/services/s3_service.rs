@@ -1,6 +1,6 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
 use crate::utils::pgsql_connect;
 
 use aws_config::Region;
@@ -503,6 +503,123 @@ pub async fn upload_files(
             Err(e) => {
                 failed += 1;
                 errors.push(format!("{}: read failed: {e}", file.name));
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Uploaded {processed} file(s) successfully.")
+    } else {
+        format!(
+            "Uploaded {processed} file(s), {failed} failed.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
+    })
+}
+
+pub async fn scan_local_folder(folder_path: String) -> AppResult<Vec<LocalFileEntry>> {
+    let root = Path::new(&folder_path);
+    if !root.is_dir() {
+        return Err(AppError::new(format!("Not a directory: {folder_path}")));
+    }
+
+    let mut files = Vec::new();
+    scan_dir_recursive(root, root, &mut files)?;
+    Ok(files)
+}
+
+fn scan_dir_recursive(
+    root: &Path,
+    current: &Path,
+    files: &mut Vec<LocalFileEntry>,
+) -> AppResult<()> {
+    let entries = std::fs::read_dir(current)
+        .map_err(|e| AppError::new(format!("Failed to read directory: {e}")))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            scan_dir_recursive(root, &path, files)?;
+        } else if path.is_file() {
+            let relative = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let size = path.metadata().map(|m| m.len()).unwrap_or(0);
+            files.push(LocalFileEntry {
+                name,
+                relative_path: relative,
+                full_path: path.to_string_lossy().to_string(),
+                size,
+            });
+        }
+    }
+    Ok(())
+}
+
+pub async fn upload_folder(
+    folder_path: String,
+    s3_prefix: String,
+) -> AppResult<S3OperationResult> {
+    let files = scan_local_folder(folder_path.clone()).await?;
+
+    if files.is_empty() {
+        return Ok(S3OperationResult {
+            success: true,
+            message: "No files to upload.".to_string(),
+            processed: 0,
+            failed: 0,
+        });
+    }
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    let root = Path::new(&folder_path);
+    let folder_name = root
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    for file in &files {
+        let s3_key = format!("{}{}/{}", s3_prefix, folder_name, file.relative_path);
+        let path = Path::new(&file.full_path);
+
+        match tokio::fs::read(path).await {
+            Ok(body) => {
+                match client
+                    .put_object()
+                    .bucket(&bucket)
+                    .key(&s3_key)
+                    .body(body.into())
+                    .send()
+                    .await
+                {
+                    Ok(_) => processed += 1,
+                    Err(e) => {
+                        failed += 1;
+                        errors.push(format!("{}: upload failed: {e}", file.relative_path));
+                    }
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: read failed: {e}", file.relative_path));
             }
         }
     }

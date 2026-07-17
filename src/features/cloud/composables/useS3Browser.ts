@@ -5,11 +5,13 @@ import {
   s3ListObjects,
   s3DownloadObjects,
   s3UploadFile,
+  s3UploadFolderToS3,
+  s3ScanLocalFolder,
   s3DeleteObjects,
   s3CreateFolder,
 } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { S3Object, S3OperationResult } from "@/_/types/s3";
+import type { S3Object, S3OperationResult, LocalFileEntry } from "@/_/types/s3";
 import type { MessageMode } from "@/_/types/app";
 import { useCloudGuard } from "./useCloudGuard";
 
@@ -334,6 +336,40 @@ export function useS3Browser() {
     }
   }
 
+  async function scanLocalFolder(folderPath: string): Promise<LocalFileEntry[]> {
+    if (!canUseTauriRuntime()) return [];
+    try {
+      return await s3ScanLocalFolder(folderPath);
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      return [];
+    }
+  }
+
+  async function uploadFolder(folderPath: string): Promise<S3OperationResult | null> {
+    if (!(await guard.ensureOnline())) return null;
+    if (!canUseTauriRuntime()) {
+      message.value = "Tauri runtime is not available.";
+      messageMode.value = "error";
+      return null;
+    }
+    isUploading.value = true;
+    try {
+      const result = await s3UploadFolderToS3(folderPath, currentPrefix.value);
+      message.value = result.message;
+      messageMode.value = result.success ? "info" : "error";
+      if (result.success) await refresh(true);
+      return result;
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      return null;
+    } finally {
+      isUploading.value = false;
+    }
+  }
+
   async function createFolder(name: string): Promise<S3OperationResult | null> {
     if (!name.trim()) return null;
     if (!(await guard.ensureOnline())) return null;
@@ -388,6 +424,8 @@ export function useS3Browser() {
     downloadSelected,
     downloadSingle,
     uploadFile,
+    scanLocalFolder,
+    uploadFolder,
     deleteSelected,
     deleteSingle,
     createFolder,

@@ -70,6 +70,15 @@ pub struct S3ListResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LocalFileEntry {
+    pub name: String,
+    pub relative_path: String,
+    pub full_path: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct S3OperationResult {
     pub success: bool,
     pub message: String,
