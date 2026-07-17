@@ -1,29 +1,39 @@
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use crate::models::explorer::{FileEntry, ReadDirResult, SearchResult};
 
+const MAX_SEARCH_RESULTS: usize = 500;
+
+const SKIP_SEARCH_DIRS: &[&str] = &[
+    "node_modules",
+    ".git",
+    "target",
+    "__pycache__",
+    ".svn",
+    ".hg",
+    ".next",
+    ".nuxt",
+];
+
 #[cfg(target_os = "windows")]
-fn is_hidden(path: &Path) -> bool {
+fn is_hidden(_path: &Path, meta: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
-    fs::metadata(path)
-        .map(|m| m.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
-        .unwrap_or(false)
+    meta.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
 }
 
 #[cfg(not(target_os = "windows"))]
-fn is_hidden(path: &Path) -> bool {
+fn is_hidden(path: &Path, _meta: &fs::Metadata) -> bool {
     path.file_name()
         .map(|n| n.to_string_lossy().starts_with('.'))
         .unwrap_or(false)
 }
 
-const MAX_SEARCH_RESULTS: usize = 500;
-
-fn to_file_entry(path: &Path) -> Option<FileEntry> {
-    let meta = fs::metadata(path).ok()?;
+fn build_file_entry(path: &Path, meta: &fs::Metadata) -> Option<FileEntry> {
     let name = path.file_name()?.to_string_lossy().to_string();
     let modified = meta
         .modified()
@@ -63,12 +73,15 @@ pub fn read_dir(dir_path: &str) -> Result<ReadDirResult, String> {
     let mut entries: Vec<FileEntry> = Vec::new();
     let read = fs::read_dir(path).map_err(|e| format!("Cannot read directory: {e}"))?;
 
-    for entry in read.flatten() {
-        let ep = entry.path();
-        if is_hidden(&ep) {
+    for dir_entry in read.flatten() {
+        let ep = dir_entry.path();
+        let Ok(meta) = dir_entry.metadata() else {
+            continue;
+        };
+        if is_hidden(&ep, &meta) {
             continue;
         }
-        if let Some(fe) = to_file_entry(&ep) {
+        if let Some(fe) = build_file_entry(&ep, &meta) {
             entries.push(fe);
         }
     }
@@ -92,40 +105,53 @@ pub fn search_files(root: &str, query: &str) -> Result<SearchResult, String> {
     }
 
     let query_lower = query.to_lowercase();
-    let mut results: Vec<FileEntry> = Vec::new();
-    let mut truncated = false;
+    let hit_count = Arc::new(AtomicUsize::new(0));
+    let hit_limit = Arc::new(AtomicBool::new(false));
 
-    fn walk(dir: &Path, query: &str, results: &mut Vec<FileEntry>, truncated: &mut bool) {
-        if *truncated {
-            return;
-        }
-        let Ok(read) = fs::read_dir(dir) else {
-            return;
-        };
-        for entry in read.flatten() {
-            if results.len() >= MAX_SEARCH_RESULTS {
-                *truncated = true;
+    let prune_count = hit_count.clone();
+
+    let mut results: Vec<FileEntry> = jwalk::WalkDir::new(root)
+        .skip_hidden(false)
+        .process_read_dir(move |_depth, _path, _state, children| {
+            if prune_count.load(Ordering::Relaxed) >= MAX_SEARCH_RESULTS {
+                children.clear();
                 return;
             }
-            let path = entry.path();
-            if is_hidden(&path) {
-                continue;
-            }
-            if let Some(name) = path.file_name() {
-                let name_lower = name.to_string_lossy().to_lowercase();
-                if name_lower.contains(query) {
-                    if let Some(fe) = to_file_entry(&path) {
-                        results.push(fe);
+            children.retain(|child_result| {
+                child_result.as_ref().map_or(false, |entry| {
+                    if entry.file_type.is_dir() {
+                        let name = entry.file_name.to_string_lossy();
+                        !SKIP_SEARCH_DIRS.contains(&name.as_ref())
+                    } else {
+                        true
                     }
-                }
+                })
+            });
+        })
+        .into_iter()
+        .filter_map(|entry_result| {
+            if hit_count.load(Ordering::Relaxed) >= MAX_SEARCH_RESULTS {
+                hit_limit.store(true, Ordering::Relaxed);
+                return None;
             }
-            if path.is_dir() {
-                walk(&path, query, results, truncated);
+            let entry = entry_result.ok()?;
+            if entry.depth == 0 {
+                return None;
             }
-        }
-    }
 
-    walk(root_path, &query_lower, &mut results, &mut truncated);
+            let name_lower = entry.file_name().to_string_lossy().to_lowercase();
+            if !name_lower.contains(&query_lower) {
+                return None;
+            }
+
+            let path = entry.path();
+            let meta = entry.metadata().ok()?;
+            hit_count.fetch_add(1, Ordering::Relaxed);
+            build_file_entry(&path, &meta)
+        })
+        .collect();
+
+    let truncated = hit_limit.load(Ordering::Relaxed);
 
     results.sort_by(|a, b| match (a.is_dir, b.is_dir) {
         (true, false) => std::cmp::Ordering::Less,
@@ -165,7 +191,9 @@ pub fn open_in_explorer(path: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let target = if p.is_file() {
-            p.parent().map(|pp| pp.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string())
+            p.parent()
+                .map(|pp| pp.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.to_string())
         } else {
             path.to_string()
         };

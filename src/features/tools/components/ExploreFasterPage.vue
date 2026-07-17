@@ -1,11 +1,74 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from "vue";
+import { onMounted, onUnmounted, ref, computed, nextTick } from "vue";
 import { useExploreFaster } from "../composables/useExploreFaster";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
 const ctrl = useExploreFaster();
 const pathInput = ref("");
 const searchInput = ref<HTMLInputElement | null>(null);
+const pathInputEl = ref<HTMLInputElement | null>(null);
+const isEditingPath = ref(false);
+
+function startEditPath() {
+  pathInput.value = ctrl.currentPath.value;
+  isEditingPath.value = true;
+  nextTick(() => {
+    pathInputEl.value?.focus();
+    pathInputEl.value?.select();
+  });
+}
+
+function commitPath() {
+  isEditingPath.value = false;
+  const trimmed = pathInput.value.trim();
+  if (trimmed && trimmed !== ctrl.currentPath.value) {
+    ctrl.handlePathSubmit(trimmed).then(() => {
+      pathInput.value = ctrl.currentPath.value;
+    });
+  }
+}
+
+function cancelEditPath() {
+  isEditingPath.value = false;
+  pathInput.value = ctrl.currentPath.value;
+}
+
+function handlePathEditKeydown(e: KeyboardEvent) {
+  if (e.key === "Enter") {
+    commitPath();
+  } else if (e.key === "Escape") {
+    cancelEditPath();
+  }
+}
+
+// --- Selection ---
+const selectedPaths = ref<Set<string>>(new Set());
+
+const isAllSelected = computed(() => {
+  return sortedEntries.value.length > 0 && sortedEntries.value.every(e => selectedPaths.value.has(e.path));
+});
+
+const isSomeSelected = computed(() => {
+  return !isAllSelected.value && sortedEntries.value.some(e => selectedPaths.value.has(e.path));
+});
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedPaths.value = new Set();
+  } else {
+    selectedPaths.value = new Set(sortedEntries.value.map(e => e.path));
+  }
+}
+
+function toggleSelect(entry: FileEntry) {
+  const newSet = new Set(selectedPaths.value);
+  if (newSet.has(entry.path)) {
+    newSet.delete(entry.path);
+  } else {
+    newSet.add(entry.path);
+  }
+  selectedPaths.value = newSet;
+}
 
 // --- Resizable sidebar ---
 const sidebarWidth = ref(176);
@@ -94,11 +157,6 @@ onMounted(async () => {
   pathInput.value = ctrl.currentPath.value;
 });
 
-function handlePathKeydown(e: KeyboardEvent) {
-  if (e.key === "Enter") {
-    ctrl.handlePathSubmit(pathInput.value);
-  }
-}
 
 function onSearchInput() {
   ctrl.searchQuery.value = (searchInput.value?.value ?? "").toString();
@@ -215,15 +273,38 @@ function parentPath(fullPath: string): string {
         <i :class="ctrl.isLoading.value ? 'pi pi-spinner pi-spin text-sm' : 'pi pi-refresh text-sm'" />
       </button>
 
-      <!-- Path bar -->
+      <!-- Path bar: breadcrumb / edit mode -->
       <div class="relative min-w-0 flex-1">
-        <i class="pi pi-folder pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted" />
-        <input
-          v-model="pathInput"
-          class="h-9 w-full rounded-md border border-divider bg-canvas pl-8 pr-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-          placeholder="Enter path... (e.g. D:\Projects)"
-          @keydown="handlePathKeydown"
-        />
+        <!-- Edit mode -->
+        <div v-if="isEditingPath" class="relative">
+          <i class="pi pi-folder pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted" />
+          <input
+            ref="pathInputEl"
+            v-model="pathInput"
+            class="h-9 w-full rounded-md border border-brand bg-canvas pl-8 pr-3 text-sm outline-none ring-2 ring-emerald-100"
+            placeholder="Enter path... (e.g. D:\Projects)"
+            @keydown="handlePathEditKeydown"
+            @blur="commitPath"
+          />
+        </div>
+        <!-- Breadcrumb mode -->
+        <div
+          v-else
+          class="flex h-9 w-full cursor-text items-center gap-0.5 overflow-x-auto rounded-md border border-divider bg-canvas px-2 text-sm"
+          @click="startEditPath"
+        >
+          <template v-for="(crumb, idx) in ctrl.breadcrumbs.value" :key="crumb.path">
+            <i v-if="idx > 0" class="pi pi-chevron-right shrink-0 text-[8px] text-muted" />
+            <button
+              class="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 transition-colors hover:bg-brand/10 hover:text-brand"
+              :class="idx === ctrl.breadcrumbs.value.length - 1 ? 'font-semibold text-brand' : 'text-secondary'"
+              @click.stop="handleBreadcrumbClick(crumb.path)"
+            >
+              <i v-if="idx === 0" class="pi pi-desktop mr-1 text-xs" />
+              {{ crumb.label }}
+            </button>
+          </template>
+        </div>
       </div>
 
       <!-- Search bar -->
@@ -331,7 +412,16 @@ function parentPath(fullPath: string): string {
       <!-- File list -->
       <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <!-- Table header -->
-        <div class="grid grid-cols-[minmax(0,1fr)_80px_100px_160px_80px] items-center gap-2 border-b border-divider bg-canvas px-4 py-2 text-xs font-bold text-ink">
+        <div class="grid grid-cols-[32px_minmax(0,1fr)_80px_100px_160px_80px] items-center gap-2 border-b border-divider bg-canvas px-4 py-2 text-xs font-bold text-ink">
+          <label class="flex items-center justify-center">
+            <input
+              type="checkbox"
+              class="accent-brand h-3.5 w-3.5 cursor-pointer rounded"
+              :checked="isAllSelected"
+              :indeterminate="isSomeSelected"
+              @change="toggleSelectAll"
+            />
+          </label>
           <button
             class="group/th flex items-center gap-1.5 text-left"
             @click="toggleSort('name')"
@@ -388,10 +478,20 @@ function parentPath(fullPath: string): string {
           <div
             v-for="entry in sortedEntries"
             :key="entry.path"
-            class="group grid grid-cols-[minmax(0,1fr)_80px_100px_160px_80px] items-center gap-2 border-b border-divider px-4 py-1.5 text-sm transition-colors hover:bg-canvas"
-            :class="entry.is_dir ? 'cursor-pointer' : ''"
+            class="group grid grid-cols-[32px_minmax(0,1fr)_80px_100px_160px_80px] items-center gap-2 border-b border-divider px-4 py-1.5 text-sm transition-colors hover:bg-canvas"
+            :class="[entry.is_dir ? 'cursor-pointer' : '', selectedPaths.has(entry.path) ? 'bg-brand/5' : '']"
             @dblclick="handleEntryClick(entry)"
           >
+            <!-- Checkbox -->
+            <label class="flex items-center justify-center" @click.stop>
+              <input
+                type="checkbox"
+                class="accent-brand h-3.5 w-3.5 cursor-pointer rounded"
+                :checked="selectedPaths.has(entry.path)"
+                @change="toggleSelect(entry)"
+              />
+            </label>
+
             <!-- Name -->
             <div class="flex min-w-0 items-center gap-2">
               <i :class="fileIcon(entry)" class="shrink-0 text-sm" />
@@ -451,7 +551,12 @@ function parentPath(fullPath: string): string {
 
         <!-- Footer status -->
         <div class="flex items-center justify-between border-t border-divider px-4 py-1.5 text-xs text-muted">
-          <span>{{ sortedEntries.length }} items</span>
+          <span>
+            {{ sortedEntries.length }} items
+            <template v-if="selectedPaths.size > 0">
+              <span class="ml-1 text-brand">({{ selectedPaths.size }} selected)</span>
+            </template>
+          </span>
           <span v-if="!ctrl.isSearchMode.value">{{ ctrl.currentPath.value }}</span>
           <span v-if="ctrl.searchTruncated.value" class="text-amber-600">Results truncated to 500 items</span>
         </div>

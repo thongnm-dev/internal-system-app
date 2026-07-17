@@ -29,3 +29,4 @@ tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-serde_j
 rust-ini = "0.21"
 bcrypt = "0.17"
 regex = "1"
+jwalk = "0.8"
