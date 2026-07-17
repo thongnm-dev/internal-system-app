@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import Password from "primevue/password";
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
@@ -47,14 +50,14 @@ const themeOptions = [
         <div class="mt-4 grid grid-cols-2 gap-3">
           <label v-for="field in userFields" :key="field.key" :class="field.key === 'address' ? 'col-span-2' : undefined">
             <span class="text-xs font-bold text-muted">{{ field.label }}</span>
-            <input
+            <InputText
               :class="['mt-1 h-10 w-full rounded-md border border-divider px-3 text-sm outline-none',
                 field.disabled ? 'bg-canvas text-muted cursor-not-allowed' : 'bg-panel text-ink focus:border-brand focus:ring-2 focus:ring-emerald-100']"
               :placeholder="field.placeholder"
               :type="field.type ?? 'text'"
               :disabled="field.disabled"
-              :value="settings.user[field.key]"
-              @input="updateUser(field.key, ($event.target as HTMLInputElement).value)"
+              :model-value="settings.user[field.key]"
+              @update:model-value="updateUser(field.key, $event as string)"
             />
           </label>
         </div>
@@ -67,19 +70,18 @@ const themeOptions = [
             <h3 class="font-bold">Theme</h3>
           </div>
           <div class="mt-4 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
-            <button
+            <Button
               v-for="opt in themeOptions"
               :key="opt.value"
+              :icon="`pi ${opt.icon}`"
+              :label="opt.label"
               :class="[
                 'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
                 settings.theme === opt.value ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
               ]"
-              type="button"
+              unstyled
               @click="updateTheme(opt.value)"
-            >
-              <i :class="`pi ${opt.icon}`" />
-              {{ opt.label }}
-            </button>
+            />
           </div>
         </section>
 
@@ -111,14 +113,7 @@ const themeOptions = [
           <i class="pi pi-key text-xl text-brand" />
           <h3 class="font-bold">API key settings</h3>
         </div>
-        <button
-          class="flex h-9 items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
-          type="button"
-          @click="addApiKey"
-        >
-          <i class="pi pi-plus" />
-          Add key
-        </button>
+        <Button icon="pi pi-plus" label="Add key" size="small" @click="addApiKey" />
       </div>
 
       <div class="mt-4 space-y-3">
@@ -127,35 +122,28 @@ const themeOptions = [
           :key="ak.id"
           class="grid grid-cols-[minmax(160px,240px)_minmax(180px,260px)_minmax(0,1fr)_40px] gap-2"
         >
-          <input
+          <InputText
             class="h-10 rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             placeholder="Application name *"
-            type="text"
-            :value="ak.name"
-            @input="updateApiKey(ak.id, 'name', ($event.target as HTMLInputElement).value)"
+            :model-value="ak.name"
+            @update:model-value="updateApiKey(ak.id, 'name', $event as string)"
           />
-          <input
+          <InputText
             class="h-10 rounded-md border border-divider bg-panel px-3 font-mono text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             placeholder="KEY LABEL *"
-            type="text"
-            :value="ak.keyLabel"
-            @input="updateApiKey(ak.id, 'keyLabel', ($event.target as HTMLInputElement).value.toUpperCase())"
+            :model-value="ak.keyLabel"
+            @update:model-value="updateApiKey(ak.id, 'keyLabel', ($event as string).toUpperCase())"
           />
-          <input
-            class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+          <Password
+            class="min-w-0"
+            input-class="w-full"
             placeholder="API key *"
-            type="password"
-            :value="ak.apiKey"
-            @input="updateApiKey(ak.id, 'apiKey', ($event.target as HTMLInputElement).value)"
+            :model-value="ak.apiKey"
+            :feedback="false"
+            toggle-mask
+            @update:model-value="updateApiKey(ak.id, 'apiKey', $event as string)"
           />
-          <button
-            class="flex h-10 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-            type="button"
-            title="Remove API key"
-            @click="removeApiKey(ak.id)"
-          >
-            <i class="pi pi-trash" />
-          </button>
+          <Button icon="pi pi-trash" severity="secondary" outlined title="Remove API key" @click="removeApiKey(ak.id)" />
         </div>
       </div>
     </section>
@@ -165,23 +153,14 @@ const themeOptions = [
     >
       <template v-if="isDirty">
         <span class="mr-auto text-sm font-semibold text-brand">You have unsaved changes.</span>
-        <button
-          class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-          type="button"
-          @click="discard"
-        >
-          Discard
-        </button>
+        <Button label="Discard" severity="secondary" outlined @click="discard" />
       </template>
-      <button
-        class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        type="button"
+      <Button
+        :icon="loading ? 'pi pi-spinner pi-spin' : undefined"
+        :label="loading ? 'Saving...' : 'Save changes'"
         :disabled="!isDirty || loading"
         @click="save"
-      >
-        <i v-if="loading" class="pi pi-spinner animate-spin" />
-        {{ loading ? "Saving..." : "Save changes" }}
-      </button>
+      />
     </div>
     </template>
   </section>

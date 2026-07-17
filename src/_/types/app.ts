@@ -9,7 +9,7 @@ export type MenuKey =
   | "exploreFaster"
   | "dailyWorkNotes"
   | "dailyReport"
-  | "importCsv"
+  | "checkMonthlyReport"
   | "cloudS3"
   | "cloudS3Upload"
   | "cloudS3Download"

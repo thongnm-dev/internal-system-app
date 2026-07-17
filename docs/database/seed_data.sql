@@ -58,7 +58,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('dailyWorkNotes',  'Daily Work Notes',  '/daily-work-notes',  'pi-pencil',     '—',          TRUE, 3),
     ('dailyReport',     'Daily Report',      '/daily-report',      'pi-calendar',   '—',          TRUE, 4),
     ('excel2md',        'Excel to Markdown', '/excel2md',          'pi-file',       'Tools',      TRUE, 5),
-    ('importCsv',       'Import CSV',        '/import-csv',        'pi-database',   'Tools',      TRUE, 6),
+    ('checkMonthlyReport', 'Check Monthly Report', '/check-monthly-report', 'pi-database', 'Tools', TRUE, 6),
     ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 7),
     ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 8),
     ('governanceUsers', 'Users',             '/governance/users',  'pi-users',      'Governance', TRUE, 9),

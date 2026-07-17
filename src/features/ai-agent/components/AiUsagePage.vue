@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import Dialog from "primevue/dialog";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import { useToast } from "@/shared/composables/useToast";
 import { useAiUsage } from "../composables/useAiUsage";
 import type { AiAccountType } from "@/_/types/ai-usage";
@@ -76,7 +78,7 @@ function usageBarClass(percent: number): string {
           <h2 class="text-lg font-semibold text-ink">AI Usage</h2>
           <p class="text-sm text-muted">Track AI usage, token consumption, and cost statistics across the team.</p>
         </div>
-        <button class="ml-auto flex h-10 shrink-0 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="openDialog"><i class="pi pi-plus" />Add Account</button>
+        <Button class="ml-auto shrink-0" icon="pi pi-plus" label="Add Account" @click="openDialog" />
       </div>
     </div>
 
@@ -100,14 +102,7 @@ function usageBarClass(percent: number): string {
             </div>
             <p class="mt-0.5 font-mono text-xs text-muted">{{ account.api_key_masked }}</p>
           </div>
-          <button
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-ink"
-            type="button"
-            title="Account settings"
-            @click="openAccountSettings(account.name)"
-          >
-            <i class="pi pi-cog text-sm" />
-          </button>
+          <Button icon="pi pi-cog" severity="secondary" text rounded size="small" title="Account settings" @click="openAccountSettings(account.name)" />
         </div>
 
         <!-- Usage remaining -->
@@ -158,9 +153,9 @@ function usageBarClass(percent: number): string {
       <div class="space-y-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Account Name <span class="text-red-500">*</span></span>
-          <input
+          <InputText
             v-model="accountName"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 w-full"
             placeholder="e.g. team-claude"
             autofocus
           />
@@ -168,21 +163,22 @@ function usageBarClass(percent: number): string {
         <label class="block">
           <span class="text-xs font-bold text-muted">API Key <span class="text-red-500">*</span></span>
           <div class="relative mt-1">
-            <input
+            <InputText
               v-model="apiKey"
               :type="showApiKey ? 'text' : 'password'"
-              class="h-10 w-full rounded-md border border-divider bg-panel px-3 pr-10 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="w-full pr-10"
               placeholder="sk-..."
               autocomplete="off"
             />
-            <button
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
-              type="button"
+            <Button
+              :icon="`pi ${showApiKey ? 'pi-eye-slash' : 'pi-eye'}`"
+              text
+              rounded
+              size="small"
+              class="absolute right-2 top-1/2 -translate-y-1/2"
               :title="showApiKey ? 'Hide API key' : 'Show API key'"
               @click="showApiKey = !showApiKey"
-            >
-              <i :class="`pi ${showApiKey ? 'pi-eye-slash' : 'pi-eye'}`" />
-            </button>
+            />
           </div>
         </label>
         <p class="text-xs text-muted">Account type is detected automatically from the API key.</p>
@@ -190,21 +186,8 @@ function usageBarClass(percent: number): string {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="isDialogOpen = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
-            type="button"
-            :disabled="!accountName.trim() || !apiKey.trim() || ctrl.isSaving.value"
-            @click="saveAccount"
-          >
-            {{ ctrl.isSaving.value ? "Saving..." : "Save" }}
-          </button>
+          <Button label="Cancel" severity="secondary" @click="isDialogOpen = false" />
+          <Button :label="ctrl.isSaving.value ? 'Saving...' : 'Save'" :disabled="!accountName.trim() || !apiKey.trim() || ctrl.isSaving.value" @click="saveAccount" />
         </div>
       </template>
     </Dialog>

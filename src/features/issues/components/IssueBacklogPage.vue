@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Checkbox from "primevue/checkbox";
 import Fieldset from "primevue/fieldset";
 import Calendar from "primevue/calendar";
 import Dialog from "primevue/dialog";
+import InputText from "primevue/inputtext";
 import {
   assignees,
   priorityOptions,
@@ -284,41 +286,41 @@ async function executeImport() {
           <div class="block min-w-0">
             <span class="text-xs font-bold text-muted">Status</span>
             <div class="mt-1 flex h-10 min-w-0 flex-wrap items-center gap-1 rounded-md border border-divider bg-panel p-1 text-sm leading-none">
-              <button
+              <Button
                 :class="[
                   'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
                   ctrl.criteria.value.status.length === 0 && !ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
-                type="button"
+                unstyled
                 :disabled="ctrl.lookupLoading.value"
                 @click="selectAll()"
               >
                 All
-              </button>
-              <button
+              </Button>
+              <Button
                 v-for="s in statusOptions"
                 :key="s"
                 :class="[
                   'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
                   !ctrl.criteria.value.notClosed && ctrl.criteria.value.status.includes(s) ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
-                type="button"
+                unstyled
                 :disabled="ctrl.lookupLoading.value"
                 @click="toggleStatus(s)"
               >
                 {{ s }}
-              </button>
-              <button
+              </Button>
+              <Button
                 :class="[
                   'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
                   ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
-                type="button"
+                unstyled
                 :disabled="ctrl.lookupLoading.value || statusOptions.length === 0"
                 @click="selectNotClosed()"
               >
                 Not Closed
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -366,12 +368,11 @@ async function executeImport() {
         <div class="grid gap-3 lg:grid-cols-2">
           <label class="block min-w-0">
             <span class="text-xs font-bold text-muted">Keyword</span>
-            <input
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            <InputText
+              class="mt-1 w-full"
               placeholder="Issue key or subject"
-              type="search"
-              :value="ctrl.criteria.value.keyword"
-              @input="ctrl.setField('keyword', ($event.target as HTMLInputElement).value)"
+              :model-value="ctrl.criteria.value.keyword"
+              @update:model-value="ctrl.setField('keyword', $event as string)"
               @keydown.enter="ctrl.search()"
             />
           </label>
@@ -438,35 +439,15 @@ async function executeImport() {
         </Fieldset>
 
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            title="Reset search conditions"
-            @click="ctrl.reset()"
-          >
-            <i class="pi pi-refresh" />
-            Reset
-          </button>
-          <button
-            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            type="button"
+          <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined title="Reset search conditions" @click="ctrl.reset()" />
+          <Button
+            icon="pi pi-file-import"
+            label="Import"
             :disabled="!ctrl.canOpenImport.value"
             :title="ctrl.canOpenImport.value ? 'Import issues to Backlog' : 'Select a project before importing'"
             @click="openImportDialog"
-          >
-            <i class="pi pi-file-import" />
-            Import
-          </button>
-          <button
-            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            type="button"
-            title="Search"
-            :disabled="!ctrl.criteria.value.project"
-            @click="ctrl.search()"
-          >
-            <i class="pi pi-search" />
-            Search
-          </button>
+          />
+          <Button icon="pi pi-search" label="Search" :disabled="!ctrl.criteria.value.project" title="Search" @click="ctrl.search()" />
         </div>
       </div>
     </Fieldset>
@@ -539,14 +520,7 @@ async function executeImport() {
             class="hidden"
             @change="handleImportFile"
           />
-          <button
-            class="flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-            type="button"
-            @click="triggerImportFile"
-          >
-            <i class="pi pi-upload" />
-            Choose CSV file
-          </button>
+          <Button icon="pi pi-upload" label="Choose CSV file" size="small" @click="triggerImportFile" />
           <span class="text-xs text-muted">
             Backlog CSV format: <code class="rounded bg-canvas px-1">Subject</code>,
             <code class="rounded bg-canvas px-1">Description</code>,
@@ -612,22 +586,13 @@ async function executeImport() {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="importDialogVisible = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
+          <Button label="Cancel" severity="secondary" outlined @click="importDialogVisible = false" />
+          <Button
+            icon="pi pi-file-import"
+            :label="`Import ${importSelectedCount} issue${importSelectedCount !== 1 ? 's' : ''}`"
             :disabled="importSelectedCount === 0 || importing"
             @click="executeImport"
-          >
-            <i class="pi pi-file-import" />
-            Import {{ importSelectedCount }} issue{{ importSelectedCount !== 1 ? 's' : '' }}
-          </button>
+          />
         </div>
       </template>
     </Dialog>

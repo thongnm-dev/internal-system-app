@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import MultiSelect from "primevue/multiselect";
 import Calendar from "primevue/calendar";
+import InputNumber from "primevue/inputnumber";
+import InputText from "primevue/inputtext";
 import { useAuthStore } from "@/app/stores/auth";
 import { friendlyError } from "@/tauri/commands/_base";
 import {
@@ -98,27 +101,9 @@ async function saveTask() {
         <p class="mt-1 truncate text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
-        <button
-          class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-          type="button"
-          @click="viewReport"
-        >
-          <i class="pi pi-chart-bar" />Report
-        </button>
-        <button
-          class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-          type="button"
-          @click="importTask"
-        >
-          <i class="pi pi-upload" />Import task
-        </button>
-        <button
-          class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-          type="button"
-          @click="openAddDialog"
-        >
-          <i class="pi pi-plus" />Add task
-        </button>
+        <Button icon="pi pi-chart-bar" label="Report" severity="secondary" outlined @click="viewReport" />
+        <Button icon="pi pi-upload" label="Import task" severity="secondary" outlined @click="importTask" />
+        <Button icon="pi pi-plus" label="Add task" @click="openAddDialog" />
       </div>
     </section>
 
@@ -166,36 +151,22 @@ async function saveTask() {
         </Column>
         <Column header="Issue">
           <template #body="{ data }">
-            <button
+            <Button
               v-if="data.issueKey"
-              class="font-bold text-brand hover:underline"
-              type="button"
+              :label="data.issueKey"
+              text
+              size="small"
+              class="font-bold text-brand"
               @click="openBacklog(data.issueKey)"
-            >
-              {{ data.issueKey }}
-            </button>
+            />
             <span v-else class="text-muted">-</span>
           </template>
         </Column>
         <Column header="Action" body-class="text-center" header-class="w-28 text-center">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <button
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                type="button"
-                title="Edit task"
-                @click="openEditDialog(data)"
-              >
-                <i class="pi pi-pencil" />
-              </button>
-              <button
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                type="button"
-                title="Delete task"
-                @click="ctrl.removeTask(data.id)"
-              >
-                <i class="pi pi-trash" />
-              </button>
+              <Button icon="pi pi-pencil" severity="secondary" outlined size="small" title="Edit task" @click="openEditDialog(data)" />
+              <Button icon="pi pi-trash" severity="secondary" outlined size="small" title="Delete task" @click="ctrl.removeTask(data.id)" />
             </div>
           </template>
         </Column>
@@ -220,9 +191,9 @@ async function saveTask() {
       <div class="space-y-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Short name <span class="text-red-500">*</span></span>
-          <input
+          <InputText
             v-model="form.shortName"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 w-full"
             placeholder="Task short name"
             autofocus
           />
@@ -253,22 +224,24 @@ async function saveTask() {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
             <span class="text-xs font-bold text-muted">Assignee</span>
-            <input
+            <InputText
               v-model="form.assignee"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 w-full"
               placeholder="Username"
             />
           </label>
           <label class="block">
             <span class="text-xs font-bold text-muted">Estimate Hour</span>
-            <input
-              v-model="form.estimateHour"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              inputmode="decimal"
-              min="0"
-              step="0.25"
-              type="number"
+            <InputNumber
+              :model-value="Number(form.estimateHour) || null"
+              class="mt-1 w-full"
+              :min="0"
+              :step="0.25"
+              :minFractionDigits="0"
+              :maxFractionDigits="2"
+              :useGrouping="false"
               placeholder="0"
+              @update:model-value="form.estimateHour = String($event ?? '')"
             />
           </label>
           <label class="block">
@@ -285,9 +258,9 @@ async function saveTask() {
           </label>
           <label class="block">
             <span class="text-xs font-bold text-muted">Link Issue Backlog</span>
-            <input
+            <InputText
               v-model="form.issueKey"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 w-full"
               placeholder="Issue Key"
             />
           </label>
@@ -298,21 +271,12 @@ async function saveTask() {
         <div class="flex flex-col gap-2">
           <p v-if="saveError" class="text-right text-sm font-semibold text-red-500">{{ saveError }}</p>
           <div class="flex items-center justify-end gap-2">
-            <button
-              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-              type="button"
-              @click="isAddDialogOpen = false"
-            >
-              Cancel
-            </button>
-            <button
-              class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
+            <Button label="Cancel" severity="secondary" outlined @click="isAddDialogOpen = false" />
+            <Button
+              :label="saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add task'"
               :disabled="!canSave || saving"
               @click="saveTask"
-            >
-              {{ saving ? "Saving…" : isEditing ? "Save changes" : "Add task" }}
-            </button>
+            />
           </div>
         </div>
       </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Button from "primevue/button";
 import { useToast } from "@/shared/composables/useToast";
 
 const { toasts, dismiss } = useToast();
@@ -28,9 +29,7 @@ const icons: Record<string, string> = {
         >
           <i :class="[icons[toast.type], 'mt-0.5 shrink-0 text-base']" />
           <span class="min-w-0 flex-1 text-sm font-medium">{{ toast.message }}</span>
-          <button class="shrink-0 opacity-60 hover:opacity-100" type="button" @click="dismiss(toast.id)">
-            <i class="pi pi-times text-xs" />
-          </button>
+          <Button icon="pi pi-times" text rounded size="small" class="shrink-0 opacity-60 hover:opacity-100" @click="dismiss(toast.id)" />
         </div>
       </TransitionGroup>
     </div>

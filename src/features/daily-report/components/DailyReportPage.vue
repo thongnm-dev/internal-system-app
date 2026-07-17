@@ -2,6 +2,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import Dialog from "primevue/dialog";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import InputNumber from "primevue/inputnumber";
 import Checkbox from "primevue/checkbox";
 import Calendar from "primevue/calendar";
 import Select from "primevue/select";
@@ -478,15 +481,7 @@ async function executeSyncDailyReport() {
           <h3 class="truncate font-bold">Assigned work</h3>
           <p class="mt-1 truncate text-xs text-muted">{{ ctrl.projects.value.length.toLocaleString("en-US") }} projects</p>
         </div>
-        <button
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
-          title="Add project"
-          :disabled="ctrl.availableProjects.value.length === 0"
-          @click="openProjectPicker"
-        >
-          <i class="pi pi-plus" />
-        </button>
+        <Button icon="pi pi-plus" size="small" title="Add project" :disabled="ctrl.availableProjects.value.length === 0" @click="openProjectPicker" />
       </div>
 
       <div class="flex min-w-0 items-center justify-between gap-4 px-4">
@@ -510,47 +505,17 @@ async function executeSyncDailyReport() {
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
-          <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-            type="button"
-            title="Làm mới"
-            @click="ctrl.reload()"
-          >
-            <i class="pi pi-refresh text-sm" />
-          </button>
-          <button
-            class="flex h-9 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-sm font-semibold text-secondary hover:bg-canvas"
-            type="button"
-            title="Đồng bộ hệ thống nội bộ"
-            @click="openSyncDialog"
-          >
-            <i class="pi pi-sync text-xs" />
-            <span>Đồng bộ</span>
-          </button>
-          <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-            type="button"
-            title="Previous month"
-            @click="ctrl.previousMonth()"
-          >
-            <i class="pi pi-chevron-left" />
-          </button>
-          <input
+          <Button icon="pi pi-refresh" severity="secondary" outlined size="small" title="Làm mới" @click="ctrl.reload()" />
+          <Button icon="pi pi-sync" label="Đồng bộ" severity="secondary" outlined size="small" title="Đồng bộ hệ thống nội bộ" @click="openSyncDialog" />
+          <Button icon="pi pi-chevron-left" severity="secondary" outlined size="small" title="Previous month" @click="ctrl.previousMonth()" />
+          <InputText
             class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
             type="month"
             :max="ctrl.maxMonthValue.value"
-            :value="parseMonth(ctrl.monthValue.value)"
+            :model-value="parseMonth(ctrl.monthValue.value)"
             @change="ctrl.selectMonth(($event.target as HTMLInputElement).value)"
           />
-          <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            title="Next month"
-            :disabled="!ctrl.canGoNextMonth.value"
-            @click="ctrl.nextMonth()"
-          >
-            <i class="pi pi-chevron-right" />
-          </button>
+          <Button icon="pi pi-chevron-right" severity="secondary" outlined size="small" title="Next month" :disabled="!ctrl.canGoNextMonth.value" @click="ctrl.nextMonth()" />
         </div>
       </div>
     </section>
@@ -615,17 +580,18 @@ async function executeSyncDailyReport() {
                 :class="['flex h-14 items-center gap-2 border-b border-divider px-4', tIdx % 2 === 0 ? 'bg-panel' : 'bg-canvas']"
                 @contextmenu="openTaskContextMenu(project, task, $event)"
               >
-                <button
-                  class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition"
-                  :class="task.isCompleted
-                    ? 'border-brand bg-brand text-white hover:opacity-80'
-                    : 'border-divider bg-panel text-muted hover:border-brand hover:text-brand'"
-                  type="button"
+                <Button
+                  icon="pi pi-check"
+                  :class="[
+                    'flex !h-6 !w-6 shrink-0 items-center justify-center !rounded-full border transition',
+                    task.isCompleted
+                      ? 'border-brand bg-brand text-white hover:opacity-80'
+                      : 'border-divider bg-panel text-muted hover:border-brand hover:text-brand',
+                  ]"
+                  unstyled
                   :title="task.isCompleted ? 'Bỏ delivery' : 'Delivery'"
                   @click="ctrl.setTaskCompleted(task.id, !task.isCompleted)"
-                >
-                  <i class="pi pi-check text-[10px]" />
-                </button>
+                />
                 <div class="min-w-0 flex-1">
                   <strong
                     class="block truncate text-sm"
@@ -684,7 +650,7 @@ async function executeSyncDailyReport() {
                     day.isWeekend ? 'bg-canvas' : (tIdx % 2 === 0 ? 'bg-panel' : 'bg-canvas'),
                   ]"
                 >
-                  <button
+                  <Button
                     :class="[
                       'flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-emerald-100',
                       entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
@@ -696,7 +662,7 @@ async function executeSyncDailyReport() {
                           ? 'hover:bg-emerald-100'
                           : 'hover:border-brand hover:text-brand',
                     ]"
-                    type="button"
+                    unstyled
                     :disabled="isRowDisabled(task)"
                     :title="isRowDisabled(task)
                       ? `${task.categoryLabel ? `【${task.categoryLabel}】` : ''}${task.name} - ${day.label} ${day.weekday} (${task.isCompleted ? 'completed' : 'read-only'})`
@@ -708,7 +674,7 @@ async function executeSyncDailyReport() {
                     </template>
                     <i v-else-if="!isRowDisabled(task)" class="pi pi-plus" />
                     <span v-else class="text-muted">-</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             </template>
@@ -737,14 +703,16 @@ async function executeSyncDailyReport() {
       <div class="space-y-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Hour</span>
-          <input
-            v-model="editForm.hour"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            inputmode="decimal"
-            max="24"
-            min="0"
-            step="0.25"
-            type="number"
+          <InputNumber
+            :model-value="Number(editForm.hour) || null"
+            class="mt-1 w-full"
+            :min="0"
+            :max="24"
+            :step="0.25"
+            :minFractionDigits="0"
+            :maxFractionDigits="2"
+            :useGrouping="false"
+            @update:model-value="editForm.hour = String($event ?? '')"
           />
           <span v-if="Number(editForm.hour) > 0" class="mt-1 block text-xs tabular-nums text-muted">
             = {{ Math.round(Number(editForm.hour) * 60) }} phút
@@ -771,26 +739,30 @@ async function executeSyncDailyReport() {
         <div v-if="editForm.isOt" class="grid gap-2 rounded-md border border-divider bg-canvas p-3">
           <label class="block">
             <span class="text-xs font-bold text-muted">Regular OT</span>
-            <input
-              v-model="editForm.regularOt"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              inputmode="decimal"
-              max="24"
-              min="0"
-              step="0.25"
-              type="number"
+            <InputNumber
+              :model-value="Number(editForm.regularOt) || null"
+              class="mt-1 w-full"
+              :min="0"
+              :max="24"
+              :step="0.25"
+              :minFractionDigits="0"
+              :maxFractionDigits="2"
+              :useGrouping="false"
+              @update:model-value="editForm.regularOt = String($event ?? '')"
             />
           </label>
           <label class="block">
             <span class="text-xs font-bold text-muted">Midnight OT</span>
-            <input
-              v-model="editForm.midnightOt"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              inputmode="decimal"
-              max="24"
-              min="0"
-              step="0.25"
-              type="number"
+            <InputNumber
+              :model-value="Number(editForm.midnightOt) || null"
+              class="mt-1 w-full"
+              :min="0"
+              :max="24"
+              :step="0.25"
+              :minFractionDigits="0"
+              :maxFractionDigits="2"
+              :useGrouping="false"
+              @update:model-value="editForm.midnightOt = String($event ?? '')"
             />
           </label>
         </div>
@@ -798,28 +770,10 @@ async function executeSyncDailyReport() {
 
       <template #footer>
         <div class="flex items-center justify-between gap-3">
-          <button
-            class="h-10 rounded-md border border-red-200 bg-panel px-4 text-sm font-bold text-red-600 hover:bg-red-50"
-            type="button"
-            @click="clearEntry"
-          >
-            Clear
-          </button>
+          <Button label="Clear" severity="danger" outlined @click="clearEntry" />
           <div class="flex items-center gap-2">
-            <button
-              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-              type="button"
-              @click="editingCell = null"
-            >
-              Cancel
-            </button>
-            <button
-              class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-              type="button"
-              @click="saveEntry"
-            >
-              Save
-            </button>
+            <Button label="Cancel" severity="secondary" @click="editingCell = null" />
+            <Button label="Save" @click="saveEntry" />
           </div>
         </div>
       </template>
@@ -843,9 +797,9 @@ async function executeSyncDailyReport() {
       <div class="border-b border-divider bg-canvas px-5 py-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Project code / name</span>
-          <input
+          <InputText
             v-model="projectKeyword"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 w-full"
             placeholder="Search by code or name"
           />
         </label>
@@ -881,21 +835,8 @@ async function executeSyncDailyReport() {
         <div class="flex items-center justify-between gap-3">
           <span class="text-sm font-semibold text-muted">{{ selectedProjectIds.length }} selected</span>
           <div class="flex items-center gap-2">
-            <button
-              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-              type="button"
-              @click="isAddingProject = false"
-            >
-              Cancel
-            </button>
-            <button
-              class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="selectedProjectIds.length === 0"
-              @click="confirmAddProjects"
-            >
-              Add projects
-            </button>
+            <Button label="Cancel" severity="secondary" @click="isAddingProject = false" />
+            <Button label="Add projects" :disabled="selectedProjectIds.length === 0" @click="confirmAddProjects" />
           </div>
         </div>
       </template>
@@ -922,9 +863,9 @@ async function executeSyncDailyReport() {
         <!-- Short name -->
         <label class="block">
           <span class="text-xs font-bold text-muted">Short name <span class="text-red-500">*</span></span>
-          <input
+          <InputText
             v-model="taskForm.shortName"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 w-full"
             placeholder="Task short name"
             autofocus
           />
@@ -957,14 +898,16 @@ async function executeSyncDailyReport() {
           <!-- Estimate hour -->
           <label class="block">
             <span class="text-xs font-bold text-muted">Estimate Hour</span>
-            <input
-              v-model="taskForm.estimateHour"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              inputmode="decimal"
-              min="0"
-              step="0.25"
-              type="number"
+            <InputNumber
+              :model-value="Number(taskForm.estimateHour) || null"
+              class="mt-1 w-full"
+              :min="0"
+              :step="0.25"
+              :minFractionDigits="0"
+              :maxFractionDigits="2"
+              :useGrouping="false"
               placeholder="0"
+              @update:model-value="taskForm.estimateHour = String($event ?? '')"
             />
           </label>
 
@@ -985,9 +928,9 @@ async function executeSyncDailyReport() {
           <!-- Backlog issue key -->
           <label class="block">
             <span class="text-xs font-bold text-muted">Link Issue Backlog</span>
-            <input
+            <InputText
               v-model="taskForm.issueKey"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 w-full"
               placeholder="Issue Key"
             />
           </label>
@@ -998,21 +941,8 @@ async function executeSyncDailyReport() {
         <div class="flex flex-col gap-2">
           <p v-if="taskError" class="text-right text-sm font-semibold text-red-500">{{ taskError }}</p>
           <div class="flex items-center justify-end gap-2">
-            <button
-              class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-              type="button"
-              @click="isTaskDialogOpen = false"
-            >
-              Cancel
-            </button>
-            <button
-              class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              type="button"
-              :disabled="!canSaveTask || savingTask"
-              @click="saveTask"
-            >
-              {{ savingTask ? "Saving…" : isEditingTask ? "Cập nhật" : "Add task" }}
-            </button>
+            <Button label="Cancel" severity="secondary" @click="isTaskDialogOpen = false" />
+            <Button :label="savingTask ? 'Saving…' : isEditingTask ? 'Cập nhật' : 'Add task'" :disabled="!canSaveTask || savingTask" @click="saveTask" />
           </div>
         </div>
       </template>
@@ -1026,26 +956,9 @@ async function executeSyncDailyReport() {
       @click.stop
       @contextmenu.prevent
     >
-      <button
-        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
-        type="button"
-        @click="openTaskDialog"
-      >
-        <i class="pi pi-plus" />
-        <span class="min-w-0 truncate">Thêm nhanh task</span>
-      </button>
-      <button
-        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
-        type="button"
-        @click="openBacklog"
-      >
-        <i class="pi pi-folder-open" />
-        <span class="min-w-0 truncate">Xem backlog</span>
-      </button>
-      <button class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas" type="button">
-        <i class="pi pi-upload" />
-        <span class="min-w-0 truncate">Import task</span>
-      </button>
+      <Button icon="pi pi-plus" label="Thêm nhanh task" text size="small" class="w-full justify-start" @click="openTaskDialog" />
+      <Button icon="pi pi-folder-open" label="Xem backlog" text size="small" class="w-full justify-start" @click="openBacklog" />
+      <Button icon="pi pi-upload" label="Import task" text size="small" class="w-full justify-start" />
     </div>
 
     <!-- Task context menu -->
@@ -1056,32 +969,9 @@ async function executeSyncDailyReport() {
       @click.stop
       @contextmenu.prevent
     >
-      <button
-        v-if="taskContextMenu.task.isUserAdded"
-        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
-        type="button"
-        @click="openEditTaskDialog(taskContextMenu.project, taskContextMenu.task)"
-      >
-        <i class="pi pi-pencil" />
-        <span class="min-w-0 truncate">Chỉnh sửa task</span>
-      </button>
-      <button
-        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold hover:bg-canvas"
-        type="button"
-        @click="openTaskBacklog(taskContextMenu.task)"
-      >
-        <i class="pi pi-folder-open" />
-        <span class="min-w-0 truncate">Xem backlog</span>
-      </button>
-      <button
-        v-if="taskContextMenu.task.isUserAdded && !taskContextMenu.task.isCompleted"
-        class="flex w-full items-center gap-2 px-3 py-2 text-left font-semibold text-red-500 hover:bg-red-50"
-        type="button"
-        @click="confirmDeleteTask"
-      >
-        <i class="pi pi-trash" />
-        <span class="min-w-0 truncate">Xóa task</span>
-      </button>
+      <Button v-if="taskContextMenu.task.isUserAdded" icon="pi pi-pencil" label="Chỉnh sửa task" text size="small" class="w-full justify-start" @click="openEditTaskDialog(taskContextMenu.project, taskContextMenu.task)" />
+      <Button icon="pi pi-folder-open" label="Xem backlog" text size="small" class="w-full justify-start" @click="openTaskBacklog(taskContextMenu.task)" />
+      <Button v-if="taskContextMenu.task.isUserAdded && !taskContextMenu.task.isCompleted" icon="pi pi-trash" label="Xóa task" text severity="danger" size="small" class="w-full justify-start" @click="confirmDeleteTask" />
     </div>
 
     <!-- Delete task confirm dialog -->
@@ -1100,21 +990,8 @@ async function executeSyncDailyReport() {
       </p>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <button
-            class="rounded-md border border-divider bg-panel px-4 py-2 text-sm font-semibold text-secondary hover:bg-canvas"
-            type="button"
-            @click="taskDeleteConfirm = null"
-          >
-            Hủy
-          </button>
-          <button
-            class="rounded-md bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-            type="button"
-            :disabled="deletingTask"
-            @click="executeDeleteTask"
-          >
-            Xóa
-          </button>
+          <Button label="Hủy" severity="secondary" @click="taskDeleteConfirm = null" />
+          <Button label="Xóa" severity="danger" :disabled="deletingTask" @click="executeDeleteTask" />
         </div>
       </template>
     </Dialog>
@@ -1199,23 +1076,8 @@ async function executeSyncDailyReport() {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="isSyncDialogOpen = false"
-          >
-            Đóng
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="syncRows.length === 0 || isSyncing"
-            @click="executeSyncDailyReport"
-          >
-            <i v-if="isSyncing" class="pi pi-spin pi-spinner mr-1.5 text-xs" />
-            <i v-else class="pi pi-sync mr-1.5 text-xs" />
-            {{ isSyncing ? "Đang đồng bộ…" : "Đồng bộ" }}
-          </button>
+          <Button label="Đóng" severity="secondary" @click="isSyncDialogOpen = false" />
+          <Button :icon="isSyncing ? 'pi pi-spinner pi-spin' : 'pi pi-sync'" :label="isSyncing ? 'Đang đồng bộ…' : 'Đồng bộ'" :disabled="syncRows.length === 0 || isSyncing" @click="executeSyncDailyReport" />
         </div>
       </template>
     </Dialog>

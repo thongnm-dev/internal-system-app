@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import Button from "primevue/button";
 import InputSwitch from "primevue/inputswitch";
+import InputNumber from "primevue/inputnumber";
+import InputText from "primevue/inputtext";
 import { useCopyTools } from "../composables/useCopyTools";
 
 const ctrl = useCopyTools();
@@ -59,21 +62,13 @@ const HELP: Record<string, string> = {
                 <i v-tooltip.top="HELP.input" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
               </span>
               <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="h-10 min-w-0"
                   placeholder="D:\OUTPUT"
-                  type="text"
-                  :value="ctrl.config.value.input"
-                  @input="ctrl.set('input', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.config.value.input"
+                  @update:model-value="ctrl.set('input', $event as string)"
                 />
-                <button
-                  class="flex h-10 w-10 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                  type="button"
-                  title="Browse input folder"
-                  @click="ctrl.pickFolder('input')"
-                >
-                  <i class="pi pi-folder-open" />
-                </button>
+                <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse input folder" @click="ctrl.pickFolder('input')" />
               </div>
             </label>
 
@@ -83,21 +78,13 @@ const HELP: Record<string, string> = {
                 <i v-tooltip.top="HELP.output" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
               </span>
               <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="h-10 min-w-0"
                   placeholder="D:\OUTPUT_VN"
-                  type="text"
-                  :value="ctrl.config.value.output"
-                  @input="ctrl.set('output', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.config.value.output"
+                  @update:model-value="ctrl.set('output', $event as string)"
                 />
-                <button
-                  class="flex h-10 w-10 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                  type="button"
-                  title="Browse output folder"
-                  @click="ctrl.pickFolder('output')"
-                >
-                  <i class="pi pi-folder-open" />
-                </button>
+                <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse output folder" @click="ctrl.pickFolder('output')" />
               </div>
             </label>
 
@@ -145,12 +132,11 @@ const HELP: Record<string, string> = {
                   Ext
                   <i v-tooltip.top="HELP.ext" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
                 </span>
-                <input
-                  class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="h-10 min-w-0"
                   placeholder="xlsx, xlsm"
-                  type="text"
-                  :value="ctrl.config.value.ext"
-                  @input="ctrl.set('ext', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.config.value.ext"
+                  @update:model-value="ctrl.set('ext', $event as string)"
                 />
               </label>
               <label class="grid gap-1.5">
@@ -158,12 +144,12 @@ const HELP: Record<string, string> = {
                   Limit copy
                   <i v-tooltip.top="HELP.limit_copy" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
                 </span>
-                <input
-                  class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  type="number"
-                  min="0"
-                  :value="ctrl.config.value.limit_copy"
-                  @input="ctrl.set('limit_copy', Number(($event.target as HTMLInputElement).value) || 0)"
+                <InputNumber
+                  class="min-w-0"
+                  :min="0"
+                  :useGrouping="false"
+                  :model-value="ctrl.config.value.limit_copy"
+                  @update:model-value="ctrl.set('limit_copy', $event ?? 0)"
                 />
               </label>
             </div>
@@ -174,12 +160,11 @@ const HELP: Record<string, string> = {
                   Skip dir keywords
                   <i v-tooltip.top="HELP.skip_dir" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
                 </span>
-                <input
-                  class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="h-10 min-w-0"
                   placeholder="履歴, history, old"
-                  type="text"
-                  :value="ctrl.config.value.skip_dir"
-                  @input="ctrl.set('skip_dir', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.config.value.skip_dir"
+                  @update:model-value="ctrl.set('skip_dir', $event as string)"
                 />
               </label>
               <label class="grid gap-1.5">
@@ -187,12 +172,11 @@ const HELP: Record<string, string> = {
                   Report dir
                   <i v-tooltip.top="HELP.report_dir" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
                 </span>
-                <input
-                  class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="h-10 min-w-0"
                   placeholder="reports"
-                  type="text"
-                  :value="ctrl.config.value.report_dir"
-                  @input="ctrl.set('report_dir', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.config.value.report_dir"
+                  @update:model-value="ctrl.set('report_dir', $event as string)"
                 />
               </label>
             </div>
@@ -229,36 +213,22 @@ const HELP: Record<string, string> = {
 
     <!-- Action bar -->
     <div class="flex items-center justify-between gap-3 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm">
-      <button
-        class="inline-flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-60"
-        type="button"
-        :disabled="ctrl.running.value || ctrl.runningFolders.value"
-        @click="ctrl.loadFromIni()"
-      >
-        <i class="pi pi-refresh" />
-        Reset
-      </button>
+      <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined :disabled="ctrl.running.value || ctrl.runningFolders.value" @click="ctrl.loadFromIni()" />
       <div class="flex items-center gap-2">
-        <button
-          class="inline-flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-60"
-          type="button"
+        <Button
+          :icon="ctrl.runningFolders.value ? 'pi pi-spinner pi-spin' : 'pi pi-folder-open'"
+          :label="ctrl.config.value.dry_run ? 'Copy by folder (dry-run)' : 'Copy by folder'"
+          severity="secondary"
+          outlined
           :disabled="ctrl.running.value"
           @click="ctrl.runByFolders()"
-        >
-          <i v-if="ctrl.runningFolders.value" class="pi pi-spin pi-spinner" />
-          <i v-else class="pi pi-folder-open" />
-          {{ ctrl.config.value.dry_run ? "Copy by folder (dry-run)" : "Copy by folder" }}
-        </button>
-        <button
-          class="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          type="button"
+        />
+        <Button
+          :icon="ctrl.running.value ? 'pi pi-spinner pi-spin' : 'pi pi-copy'"
+          :label="ctrl.config.value.dry_run ? 'Copy (dry-run)' : 'Copy'"
           :disabled="ctrl.runningFolders.value"
           @click="ctrl.run()"
-        >
-          <i v-if="ctrl.running.value" class="pi pi-spin pi-spinner" />
-          <i v-else class="pi pi-copy" />
-          {{ ctrl.config.value.dry_run ? "Copy (dry-run)" : "Copy" }}
-        </button>
+        />
       </div>
     </div>
 
@@ -272,13 +242,7 @@ const HELP: Record<string, string> = {
           <i class="pi pi-list text-brand" />
           <h3 class="font-bold">Result</h3>
         </div>
-        <button
-          class="text-xs font-semibold text-muted hover:text-ink"
-          type="button"
-          @click="ctrl.showResult.value = false"
-        >
-          Hide
-        </button>
+        <Button label="Hide" text size="small" @click="ctrl.showResult.value = false" />
       </div>
       <pre class="min-h-0 max-h-80 flex-1 overflow-auto whitespace-pre-wrap break-words bg-slate-950 p-4 text-xs leading-6 text-slate-100">{{ ctrl.log.value.join("\n") }}</pre>
     </section>

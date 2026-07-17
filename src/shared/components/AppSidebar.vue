@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import Button from "primevue/button";
 import { appRoutes } from "@/app/router/routes";
 import type { MenuKey } from "@/_/types/app";
 
@@ -34,7 +35,7 @@ const groups: MenuGroup[] = [
     children: [
       { id: "excel2md", icon: "pi-file" },
       { id: "copyTools", icon: "pi-copy" },
-      { id: "importCsv", icon: "pi-database" },
+      { id: "checkMonthlyReport", icon: "pi-database" },
       { id: "sqlEditor", icon: "pi-server" },
       { id: "exploreFaster", icon: "pi-compass" },
     ],
@@ -103,26 +104,26 @@ function tooltipOpts(label: string) {
     <div :class="['border-b border-sidebar-border', isCollapsed ? 'p-3' : 'p-5']">
       <div :class="['flex items-center gap-3', isCollapsed ? 'justify-center' : 'justify-between']">
         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand font-bold text-white">PJ</div>
-        <button
+        <Button
           v-if="!isCollapsed"
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
-          type="button"
+          icon="pi pi-chevron-left"
+          text
+          rounded
+          size="small"
+          class="shrink-0 text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
           title="Collapse sidebar"
           @click="emit('toggleCollapse')"
-        >
-          <i class="pi pi-chevron-left" />
-        </button>
+        />
       </div>
 
       <template v-if="isCollapsed">
-        <button
-          class="mt-3 flex h-9 w-full items-center justify-center rounded-md text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
-          type="button"
+        <Button
+          icon="pi pi-chevron-right"
+          text
+          class="mt-3 w-full text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
           title="Expand sidebar"
           @click="emit('toggleCollapse')"
-        >
-          <i class="pi pi-chevron-right" />
-        </button>
+        />
       </template>
       <template v-else>
         <h1 class="mt-4 text-xl font-bold leading-tight text-sidebar-title">Manager System</h1>
@@ -130,7 +131,7 @@ function tooltipOpts(label: string) {
     </div>
 
     <nav :class="['flex-1 space-y-1 overflow-y-auto overflow-x-hidden', isCollapsed ? 'p-2' : 'p-3']">
-      <button
+      <Button
         v-for="item in items"
         :key="item.id"
         v-tooltip.right="tooltipOpts(labelFor(item.id))"
@@ -141,16 +142,16 @@ function tooltipOpts(label: string) {
             ? 'bg-sidebar-active text-sidebar-text-active'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
         ]"
-        type="button"
+        unstyled
         @click="emit('menuChange', item.id)"
       >
         <i :class="`pi ${item.icon} shrink-0`" />
         <span v-if="!isCollapsed">{{ labelFor(item.id) }}</span>
-      </button>
+      </Button>
 
       <!-- Collapsible groups -->
       <template v-for="g in groups" :key="g.label">
-        <button
+        <Button
           v-if="isCollapsed"
           v-tooltip.right="tooltipOpts(g.label)"
           :class="[
@@ -159,30 +160,30 @@ function tooltipOpts(label: string) {
               ? 'bg-sidebar-active text-sidebar-text-active'
               : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
           ]"
-          type="button"
+          unstyled
           @click="groupOpen[g.label] = !groupOpen[g.label]"
         >
           <i :class="`pi ${g.icon} shrink-0`" />
-        </button>
+        </Button>
 
-        <button
+        <Button
           v-if="!isCollapsed"
-          class="flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold transition"
           :class="[
+            'flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold transition',
             groupKeySet.get(g.label)!.has(activeMenu)
               ? 'text-sidebar-text-active'
               : 'text-sidebar-text hover:text-sidebar-text-active',
           ]"
-          type="button"
+          unstyled
           @click="groupOpen[g.label] = !groupOpen[g.label]"
         >
           <i :class="`pi ${g.icon} shrink-0`" />
           <span class="flex-1">{{ g.label }}</span>
           <i :class="['pi shrink-0 text-xs transition-transform', groupOpen[g.label] ? 'pi-chevron-down' : 'pi-chevron-right']" />
-        </button>
+        </Button>
 
         <template v-if="groupOpen[g.label]">
-          <button
+          <Button
             v-for="child in g.children"
             :key="child.id"
             v-tooltip.right="tooltipOpts(labelFor(child.id))"
@@ -193,18 +194,18 @@ function tooltipOpts(label: string) {
                 ? 'bg-sidebar-active text-sidebar-text-active'
                 : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
             ]"
-            type="button"
+            unstyled
             @click="emit('menuChange', child.id)"
           >
             <i :class="`pi ${child.icon} shrink-0 text-xs`" />
             <span v-if="!isCollapsed">{{ labelFor(child.id) }}</span>
-          </button>
+          </Button>
         </template>
       </template>
     </nav>
 
     <div :class="['border-t border-sidebar-border text-sm text-sidebar-text', isCollapsed ? 'p-2' : 'p-4']">
-      <button
+      <Button
         v-tooltip.right="tooltipOpts(settingsLabel)"
         :class="[
           'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
@@ -213,12 +214,12 @@ function tooltipOpts(label: string) {
             ? 'bg-sidebar-active text-sidebar-text-active'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
         ]"
-        type="button"
+        unstyled
         @click="emit('menuChange', 'settings')"
       >
         <i class="pi pi-cog shrink-0" />
         <span v-if="!isCollapsed">{{ settingsLabel }}</span>
-      </button>
+      </Button>
     </div>
   </aside>
 </template>

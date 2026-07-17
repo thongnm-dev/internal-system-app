@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
+import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import InputText from "primevue/inputtext";
+import Password from "primevue/password";
 import { useAuthStore } from "@/app/stores/auth";
 import { defaultRoute } from "@/app/router/routes";
 import { friendlyError } from "@/tauri/commands/_base";
@@ -57,39 +61,33 @@ async function submitLogin() {
           <span class="text-xs font-bold text-muted">Username</span>
           <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
             <i class="pi pi-user shrink-0 text-muted" />
-            <input
+            <InputText
               v-model="username"
               class="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none"
               autocomplete="username"
               autofocus
               placeholder="username"
-              type="text"
             />
           </div>
         </label>
 
         <label class="block">
           <span class="text-xs font-bold text-muted">Password</span>
-          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-            <i class="pi pi-lock shrink-0 text-muted" />
-            <input
-              v-model="password"
-              class="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none"
-              autocomplete="current-password"
-              placeholder="password"
-              type="password"
-            />
-          </div>
+          <Password
+            v-model="password"
+            class="mt-1 w-full"
+            input-class="w-full"
+            autocomplete="current-password"
+            placeholder="password"
+            :feedback="false"
+            toggle-mask
+          />
         </label>
 
-        <label class="flex cursor-pointer items-center gap-2 select-none">
-          <input
-            v-model="rememberMe"
-            type="checkbox"
-            class="h-4 w-4 rounded border-divider accent-brand"
-          />
-          <span class="text-sm text-muted">Ghi nhớ thông tin đăng nhập</span>
-        </label>
+        <div class="flex cursor-pointer items-center gap-2 select-none">
+          <Checkbox v-model="rememberMe" binary input-id="remember-me" />
+          <label for="remember-me" class="cursor-pointer text-sm text-muted">Ghi nhớ thông tin đăng nhập</label>
+        </div>
 
         <p
           v-if="error"
@@ -98,14 +96,13 @@ async function submitLogin() {
           {{ error }}
         </p>
 
-        <button
+        <Button
           :disabled="loading"
-          class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
+          :icon="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sign-in'"
+          :label="loading ? 'Đang đăng nhập...' : 'Login'"
+          class="w-full"
           type="submit"
-        >
-          <i :class="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sign-in'" />
-          {{ loading ? "Đang đăng nhập..." : "Login" }}
-        </button>
+        />
       </form>
 
       <p class="mt-4 text-center text-sm">

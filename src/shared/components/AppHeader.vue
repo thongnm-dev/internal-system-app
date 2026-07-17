@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AppRoute } from "@/app/router/routes";
+import Button from "primevue/button";
 import { useSettings } from "@/features/settings/composables/useSettings";
 import { useNavigationHistory } from "@/shared/composables/useNavigationHistory";
 
@@ -38,36 +39,37 @@ function toggleTheme() {
           <span class="text-brand">{{ route.title }}</span>
         </template>
       </nav>
-      <button
+      <Button
         v-if="canGoBack"
-        class="mt-3 flex h-8 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-sidebar-hover"
-        type="button"
+        icon="pi pi-arrow-left"
+        :label="backTitle ? `Back to ${backTitle}` : 'Back'"
+        severity="secondary"
+        outlined
+        size="small"
         :title="backTitle ? `Back to ${backTitle}` : 'Back'"
+        class="mt-3"
         @click="goBack"
-      >
-        <i class="pi pi-arrow-left" />
-        <span class="min-w-0 truncate">{{ backTitle ? `Back to ${backTitle}` : "Back" }}</span>
-      </button>
+      />
     </div>
     <div class="flex shrink-0 items-center gap-2">
-      <button
-        class="flex h-9 w-9 items-center justify-center rounded-full border border-divider bg-panel text-secondary hover:bg-sidebar-hover"
-        type="button"
+      <Button
+        :icon="settings.theme === 'dark' ? 'pi pi-sun' : 'pi pi-moon'"
+        severity="secondary"
+        outlined
+        rounded
         :title="settings.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
         @click="toggleTheme"
-      >
-        <i :class="settings.theme === 'dark' ? 'pi pi-sun' : 'pi pi-moon'" />
-      </button>
-      <button
+      />
+      <Button
         v-if="username"
-        class="flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-sidebar-hover"
-        type="button"
+        icon="pi pi-sign-out"
+        label="Logout"
+        severity="secondary"
+        outlined
+        size="small"
         title="Logout"
         @click="emit('logout')"
-      >
-        <i class="pi pi-sign-out" />
-        Logout
-      </button>
+      />
     </div>
   </header>
 </template>

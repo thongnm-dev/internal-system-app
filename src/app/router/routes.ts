@@ -78,9 +78,9 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Enter daily work hours for each assigned project task.",
   },
   {
-    key: "importCsv",
-    path: "/import-csv",
-    title: "Import CSV",
+    key: "checkMonthlyReport",
+    path: "/check-monthly-report",
+    title: "Check Monthly Report",
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
   {
@@ -271,9 +271,9 @@ export const vueRoutes: RouteRecordRaw[] = [
     meta: { key: "dailyReport" as MenuKey },
   },
   {
-    path: "/import-csv",
-    component: () => import("@/features/tools/components/ImportCsvPage.vue"),
-    meta: { key: "importCsv" as MenuKey },
+    path: "/check-monthly-report",
+    component: () => import("@/features/tools/components/CheckMonthlyReportPage.vue"),
+    meta: { key: "checkMonthlyReport" as MenuKey },
   },
   {
     path: "/cloud/s3",

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import Dialog from "primevue/dialog";
 import Calendar from "primevue/calendar";
 import { useAuthStore } from "@/app/stores/auth";
@@ -90,28 +92,14 @@ function parseDateStr(value: string): Date | null {
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-2">
-          <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-            type="button"
-            title="Tháng trước"
-            @click="ctrl.previousMonth()"
-          >
-            <i class="pi pi-chevron-left" />
-          </button>
-          <input
+          <Button icon="pi pi-chevron-left" severity="secondary" outlined size="small" title="Tháng trước" @click="ctrl.previousMonth()" />
+          <InputText
             class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
             type="month"
-            :value="ctrl.monthValue.value"
+            :model-value="ctrl.monthValue.value"
             @change="ctrl.selectMonth(($event.target as HTMLInputElement).value)"
           />
-          <button
-            class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-            type="button"
-            title="Tháng sau"
-            @click="ctrl.nextMonth()"
-          >
-            <i class="pi pi-chevron-right" />
-          </button>
+          <Button icon="pi pi-chevron-right" severity="secondary" outlined size="small" title="Tháng sau" @click="ctrl.nextMonth()" />
         </div>
       </div>
 
@@ -120,7 +108,7 @@ function parseDateStr(value: string): Date | null {
       </div>
 
       <div class="grid flex-1 grid-cols-7 grid-rows-6 bg-panel">
-        <button
+        <Button
           v-for="day in ctrl.calendarDays.value"
           :key="day.date"
           :class="[
@@ -132,7 +120,7 @@ function parseDateStr(value: string): Date | null {
                 : 'bg-canvas text-muted',
             day.isFutureDisabled ? 'cursor-not-allowed opacity-50' : '',
           ]"
-          type="button"
+          unstyled
           :disabled="day.isFutureDisabled"
           @click="ctrl.selectDate(day.date)"
         >
@@ -148,7 +136,7 @@ function parseDateStr(value: string): Date | null {
             <span class="text-[11px] font-semibold text-muted">Công việc</span>
             <strong class="rounded-md bg-canvas px-2 py-1 text-xs text-secondary">{{ day.taskCount }}</strong>
           </span>
-        </button>
+        </Button>
       </div>
     </section>
 
@@ -160,21 +148,14 @@ function parseDateStr(value: string): Date | null {
             <h3 class="truncate font-bold">Ghi chú công việc hằng ngày</h3>
             <p class="mt-1 truncate text-sm text-muted">{{ ctrl.selectedDateLabel.value }}</p>
           </div>
-          <button
-            class="flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-            type="button"
-            @click="openAddDialog"
-          >
-            <i class="pi pi-plus" />
-            Thêm công việc
-          </button>
+          <Button icon="pi pi-plus" label="Thêm công việc" @click="openAddDialog" />
         </div>
       </section>
 
       <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <div class="shrink-0 border-b border-divider p-4">
           <div class="grid grid-cols-3 rounded-md border border-divider bg-canvas p-1">
-            <button
+            <Button
               v-for="opt in statusOptions"
               :key="opt.value"
               :class="[
@@ -183,13 +164,13 @@ function parseDateStr(value: string): Date | null {
                   ? 'bg-panel text-ink shadow-sm'
                   : 'text-muted hover:text-secondary',
               ]"
-              type="button"
+              unstyled
               @click="ctrl.statusFilter.value = opt.value"
             >
               <i :class="`pi ${opt.icon}`" />
               <span class="truncate">{{ opt.label }}</span>
               <span class="rounded-md bg-panel/70 px-1.5 py-0.5 text-xs">{{ ctrl.statusCounts.value[opt.value] }}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -211,40 +192,27 @@ function parseDateStr(value: string): Date | null {
                   {{ note.content }}
                 </p>
                 <div class="flex shrink-0 items-center gap-1">
-                  <button
-                    class="flex h-9 w-9 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                    type="button"
-                    title="Chỉnh sửa"
-                    @click="openEditDialog(note)"
-                  >
-                    <i class="pi pi-pencil" />
-                  </button>
-                  <button
-                    class="flex h-9 w-9 items-center justify-center rounded-md border border-red-200 bg-panel text-red-600 hover:bg-red-50"
-                    type="button"
-                    title="Xóa công việc"
-                    @click="ctrl.removeNote(note.id)"
-                  >
-                    <i class="pi pi-trash" />
-                  </button>
+                  <Button icon="pi pi-pencil" severity="secondary" outlined size="small" title="Chỉnh sửa" @click="openEditDialog(note)" />
+                  <Button icon="pi pi-trash" severity="danger" outlined size="small" title="Xóa công việc" @click="ctrl.removeNote(note.id)" />
                 </div>
               </div>
               <div class="mt-4 flex flex-wrap items-center gap-2">
-                <button
+                <Button
                   v-for="status in statusOptions"
                   :key="status.value"
+                  :icon="`pi ${status.icon}`"
+                  :label="status.label"
                   :class="[
-                    'flex h-8 items-center gap-2 rounded-md border px-3 text-xs font-bold',
+                    'h-8 text-xs',
                     note.status === status.value
                       ? 'border-brand bg-emerald-50 text-brand'
-                      : 'border-divider bg-panel text-muted hover:bg-canvas',
+                      : '',
                   ]"
-                  type="button"
+                  :severity="note.status === status.value ? undefined : 'secondary'"
+                  :outlined="note.status !== status.value"
+                  size="small"
                   @click="ctrl.updateNoteStatus(note.id, status.value)"
-                >
-                  <i :class="`pi ${status.icon} text-sm`" />
-                  {{ status.label }}
-                </button>
+                />
               </div>
             </article>
           </div>
@@ -286,7 +254,7 @@ function parseDateStr(value: string): Date | null {
         <div>
           <span class="text-xs font-bold text-muted">Trạng thái</span>
           <div class="mt-1 grid grid-cols-3 rounded-md border border-divider bg-canvas p-1">
-            <button
+            <Button
               v-for="opt in statusOptions"
               :key="opt.value"
               :class="[
@@ -295,12 +263,12 @@ function parseDateStr(value: string): Date | null {
                   ? 'bg-panel text-ink shadow-sm'
                   : 'text-muted hover:text-secondary',
               ]"
-              type="button"
+              unstyled
               @click="draftStatus = opt.value"
             >
               <i :class="`pi ${opt.icon}`" />
               <span class="truncate">{{ opt.label }}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -316,21 +284,12 @@ function parseDateStr(value: string): Date | null {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="dialogVisible = false"
-          >
-            Hủy
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
+          <Button label="Hủy" severity="secondary" outlined @click="dialogVisible = false" />
+          <Button
+            :label="isEditing ? 'Cập nhật' : 'Lưu công việc'"
             :disabled="!draftContent.trim() || !draftDate"
             @click="saveDraft"
-          >
-            {{ isEditing ? 'Cập nhật' : 'Lưu công việc' }}
-          </button>
+          />
         </div>
       </template>
     </Dialog>

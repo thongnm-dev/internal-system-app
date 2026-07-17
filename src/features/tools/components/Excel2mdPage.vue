@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import { useExcel2md } from "../composables/useExcel2md";
 
 const ctrl = useExcel2md();
@@ -17,54 +19,35 @@ const ctrl = useExcel2md();
           <label class="grid gap-1.5">
             <span class="text-xs font-bold uppercase tracking-wide text-muted">Input .xlsx</span>
             <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-              <input
-                class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              <InputText
+                class="h-10 min-w-0"
                 placeholder="Select Excel workbook..."
-                type="text"
-                :value="ctrl.inputPath.value"
-                @input="ctrl.updateInputPath(($event.target as HTMLInputElement).value)"
+                :model-value="ctrl.inputPath.value"
+                @update:model-value="ctrl.updateInputPath($event as string)"
               />
-              <button
-                class="flex h-10 w-10 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                type="button"
-                title="Browse Excel workbook"
-                @click="ctrl.pickInputFile()"
-              >
-                <i class="pi pi-folder-open" />
-              </button>
+              <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel workbook" @click="ctrl.pickInputFile()" />
             </div>
           </label>
 
           <label class="grid gap-1.5">
             <span class="text-xs font-bold uppercase tracking-wide text-muted">Output .md</span>
             <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-              <input
-                class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              <InputText
+                class="h-10 min-w-0"
                 placeholder="Markdown output path..."
-                type="text"
-                :value="ctrl.outputPath.value"
-                @input="ctrl.setOutputPath(($event.target as HTMLInputElement).value)"
+                :model-value="ctrl.outputPath.value"
+                @update:model-value="ctrl.setOutputPath($event as string)"
               />
-              <button
-                class="flex h-10 w-10 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas"
-                type="button"
-                title="Choose Markdown output"
-                @click="ctrl.pickOutputFile()"
-              >
-                <i class="pi pi-save" />
-              </button>
+              <Button icon="pi pi-save" severity="secondary" outlined title="Choose Markdown output" @click="ctrl.pickOutputFile()" />
             </div>
           </label>
 
-          <button
-            class="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            type="button"
+          <Button
+            icon="pi pi-bolt"
+            :label="ctrl.isConverting.value ? 'Converting...' : 'Convert'"
             :disabled="ctrl.isConverting.value"
             @click="ctrl.convert()"
-          >
-            <i class="pi pi-bolt" />
-            {{ ctrl.isConverting.value ? "Converting..." : "Convert" }}
-          </button>
+          />
         </div>
       </section>
     </div>

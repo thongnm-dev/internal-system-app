@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Button from "primevue/button";
+
 defineProps<{
   isChecking: boolean;
 }>();
@@ -46,24 +48,12 @@ const emit = defineEmits<{
         </p>
       </div>
 
-      <button
-        type="button"
-        class="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      <Button
+        :icon="isChecking ? 'pi pi-spinner pi-spin' : undefined"
+        :label="isChecking ? 'Đang kiểm tra...' : 'Thử lại'"
         :disabled="isChecking"
         @click="emit('retry')"
-      >
-        <svg
-          v-if="isChecking"
-          class="h-4 w-4 animate-spin"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-        </svg>
-        {{ isChecking ? "Đang kiểm tra..." : "Thử lại" }}
-      </button>
+      />
     </section>
   </main>
 </template>

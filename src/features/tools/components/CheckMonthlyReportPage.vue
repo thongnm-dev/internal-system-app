@@ -3,6 +3,8 @@ import { computed, ref } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
+import InputText from "primevue/inputtext";
+import Button from "primevue/button";
 import { useImportCsv } from "../composables/useImportCsv";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
@@ -85,9 +87,13 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </div>
         <p class="mt-2 text-sm text-secondary">Upload an exported CSV from the system and save it as check data for monthly report matching.</p>
         <div class="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
-          <input class="h-10 min-w-0 rounded-md border border-divider bg-panel px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Select CSV file..." type="text" :value="ctrl.csvPath.value" @input="ctrl.updateCsvPath(($event.target as HTMLInputElement).value)" />
-          <button class="flex h-10 items-center justify-center rounded-md border border-divider bg-panel px-4 text-secondary hover:bg-canvas" type="button" title="Browse CSV" @click="ctrl.pickCsvFile()"><i class="pi pi-folder-open" /></button>
-          <button class="flex h-10 items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60" type="button" :disabled="ctrl.isImporting.value" @click="ctrl.previewCsv()"><i class="pi pi-file-import" />Import</button>
+          <InputText class="min-w-0 flex-1" placeholder="Select CSV file..." 
+          :model-value="ctrl.csvPath.value" 
+          @update:model-value="ctrl.updateCsvPath($event as string)" 
+          readonly
+          />
+          <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse CSV" @click="ctrl.pickCsvFile()" />
+          <Button icon="pi pi-file-import" label="Import" :disabled="ctrl.isImporting.value" @click="ctrl.previewCsv()" />
         </div>
       </div>
     </div>
@@ -102,7 +108,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
               {{ ctrl.previewResult.value ? `${ctrl.previewResult.value.source_file_name}${ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : ''}` : 'No CSV data imported yet.' }}
             </p>
           </div>
-          <button class="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50" type="button" :disabled="!ctrl.previewResult.value" title="Show detail list" @click="isDetailDialogOpen = true"><i class="pi pi-list" />Show detail</button>
+          <Button icon="pi pi-list" label="Show detail" severity="secondary" outlined size="small" :disabled="!ctrl.previewResult.value" title="Show detail list" @click="isDetailDialogOpen = true" />
         </div>
         <DataTable class="app-data-table min-h-0" empty-message="No data. Select a CSV file, then click Import." :row-class="(row: any) => row.kind === 'project' ? 'bg-emerald-50 font-bold' : 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="previewRows" @row-click="(e: any) => { if (e.data.kind === 'phase') onOpenDetail({ project_code: e.data.project.project_code, project_name: e.data.project.project_name, phase: e.data.phase }); }">
           <Column header="Project">

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import Button from "primevue/button";
 import Fieldset from "primevue/fieldset";
+import InputNumber from "primevue/inputnumber";
+import InputText from "primevue/inputtext";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
 import {
   skillCategories,
@@ -75,12 +78,11 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
           <span class="text-xs font-bold text-muted">Search Skills</span>
           <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
             <i class="pi pi-search shrink-0 text-muted" />
-            <input
+            <InputText
               class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
               placeholder="Name, tag, category, guidance"
-              type="search"
-              :value="ctrl.query.value"
-              @input="ctrl.query.value = ($event.target as HTMLInputElement).value"
+              :model-value="ctrl.query.value"
+              @update:model-value="ctrl.query.value = $event as string"
             />
           </span>
         </label>
@@ -97,51 +99,42 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
       </div>
 
       <div class="flex flex-wrap items-end justify-between gap-2 xl:justify-end">
-        <button
-          class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-          type="button"
-          title="Create skill"
-          @click="ctrl.createSkill()"
-        >
-          <i class="pi pi-plus" />
-          New
-        </button>
+        <Button icon="pi pi-plus" label="New" title="Create skill" @click="ctrl.createSkill()" />
       </div>
     </section>
 
     <!-- Category tabs + view mode -->
     <section class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap gap-2">
-        <button
+        <Button
           v-for="item in categoryOptions"
           :key="item"
+          :label="item"
           :class="[
-            'h-9 rounded-md border px-3 text-xs font-bold',
+            'h-9 text-xs',
             ctrl.category.value === item
               ? 'border-brand bg-emerald-50 text-brand'
-              : 'border-divider bg-panel text-secondary hover:bg-canvas',
+              : '',
           ]"
-          type="button"
+          :severity="ctrl.category.value === item ? undefined : 'secondary'"
+          :outlined="ctrl.category.value !== item"
+          size="small"
           @click="ctrl.category.value = item as SkillCategory | 'All'"
-        >
-          {{ item }}
-        </button>
+        />
       </div>
       <div class="grid h-9 grid-cols-2 gap-1 rounded-md border border-divider bg-panel p-1">
-        <button
+        <Button
+          icon="pi pi-list"
           :class="['flex h-7 items-center justify-center rounded px-2', ctrl.viewMode.value === 'list' ? 'bg-canvas' : '']"
-          type="button"
+          unstyled
           @click="ctrl.viewMode.value = 'list'"
-        >
-          <i class="pi pi-list" />
-        </button>
-        <button
+        />
+        <Button
+          icon="pi pi-th-large"
           :class="['flex h-7 items-center justify-center rounded px-2', ctrl.viewMode.value === 'grid' ? 'bg-canvas' : '']"
-          type="button"
+          unstyled
           @click="ctrl.viewMode.value = 'grid'"
-        >
-          <i class="pi pi-th-large" />
-        </button>
+        />
       </div>
     </section>
 
@@ -153,11 +146,11 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
       <section class="min-h-0 overflow-auto rounded-lg border border-divider bg-panel p-3 shadow-sm">
         <p v-if="ctrl.filteredSkills.value.length === 0" class="p-3 text-sm text-muted">No skills match the current filters.</p>
         <div v-else :class="ctrl.viewMode.value === 'grid' ? 'grid gap-3 2xl:grid-cols-2' : 'grid gap-2'">
-          <button
+          <Button
             v-for="skill in ctrl.filteredSkills.value"
             :key="skill.id"
             :class="skillCardClass(skill, ctrl.selectedSkillId.value === skill.id, ctrl.viewMode.value)"
-            type="button"
+            unstyled
             @click="ctrl.selectSkill(skill.id)"
           >
             <span class="min-w-0 flex-1">
@@ -181,7 +174,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
                 {{ skill.stars.toLocaleString("en-US") }}
               </span>
             </span>
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -190,24 +183,8 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
         <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
           <h3 class="font-bold">Skill Details</h3>
           <div class="flex items-center gap-2">
-            <button
-              class="flex h-9 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas"
-              type="button"
-              title="Reset draft"
-              @click="ctrl.resetDraft()"
-            >
-              <i class="pi pi-refresh" />
-              Reset
-            </button>
-            <button
-              class="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
-              type="button"
-              title="Save skill"
-              @click="ctrl.saveDraft()"
-            >
-              <i class="pi pi-save" />
-              Save
-            </button>
+            <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined size="small" title="Reset draft" @click="ctrl.resetDraft()" />
+            <Button icon="pi pi-save" label="Save" size="small" title="Save skill" @click="ctrl.saveDraft()" />
           </div>
         </div>
 
@@ -216,11 +193,11 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             <div class="grid gap-3 md:grid-cols-2">
               <label class="block min-w-0 md:col-span-2">
                 <span class="text-xs font-bold text-muted">Skill Name</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="mt-1 w-full"
                   placeholder="Skill name"
-                  :value="ctrl.draft.value.name"
-                  @input="ctrl.updateDraft('name', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.draft.value.name"
+                  @update:model-value="ctrl.updateDraft('name', $event as string)"
                 />
               </label>
               <label class="block min-w-0">
@@ -245,20 +222,20 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
               </label>
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Publisher</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="mt-1 w-full"
                   placeholder="Publisher"
-                  :value="ctrl.draft.value.publisher"
-                  @input="ctrl.updateDraft('publisher', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.draft.value.publisher"
+                  @update:model-value="ctrl.updateDraft('publisher', $event as string)"
                 />
               </label>
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Version</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="mt-1 w-full"
                   placeholder="0.1.0"
-                  :value="ctrl.draft.value.version"
-                  @input="ctrl.updateDraft('version', ($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.draft.value.version"
+                  @update:model-value="ctrl.updateDraft('version', $event as string)"
                 />
               </label>
               <label class="block min-w-0 md:col-span-2">
@@ -272,11 +249,11 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
               </label>
               <label class="block min-w-0 md:col-span-2">
                 <span class="text-xs font-bold text-muted">Tags</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                <InputText
+                  class="mt-1 w-full"
                   placeholder="browser, qa, frontend"
-                  :value="ctrl.draft.value.tags.join(', ')"
-                  @input="updateTags(($event.target as HTMLInputElement).value)"
+                  :model-value="ctrl.draft.value.tags.join(', ')"
+                  @update:model-value="updateTags($event as string)"
                 />
               </label>
             </div>
@@ -307,29 +284,32 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             <div class="grid gap-3 md:grid-cols-3">
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Downloads</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  inputmode="numeric"
-                  :value="String(ctrl.draft.value.downloads)"
-                  @input="ctrl.updateDraft('downloads', Math.max(0, Number(($event.target as HTMLInputElement).value) || 0))"
+                <InputNumber
+                  class="mt-1 w-full"
+                  :model-value="ctrl.draft.value.downloads"
+                  :min="0"
+                  :useGrouping="false"
+                  @update:model-value="ctrl.updateDraft('downloads', $event ?? 0)"
                 />
               </label>
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Stars</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  inputmode="numeric"
-                  :value="String(ctrl.draft.value.stars)"
-                  @input="ctrl.updateDraft('stars', Math.max(0, Number(($event.target as HTMLInputElement).value) || 0))"
+                <InputNumber
+                  class="mt-1 w-full"
+                  :model-value="ctrl.draft.value.stars"
+                  :min="0"
+                  :useGrouping="false"
+                  @update:model-value="ctrl.updateDraft('stars', $event ?? 0)"
                 />
               </label>
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Installs</span>
-                <input
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                  inputmode="numeric"
-                  :value="String(ctrl.draft.value.installs)"
-                  @input="ctrl.updateDraft('installs', Math.max(0, Number(($event.target as HTMLInputElement).value) || 0))"
+                <InputNumber
+                  class="mt-1 w-full"
+                  :model-value="ctrl.draft.value.installs"
+                  :min="0"
+                  :useGrouping="false"
+                  @update:model-value="ctrl.updateDraft('installs', $event ?? 0)"
                 />
               </label>
             </div>
@@ -339,30 +319,14 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
           <section class="mt-4 flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel">
             <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
               <h3 class="font-bold">Generated Markdown</h3>
-              <button
-                class="flex h-9 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas"
-                type="button"
-                title="Copy generated markdown"
-                @click="copyMarkdown()"
-              >
-                <i class="pi pi-copy" />
-                Copy
-              </button>
+              <Button icon="pi pi-copy" label="Copy" severity="secondary" outlined size="small" title="Copy generated markdown" @click="copyMarkdown()" />
             </div>
             <p v-if="copyMessage" class="border-b border-divider px-4 py-2 text-xs text-muted">{{ copyMessage }}</p>
             <pre class="max-h-72 overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-ink">{{ ctrl.generatedMarkdown.value }}</pre>
           </section>
 
           <div class="mt-4 flex justify-end">
-            <button
-              class="flex h-9 items-center gap-2 rounded-md border border-red-200 bg-panel px-3 text-sm font-bold text-red-700 hover:bg-red-50"
-              type="button"
-              title="Delete skill"
-              @click="confirmDelete"
-            >
-              <i class="pi pi-trash" />
-              Delete
-            </button>
+            <Button icon="pi pi-trash" label="Delete" severity="danger" outlined size="small" title="Delete skill" @click="confirmDelete" />
           </div>
         </div>
       </section>

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import Password from "primevue/password";
 import Dialog from "primevue/dialog";
+import InputNumber from "primevue/inputnumber";
 import { friendlyError } from "@/tauri/commands/_base";
 import { getDatabaseConfig, testDatabaseConfig } from "@/tauri/commands/database-config";
 import type { DatabaseStatus, SaveDatabaseConfigRequest } from "@/_/types/database-config";
@@ -161,21 +165,21 @@ function acknowledge() {
         <div class="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
           <label class="block">
             <span class="text-xs font-bold text-muted">Host <span class="text-red-500">*</span></span>
-            <input
+            <InputText
               v-model="form.host"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 w-full"
               placeholder="localhost"
               autocomplete="off"
             />
           </label>
           <label class="block">
             <span class="text-xs font-bold text-muted">Port <span class="text-red-500">*</span></span>
-            <input
-              v-model.number="form.port"
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              type="number"
-              min="1"
-              max="65535"
+            <InputNumber
+              v-model="form.port"
+              class="mt-1 w-full"
+              :min="1"
+              :max="65535"
+              :useGrouping="false"
               placeholder="5432"
             />
           </label>
@@ -183,9 +187,9 @@ function acknowledge() {
 
         <label class="block">
           <span class="text-xs font-bold text-muted">Database (dbname) <span class="text-red-500">*</span></span>
-          <input
+          <InputText
             v-model="form.dbname"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 w-full"
             placeholder="management_systems"
             autocomplete="off"
           />
@@ -193,9 +197,9 @@ function acknowledge() {
 
         <label class="block">
           <span class="text-xs font-bold text-muted">User</span>
-          <input
+          <InputText
             v-model="form.user"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 w-full"
             placeholder="postgres"
             autocomplete="off"
           />
@@ -203,64 +207,45 @@ function acknowledge() {
 
         <label class="block">
           <span class="text-xs font-bold text-muted">Password</span>
-          <input
+          <Password
             v-model="form.password"
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            type="password"
+            class="mt-1 w-full"
+            input-class="w-full"
             placeholder="••••••"
             autocomplete="off"
+            :feedback="false"
+            toggle-mask
           />
         </label>
 
         <div class="mt-2 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-60"
+          <Button
+            :icon="isTesting ? 'pi pi-spinner pi-spin' : undefined"
+            :label="isTesting ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'"
+            severity="secondary"
+            outlined
             :disabled="isTesting || isSaving"
             @click="runTest"
-          >
-            <svg
-              v-if="isTesting"
-              class="h-4 w-4 animate-spin"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-            </svg>
-            {{ isTesting ? "Đang kiểm tra..." : "Kiểm tra kết nối" }}
-          </button>
+          />
 
-          <button
+          <Button
+            :icon="isSaving ? 'pi pi-spinner pi-spin' : undefined"
+            :label="isSaving ? 'Đang lưu...' : 'Lưu cấu hình'"
             type="submit"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white shadow-card transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="isTesting || isSaving"
-          >
-            <svg
-              v-if="isSaving"
-              class="h-4 w-4 animate-spin"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-            >
-              <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-            </svg>
-            {{ isSaving ? "Đang lưu..." : "Lưu cấu hình" }}
-          </button>
+          />
         </div>
 
-        <button
+        <Button
           v-if="database.wantsReconfigure.value"
-          type="button"
-          class="mt-1 inline-flex items-center justify-center gap-1 self-center text-xs font-semibold text-muted hover:text-secondary disabled:cursor-not-allowed disabled:opacity-60"
+          icon="pi pi-arrow-left"
+          label="Quay lại"
+          text
+          size="small"
+          class="mt-1 self-center"
           :disabled="isTesting || isSaving"
           @click="database.cancelReconfigure()"
-        >
-          <i class="pi pi-arrow-left text-[10px]" />
-          Quay lại
-        </button>
+        />
       </form>
     </section>
 
@@ -290,13 +275,7 @@ function acknowledge() {
       <p class="text-sm text-secondary">{{ dialog?.text }}</p>
 
       <template #footer>
-        <button
-          type="button"
-          class="h-10 rounded-md bg-brand px-5 text-sm font-bold text-white hover:opacity-90"
-          @click="acknowledge"
-        >
-          OK
-        </button>
+        <Button label="OK" @click="acknowledge" />
       </template>
     </Dialog>
   </main>

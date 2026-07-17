@@ -5,6 +5,8 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 import { friendlyError } from "@/tauri/commands/_base";
 import { createProject, updateProject, getBacklogProjectByKey, getProjectDetail } from "@/tauri/commands/project";
 import { useToast } from "@/shared/composables/useToast";
@@ -150,7 +152,7 @@ function reloadBacklogProject() {
 <template>
   <section class="min-h-0 flex-1 overflow-auto rounded-lg border border-divider bg-panel p-4 shadow-sm">
     <div class="flex items-center justify-end gap-4">
-      <button class="flex h-9 items-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" type="button" :disabled="isSaving" @click="saveProject"><i :class="['pi', isSaving ? 'pi-spinner animate-spin' : 'pi-save']" />{{ isSaving ? 'Saving...' : 'Save' }}</button>
+      <Button :icon="isSaving ? 'pi pi-spinner pi-spin' : 'pi pi-save'" :label="isSaving ? 'Saving...' : 'Save'" size="small" :disabled="isSaving" @click="saveProject" />
     </div>
 
     <p v-if="isLoading" class="mt-4 text-sm text-muted">Loading project information...</p>
@@ -162,49 +164,49 @@ function reloadBacklogProject() {
         <div class="grid gap-3 md:grid-cols-2">
           <label>
             <span class="text-xs font-bold text-muted">Project ID</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none" placeholder="Auto generated" readonly :value="form.id ?? ''" />
+            <InputText class="mt-1 w-full" placeholder="Auto generated" readonly :model-value="String(form.id ?? '')" />
           </label>
           <label>
             <span class="text-xs font-bold text-muted">Project Code</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Project code" :value="form.code" @input="updateForm('code', ($event.target as HTMLInputElement).value)" />
+            <InputText class="mt-1 w-full" placeholder="Project code" :model-value="form.code" @update:model-value="updateForm('code', $event as string)" />
           </label>
           <label class="md:col-span-2">
             <span class="text-xs font-bold text-muted">Project Name</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Project name" :value="form.name" @input="updateForm('name', ($event.target as HTMLInputElement).value)" />
+            <InputText class="mt-1 w-full" placeholder="Project name" :model-value="form.name" @update:model-value="updateForm('name', $event as string)" />
           </label>
           <label class="md:col-span-2">
             <span class="text-xs font-bold text-muted">Client</span>
-            <input class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100" placeholder="Client name" :value="form.client" @input="updateForm('client', ($event.target as HTMLInputElement).value)" />
+            <InputText class="mt-1 w-full" placeholder="Client name" :model-value="form.client" @update:model-value="updateForm('client', $event as string)" />
           </label>
           <Fieldset class="rounded-lg border border-divider p-4 md:col-span-2 fieldset-nested" legend="Backlog" toggleable>
             <div class="grid gap-3 md:grid-cols-2">
               <div>
                 <span class="text-xs font-bold text-muted">Backlog Key</span>
                 <div class="group/key mt-1 flex rounded-md ring-emerald-100 focus-within:ring-2">
-                  <input
-                    class="h-10 min-w-0 flex-1 rounded-l-md border border-r-0 border-divider bg-panel px-3 text-sm text-ink outline-none group-hover/key:border-brand group-focus-within/key:border-brand"
+                  <InputText
+                    class="min-w-0 flex-1 !rounded-r-none"
                     placeholder="BACKLOG_KEY"
-                    :value="form.backlogKey"
-                    @input="updateForm('backlogKey', ($event.target as HTMLInputElement).value)"
+                    :model-value="form.backlogKey"
+                    @update:model-value="updateForm('backlogKey', $event as string)"
                   />
-                  <button
-                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-r-md border border-divider bg-canvas text-secondary group-hover/key:border-brand group-focus-within/key:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
-                    type="button"
+                  <Button
+                    class="!rounded-l-none"
+                    :icon="isBacklogLookupLoading ? 'pi pi-refresh pi-spin' : 'pi pi-refresh'"
+                    severity="secondary"
+                    outlined
                     title="Reload from Backlog API"
                     :disabled="isBacklogLookupLoading || !form.backlogKey.trim()"
                     @click="reloadBacklogProject"
-                  >
-                    <i :class="['pi pi-refresh', isBacklogLookupLoading ? 'animate-spin' : '']" />
-                  </button>
+                  />
                 </div>
               </div>
               <label>
                 <span class="text-xs font-bold text-muted">Backlog Code</span>
-                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-canvas px-3 text-sm text-muted outline-none" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :value="form.backlogCode" />
+                <InputText class="mt-1 w-full" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :model-value="form.backlogCode" />
               </label>
               <label class="md:col-span-2">
                 <span class="text-xs font-bold text-muted">Backlog Name</span>
-                <input class="mt-1 h-10 w-full rounded-md border border-divider bg-canvas px-3 text-sm text-muted outline-none" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :value="form.backlogName" />
+                <InputText class="mt-1 w-full" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :model-value="form.backlogName" />
               </label>
               <p v-if="backlogLookupError" class="text-sm text-red-600 md:col-span-2">{{ backlogLookupError }}</p>
             </div>
@@ -215,7 +217,7 @@ function reloadBacklogProject() {
       <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Members" toggleable>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h3 class="font-bold text-ink">Members</h3>
-          <button class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90" type="button" @click="isSearchHelpOpen = true"><i class="pi pi-plus" />Add member</button>
+          <Button icon="pi pi-plus" label="Add member" @click="isSearchHelpOpen = true" />
         </div>
         <div class="mt-4 overflow-auto rounded-lg border border-divider">
           <DataTable class="app-data-table" empty-message="No members selected." :table-style="{ minWidth: '560px' }" :value="members">
@@ -223,7 +225,7 @@ function reloadBacklogProject() {
             <Column field="name" header="Name" />
             <Column header="Action" body-class="text-center" header-class="w-20 text-center">
               <template #body="{ data }">
-                <button class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas" type="button" title="Remove member" @click="removeMember(data.username)"><i class="pi pi-trash" /></button>
+                <Button icon="pi pi-trash" severity="danger" text rounded size="small" title="Remove member" @click="removeMember(data.username)" />
               </template>
             </Column>
           </DataTable>
@@ -249,10 +251,7 @@ function reloadBacklogProject() {
       <div>
         <label>
           <span class="text-xs font-bold text-muted">Keyword</span>
-          <div class="mt-1 flex h-10 items-center rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-            <i class="pi pi-search shrink-0 text-muted" />
-            <input class="h-full min-w-0 flex-1 border-0 px-2 text-sm text-ink outline-none" placeholder="Search username or name" type="search" v-model="memberKeyword" />
-          </div>
+          <InputText class="mt-1 w-full" placeholder="Search username or name" v-model="memberKeyword" />
         </label>
         <div class="mt-4 max-h-[360px] overflow-auto rounded-lg border border-divider">
           <DataTable class="app-data-table" empty-message="No members match the search conditions." :table-style="{ minWidth: '520px' }" :value="filteredMembers">
@@ -260,7 +259,7 @@ function reloadBacklogProject() {
             <Column field="name" header="Name" />
             <Column header="Select" body-class="text-center" header-class="w-20 text-center">
               <template #body="{ data }">
-                <button class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white hover:opacity-90" type="button" title="Select member" @click="addMember(data)"><i class="pi pi-plus" /></button>
+                <Button icon="pi pi-plus" rounded size="small" title="Select member" @click="addMember(data)" />
               </template>
             </Column>
           </DataTable>

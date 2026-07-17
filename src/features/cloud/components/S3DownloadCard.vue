@@ -196,13 +196,13 @@ onMounted(() => {
     <!-- Header -->
     <div class="border-b border-surface-200 px-4 dark:border-surface-700">
       <div class="flex items-center justify-between gap-3">
-        <button class="flex flex-1 items-center gap-4 bg-transparent py-2" @click="toggle">
+        <Button class="flex flex-1 items-center gap-4 bg-transparent py-2" unstyled @click="toggle">
           <i :class="['pi text-xl text-orange-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
           <span class="text-lg font-bold text-surface-800 dark:text-surface-100">
             {{ awsStorage.nameAlias || awsStorage.name }}
             <span class="text-red-600">({{ items.length }})</span>
           </span>
-        </button>
+        </Button>
         <div class="flex items-center gap-2 py-2">
           <Button
             label="Tải lại"

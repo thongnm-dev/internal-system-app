@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import InputNumber from "primevue/inputnumber";
+import InputText from "primevue/inputtext";
 import { useGovernanceMenus } from "../composables/useGovernanceMenus";
 
 const ctrl = useGovernanceMenus();
@@ -36,12 +39,11 @@ function saveAndClose() {
         <span class="text-xs font-bold text-muted">Search</span>
         <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
           <i class="pi pi-search shrink-0 text-muted" />
-          <input
+          <InputText
             class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
             placeholder="Title, key, or path"
-            type="search"
-            :value="ctrl.searchQuery.value"
-            @input="ctrl.searchQuery.value = ($event.target as HTMLInputElement).value"
+            :model-value="ctrl.searchQuery.value"
+            @update:model-value="ctrl.searchQuery.value = $event as string"
           />
         </span>
       </label>
@@ -55,15 +57,7 @@ function saveAndClose() {
           <option v-for="g in ctrl.groups.value" :key="g" :value="g">{{ g }}</option>
         </select>
       </label>
-      <button
-        class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-        type="button"
-        title="Reset to defaults"
-        @click="ctrl.resetToDefault()"
-      >
-        <i class="pi pi-refresh" />
-        Reset
-      </button>
+      <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined title="Reset to defaults" @click="ctrl.resetToDefault()" />
     </section>
 
     <!-- Menu table -->
@@ -99,32 +93,20 @@ function saveAndClose() {
               </span>
             </td>
             <td class="px-4 py-2.5 text-center">
-              <button
-                type="button"
+              <Button
+                :icon="item.visible ? 'pi pi-eye' : 'pi pi-eye-slash'"
                 :title="item.visible ? 'Hide menu' : 'Show menu'"
+                text
+                rounded
+                size="small"
+                :class="item.visible ? 'text-brand' : 'text-muted'"
                 @click.stop="ctrl.toggleVisibility(item.key)"
-              >
-                <i :class="['pi', item.visible ? 'pi-eye text-brand' : 'pi-eye-slash text-muted']" />
-              </button>
+              />
             </td>
             <td class="px-4 py-2.5 text-center">
               <div class="flex items-center justify-center gap-1">
-                <button
-                  class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-canvas hover:text-ink"
-                  type="button"
-                  title="Move up"
-                  @click.stop="ctrl.moveUp(item.key)"
-                >
-                  <i class="pi pi-chevron-up text-xs" />
-                </button>
-                <button
-                  class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-canvas hover:text-ink"
-                  type="button"
-                  title="Move down"
-                  @click.stop="ctrl.moveDown(item.key)"
-                >
-                  <i class="pi pi-chevron-down text-xs" />
-                </button>
+                <Button icon="pi pi-chevron-up" text rounded size="small" title="Move up" @click.stop="ctrl.moveUp(item.key)" />
+                <Button icon="pi pi-chevron-down" text rounded size="small" title="Move down" @click.stop="ctrl.moveDown(item.key)" />
               </div>
             </td>
           </tr>
@@ -151,22 +133,22 @@ function saveAndClose() {
       <div v-if="ctrl.draft.value" class="space-y-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Title <span class="text-red-500">*</span></span>
-          <input
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            :value="ctrl.draft.value.title"
+          <InputText
+            class="mt-1 w-full"
+            :model-value="ctrl.draft.value.title"
             placeholder="Menu title"
             autofocus
-            @input="ctrl.updateDraft('title', ($event.target as HTMLInputElement).value)"
+            @update:model-value="ctrl.updateDraft('title', $event as string)"
           />
         </label>
 
         <label class="block">
           <span class="text-xs font-bold text-muted">Path</span>
-          <input
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            :value="ctrl.draft.value.path"
+          <InputText
+            class="mt-1 w-full"
+            :model-value="ctrl.draft.value.path"
             placeholder="/route-path"
-            @input="ctrl.updateDraft('path', ($event.target as HTMLInputElement).value)"
+            @update:model-value="ctrl.updateDraft('path', $event as string)"
           />
         </label>
 
@@ -175,71 +157,59 @@ function saveAndClose() {
             <span class="text-xs font-bold text-muted">Icon</span>
             <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
               <i :class="`pi ${ctrl.draft.value.icon} text-muted`" />
-              <input
+              <InputText
                 class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
-                :value="ctrl.draft.value.icon"
+                :model-value="ctrl.draft.value.icon"
                 placeholder="pi-home"
-                @input="ctrl.updateDraft('icon', ($event.target as HTMLInputElement).value)"
+                @update:model-value="ctrl.updateDraft('icon', $event as string)"
               />
             </div>
           </label>
 
           <label class="block">
             <span class="text-xs font-bold text-muted">Group</span>
-            <input
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              :value="ctrl.draft.value.group"
+            <InputText
+              class="mt-1 w-full"
+              :model-value="ctrl.draft.value.group"
               placeholder="— (none), Tools, Governance"
-              @input="ctrl.updateDraft('group', ($event.target as HTMLInputElement).value)"
+              @update:model-value="ctrl.updateDraft('group', $event as string)"
             />
           </label>
 
           <label class="block">
             <span class="text-xs font-bold text-muted">Order</span>
-            <input
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              type="number"
-              :value="ctrl.draft.value.order"
-              min="0"
-              @input="ctrl.updateDraft('order', Number(($event.target as HTMLInputElement).value) || 0)"
+            <InputNumber
+              class="mt-1 w-full"
+              :model-value="ctrl.draft.value.order"
+              :min="0"
+              :useGrouping="false"
+              @update:model-value="ctrl.updateDraft('order', $event ?? 0)"
             />
           </label>
 
           <label class="block">
             <span class="text-xs font-bold text-muted">Visible</span>
-            <button
-              type="button"
+            <Button
+              :icon="ctrl.draft.value.visible ? 'pi pi-eye' : 'pi pi-eye-slash'"
+              :label="ctrl.draft.value.visible ? 'Shown in sidebar' : 'Hidden from sidebar'"
               :class="[
-                'mt-1 flex h-10 w-full items-center gap-2 rounded-md border px-3 text-sm font-semibold transition',
+                'mt-1 w-full',
                 ctrl.draft.value.visible
                   ? 'border-brand bg-emerald-50 text-brand'
-                  : 'border-divider bg-panel text-secondary hover:border-brand',
+                  : '',
               ]"
+              :severity="ctrl.draft.value.visible ? undefined : 'secondary'"
+              :outlined="!ctrl.draft.value.visible"
               @click="ctrl.updateDraft('visible', !ctrl.draft.value.visible)"
-            >
-              <i :class="['pi', ctrl.draft.value.visible ? 'pi-eye' : 'pi-eye-slash']" />
-              {{ ctrl.draft.value.visible ? "Shown in sidebar" : "Hidden from sidebar" }}
-            </button>
+            />
           </label>
         </div>
       </div>
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="closeDialog"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-            type="button"
-            @click="saveAndClose"
-          >
-            Save
-          </button>
+          <Button label="Cancel" severity="secondary" outlined @click="closeDialog" />
+          <Button label="Save" @click="saveAndClose" />
         </div>
       </template>
     </Dialog>

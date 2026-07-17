@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from "vue";
+import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import InputText from "primevue/inputtext";
 import { useS3Browser } from "../composables/useS3Browser";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
@@ -323,14 +326,17 @@ function contextCopyKey() {
         <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto text-sm">
           <template v-for="(crumb, idx) in ctrl.breadcrumbs.value" :key="crumb.prefix">
             <i v-if="idx > 0" class="pi pi-chevron-right text-[10px] text-muted" />
-            <button
-              class="whitespace-nowrap rounded px-1.5 py-0.5 font-semibold hover:bg-canvas"
-              :class="idx === ctrl.breadcrumbs.value.length - 1 ? 'text-brand' : 'text-secondary'"
+            <Button
+              :class="[
+                'whitespace-nowrap rounded px-1.5 py-0.5 font-semibold hover:bg-canvas',
+                idx === ctrl.breadcrumbs.value.length - 1 ? 'text-brand' : 'text-secondary',
+              ]"
+              unstyled
               @click="ctrl.navigateToBreadcrumb(crumb.prefix)"
             >
               <i v-if="idx === 0" class="pi pi-server mr-1" />
               {{ crumb.label }}
-            </button>
+            </Button>
           </template>
         </div>
         <!-- Actions -->
@@ -340,85 +346,50 @@ function contextCopyKey() {
             <span v-if="ctrl.selectedCount.value > 0" class="mr-1 text-xs font-bold text-brand">
               {{ ctrl.selectedCount.value }} selected
             </span>
-            <button
-              class="flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            <Button
+              :icon="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'"
+              label="Upload"
+              size="small"
               :disabled="isOperating"
               @click="handleUpload()"
-            >
-              <i :class="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'" />
-              Upload
-            </button>
-            <button
-              class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="isOperating"
-              @click="openUploadFolderDialog()"
-            >
-              <i class="pi pi-folder-open" /> Upload Folder
-            </button>
-            <button
-              class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="isOperating"
-              @click="openCreateFolder()"
-            >
-              <i class="pi pi-folder-plus" /> New Folder
-            </button>
-            <button
+            />
+            <Button icon="pi pi-folder-open" label="Upload Folder" severity="secondary" outlined size="small" :disabled="isOperating" @click="openUploadFolderDialog()" />
+            <Button icon="pi pi-folder-plus" label="New Folder" severity="secondary" outlined size="small" :disabled="isOperating" @click="openCreateFolder()" />
+            <Button
               v-if="ctrl.selectedCount.value > 0"
-              class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+              :icon="ctrl.isDownloading.value ? 'pi pi-spinner pi-spin' : 'pi pi-download'"
+              label="Download"
+              severity="secondary"
+              outlined
+              size="small"
               :disabled="isOperating"
               @click="handleDownloadSelected()"
-            >
-              <i :class="ctrl.isDownloading.value ? 'pi pi-spinner pi-spin' : 'pi pi-download'" />
-              Download
-            </button>
+            />
             <div v-if="ctrl.selectedCount.value > 0" class="relative">
-              <button
-                class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="isOperating"
-                @click="toggleMoreActions()"
-              >
-                <i class="pi pi-ellipsis-v" />
-                Actions
-                <i class="pi pi-chevron-down text-[10px]" />
-              </button>
+              <Button icon="pi pi-ellipsis-v" label="Actions" severity="secondary" outlined size="small" :disabled="isOperating" @click="toggleMoreActions()" />
               <div
                 v-if="showMoreActions"
                 class="absolute right-0 top-full z-50 mt-1 min-w-40 overflow-hidden rounded-md border border-divider bg-panel py-1 shadow-xl"
                 @click.stop
               >
-                <button
-                  class="flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-semibold text-secondary hover:bg-canvas"
-                  @click="openMoveDialog()"
-                >
-                  <i class="pi pi-arrow-right-arrow-left" /> Move
-                </button>
+                <Button icon="pi pi-arrow-right-arrow-left" label="Move" text size="small" class="w-full justify-start" @click="openMoveDialog()" />
                 <div class="my-0.5 border-t border-divider" />
-                <button
-                  class="flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-semibold text-red-600 hover:bg-canvas"
-                  @click="closeMoreActions(); confirmDeleteSelected()"
-                >
-                  <i class="pi pi-trash" /> Delete
-                </button>
+                <Button icon="pi pi-trash" label="Delete" text severity="danger" size="small" class="w-full justify-start" @click="closeMoreActions(); confirmDeleteSelected()" />
               </div>
             </div>
-            <button
-              class="flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="isOperating"
-              @click="ctrl.refresh()"
-            >
-              <i :class="ctrl.isLoading.value ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" />
-            </button>
+            <Button :icon="ctrl.isLoading.value ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" severity="secondary" outlined size="small" :disabled="isOperating" @click="ctrl.refresh()" />
           </template>
           <!-- Disconnected: show test connection button -->
-          <button
+          <Button
             v-else
-            class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+            :icon="ctrl.isTesting.value ? 'pi pi-spinner pi-spin' : 'pi pi-link'"
+            label="Kiểm tra kết nối"
+            severity="secondary"
+            outlined
+            size="small"
             :disabled="ctrl.isTesting.value"
             @click="ctrl.connect()"
-          >
-            <i :class="ctrl.isTesting.value ? 'pi pi-spinner pi-spin' : 'pi pi-link'" />
-            Kiểm tra kết nối
-          </button>
+          />
         </div>
       </div>
 
@@ -434,20 +405,18 @@ function contextCopyKey() {
       >
         <Column header="" style="width: 40px" :sortable="false">
           <template #header>
-            <input
-              type="checkbox"
-              :checked="ctrl.allSelected.value"
+            <Checkbox
+              :model-value="ctrl.allSelected.value"
               :indeterminate="ctrl.selectedCount.value > 0 && !ctrl.allSelected.value"
-              class="accent-brand"
+              binary
               @change="ctrl.toggleSelectAll()"
               @click.stop
             />
           </template>
           <template #body="{ data }">
-            <input
-              type="checkbox"
-              :checked="ctrl.selectedKeys.value.has(data.key)"
-              class="accent-brand"
+            <Checkbox
+              :model-value="ctrl.selectedKeys.value.has(data.key)"
+              binary
               @change="ctrl.toggleSelect(data.key)"
               @click.stop
             />
@@ -478,20 +447,8 @@ function contextCopyKey() {
         <Column header="" :sortable="false" style="width: 80px">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <button
-                class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-canvas hover:text-ink"
-                title="Download"
-                @click.stop="ctrl.downloadSingle(data.key)"
-              >
-                <i class="pi pi-download text-xs" />
-              </button>
-              <button
-                class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-canvas hover:text-red-600"
-                title="Delete"
-                @click.stop="confirmDeleteSingle(data)"
-              >
-                <i class="pi pi-trash text-xs" />
-              </button>
+              <Button icon="pi pi-download" severity="secondary" text rounded size="small" title="Download" @click.stop="ctrl.downloadSingle(data.key)" />
+              <Button icon="pi pi-trash" severity="danger" text rounded size="small" title="Delete" @click.stop="confirmDeleteSingle(data)" />
             </div>
           </template>
         </Column>
@@ -506,25 +463,10 @@ function contextCopyKey() {
       @click.stop
       @contextmenu.prevent
     >
-      <button
-        class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas"
-        @click="contextDownload()"
-      >
-        <i class="pi pi-download" /> Download
-      </button>
-      <button
-        class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-secondary hover:bg-canvas"
-        @click="contextCopyKey()"
-      >
-        <i class="pi pi-copy" /> Copy Key
-      </button>
+      <Button icon="pi pi-download" label="Download" text size="small" class="w-full justify-start" @click="contextDownload()" />
+      <Button icon="pi pi-copy" label="Copy Key" text size="small" class="w-full justify-start" @click="contextCopyKey()" />
       <div class="my-1 border-t border-divider" />
-      <button
-        class="flex h-10 w-full items-center gap-2 rounded-none px-3 text-left text-sm font-semibold text-red-600 hover:bg-canvas"
-        @click="contextDelete()"
-      >
-        <i class="pi pi-trash" /> Delete
-      </button>
+      <Button icon="pi pi-trash" label="Delete" text severity="danger" size="small" class="w-full justify-start" @click="contextDelete()" />
     </div>
 
     <!-- Create Folder Dialog -->
@@ -540,28 +482,17 @@ function contextCopyKey() {
       </template>
       <label class="block">
         <span class="text-xs font-bold text-muted">Folder Name</span>
-        <input
+        <InputText
           v-model="newFolderName"
-          class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+          class="mt-1 w-full"
           placeholder="new-folder"
           @keyup.enter="submitCreateFolder()"
         />
       </label>
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            @click="showCreateFolder = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="!newFolderName.trim()"
-            @click="submitCreateFolder()"
-          >
-            Create
-          </button>
+          <Button label="Cancel" severity="secondary" outlined @click="showCreateFolder = false" />
+          <Button label="Create" :disabled="!newFolderName.trim()" @click="submitCreateFolder()" />
         </div>
       </template>
     </Dialog>
@@ -582,18 +513,8 @@ function contextCopyKey() {
       </p>
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            @click="confirmDeleteTarget = null"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-red-600 px-4 text-sm font-bold text-white hover:opacity-90"
-            @click="executeDelete()"
-          >
-            Delete
-          </button>
+          <Button label="Cancel" severity="secondary" outlined @click="confirmDeleteTarget = null" />
+          <Button label="Delete" severity="danger" @click="executeDelete()" />
         </div>
       </template>
     </Dialog>
@@ -619,12 +540,7 @@ function contextCopyKey() {
         <i class="pi pi-cloud-upload text-4xl text-muted" />
         <p class="text-sm font-semibold text-secondary">Kéo thả thư mục vào đây</p>
         <span class="text-xs text-muted">hoặc</span>
-        <button
-          class="h-8 rounded-md border border-divider bg-panel px-4 text-xs font-bold text-secondary hover:bg-canvas"
-          @click="browseFolder()"
-        >
-          Chọn thư mục
-        </button>
+        <Button icon="pi pi-folder-open" label="Chọn thư mục" severity="secondary" outlined size="small" @click="browseFolder()" />
       </div>
 
       <!-- Folder selected: show preview -->
@@ -632,13 +548,7 @@ function contextCopyKey() {
         <div class="flex items-center gap-2 rounded-md bg-canvas px-3 py-2">
           <i class="pi pi-folder text-amber-500" />
           <span class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{{ folderDisplayName }}</span>
-          <button
-            v-if="!ctrl.isUploading.value"
-            class="flex h-6 w-6 items-center justify-center rounded text-muted hover:text-ink"
-            @click="clearFolder()"
-          >
-            <i class="pi pi-times text-xs" />
-          </button>
+          <Button v-if="!ctrl.isUploading.value" icon="pi pi-times" text rounded size="small" @click="clearFolder()" />
         </div>
 
         <!-- Scanning spinner -->
@@ -668,21 +578,13 @@ function contextCopyKey() {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            :disabled="ctrl.isUploading.value"
-            @click="closeUploadFolderDialog()"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          <Button label="Cancel" severity="secondary" outlined :disabled="ctrl.isUploading.value" @click="closeUploadFolderDialog()" />
+          <Button
+            :icon="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : undefined"
+            label="Upload"
             :disabled="!folderPath || scannedFiles.length === 0 || ctrl.isUploading.value || isScanning"
             @click="executeUploadFolder()"
-          >
-            <i v-if="ctrl.isUploading.value" class="pi pi-spinner pi-spin mr-1" />
-            Upload
-          </button>
+          />
         </div>
       </template>
     </Dialog>
@@ -710,10 +612,9 @@ function contextCopyKey() {
               :key="key"
               class="flex items-center gap-2 border-b border-divider px-3 py-1.5 last:border-b-0"
             >
-              <input
-                type="checkbox"
-                :checked="moveKeys.has(key)"
-                class="accent-brand"
+              <Checkbox
+                :model-value="moveKeys.has(key)"
+                binary
                 @change="toggleMoveKey(key)"
               />
               <i :class="key.endsWith('/') ? 'pi pi-folder text-amber-500 text-xs' : 'pi pi-file text-muted text-xs'" />
@@ -731,14 +632,17 @@ function contextCopyKey() {
           <div class="mt-1 flex items-center gap-1 overflow-x-auto text-xs">
             <template v-for="(crumb, idx) in moveBreadcrumbs" :key="crumb.prefix">
               <i v-if="idx > 0" class="pi pi-chevron-right text-[8px] text-muted" />
-              <button
-                class="whitespace-nowrap rounded px-1.5 py-0.5 font-semibold hover:bg-canvas"
-                :class="idx === moveBreadcrumbs.length - 1 ? 'text-brand' : 'text-secondary'"
+              <Button
+                :class="[
+                  'whitespace-nowrap rounded px-1.5 py-0.5 font-semibold hover:bg-canvas',
+                  idx === moveBreadcrumbs.length - 1 ? 'text-brand' : 'text-secondary',
+                ]"
+                unstyled
                 @click="navigateMoveFolder(crumb.prefix)"
               >
                 <i v-if="idx === 0" class="pi pi-server mr-0.5" />
                 {{ crumb.label }}
-              </button>
+              </Button>
             </template>
           </div>
           <!-- Folder list -->
@@ -751,16 +655,17 @@ function contextCopyKey() {
               No subfolders
             </div>
             <template v-else>
-              <button
+              <Button
                 v-for="folder in moveBrowseFolders"
                 :key="folder.key"
                 class="flex h-9 w-full items-center gap-2 border-b border-divider px-3 text-left last:border-b-0 hover:bg-canvas"
+                unstyled
                 @click="navigateMoveFolder(folder.key)"
               >
                 <i class="pi pi-folder text-amber-500" />
                 <span class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{{ folder.displayName }}</span>
                 <i class="pi pi-chevron-right text-[10px] text-muted" />
-              </button>
+              </Button>
             </template>
           </div>
         </div>
@@ -768,21 +673,13 @@ function contextCopyKey() {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            :disabled="ctrl.isMoving.value"
-            @click="closeMoveDialog()"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          <Button label="Cancel" severity="secondary" outlined :disabled="ctrl.isMoving.value" @click="closeMoveDialog()" />
+          <Button
+            :icon="ctrl.isMoving.value ? 'pi pi-spinner pi-spin' : undefined"
+            label="Move"
             :disabled="moveKeys.size === 0 || ctrl.isMoving.value"
             @click="executeMove()"
-          >
-            <i v-if="ctrl.isMoving.value" class="pi pi-spinner pi-spin mr-1" />
-            Move
-          </button>
+          />
         </div>
       </template>
     </Dialog>
@@ -800,12 +697,7 @@ function contextCopyKey() {
         <span class="text-sm text-secondary">{{ ctrl.offlineMessage }}</span>
       </div>
       <template #footer>
-        <button
-          class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-          @click="ctrl.dismissOfflineDialog()"
-        >
-          Đóng
-        </button>
+        <Button label="Đóng" @click="ctrl.dismissOfflineDialog()" />
       </template>
     </Dialog>
   </section>

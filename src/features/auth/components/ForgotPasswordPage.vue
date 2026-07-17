@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { RouterLink } from "vue-router";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
 
 const email = ref("");
 const submitted = ref(false);
@@ -36,7 +38,7 @@ function submitForgotPassword() {
             <span class="text-xs font-bold text-muted">Email</span>
             <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
               <i class="pi pi-envelope shrink-0 text-muted" />
-              <input
+              <InputText
                 v-model="email"
                 class="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none"
                 autocomplete="email"
@@ -54,13 +56,12 @@ function submitForgotPassword() {
             {{ error }}
           </p>
 
-          <button
-            class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-3 text-sm font-bold text-white hover:opacity-90"
+          <Button
+            icon="pi pi-send"
+            label="Gửi yêu cầu"
+            class="w-full"
             type="submit"
-          >
-            <i class="pi pi-send" />
-            Gửi yêu cầu
-          </button>
+          />
         </form>
       </template>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import Button from "primevue/button";
 import Select from "primevue/select";
 import { useAiChat, type ProviderId } from "../composables/useAiChat";
 
@@ -101,23 +102,9 @@ function formatDate(ts: number) {
       :style="{ width: sidebarWidth + 'px' }"
     >
       <div class="flex items-center gap-2 border-b border-divider p-3">
-        <button
-          class="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-ink"
-          type="button"
-          title="Collapse history"
-          @click="toggleSidebar"
-        >
-          <i class="pi pi-angle-double-left text-sm" />
-        </button>
+        <Button icon="pi pi-angle-double-left" text rounded size="small" title="Collapse history" @click="toggleSidebar" />
         <span class="text-sm font-semibold text-ink">Chat history</span>
-        <button
-          class="ml-auto flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white hover:opacity-90"
-          type="button"
-          title="New chat"
-          @click="createSession"
-        >
-          <i class="pi pi-plus text-xs" />
-        </button>
+        <Button icon="pi pi-plus" size="small" class="ml-auto" title="New chat" @click="createSession" />
       </div>
 
       <div class="flex-1 space-y-1 overflow-auto p-2">
@@ -125,12 +112,12 @@ function formatDate(ts: number) {
           No chats yet. Start a new conversation.
         </p>
 
-        <button
+        <Button
           v-for="s in sessions"
           :key="s.id"
-          type="button"
           class="group flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors"
           :class="s.id === activeId ? 'bg-brand/10 text-brand' : 'text-secondary hover:bg-canvas'"
+          unstyled
           @click="openSession(s.id)"
         >
           <i class="pi pi-comment shrink-0 text-xs" />
@@ -143,7 +130,7 @@ function formatDate(ts: number) {
             title="Delete chat"
             @click.stop="deleteSession(s.id)"
           />
-        </button>
+        </Button>
       </div>
     </aside>
 
@@ -160,15 +147,16 @@ function formatDate(ts: number) {
     <!-- Chat panel -->
     <div class="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-divider bg-panel shadow-sm">
       <!-- Toggle to expand history when collapsed -->
-      <button
+      <Button
         v-if="sidebarCollapsed"
-        class="absolute left-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-muted shadow-sm hover:bg-canvas hover:text-ink"
-        type="button"
+        icon="pi pi-angle-double-right"
+        severity="secondary"
+        outlined
+        size="small"
+        class="absolute left-3 top-3 z-10"
         title="Show history"
         @click="toggleSidebar"
-      >
-        <i class="pi pi-angle-double-right text-sm" />
-      </button>
+      />
 
       <!-- Messages -->
       <div ref="scrollRef" class="flex-1 space-y-4 overflow-auto p-4">
@@ -249,14 +237,7 @@ function formatDate(ts: number) {
               @update:model-value="selectModel"
             />
 
-            <button
-              class="ml-auto flex h-9 shrink-0 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
-              type="button"
-              :disabled="!canSend"
-              @click="send"
-            >
-              <i class="pi pi-send" />Send
-            </button>
+            <Button icon="pi pi-send" label="Send" size="small" class="ml-auto" :disabled="!canSend" @click="send" />
           </div>
         </div>
       </div>

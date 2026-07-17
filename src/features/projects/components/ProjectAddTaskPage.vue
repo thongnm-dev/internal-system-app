@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Checkbox from "primevue/checkbox";
@@ -384,15 +385,12 @@ async function importSelected() {
           {{ ctrl.projectLabel.value }}
         </p>
       </div>
-        <button
-          class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
+        <Button
+          icon="pi pi-check"
+          :label="`Import ${selectedCount} task${selectedCount !== 1 ? 's' : ''}`"
           :disabled="selectedCount === 0"
           @click="importSelected"
-        >
-          <i class="pi pi-check" />
-          Import {{ selectedCount }} task{{ selectedCount !== 1 ? 's' : '' }}
-        </button>
+        />
     </section>
 
     <!-- File upload area -->
@@ -405,22 +403,8 @@ async function importSelected() {
           class="hidden"
           @change="handleFileChange"
         />
-        <button
-          class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
-          type="button"
-          @click="triggerFileInput"
-        >
-          <i class="pi pi-upload" />
-          Choose CSV file
-        </button>
-        <button
-          class="flex h-10 items-center gap-2 rounded-md border border-brand bg-transparent px-4 text-sm font-bold text-brand hover:bg-brand/10"
-          type="button"
-          @click="openBacklogDialog"
-        >
-          <i class="pi pi-list-check" />
-          Import from Backlog
-        </button>
+        <Button icon="pi pi-upload" label="Choose CSV file" @click="triggerFileInput" />
+        <Button icon="pi pi-list-check" label="Import from Backlog" outlined @click="openBacklogDialog" />
         <span class="text-sm text-muted">
           CSV columns: <code class="rounded bg-canvas px-1 text-xs">short name</code> (required),
           <code class="rounded bg-canvas px-1 text-xs">description</code>,
@@ -521,33 +505,33 @@ async function importSelected() {
             <div class="block min-w-0">
               <span class="text-xs font-bold text-muted">Status</span>
               <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-divider bg-panel p-1 text-sm leading-none">
-                <button
+                <Button
                   :class="[
                     'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
                     blSelectedStatuses.length === 0 && !blNotClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                   ]"
-                  type="button"
+                  unstyled
                   @click="blSelectedStatuses = []; blNotClosed = false"
-                >All</button>
-                <button
+                >All</Button>
+                <Button
                   v-for="s in blStatusOptions"
                   :key="s.id"
                   :class="[
                     'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
                     !blNotClosed && blSelectedStatuses.includes(s.id) ? 'bg-brand text-white' : 'hover:bg-canvas',
                   ]"
-                  type="button"
+                  unstyled
                   @click="toggleBlStatus(s.id)"
-                >{{ s.name }}</button>
-                <button
+                >{{ s.name }}</Button>
+                <Button
                   :class="[
                     'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
                     blNotClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                   ]"
-                  type="button"
+                  unstyled
                   :disabled="blStatusOptions.length === 0"
                   @click="selectBlNotClosed()"
-                >Not Closed</button>
+                >Not Closed</Button>
               </div>
             </div>
 
@@ -584,15 +568,13 @@ async function importSelected() {
             </div>
 
             <div class="flex items-center justify-end">
-              <button
-                class="flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                type="button"
+              <Button
+                :icon="backlogSearching ? 'pi pi-spinner pi-spin' : 'pi pi-search'"
+                :label="backlogSearching ? 'Searching...' : 'Search'"
+                size="small"
                 :disabled="backlogSearching"
                 @click="searchBacklog()"
-              >
-                <i :class="backlogSearching ? 'pi pi-spinner pi-spin' : 'pi pi-search'" />
-                {{ backlogSearching ? 'Searching...' : 'Search' }}
-              </button>
+              />
             </div>
           </div>
         </div>
@@ -650,22 +632,13 @@ async function importSelected() {
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            @click="backlogDialogVisible = false"
-          >
-            Cancel
-          </button>
-          <button
-            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
+          <Button label="Cancel" severity="secondary" outlined @click="backlogDialogVisible = false" />
+          <Button
+            icon="pi pi-check"
+            :label="`Select ${backlogSelectedCount} task${backlogSelectedCount !== 1 ? 's' : ''}`"
             :disabled="backlogSelectedCount === 0"
             @click="confirmBacklogSelection"
-          >
-            <i class="pi pi-check" />
-            Select {{ backlogSelectedCount }} task{{ backlogSelectedCount !== 1 ? 's' : '' }}
-          </button>
+          />
         </div>
       </template>
     </Dialog>

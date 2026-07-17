@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Button from "primevue/button";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 
 const database = useDatabaseStatus();
@@ -36,34 +37,21 @@ const database = useDatabaseStatus();
       </div>
 
       <div class="flex items-center gap-2">
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-divider bg-panel px-5 py-2.5 text-sm font-semibold text-secondary transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-60"
+        <Button
+          icon="pi pi-cog"
+          label="Cấu hình lại"
+          severity="secondary"
+          outlined
           :disabled="database.isChecking.value"
           @click="database.requestReconfigure()"
-        >
-          <i class="pi pi-cog" />
-          Cấu hình lại
-        </button>
+        />
 
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        <Button
+          :icon="database.isChecking.value ? 'pi pi-spinner pi-spin' : undefined"
+          :label="database.isChecking.value ? 'Đang kiểm tra...' : 'Thử lại'"
           :disabled="database.isChecking.value"
           @click="database.check()"
-        >
-          <svg
-            v-if="database.isChecking.value"
-            class="h-4 w-4 animate-spin"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" d="M12 3a9 9 0 1 0 9 9" />
-          </svg>
-          {{ database.isChecking.value ? "Đang kiểm tra..." : "Thử lại" }}
-        </button>
+        />
       </div>
     </section>
   </main>

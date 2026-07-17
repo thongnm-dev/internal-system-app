@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, nextTick } from "vue";
+import { onMounted, onUnmounted, ref, computed, nextTick, type ComponentPublicInstance } from "vue";
+import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import InputText from "primevue/inputtext";
 import { useExploreFaster } from "../composables/useExploreFaster";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
 const ctrl = useExploreFaster();
 const pathInput = ref("");
-const searchInput = ref<HTMLInputElement | null>(null);
-const pathInputEl = ref<HTMLInputElement | null>(null);
+const searchInput = ref<ComponentPublicInstance | null>(null);
+const pathInputEl = ref<ComponentPublicInstance | null>(null);
 const isEditingPath = ref(false);
 
 function startEditPath() {
   pathInput.value = ctrl.currentPath.value;
   isEditingPath.value = true;
   nextTick(() => {
-    pathInputEl.value?.focus();
-    pathInputEl.value?.select();
+    (pathInputEl.value?.$el as HTMLInputElement)?.focus();
+    (pathInputEl.value?.$el as HTMLInputElement)?.select();
   });
 }
 
@@ -208,18 +211,18 @@ async function executeDelete() {
 // --- Inline rename ---
 const renamingPath = ref("");
 const renameValue = ref("");
-const renameInputEl = ref<HTMLInputElement | null>(null);
+const renameInputEl = ref<ComponentPublicInstance | null>(null);
 
 function startRename(entry: FileEntry) {
   renamingPath.value = entry.path;
   renameValue.value = entry.name;
   nextTick(() => {
-    renameInputEl.value?.focus();
+    (renameInputEl.value?.$el as HTMLInputElement)?.focus();
     const dotIdx = entry.name.lastIndexOf(".");
     if (!entry.is_dir && dotIdx > 0) {
-      renameInputEl.value?.setSelectionRange(0, dotIdx);
+      (renameInputEl.value?.$el as HTMLInputElement)?.setSelectionRange(0, dotIdx);
     } else {
-      renameInputEl.value?.select();
+      (renameInputEl.value?.$el as HTMLInputElement)?.select();
     }
   });
 }
@@ -250,17 +253,17 @@ function handleRenameKeydown(e: KeyboardEvent) {
 // --- Inline new file/folder ---
 const newEntryMode = ref<"file" | "folder" | "">("");
 const newEntryName = ref("");
-const newEntryInputEl = ref<HTMLInputElement | null>(null);
+const newEntryInputEl = ref<ComponentPublicInstance | null>(null);
 
 function startNewEntry(mode: "file" | "folder") {
   newEntryMode.value = mode;
   newEntryName.value = mode === "file" ? "New File.txt" : "New Folder";
   nextTick(() => {
-    newEntryInputEl.value?.focus();
+    (newEntryInputEl.value?.$el as HTMLInputElement)?.focus();
     if (mode === "file") {
-      newEntryInputEl.value?.setSelectionRange(0, 8);
+      (newEntryInputEl.value?.$el as HTMLInputElement)?.setSelectionRange(0, 8);
     } else {
-      newEntryInputEl.value?.select();
+      (newEntryInputEl.value?.$el as HTMLInputElement)?.select();
     }
   });
 }
@@ -462,14 +465,15 @@ onMounted(async () => {
 
 
 function onSearchInput() {
-  ctrl.searchQuery.value = (searchInput.value?.value ?? "").toString();
+  ctrl.searchQuery.value = ((searchInput.value?.$el as HTMLInputElement)?.value ?? "").toString();
   ctrl.triggerSearch();
 }
 
 function onSearchKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     ctrl.clearSearch();
-    if (searchInput.value) searchInput.value.value = "";
+    const el = searchInput.value?.$el as HTMLInputElement;
+    if (el) el.value = "";
   }
 }
 
@@ -545,43 +549,17 @@ function parentPath(fullPath: string): string {
     <!-- Navigation bar -->
     <div class="flex items-center gap-2 rounded-lg border border-divider bg-panel px-3 py-2 shadow-sm">
       <!-- Nav buttons -->
-      <button
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary hover:bg-canvas disabled:opacity-40 disabled:hover:bg-transparent"
-        :disabled="!ctrl.canGoBack.value"
-        title="Back"
-        @click="handleGoBack"
-      >
-        <i class="pi pi-arrow-left text-sm" />
-      </button>
-      <button
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary hover:bg-canvas disabled:opacity-40 disabled:hover:bg-transparent"
-        :disabled="!ctrl.canGoForward.value"
-        title="Forward"
-        @click="handleGoForward"
-      >
-        <i class="pi pi-arrow-right text-sm" />
-      </button>
-      <button
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary hover:bg-canvas"
-        title="Up"
-        @click="handleGoUp"
-      >
-        <i class="pi pi-arrow-up text-sm" />
-      </button>
-      <button
-        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary hover:bg-canvas"
-        title="Refresh"
-        @click="handleRefresh"
-      >
-        <i :class="ctrl.isLoading.value ? 'pi pi-spinner pi-spin text-sm' : 'pi pi-refresh text-sm'" />
-      </button>
+      <Button icon="pi pi-arrow-left" severity="secondary" text size="small" :disabled="!ctrl.canGoBack.value" title="Back" @click="handleGoBack" />
+      <Button icon="pi pi-arrow-right" severity="secondary" text size="small" :disabled="!ctrl.canGoForward.value" title="Forward" @click="handleGoForward" />
+      <Button icon="pi pi-arrow-up" severity="secondary" text size="small" title="Up" @click="handleGoUp" />
+      <Button :icon="ctrl.isLoading.value ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" severity="secondary" text size="small" title="Refresh" @click="handleRefresh" />
 
       <!-- Path bar: breadcrumb / edit mode -->
       <div class="relative min-w-0 flex-1">
         <!-- Edit mode -->
         <div v-if="isEditingPath" class="relative">
           <i class="pi pi-folder pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted" />
-          <input
+          <InputText
             ref="pathInputEl"
             v-model="pathInput"
             class="h-9 w-full rounded-md border border-brand bg-canvas pl-8 pr-3 text-sm outline-none ring-2 ring-emerald-100"
@@ -598,14 +576,17 @@ function parentPath(fullPath: string): string {
         >
           <template v-for="(crumb, idx) in ctrl.breadcrumbs.value" :key="crumb.path">
             <i v-if="idx > 0" class="pi pi-chevron-right shrink-0 text-[8px] text-muted" />
-            <button
-              class="shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 transition-colors hover:bg-brand/10 hover:text-brand"
-              :class="idx === ctrl.breadcrumbs.value.length - 1 ? 'font-semibold text-brand' : 'text-secondary'"
+            <Button
+              :class="[
+                'shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 transition-colors hover:bg-brand/10 hover:text-brand',
+                idx === ctrl.breadcrumbs.value.length - 1 ? 'font-semibold text-brand' : 'text-secondary',
+              ]"
+              unstyled
               @click.stop="handleBreadcrumbClick(crumb.path)"
             >
               <i v-if="idx === 0" class="pi pi-desktop mr-1 text-xs" />
               {{ crumb.label }}
-            </button>
+            </Button>
           </template>
         </div>
       </div>
@@ -613,20 +594,22 @@ function parentPath(fullPath: string): string {
       <!-- Search bar -->
       <div class="relative w-56 shrink-0">
         <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted" />
-        <input
+        <InputText
           ref="searchInput"
           class="h-9 w-full rounded-md border border-divider bg-canvas pl-8 pr-8 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
           placeholder="Search files..."
           @input="onSearchInput"
           @keydown="onSearchKeydown"
         />
-        <button
+        <Button
           v-if="ctrl.searchQuery.value"
-          class="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
-          @click="ctrl.clearSearch(); if (searchInput) searchInput.value = ''"
-        >
-          <i class="pi pi-times text-xs" />
-        </button>
+          icon="pi pi-times"
+          text
+          rounded
+          size="small"
+          class="absolute right-2 top-1/2 -translate-y-1/2"
+          @click="ctrl.clearSearch(); if (searchInput) (searchInput.$el as HTMLInputElement).value = ''"
+        />
         <i
           v-if="ctrl.isSearching.value"
           class="pi pi-spinner pi-spin absolute right-2 top-1/2 -translate-y-1/2 text-xs text-brand"
@@ -654,12 +637,7 @@ function parentPath(fullPath: string): string {
         in <strong class="text-ink">{{ ctrl.currentPath.value }}</strong>
         <span class="ml-2 text-muted">({{ ctrl.searchResults.value.length }} items{{ ctrl.searchTruncated.value ? ', showing first 500' : '' }})</span>
       </span>
-      <button
-        class="text-xs font-bold text-brand hover:underline"
-        @click="ctrl.clearSearch(); if (searchInput) searchInput.value = ''"
-      >
-        Clear Search
-      </button>
+      <Button label="Clear Search" text size="small" @click="ctrl.clearSearch(); if (searchInput) (searchInput.$el as HTMLInputElement).value = ''" />
     </div>
 
     <!-- Main content -->
@@ -674,31 +652,33 @@ function parentPath(fullPath: string): string {
           <span class="text-xs font-bold uppercase tracking-wide text-muted">Drives</span>
         </div>
         <div class="flex-1 overflow-y-auto p-1.5">
-          <button
+          <Button
             v-for="drive in ctrl.drives.value"
             :key="drive"
             class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-canvas"
             :class="ctrl.currentPath.value.startsWith(drive) ? 'bg-canvas font-semibold text-brand' : 'text-secondary'"
+            unstyled
             @click="handleDriveClick(drive)"
           >
             <i class="pi pi-desktop text-xs" />
             {{ drive }}
-          </button>
+          </Button>
         </div>
 
         <!-- Quick Breadcrumbs -->
         <div class="border-t border-divider p-1.5">
           <div class="max-h-40 overflow-y-auto">
-            <button
+            <Button
               v-for="crumb in ctrl.breadcrumbs.value"
               :key="crumb.path"
               class="flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-canvas"
               :class="crumb.path === ctrl.currentPath.value ? 'font-semibold text-brand' : 'text-muted'"
+              unstyled
               @click="handleBreadcrumbClick(crumb.path)"
             >
               <i class="pi pi-chevron-right text-[8px]" />
               <span class="truncate">{{ crumb.label }}</span>
-            </button>
+            </Button>
           </div>
         </div>
       </aside>
@@ -719,43 +699,30 @@ function parentPath(fullPath: string): string {
       >
         <!-- Table header -->
         <div class="grid grid-cols-[32px_minmax(0,1fr)_80px_100px_160px_80px] items-center gap-2 border-b border-divider bg-canvas px-4 py-2 text-xs font-bold text-ink">
-          <label class="flex items-center justify-center">
-            <input
-              type="checkbox"
-              class="accent-brand h-3.5 w-3.5 cursor-pointer rounded"
-              :checked="isAllSelected"
+          <div class="flex items-center justify-center">
+            <Checkbox
+              :model-value="isAllSelected"
               :indeterminate="isSomeSelected"
+              binary
               @change="toggleSelectAll"
             />
-          </label>
-          <button
-            class="group/th flex items-center gap-1.5 text-left"
-            @click="toggleSort('name')"
-          >
+          </div>
+          <Button class="group/th flex items-center gap-1.5 text-left" unstyled @click="toggleSort('name')">
             Name
             <i :class="sortIcon('name')" />
-          </button>
-          <button
-            class="group/th flex items-center gap-1.5 text-left"
-            @click="toggleSort('extension')"
-          >
+          </Button>
+          <Button class="group/th flex items-center gap-1.5 text-left" unstyled @click="toggleSort('extension')">
             Ext
             <i :class="sortIcon('extension')" />
-          </button>
-          <button
-            class="group/th flex items-center justify-end gap-1.5"
-            @click="toggleSort('size')"
-          >
+          </Button>
+          <Button class="group/th flex items-center justify-end gap-1.5" unstyled @click="toggleSort('size')">
             Size
             <i :class="sortIcon('size')" />
-          </button>
-          <button
-            class="group/th flex items-center gap-1.5 text-left"
-            @click="toggleSort('modified')"
-          >
+          </Button>
+          <Button class="group/th flex items-center gap-1.5 text-left" unstyled @click="toggleSort('modified')">
             Modified
             <i :class="sortIcon('modified')" />
-          </button>
+          </Button>
           <span class="text-center">Actions</span>
         </div>
 
@@ -805,21 +772,20 @@ function parentPath(fullPath: string): string {
               @contextmenu="openEntryMenu($event, entry)"
             >
               <!-- Checkbox -->
-              <label class="flex items-center justify-center" @click.stop>
-                <input
-                  type="checkbox"
-                  class="accent-brand h-3.5 w-3.5 cursor-pointer rounded"
-                  :checked="selectedPaths.has(entry.path)"
+              <div class="flex items-center justify-center" @click.stop>
+                <Checkbox
+                  :model-value="selectedPaths.has(entry.path)"
+                  binary
                   @change="toggleSelect(entry)"
                 />
-              </label>
+              </div>
 
               <!-- Name -->
               <div class="flex min-w-0 items-center gap-2">
                 <i :class="fileIcon(entry)" class="shrink-0 text-sm" />
                 <div class="min-w-0">
                   <!-- Rename mode -->
-                  <input
+                  <InputText
                     v-if="renamingPath === entry.path"
                     ref="renameInputEl"
                     v-model="renameValue"
@@ -865,21 +831,8 @@ function parentPath(fullPath: string): string {
 
               <!-- Actions -->
               <div class="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100">
-                <button
-                  v-if="entry.is_dir"
-                  class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-panel hover:text-brand"
-                  title="Open folder"
-                  @click.stop="handleEntryClick(entry)"
-                >
-                  <i class="pi pi-folder-open text-xs" />
-                </button>
-                <button
-                  class="flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-panel hover:text-brand"
-                  title="Show in Explorer"
-                  @click.stop="ctrl.openInExplorer(entry.path)"
-                >
-                  <i class="pi pi-external-link text-xs" />
-                </button>
+                <Button v-if="entry.is_dir" icon="pi pi-folder-open" text rounded size="small" title="Open folder" @click.stop="handleEntryClick(entry)" />
+                <Button icon="pi pi-external-link" text rounded size="small" title="Show in Explorer" @click.stop="ctrl.openInExplorer(entry.path)" />
               </div>
             </div>
           </template>
@@ -892,7 +845,7 @@ function parentPath(fullPath: string): string {
             <span />
             <div class="flex min-w-0 items-center gap-2">
               <i :class="newEntryMode === 'folder' ? 'pi pi-folder text-amber-500' : 'pi pi-file text-muted'" class="shrink-0 text-sm" />
-              <input
+              <InputText
                 ref="newEntryInputEl"
                 v-model="newEntryName"
                 class="block w-full rounded border border-brand bg-canvas px-1.5 py-0.5 text-sm outline-none ring-1 ring-brand/30"
@@ -938,112 +891,112 @@ function parentPath(fullPath: string): string {
     >
       <!-- === Entry context menu === -->
       <template v-if="ctxMenu.type === 'entry' && ctxMenu.entry">
-        <button v-if="ctxMenu.entry.is_dir" class="ctx-item" @click="handleEntryClick(ctxMenu.entry!); closeCtxMenu()">
+        <Button v-if="ctxMenu.entry.is_dir" class="ctx-item" unstyled @click="handleEntryClick(ctxMenu.entry!); closeCtxMenu()">
           <i class="pi pi-folder-open" /> Open
-        </button>
-        <button class="ctx-item" @click="ctrl.openInExplorer(ctxMenu.entry!.path); closeCtxMenu()">
+        </Button>
+        <Button class="ctx-item" unstyled @click="ctrl.openInExplorer(ctxMenu.entry!.path); closeCtxMenu()">
           <i class="pi pi-external-link" /> Show in Explorer
-        </button>
+        </Button>
         <div class="ctx-sep" />
-        <button class="ctx-item" @click="ctxCut">
+        <Button class="ctx-item" unstyled @click="ctxCut">
           <i class="pi pi-scissors" /> Cut
           <span class="ctx-shortcut">Ctrl+X</span>
-        </button>
-        <button class="ctx-item" @click="ctxCopy">
+        </Button>
+        <Button class="ctx-item" unstyled @click="ctxCopy">
           <i class="pi pi-copy" /> Copy
           <span class="ctx-shortcut">Ctrl+C</span>
-        </button>
+        </Button>
         <div class="ctx-sep" />
-        <button class="ctx-item" @click="ctxRename">
+        <Button class="ctx-item" unstyled @click="ctxRename">
           <i class="pi pi-pencil" /> Rename
           <span class="ctx-shortcut">F2</span>
-        </button>
-        <button class="ctx-item text-red-600 hover:!bg-red-50" @click="ctxDelete">
+        </Button>
+        <Button class="ctx-item text-red-600 hover:!bg-red-50" unstyled @click="ctxDelete">
           <i class="pi pi-trash" /> Delete
           <span class="ctx-shortcut">Del</span>
-        </button>
+        </Button>
       </template>
 
       <!-- === Background context menu === -->
       <template v-else-if="ctxMenu.type === 'background'">
         <!-- New submenu -->
         <div class="relative">
-          <button class="ctx-item" @click.stop="toggleSubmenu('new')">
+          <Button class="ctx-item" unstyled @click.stop="toggleSubmenu('new')">
             <i class="pi pi-plus" /> New
             <i class="pi pi-chevron-right ml-auto text-[10px]" />
-          </button>
+          </Button>
           <div
             v-if="ctxSubmenu === 'new'"
             class="absolute left-full top-0 z-10 min-w-40 rounded-lg border border-divider bg-panel py-1 shadow-xl"
           >
-            <button class="ctx-item" @click="ctxNewFolder">
+            <Button class="ctx-item" unstyled @click="ctxNewFolder">
               <i class="pi pi-folder" /> Folder
-            </button>
-            <button class="ctx-item" @click="ctxNewFile">
+            </Button>
+            <Button class="ctx-item" unstyled @click="ctxNewFile">
               <i class="pi pi-file" /> File
-            </button>
+            </Button>
           </div>
         </div>
         <div class="ctx-sep" />
 
         <!-- Paste -->
-        <button class="ctx-item" :class="!clipboard ? 'opacity-40 pointer-events-none' : ''" @click="ctxPaste">
+        <Button class="ctx-item" :class="!clipboard ? 'opacity-40 pointer-events-none' : ''" unstyled @click="ctxPaste">
           <i class="pi pi-clipboard" /> Paste
           <span class="ctx-shortcut">Ctrl+V</span>
-        </button>
+        </Button>
         <div class="ctx-sep" />
 
         <!-- Sort submenu -->
         <div class="relative">
-          <button class="ctx-item" @click.stop="toggleSubmenu('sort')">
+          <Button class="ctx-item" unstyled @click.stop="toggleSubmenu('sort')">
             <i class="pi pi-sort-alt" /> Sort by
             <i class="pi pi-chevron-right ml-auto text-[10px]" />
-          </button>
+          </Button>
           <div
             v-if="ctxSubmenu === 'sort'"
             class="absolute left-full top-0 z-10 min-w-40 rounded-lg border border-divider bg-panel py-1 shadow-xl"
           >
-            <button class="ctx-item" :class="sortKey === 'name' ? 'font-bold text-brand' : ''" @click="ctxSortBy('name')">
+            <Button class="ctx-item" :class="sortKey === 'name' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('name')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'name' ? '' : 'invisible'" /> Name
-            </button>
-            <button class="ctx-item" :class="sortKey === 'extension' ? 'font-bold text-brand' : ''" @click="ctxSortBy('extension')">
+            </Button>
+            <Button class="ctx-item" :class="sortKey === 'extension' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('extension')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'extension' ? '' : 'invisible'" /> Extension
-            </button>
-            <button class="ctx-item" :class="sortKey === 'size' ? 'font-bold text-brand' : ''" @click="ctxSortBy('size')">
+            </Button>
+            <Button class="ctx-item" :class="sortKey === 'size' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('size')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'size' ? '' : 'invisible'" /> Size
-            </button>
-            <button class="ctx-item" :class="sortKey === 'modified' ? 'font-bold text-brand' : ''" @click="ctxSortBy('modified')">
+            </Button>
+            <Button class="ctx-item" :class="sortKey === 'modified' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('modified')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'modified' ? '' : 'invisible'" /> Date modified
-            </button>
+            </Button>
           </div>
         </div>
 
         <!-- Group by submenu -->
         <div class="relative">
-          <button class="ctx-item" @click.stop="toggleSubmenu('group')">
+          <Button class="ctx-item" unstyled @click.stop="toggleSubmenu('group')">
             <i class="pi pi-objects-column" /> Group by
             <i class="pi pi-chevron-right ml-auto text-[10px]" />
-          </button>
+          </Button>
           <div
             v-if="ctxSubmenu === 'group'"
             class="absolute left-full top-0 z-10 min-w-40 rounded-lg border border-divider bg-panel py-1 shadow-xl"
           >
-            <button class="ctx-item" :class="!groupBy ? 'font-bold text-brand' : ''" @click="ctxGroupBy('')">
+            <Button class="ctx-item" :class="!groupBy ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('')">
               <i class="pi pi-check text-[10px]" :class="!groupBy ? '' : 'invisible'" /> None
-            </button>
-            <button class="ctx-item" :class="groupBy === 'type' ? 'font-bold text-brand' : ''" @click="ctxGroupBy('type')">
+            </Button>
+            <Button class="ctx-item" :class="groupBy === 'type' ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('type')">
               <i class="pi pi-check text-[10px]" :class="groupBy === 'type' ? '' : 'invisible'" /> Type
-            </button>
-            <button class="ctx-item" :class="groupBy === 'extension' ? 'font-bold text-brand' : ''" @click="ctxGroupBy('extension')">
+            </Button>
+            <Button class="ctx-item" :class="groupBy === 'extension' ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('extension')">
               <i class="pi pi-check text-[10px]" :class="groupBy === 'extension' ? '' : 'invisible'" /> Extension
-            </button>
+            </Button>
           </div>
         </div>
 
         <div class="ctx-sep" />
-        <button class="ctx-item" @click="ctxRefresh">
+        <Button class="ctx-item" unstyled @click="ctxRefresh">
           <i class="pi pi-refresh" /> Refresh
-        </button>
+        </Button>
       </template>
     </div>
 
@@ -1059,18 +1012,8 @@ function parentPath(fullPath: string): string {
           Are you sure you want to delete <strong>{{ confirmDeleteLabel }}</strong>? This action cannot be undone.
         </p>
         <div class="flex items-center justify-end gap-2">
-          <button
-            class="h-9 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            @click="confirmDeleteTarget = null"
-          >
-            Cancel
-          </button>
-          <button
-            class="h-9 rounded-md bg-red-600 px-4 text-sm font-bold text-white hover:opacity-90"
-            @click="executeDelete"
-          >
-            Delete
-          </button>
+          <Button label="Cancel" severity="secondary" size="small" @click="confirmDeleteTarget = null" />
+          <Button label="Delete" severity="danger" size="small" @click="executeDelete" />
         </div>
       </div>
     </div>

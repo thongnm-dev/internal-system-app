@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import { useProjectTasks } from "../composables/useProjectTasks";
@@ -43,13 +44,7 @@ function goBack() {
         <h3 class="truncate font-bold text-ink">Report</h3>
         <p class="mt-1 truncate text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
       </div>
-      <button
-        class="flex h-9 shrink-0 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-sm font-bold text-secondary hover:bg-canvas"
-        type="button"
-        @click="goBack"
-      >
-        <i class="pi pi-arrow-left" />Back
-      </button>
+      <Button icon="pi pi-arrow-left" label="Back" severity="secondary" outlined size="small" @click="goBack" />
     </section>
 
     <p v-if="!analysisProject" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

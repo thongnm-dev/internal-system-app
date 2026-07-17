@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import Button from "primevue/button";
 
 const query = ref("SELECT * FROM projects LIMIT 100;");
 </script>
@@ -23,13 +24,7 @@ const query = ref("SELECT * FROM projects LIMIT 100;");
         </label>
 
         <div class="flex justify-end">
-          <button
-            class="flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-semibold text-white hover:opacity-90"
-            type="button"
-          >
-            <i class="pi pi-play" />
-            Run query
-          </button>
+          <Button icon="pi pi-play" label="Run query" />
         </div>
       </div>
     </section>

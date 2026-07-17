@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRoute } from "vue-router";
+import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
@@ -64,27 +65,11 @@ function formatEmpty(value: string) {
             accept=".csv,text/csv"
             @change="onFileChange"
           />
-          <button
-            class="flex h-10 w-full items-center justify-center gap-2 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
-            type="button"
-            title="Browse CSV"
-            @click="fileInputRef?.click()"
-          >
-            <i class="pi pi-folder-open" />
-            Browse
-          </button>
+          <Button icon="pi pi-folder-open" label="Browse" severity="secondary" outlined title="Browse CSV" class="w-full" @click="fileInputRef?.click()" />
         </div>
 
         <div class="flex items-end">
-          <button
-            class="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            type="button"
-            :disabled="ctrl.isImporting.value"
-            @click="ctrl.importCsv()"
-          >
-            <i class="pi pi-file-import" />
-            Import
-          </button>
+          <Button icon="pi pi-file-import" label="Import" class="w-full" :disabled="ctrl.isImporting.value" @click="ctrl.importCsv()" />
         </div>
       </div>
     </section>
