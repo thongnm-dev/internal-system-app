@@ -158,48 +158,61 @@ function contextCopyKey() {
         </div>
         <!-- Actions -->
         <div class="flex items-center gap-1.5">
-          <span v-if="ctrl.selectedCount.value > 0" class="mr-1 text-xs font-bold text-brand">
-            {{ ctrl.selectedCount.value }} selected
-          </span>
+          <!-- Connected: show normal actions -->
+          <template v-if="ctrl.isConnected.value">
+            <span v-if="ctrl.selectedCount.value > 0" class="mr-1 text-xs font-bold text-brand">
+              {{ ctrl.selectedCount.value }} selected
+            </span>
+            <button
+              class="flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isOperating"
+              @click="handleUpload()"
+            >
+              <i :class="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'" />
+              Upload
+            </button>
+            <button
+              class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isOperating"
+              @click="openCreateFolder()"
+            >
+              <i class="pi pi-folder-plus" /> New Folder
+            </button>
+            <button
+              v-if="ctrl.selectedCount.value > 0"
+              class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isOperating"
+              @click="handleDownloadSelected()"
+            >
+              <i :class="ctrl.isDownloading.value ? 'pi pi-spinner pi-spin' : 'pi pi-download'" />
+              Download
+            </button>
+            <button
+              v-if="ctrl.selectedCount.value > 0"
+              class="flex h-8 items-center gap-1.5 rounded-md bg-red-600 px-3 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isOperating"
+              @click="confirmDeleteSelected()"
+            >
+              <i :class="ctrl.isDeleting.value ? 'pi pi-spinner pi-spin' : 'pi pi-trash'" />
+              Delete
+            </button>
+            <button
+              class="flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="isOperating"
+              @click="ctrl.refresh()"
+            >
+              <i :class="ctrl.isLoading.value ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" />
+            </button>
+          </template>
+          <!-- Disconnected: show test connection button -->
           <button
-            class="flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="isOperating"
-            @click="handleUpload()"
-          >
-            <i :class="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'" />
-            Upload
-          </button>
-          <button
+            v-else
             class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="isOperating"
-            @click="openCreateFolder()"
+            :disabled="ctrl.isTesting.value"
+            @click="ctrl.connect()"
           >
-            <i class="pi pi-folder-plus" /> New Folder
-          </button>
-          <button
-            v-if="ctrl.selectedCount.value > 0"
-            class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="isOperating"
-            @click="handleDownloadSelected()"
-          >
-            <i :class="ctrl.isDownloading.value ? 'pi pi-spinner pi-spin' : 'pi pi-download'" />
-            Download
-          </button>
-          <button
-            v-if="ctrl.selectedCount.value > 0"
-            class="flex h-8 items-center gap-1.5 rounded-md bg-red-600 px-3 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="isOperating"
-            @click="confirmDeleteSelected()"
-          >
-            <i :class="ctrl.isDeleting.value ? 'pi pi-spinner pi-spin' : 'pi pi-trash'" />
-            Delete
-          </button>
-          <button
-            class="flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="isOperating"
-            @click="ctrl.refresh()"
-          >
-            <i :class="ctrl.isLoading.value ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" />
+            <i :class="ctrl.isTesting.value ? 'pi pi-spinner pi-spin' : 'pi pi-link'" />
+            Kiểm tra kết nối
           </button>
         </div>
       </div>
@@ -377,6 +390,28 @@ function contextCopyKey() {
             Delete
           </button>
         </div>
+      </template>
+    </Dialog>
+
+    <!-- Offline Dialog -->
+    <Dialog
+      v-model:visible="ctrl.showOfflineDialog.value"
+      header="Lỗi kết nối"
+      :modal="true"
+      :closable="true"
+      :style="{ width: '28rem' }"
+    >
+      <div class="flex items-center gap-3">
+        <i class="pi pi-wifi text-3xl text-red-500" />
+        <span class="text-sm text-secondary">{{ ctrl.offlineMessage }}</span>
+      </div>
+      <template #footer>
+        <button
+          class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90"
+          @click="ctrl.dismissOfflineDialog()"
+        >
+          Đóng
+        </button>
       </template>
     </Dialog>
   </section>

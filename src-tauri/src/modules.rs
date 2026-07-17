@@ -75,6 +75,8 @@ mod database {
     pub mod menu_config_store;
     /// Data access cho bảng `api_keys` (PostgreSQL).
     pub mod api_key_store;
+    /// Data access cho bảng `aws_storage` (PostgreSQL).
+    pub mod aws_storage_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.

@@ -1,6 +1,6 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::s3::{S3Config, S3ListResult, S3Object, S3OperationResult};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
 use crate::utils::pgsql_connect;
 
 use aws_config::Region;
@@ -142,6 +142,7 @@ pub async fn list_objects(prefix: String) -> AppResult<S3ListResult> {
 pub async fn download_objects(
     keys: Vec<String>,
     destination_dir: String,
+    strip_prefix: String,
 ) -> AppResult<S3OperationResult> {
     let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
@@ -174,7 +175,7 @@ pub async fn download_objects(
     }
 
     for key in &all_keys {
-        let relative = key.as_str();
+        let relative = key.strip_prefix(strip_prefix.as_str()).unwrap_or(key.as_str());
         let local_path = dest.join(relative);
 
         if let Some(parent) = local_path.parent() {
@@ -394,5 +395,205 @@ pub async fn create_folder(
         message: format!("Created folder '{folder_key}' successfully."),
         processed: 1,
         failed: 0,
+    })
+}
+
+pub async fn list_upload_storages() -> AppResult<Vec<AwsStorage>> {
+    crate::database::aws_storage_store::list_by_upload().await
+}
+
+pub async fn scan_upload_folder(dir_path: String) -> AppResult<Vec<ScannedFile>> {
+    let root = Path::new(&dir_path);
+    if !root.is_dir() {
+        return Err(AppError::new(format!("Not a directory: {dir_path}")));
+    }
+
+    let mut files = Vec::new();
+    let entries = std::fs::read_dir(root)
+        .map_err(|e| AppError::new(format!("Failed to read directory: {e}")))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let parent_name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let sub_entries = std::fs::read_dir(&path)
+                .map_err(|e| AppError::new(format!("Failed to read sub-directory: {e}")))?;
+            for sub_entry in sub_entries.flatten() {
+                let sub_path = sub_entry.path();
+                if sub_path.is_file() {
+                    let name = sub_path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let file_size = sub_path.metadata().map(|m| m.len()).unwrap_or(0);
+                    let full_path = sub_path.to_string_lossy().to_string();
+                    files.push(ScannedFile {
+                        parent_name: parent_name.clone(),
+                        name,
+                        file_path: full_path.clone(),
+                        full_path,
+                        file_size,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(files)
+}
+
+pub async fn get_work_folder(folder_key: &str) -> AppResult<String> {
+    crate::database::aws_storage_store::get_work_folder_name(folder_key).await
+}
+
+pub async fn upload_files(
+    files: Vec<UploadFileRequest>,
+    storage_name: String,
+    subscribe: String,
+    create_folder_same_name: bool,
+) -> AppResult<S3OperationResult> {
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    // {work_folder}/{storage_name}/{subscribe}/{parent_name}/{file_name}
+    let base_prefix = format!("{}/{}/{}", work_folder, storage_name, subscribe);
+
+    for file in &files {
+        let s3_key = if create_folder_same_name {
+            let stem = Path::new(&file.name)
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| file.name.clone());
+            format!("{}/{}/{}/{}", base_prefix, file.parent_name, stem, file.name)
+        } else {
+            format!("{}/{}/{}", base_prefix, file.parent_name, file.name)
+        };
+        let path = Path::new(&file.local_path);
+        if !path.exists() {
+            failed += 1;
+            errors.push(format!("{}: file not found", file.name));
+            continue;
+        }
+
+        match tokio::fs::read(path).await {
+            Ok(body) => {
+                match client
+                    .put_object()
+                    .bucket(&bucket)
+                    .key(&s3_key)
+                    .body(body.into())
+                    .send()
+                    .await
+                {
+                    Ok(_) => processed += 1,
+                    Err(e) => {
+                        failed += 1;
+                        errors.push(format!("{}: upload failed: {e}", file.name));
+                    }
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: read failed: {e}", file.name));
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Uploaded {processed} file(s) successfully.")
+    } else {
+        format!(
+            "Uploaded {processed} file(s), {failed} failed.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
+    })
+}
+
+pub async fn list_delete_options(destination_code: String) -> AppResult<Vec<AwsStorage>> {
+    crate::database::aws_storage_store::list_delete_options(&destination_code).await
+}
+
+pub async fn delete_uploaded_items(
+    items: Vec<DeleteUploadedItem>,
+) -> AppResult<S3OperationResult> {
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let all_codes: Vec<String> = items.iter().map(|i| i.aws_cd.clone()).collect();
+    let storages = crate::database::aws_storage_store::list_by_codes(&all_codes).await?;
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for item in &items {
+        let storage = match storages.iter().find(|s| s.code == item.aws_cd) {
+            Some(s) => s,
+            None => {
+                failed += 1;
+                errors.push(format!("{}: storage code '{}' not found", item.bug_no, item.aws_cd));
+                continue;
+            }
+        };
+
+        let prefix = format!(
+            "{}/{}/{}/",
+            work_folder, storage.name, item.bug_no
+        );
+        match list_all_objects_recursive(&client, &bucket, &prefix).await {
+            Ok(keys) => {
+                if keys.is_empty() {
+                    processed += 1;
+                    continue;
+                }
+                let mut item_failed = false;
+                for key in &keys {
+                    if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
+                        failed += 1;
+                        item_failed = true;
+                        errors.push(format!("{}: {e}", key));
+                    }
+                }
+                let _ = client.delete_object().bucket(&bucket).key(&prefix).send().await;
+                if !item_failed {
+                    processed += 1;
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: list failed: {e}", item.bug_no));
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Đã thực hiện xoá thành công {processed} thư mục.")
+    } else {
+        format!(
+            "Đã xoá {processed} thư mục, {failed} thất bại.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
     })
 }

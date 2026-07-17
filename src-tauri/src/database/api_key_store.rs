@@ -1,4 +1,7 @@
 //! Tầng truy cập dữ liệu cho bảng `api_keys`.
+//!
+//! Tất cả các thao tác đều gọi stored procedure qua PostgreSQL,
+//! không viết SQL trực tiếp trong code Rust.
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
@@ -16,7 +19,7 @@ pub async fn list_by_user_id(user_id: i32) -> AppResult<Vec<ApiKeyRow>> {
 
     let rows = client
         .query(
-            "SELECT id, name, key_label, api_key FROM api_keys WHERE user_id = $1 ORDER BY created_at",
+            "SELECT * FROM sp_api_key_select_by_user($1)",
             &[&user_id],
         )
         .await
@@ -37,14 +40,14 @@ pub async fn sync_for_user(user_id: i32, keys: &[ApiKeyRow]) -> AppResult<()> {
     let client = pgsql_connect::connect().await?;
 
     client
-        .execute("DELETE FROM api_keys WHERE user_id = $1", &[&user_id])
+        .execute("SELECT sp_api_key_delete_by_user($1)", &[&user_id])
         .await
         .map_err(|e| AppError::new(format!("Failed to delete old api_keys: {e}")))?;
 
     for key in keys {
         client
             .execute(
-                "INSERT INTO api_keys (id, user_id, name, key_label, api_key) VALUES ($1, $2, $3, $4, $5)",
+                "SELECT sp_api_key_insert($1, $2, $3, $4, $5)",
                 &[&key.id, &user_id, &key.name, &key.key_label, &key.api_key],
             )
             .await
@@ -59,7 +62,7 @@ pub async fn get_value(name: &str, key_label: &str) -> AppResult<String> {
 
     let row = client
         .query_opt(
-            "SELECT api_key FROM api_keys WHERE name = $1 AND key_label = $2 LIMIT 1",
+            "SELECT * FROM sp_api_key_get_value($1, $2)",
             &[&name, &key_label],
         )
         .await

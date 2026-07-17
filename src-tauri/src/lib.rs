@@ -52,8 +52,9 @@ use commands::ai_usage_commands::{
 };
 use commands::ai_chat_commands::ai_chat_complete;
 use commands::s3_commands::{
-    s3_create_folder, s3_delete_objects, s3_download_objects, s3_list_objects,
-    s3_test_connection, s3_upload_file,
+    s3_create_folder, s3_delete_objects, s3_delete_uploaded_items, s3_download_objects,
+    s3_list_delete_options, s3_list_objects, s3_list_upload_storages,
+    s3_scan_upload_folder, s3_test_connection, s3_upload_file, s3_upload_files,
 };
 
 /// Khởi chạy ứng dụng Tauri desktop.
@@ -158,8 +159,13 @@ pub fn run() {
             s3_list_objects,
             s3_download_objects,
             s3_upload_file,
+            s3_upload_files,
             s3_delete_objects,
             s3_create_folder,
+            s3_list_upload_storages,
+            s3_scan_upload_folder,
+            s3_list_delete_options,
+            s3_delete_uploaded_items,
             // === Sync commands ===
             sync_daily_report,
             // === Collect/Copy tools commands ===

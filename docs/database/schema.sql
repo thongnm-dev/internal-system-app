@@ -281,6 +281,31 @@ CREATE INDEX IF NOT EXISTS idx_logs_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_logs_detail  ON audit_logs USING GIN (detail);
 
 -- ============================================================================
+-- CLOUD STORAGE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS aws_work_folder (
+    id SERIAL PRIMARY KEY,
+    folder_key VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS aws_storage (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(3) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    name_alias VARCHAR(100) NOT NULL,
+    subscribe VARCHAR(100) NOT NULL,
+    is_upload BOOLEAN DEFAULT FALSE,
+    is_download BOOLEAN DEFAULT FALSE,
+    file_only BOOLEAN DEFAULT FALSE,
+    link_available TEXT[],
+    exclude_subscribe TEXT[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- ============================================================================
 -- TRIGGERS — auto-update updated_at
 -- ============================================================================
 

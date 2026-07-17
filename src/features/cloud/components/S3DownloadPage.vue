@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import S3DownloadCard from "./S3DownloadCard.vue";
+import { useCloudGuard } from "../composables/useCloudGuard";
 
 interface AwsStorage {
   aws_cd: string;
@@ -21,6 +22,8 @@ interface DownloadItem {
   download_count?: number;
   aws_name?: string;
 }
+
+const guard = useCloudGuard();
 
 const listDownloadItems = ref<AwsStorage[]>([]);
 const downloadItems = ref<DownloadItem[]>([]);
@@ -42,11 +45,17 @@ const downloadableStorages = computed(() =>
 
 const hasHistory = computed(() => downloadItems.value.length > 0);
 
-function handleRefresh() {
+async function handleRefresh() {
+  if (!(await guard.ensureOnline())) return;
   isReloading.value = true;
   // TODO: call backend to refresh
   isReloading.value = false;
 }
+
+onMounted(async () => {
+  if (!(await guard.ensureOnline())) return;
+  // TODO: load download storages from backend
+});
 </script>
 
 <template>
@@ -58,6 +67,7 @@ function handleRefresh() {
           v-for="storage in downloadableStorages"
           :key="storage.aws_cd"
           :aws-storage="storage"
+          :ensure-online="guard.ensureOnline"
         />
       </div>
     </template>
@@ -110,5 +120,22 @@ function handleRefresh() {
         <Column field="download_count" header="Số lượng tập tin đã tải" />
       </DataTable>
     </div>
+
+    <!-- Offline Dialog -->
+    <Dialog
+      v-model:visible="guard.showOfflineDialog.value"
+      header="Lỗi kết nối"
+      :modal="true"
+      :closable="true"
+      :style="{ width: '28rem' }"
+    >
+      <div class="flex items-center gap-3">
+        <i class="pi pi-wifi text-3xl text-red-500" />
+        <span class="text-sm text-surface-600 dark:text-surface-400">{{ guard.offlineMessage }}</span>
+      </div>
+      <template #footer>
+        <Button label="Đóng" @click="guard.dismissOfflineDialog()" />
+      </template>
+    </Dialog>
   </div>
 </template>

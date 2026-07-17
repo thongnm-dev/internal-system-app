@@ -26,3 +26,35 @@ export interface S3OperationResult {
   processed: number;
   failed: number;
 }
+
+export interface AwsStorage {
+  id: number;
+  code: string;
+  name: string;
+  nameAlias: string;
+  subscribe: string;
+  isUpload: boolean;
+  isDownload: boolean;
+  fileOnly: boolean;
+  linkAvailable: string[];
+  excludeSubscribe: string[];
+}
+
+export interface UploadFileRequest {
+  parentName: string;
+  name: string;
+  localPath: string;
+}
+
+export interface ScannedFile {
+  parentName: string;
+  name: string;
+  filePath: string;
+  fullPath: string;
+  fileSize: number;
+}
+
+export interface DeleteUploadedItem {
+  awsCd: string;
+  bugNo: string;
+}

@@ -107,6 +107,15 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_menu_config_select_list", include_str!("../../../docs/store-procedure/sp_menu_config_select_list.sql")),
         ("sp_menu_config_upsert", include_str!("../../../docs/store-procedure/sp_menu_config_upsert.sql")),
         ("sp_menu_config_delete_all", include_str!("../../../docs/store-procedure/sp_menu_config_delete_all.sql")),
+        // === API Keys ===
+        ("sp_api_key_select_by_user", include_str!("../../../docs/store-procedure/sp_api_key_select_by_user.sql")),
+        ("sp_api_key_delete_by_user", include_str!("../../../docs/store-procedure/sp_api_key_delete_by_user.sql")),
+        ("sp_api_key_insert", include_str!("../../../docs/store-procedure/sp_api_key_insert.sql")),
+        ("sp_api_key_get_value", include_str!("../../../docs/store-procedure/sp_api_key_get_value.sql")),
+        // === AWS Storage ===
+        ("sp_aws_storage_select_by_upload", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_upload.sql")),
+        ("sp_aws_storage_select_by_codes", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_codes.sql")),
+        ("sp_aws_work_folder_get_name", include_str!("../../../docs/store-procedure/sp_aws_work_folder_get_name.sql")),
     ];
 
     let mut errors = Vec::new();

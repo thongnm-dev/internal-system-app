@@ -10,6 +10,46 @@ pub struct S3Config {
     pub endpoint_url: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AwsStorage {
+    pub id: i32,
+    pub code: String,
+    pub name: String,
+    pub name_alias: String,
+    pub subscribe: String,
+    pub is_upload: bool,
+    pub is_download: bool,
+    pub file_only: bool,
+    pub link_available: Vec<String>,
+    pub exclude_subscribe: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadFileRequest {
+    pub parent_name: String,
+    pub name: String,
+    pub local_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScannedFile {
+    pub parent_name: String,
+    pub name: String,
+    pub file_path: String,
+    pub full_path: String,
+    pub file_size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteUploadedItem {
+    pub aws_cd: String,
+    pub bug_no: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Object {

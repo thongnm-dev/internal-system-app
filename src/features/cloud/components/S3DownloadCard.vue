@@ -15,6 +15,7 @@ interface AwsStorage {
 
 const props = defineProps<{
   awsStorage: AwsStorage;
+  ensureOnline: () => Promise<boolean>;
 }>();
 
 const expanded = ref(true);
@@ -46,15 +47,18 @@ function toggle() {
   expanded.value = !expanded.value;
 }
 
-function handleRefresh() {
+async function handleRefresh() {
+  if (!(await props.ensureOnline())) return;
   // TODO: call backend
 }
 
-function handleDownload() {
+async function handleDownload() {
+  if (!(await props.ensureOnline())) return;
   showDownloadModal.value = true;
 }
 
-function handleMove() {
+async function handleMove() {
+  if (!(await props.ensureOnline())) return;
   selectedBugs.value = new Set(items.value);
   showMoveModal.value = true;
 }
@@ -68,7 +72,8 @@ function handleCancelModal() {
   showMoveModal.value = false;
 }
 
-function handleConfirm() {
+async function handleConfirm() {
+  if (!(await props.ensureOnline())) return;
   // TODO: call backend for download or move
   showDownloadModal.value = false;
   showMoveModal.value = false;

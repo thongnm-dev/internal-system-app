@@ -1,50 +1,42 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Select from "primevue/select";
+import ProgressSpinner from "primevue/progressspinner";
 import S3UploadCard from "./S3UploadCard.vue";
+import { useS3Upload } from "../composables/useS3Upload";
+import type { AwsStorage, ScannedFile, UploadFileRequest } from "@/_/types/s3";
 
-interface AwsStorage {
-  aws_cd: string;
-  aws_name: string;
-  aws_name_alias?: string;
-}
+const {
+  uploadStorages,
+  isLoading,
+  isUploading,
+  isDeleting,
+  deleteItems,
+  deleteOptions,
+  showDeleteDialog,
+  showOfflineDialog,
+  offlineMessage,
+  dismissOfflineDialog,
+  scanFolder,
+  uploadFiles,
+  confirmDelete,
+  dismissDeleteDialog,
+  updateDeleteItemCode,
+} = useS3Upload();
 
-interface FileItem {
-  file_id?: number;
-  parent_name: string;
-  sub_folder?: string;
-  name: string;
-  file_path: string;
-  full_path: string;
-  file_size?: number;
-}
-
-interface UploadItem {
-  aws_cd?: string;
-  bug_no?: string;
-}
-
-// STUB data — remove after backend wiring
-const listUploadItems = ref<AwsStorage[]>([
-  { aws_cd: "01", aws_name: "s3://project-bucket/upload/release", aws_name_alias: "Release Upload" },
-  { aws_cd: "011", aws_name: "s3://project-bucket/upload/hotfix", aws_name_alias: "Hotfix Upload" },
-]);
 const uploadedId = ref("");
 
 const openModal = ref(false);
-const isUpdating = ref(false);
 const modalTitle = ref("");
 const modalHeaderTitle = ref("");
-const destination = ref<AwsStorage>({} as AwsStorage);
+const destination = ref<AwsStorage | null>(null);
 const createFolderSameName = ref(false);
-const uploadFileItems = ref<FileItem[]>([]);
-const deleteItems = ref<UploadItem[]>([]);
-const deleteOptions = ref<AwsStorage[]>([]);
+const uploadFileItems = ref<ScannedFile[]>([]);
 
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
@@ -57,44 +49,70 @@ function formatFileSize(bytes: number): string {
 function uploadAction(params: {
   aws_storage: AwsStorage;
   is_folder_same_name: boolean;
-  selected_items: FileItem[];
+  selected_items: ScannedFile[];
 }) {
-  modalHeaderTitle.value = params.aws_storage.aws_name;
+  modalHeaderTitle.value = params.aws_storage.name || params.aws_storage.nameAlias;
   createFolderSameName.value = params.is_folder_same_name;
   destination.value = params.aws_storage;
   modalTitle.value = "Tải lên S3 AWS";
   uploadFileItems.value = params.selected_items;
   openModal.value = true;
-  isUpdating.value = true;
 }
 
-function handleConfirm() {
-  // TODO: call backend for upload or delete
+async function handleScanFolder(callback: (files: ScannedFile[]) => void) {
+  const files = await scanFolder();
+  callback(files);
+}
+
+async function handleConfirm() {
+  if (!destination.value || uploadFileItems.value.length === 0) return;
+
+  const files: UploadFileRequest[] = uploadFileItems.value.map((f) => ({
+    parentName: f.parentName,
+    name: f.name,
+    localPath: f.filePath,
+  }));
+
   openModal.value = false;
+
+  const result = await uploadFiles(files, destination.value, createFolderSameName.value);
+  if (result?.success) {
+    uploadedId.value = destination.value.code;
+  }
+
+  if (deleteItems.value.length > 0) {
+    await nextTick();
+    showDeleteDialog.value = true;
+  }
 }
 
 function handleCloseModal() {
   openModal.value = false;
 }
 
-function updateDeleteItemAwsCd(bugNo: string, newValue: string) {
-  deleteItems.value = deleteItems.value.map((item) =>
-    item.bug_no === bugNo ? { ...item, aws_cd: newValue } : item,
-  );
+function getStorageName(code: string): string {
+  const storage = deleteOptions.value.find((s) => s.code === code);
+  return storage?.name || storage?.nameAlias || code;
 }
 </script>
 
 <template>
   <div class="space-y-4">
+    <!-- Loading -->
+    <div v-if="isLoading" class="flex items-center justify-center py-16">
+      <ProgressSpinner style="width: 40px; height: 40px" />
+    </div>
+
     <!-- Upload cards -->
-    <div v-if="listUploadItems.length > 0" class="grid grid-cols-1 gap-3">
+    <div v-else-if="uploadStorages.length > 0" class="grid grid-cols-1 gap-3">
       <S3UploadCard
-        v-for="(item, index) in listUploadItems"
-        :key="index"
+        v-for="item in uploadStorages"
+        :key="item.code"
         :aws-storage="item"
         :uploaded-id="uploadedId"
         @upload="uploadAction"
         @clear="uploadedId = ''"
+        @scan-folder="handleScanFolder"
       />
     </div>
 
@@ -103,9 +121,27 @@ function updateDeleteItemAwsCd(bugNo: string, newValue: string) {
       <i class="pi pi-cloud-upload mb-4 text-5xl text-surface-300" />
       <span class="text-surface-500">Chưa có cấu hình nơi tải lên.</span>
     </div>
+
   </div>
 
-  <!-- Upload / Delete confirmation modal -->
+  <!-- Offline Dialog -->
+  <Dialog
+    v-model:visible="showOfflineDialog"
+    header="Lỗi kết nối"
+    :modal="true"
+    :closable="true"
+    :style="{ width: '28rem' }"
+  >
+    <div class="flex items-center gap-3">
+      <i class="pi pi-wifi text-3xl text-red-500" />
+      <span class="text-sm">{{ offlineMessage }}</span>
+    </div>
+    <template #footer>
+      <Button label="Đóng" @click="dismissOfflineDialog()" />
+    </template>
+  </Dialog>
+
+  <!-- Upload confirmation modal -->
   <Dialog
     v-model:visible="openModal"
     :header="modalTitle"
@@ -114,19 +150,13 @@ function updateDeleteItemAwsCd(bugNo: string, newValue: string) {
     :closable="true"
   >
     <!-- Upload header -->
-    <div v-if="isUpdating" class="mb-3 flex items-center gap-2 rounded border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900">
+    <div class="mb-3 flex items-center gap-2 rounded border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900">
       <span class="font-bold">Bạn đang thực hiện tải các tập tin lên đường dẫn sau:</span>
       <span class="font-bold text-red-600">{{ modalHeaderTitle }}</span>
     </div>
 
-    <!-- Delete header -->
-    <div v-if="!isUpdating && deleteOptions.length === 1" class="mb-3 flex items-center gap-2 rounded border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900">
-      <span class="font-bold">Bạn đang thực hiện xoá các tập tin lên đường dẫn sau:</span>
-      <span class="font-bold text-red-600">{{ deleteOptions[0]?.aws_name }}</span>
-    </div>
-
     <!-- Folder same name checkbox -->
-    <div v-if="destination.aws_cd === '011'" class="mb-3 flex items-center gap-2 p-2">
+    <div v-if="destination?.code === '011'" class="mb-3 flex items-center gap-2 p-2">
       <Checkbox
         v-model="createFolderSameName"
         :binary="true"
@@ -139,23 +169,31 @@ function updateDeleteItemAwsCd(bugNo: string, newValue: string) {
     </div>
 
     <!-- Upload file list -->
-    <div v-if="isUpdating" class="rounded-lg shadow">
+    <div class="rounded-lg shadow">
       <DataTable
-        :value="uploadFileItems.map((f) => ({ name: f.name, size: f.file_size ?? 0, file_path: f.file_path }))"
+        :value="uploadFileItems.map((f) => ({ name: f.name, size: f.fileSize ?? 0, parentName: f.parentName }))"
         scrollable
         scroll-height="300px"
         size="small"
         striped-rows
       >
+        <Column field="parentName" header="Thư mục">
+          <template #body="{ data }">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-folder text-lg text-orange-500" />
+              <span class="font-medium text-surface-900 dark:text-surface-100">{{ data.parentName }}</span>
+            </div>
+          </template>
+        </Column>
         <Column field="name" header="Tên tập tin">
           <template #body="{ data }">
             <div class="flex items-center gap-2">
-              <i class="pi pi-file-excel text-lg text-green-600" />
+              <i class="pi pi-file text-lg text-blue-500" />
               <span class="font-medium text-surface-900 dark:text-surface-100">{{ data.name }}</span>
             </div>
           </template>
         </Column>
-        <Column field="size" header="Kích thước">
+        <Column field="size" header="Kích thước" style="width: 120px">
           <template #body="{ data }">
             <span class="text-surface-600 dark:text-surface-400">{{ formatFileSize(data.size) }}</span>
           </template>
@@ -163,35 +201,72 @@ function updateDeleteItemAwsCd(bugNo: string, newValue: string) {
       </DataTable>
     </div>
 
-    <!-- Delete items list -->
-    <div v-if="!isUpdating" class="rounded-lg shadow">
+    <template #footer>
+      <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCloseModal" />
+      <Button
+        label="Bắt đầu tải lên"
+        icon="pi pi-upload"
+        :loading="isUploading"
+        @click="handleConfirm"
+      />
+    </template>
+  </Dialog>
+
+  <!-- Delete after upload dialog -->
+  <Dialog
+    v-model:visible="showDeleteDialog"
+    header="Thực hiện xoá tập tin S3"
+    :modal="true"
+    :style="{ width: '48rem' }"
+    :closable="true"
+    @hide="dismissDeleteDialog"
+  >
+    <div v-if="deleteOptions.length === 1" class="mb-3 flex items-center gap-2 rounded border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900">
+      <span class="font-bold">Bạn đang thực hiện xoá các tập tin ở đường dẫn sau:</span>
+      <span class="font-bold text-red-600">{{ deleteOptions[0].name }}</span>
+    </div>
+
+    <div class="rounded-lg shadow">
       <DataTable
-        :value="deleteItems.map((f) => ({ bug_no: f.bug_no, aws_cd: f.aws_cd }))"
+        :value="deleteItems"
         scrollable
         scroll-height="300px"
         size="small"
         striped-rows
       >
-        <Column field="aws_cd" header="Đích nơi xoá">
+        <Column header="Đích nơi xoá" style="width: 50%">
           <template #body="{ data }">
             <Select
-              :model-value="data.aws_cd"
+              :model-value="data.awsCd"
               :options="deleteOptions"
-              option-label="aws_name"
-              option-value="aws_cd"
-              :disabled="destination.aws_cd === '05'"
+              option-label="name"
+              option-value="code"
+              :disabled="deleteOptions.length <= 1"
               class="w-full"
-              @update:model-value="(v: string) => updateDeleteItemAwsCd(data.bug_no, v)"
+              @update:model-value="(val: string) => updateDeleteItemCode(data.bugNo, val)"
             />
           </template>
         </Column>
-        <Column field="bug_no" header="Đối tượng xoá" />
+        <Column header="Đối tượng xoá" style="width: 50%">
+          <template #body="{ data }">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-folder text-lg text-orange-500" />
+              <span class="font-medium text-surface-900 dark:text-surface-100">{{ data.bugNo }}</span>
+            </div>
+          </template>
+        </Column>
       </DataTable>
     </div>
 
     <template #footer>
-      <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCloseModal" />
-      <Button label="Bắt đầu..." icon="pi pi-check" @click="handleConfirm" />
+      <Button label="Bỏ qua" icon="pi pi-times" severity="secondary" @click="dismissDeleteDialog" />
+      <Button
+        label="Xác nhận xoá"
+        icon="pi pi-trash"
+        severity="danger"
+        :loading="isDeleting"
+        @click="confirmDelete"
+      />
     </template>
   </Dialog>
 </template>

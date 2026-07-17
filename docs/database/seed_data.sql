@@ -65,3 +65,18 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 10),
     ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 11)
 ON CONFLICT (key) DO NOTHING;
+
+--- AWS Storage configuration
+truncate table aws_work_folder cascade;
+INSERT INTO public.aws_work_folder (folder_key, "name") VALUES
+('CORRECT_BUG_TEST', '80_system/Attach/11_alx/40_バグ管理');
+
+truncate table aws_storage cascade;
+INSERT INTO aws_storage (code,name,subscribe,is_upload,is_download,link_available,name_alias,exclude_subscribe,file_only) VALUES
+	 ('011', '01_起票済（エネコム確認）',        'to_エネコム',              true,false,   '{}','01_起票済',           '{to_エネコム,to_アレクシード（翻訳前）}',  false),
+	 ('012', '01_起票済（エネコム確認）',        'to_アレクシード（翻訳前）', false,true,   '{}','01_起票済（翻訳前）',  '{to_エネコム,to_アレクシード（翻訳前）}',  true),
+	 ('02',  '02_原因確認中（アレクシード確認）', 'to_アレクシード',          false,true,   '{03}','02_原因確認中',     '{to_アレクシード}',                       false),
+	 ('03',  '03_対応確認中（エネコム確認）',    'to_エネコム',              true,false,   '{03}','03_対応確認中',     '{to_エネコム}',                           false),
+	 ('04',  '04_対応中（アレクシード確認）',    'to_アレクシード',          false,true,   '{03,05}','04_対応中',      '{to_アレクシード}',                       false),
+	 ('05',  '05_対応済（アレクシード確認）',     'to_エネコム',             true,false,   '{}','05_対応済',           '{to_エネコム}',                          false),
+	 ('06',  '06_完了（エネコム確認）',          'to_完了',                 false,false,  '{}','06_完了',             '{to_完了}',                              false);

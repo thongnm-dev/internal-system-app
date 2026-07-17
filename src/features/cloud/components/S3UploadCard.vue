@@ -1,26 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watchEffect } from "vue";
-import DataTable from "primevue/datatable";
-import Column from "primevue/column";
 import Button from "primevue/button";
 import Tree from "primevue/tree";
 import type { TreeNode } from "primevue/treenode";
-
-interface AwsStorage {
-  aws_cd: string;
-  aws_name: string;
-  aws_name_alias?: string;
-}
-
-interface FileItem {
-  file_id?: number;
-  parent_name: string;
-  sub_folder?: string;
-  name: string;
-  file_path: string;
-  full_path: string;
-  file_size?: number;
-}
+import type { AwsStorage, ScannedFile } from "@/_/types/s3";
 
 const props = defineProps<{
   awsStorage: AwsStorage;
@@ -28,33 +11,31 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  upload: [params: { aws_storage: AwsStorage; is_folder_same_name: boolean; selected_items: FileItem[] }];
+  upload: [params: { aws_storage: AwsStorage; is_folder_same_name: boolean; selected_items: ScannedFile[] }];
   clear: [];
+  scanFolder: [callback: (files: ScannedFile[]) => void];
 }>();
 
 const expanded = ref(true);
-// STUB data — remove after backend wiring
-const items = ref<FileItem[]>([
-  { parent_name: "BUG-1001", name: "screenshot_01.xlsx", file_path: "C:/work/BUG-1001/screenshot_01.xlsx", full_path: "C:/work/BUG-1001/screenshot_01.xlsx", file_size: 245760 },
-  { parent_name: "BUG-1001", name: "log_error.xlsx", file_path: "C:/work/BUG-1001/log_error.xlsx", full_path: "C:/work/BUG-1001/log_error.xlsx", file_size: 102400 },
-  { parent_name: "BUG-1002", name: "test_result.xlsx", file_path: "C:/work/BUG-1002/test_result.xlsx", full_path: "C:/work/BUG-1002/test_result.xlsx", file_size: 512000 },
-  { parent_name: "BUG-1002", name: "evidence_capture.xlsx", file_path: "C:/work/BUG-1002/evidence_capture.xlsx", full_path: "C:/work/BUG-1002/evidence_capture.xlsx", file_size: 1048576 },
-  { parent_name: "BUG-1003", name: "report_final.xlsx", file_path: "C:/work/BUG-1003/report_final.xlsx", full_path: "C:/work/BUG-1003/report_final.xlsx", file_size: 358400 },
-]);
+const items = ref<ScannedFile[]>([]);
 const selectedKeys = ref<Record<string, { checked: boolean; partialChecked: boolean }>>({});
 const expandedKeys = ref<Record<string, boolean>>({});
-const isUploadable = ref(true);
+
+const isUploadable = computed(() => {
+  if (props.uploadedId && props.uploadedId === props.awsStorage.code) return false;
+  return true;
+});
 
 const treeNodes = computed<TreeNode[]>(() => {
   if (items.value.length === 0) return [];
 
   const grouped = items.value.reduce(
     (acc, item) => {
-      if (!acc[item.parent_name]) acc[item.parent_name] = [];
-      acc[item.parent_name].push(item);
+      if (!acc[item.parentName]) acc[item.parentName] = [];
+      acc[item.parentName].push(item);
       return acc;
     },
-    {} as Record<string, FileItem[]>,
+    {} as Record<string, ScannedFile[]>,
   );
 
   const children: TreeNode[] = Object.entries(grouped).map(([folder, files]) => ({
@@ -62,7 +43,7 @@ const treeNodes = computed<TreeNode[]>(() => {
     label: folder,
     icon: "pi pi-folder",
     children: files.map((f) => ({
-      key: `file-${f.file_path}`,
+      key: `file-${f.filePath}`,
       label: f.name,
       icon: "pi pi-file",
       data: f,
@@ -81,18 +62,16 @@ const treeNodes = computed<TreeNode[]>(() => {
 
 const folderCount = computed(() => {
   if (items.value.length === 0) return 0;
-  const folders = new Set(items.value.map((f) => f.parent_name));
-  return folders.size;
+  return new Set(items.value.map((f) => f.parentName)).size;
 });
 
-const selectedItems = computed<FileItem[]>(() => {
+const selectedItems = computed<ScannedFile[]>(() => {
   const keys = Object.keys(selectedKeys.value).filter(
     (k) => k.startsWith("file-") && selectedKeys.value[k]?.checked,
   );
-  return items.value.filter((f) => keys.includes(`file-${f.file_path}`));
+  return items.value.filter((f) => keys.includes(`file-${f.filePath}`));
 });
 
-// Auto-expand and pre-select all nodes when items change
 watchEffect(() => {
   if (treeNodes.value.length > 0) {
     const keys: Record<string, boolean> = {};
@@ -115,7 +94,13 @@ function toggle() {
 }
 
 function addAttachment() {
-  // TODO: call Tauri file dialog to select directories
+  emit("scanFolder", (files: ScannedFile[]) => {
+    if (files.length > 0) {
+      const existingPaths = new Set(items.value.map((f) => f.filePath));
+      const newFiles = files.filter((f) => !existingPaths.has(f.filePath));
+      items.value = [...items.value, ...newFiles];
+    }
+  });
 }
 
 function clearItems() {
@@ -128,7 +113,7 @@ function handleUpload() {
   if (selectedItems.value.length === 0) return;
   emit("upload", {
     aws_storage: props.awsStorage,
-    is_folder_same_name: props.awsStorage.aws_cd === "011",
+    is_folder_same_name: props.awsStorage.code === "011",
     selected_items: selectedItems.value,
   });
 }
@@ -142,7 +127,7 @@ function handleUpload() {
         <div class="flex flex-1 cursor-pointer items-center gap-2" @click="toggle">
           <i :class="['pi text-lg text-orange-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
           <span class="text-lg font-bold text-surface-800 dark:text-surface-100">
-            {{ awsStorage.aws_name_alias ?? awsStorage.aws_name }}
+            {{ awsStorage.nameAlias || awsStorage.name }}
             <span class="text-red-600">({{ folderCount }})</span>
           </span>
         </div>
