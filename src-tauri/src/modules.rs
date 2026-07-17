@@ -51,6 +51,8 @@ mod commands {
     pub mod ai_usage_commands;
     /// Commands cho module AI Chat (gọi API các nhà cung cấp LLM).
     pub mod ai_chat_commands;
+    /// Commands cho đọc file schedule Excel.
+    pub mod schedule_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -119,6 +121,8 @@ mod models {
     pub mod ai_usage;
     /// Model cho module AI Chat (hội thoại với các nhà cung cấp LLM).
     pub mod ai_chat;
+    /// Model cho đọc file schedule Excel.
+    pub mod schedule;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -165,6 +169,8 @@ mod services {
     pub mod ai_usage_service;
     /// Service cho module AI Chat — gọi API các nhà cung cấp LLM.
     pub mod ai_chat_service;
+    /// Service đọc file schedule Excel và trích xuất dữ liệu giờ công.
+    pub mod schedule_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

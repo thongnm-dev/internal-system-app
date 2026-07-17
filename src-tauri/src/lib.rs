@@ -52,6 +52,7 @@ use commands::ai_usage_commands::{
     ai_usage_add_account, ai_usage_delete_account, ai_usage_list_accounts,
 };
 use commands::ai_chat_commands::ai_chat_complete;
+use commands::schedule_commands::read_schedule_excel;
 use commands::s3_commands::{
     s3_check_download_available, s3_create_folder, s3_delete_by_storage, s3_delete_objects,
     s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
@@ -201,7 +202,9 @@ pub fn run() {
             ai_usage_list_accounts,
             ai_usage_delete_account,
             // === AI Chat commands ===
-            ai_chat_complete
+            ai_chat_complete,
+            // === Schedule commands ===
+            read_schedule_excel
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

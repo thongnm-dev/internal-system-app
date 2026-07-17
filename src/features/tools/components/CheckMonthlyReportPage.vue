@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { open } from "@tauri-apps/plugin-dialog";
+import Calendar from "primevue/calendar";
+import Checkbox from "primevue/checkbox";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
+import { useAuthStore } from "@/app/stores/auth";
 import { useImportCsv } from "../composables/useImportCsv";
-import MessageBanner from "@/shared/components/MessageBanner.vue";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
+import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { tauriRuntimeMessage } from "@/shared/config/appConfig";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
+import { readScheduleExcel, type ScheduleResult } from "@/tauri/commands/schedule";
 import type {
   AnalysisResult,
   ProjectSummary,
@@ -15,8 +22,117 @@ import type {
 } from "@/_/types/analysis";
 import type { ImportCsvPreviewResult } from "@/_/types/import-csv";
 
+const auth = useAuthStore();
+const loading = useGlobalLoading();
 const ctrl = useImportCsv();
 const isDetailDialogOpen = ref(false);
+
+const schedulePath = ref("");
+const targetMonth = ref<Date>(new Date());
+const targetUser = ref(auth.user?.username ?? "");
+const autoFetchData = ref(false);
+const isConflictDialogOpen = ref(false);
+const isScheduleDialogOpen = ref(false);
+const scheduleData = ref<ScheduleResult | null>(null);
+
+type ScheduleTableRow = {
+  id: string;
+  date: string;
+  phase: string;
+  job_id: string;
+  hours: number;
+  sheet_name: string;
+  worker_name: string;
+};
+
+const scheduleRows = computed<ScheduleTableRow[]>(() => {
+  if (!scheduleData.value) return [];
+  const grouped = new Map<string, ScheduleTableRow>();
+  const tm = scheduleData.value.target_month;
+  const [mm, yyyy] = tm.split("/");
+  for (const worker of scheduleData.value.workers) {
+    for (const day of worker.days) {
+      for (const entry of day.entries) {
+        const date = `${yyyy}/${mm}/${day.day}`;
+        const key = `${worker.worker_name}|${date}|${entry.job_id}|${entry.sheet_name}`;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.hours += entry.hours;
+        } else {
+          grouped.set(key, {
+            id: key,
+            date,
+            phase: entry.phase,
+            job_id: entry.job_id,
+            hours: entry.hours,
+            sheet_name: entry.sheet_name,
+            worker_name: worker.worker_name,
+          });
+        }
+      }
+    }
+  }
+  return Array.from(grouped.values());
+});
+
+const scheduleTotalHours = computed(() =>
+  scheduleRows.value.reduce((sum, r) => sum + r.hours, 0),
+);
+
+async function viewScheduleData() {
+  if (!schedulePath.value) return;
+  await loading.run(async () => {
+    try {
+      const year = targetMonth.value.getFullYear();
+      const month = targetMonth.value.getMonth() + 1;
+      scheduleData.value = await readScheduleExcel(schedulePath.value, year, month, targetUser.value || undefined);
+      isScheduleDialogOpen.value = true;
+    } catch (e) {
+      ctrl.message.value = friendlyError(e);
+      ctrl.messageMode.value = "error";
+    }
+  });
+}
+
+async function previewWithLoading() {
+  await loading.run(() => ctrl.previewCsv());
+}
+
+function onCompareClick() {
+  if (ctrl.csvPath.value && autoFetchData.value) {
+    isConflictDialogOpen.value = true;
+    return;
+  }
+  runCompare(autoFetchData.value ? "fetch" : "file");
+}
+
+async function runCompare(source: "file" | "fetch") {
+  isConflictDialogOpen.value = false;
+  await loading.run(async () => {
+    // TODO: compare logic
+    void source;
+  });
+}
+
+async function pickScheduleFile() {
+  if (!canUseTauriRuntime()) {
+    ctrl.message.value = tauriRuntimeMessage;
+    ctrl.messageMode.value = "error";
+    return;
+  }
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
+    });
+    if (typeof selected === "string") {
+      schedulePath.value = selected;
+    }
+  } catch (e) {
+    ctrl.message.value = friendlyError(e);
+    ctrl.messageMode.value = "error";
+  }
+}
 
 type ImportProjectTableRow =
   | { id: string; kind: "project"; project: ProjectSummary; phase: null; rowCount: number; totals: ProjectSummary["totals"] }
@@ -81,19 +197,38 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <div class="grid grid-cols-1 gap-4">
       <div class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-        <div class="flex items-center gap-2">
-          <i class="pi pi-database text-xl text-brand" />
-          <h3 class="font-bold">Monthly report CSV import</h3>
-        </div>
-        <p class="mt-2 text-sm text-secondary">Upload an exported CSV from the system and save it as check data for monthly report matching.</p>
-        <div class="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
-          <InputText class="min-w-0 flex-1" placeholder="Select CSV file..." 
-          :model-value="ctrl.csvPath.value" 
-          @update:model-value="ctrl.updateCsvPath($event as string)" 
+        <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
+          <InputText class="min-w-0 flex-1" placeholder="Select CSV file..."
+          :model-value="ctrl.csvPath.value"
+          @update:model-value="ctrl.updateCsvPath($event as string)"
           readonly
           />
           <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse CSV" @click="ctrl.pickCsvFile()" />
-          <Button icon="pi pi-file-import" label="Import" :disabled="ctrl.isImporting.value" @click="ctrl.previewCsv()" />
+        </div>
+        <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
+          <InputText class="min-w-0 flex-1" placeholder="Select schedule Excel file..."
+          :model-value="schedulePath"
+          readonly
+          />
+          <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel" @click="pickScheduleFile()" />
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <span class="w-24 shrink-0 text-sm font-medium text-muted">Target month</span>
+          <Calendar v-model="targetMonth" view="month" date-format="mm/yy" show-icon icon-display="input" class="w-44" />
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <span class="w-24 shrink-0 text-sm font-medium text-muted">Target user</span>
+          <InputText v-model="targetUser" placeholder="Worker name" class="w-44" />
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <span class="w-24 shrink-0 text-sm font-medium text-muted"></span>
+          <Checkbox v-model="autoFetchData" input-id="autoFetch" :binary="true" />
+          <label for="autoFetch" class="cursor-pointer text-sm text-ink">Tự động lấy dữ liệu từ hệ thống</label>
+        </div>
+        <div class="mt-2 flex items-center justify-end gap-2">
+          <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!schedulePath" @click="viewScheduleData()" />
+          <Button icon="pi pi-file-import" label="Preview" :disabled="ctrl.isImporting.value" @click="previewWithLoading()" />
+          <Button icon="pi pi-check-circle" label="Compare" :disabled="!schedulePath" @click="onCompareClick()" />
         </div>
       </div>
     </div>
@@ -125,6 +260,42 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </DataTable>
       </section>
     </div>
+
+    <!-- Schedule Data Dialog -->
+    <Dialog :visible="isScheduleDialogOpen" modal class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isScheduleDialogOpen = $event">
+      <template #header>
+        <div class="min-w-0">
+          <h3 class="truncate text-lg font-bold text-ink">Schedule data</h3>
+          <p class="mt-1 truncate text-sm text-muted">
+            {{ scheduleData ? `${scheduleData.target_month} — ${scheduleRows.length} rows — Total: ${scheduleTotalHours.toFixed(1)}h` : '' }}
+          </p>
+        </div>
+      </template>
+      <DataTable class="app-data-table min-h-0" empty-message="No schedule data found for this month." scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="scheduleRows">
+        <Column header="Date" field="date" style="width: 100px" />
+        <Column header="Worker" field="worker_name" style="width: 130px" />
+        <Column header="Phase" field="phase" style="width: 180px" />
+        <Column header="Job ID" field="job_id" />
+        <Column header="Hours" field="hours" body-class="num font-bold text-brand" header-class="num" style="width: 80px">
+          <template #body="{ data }">{{ data.hours.toFixed(1) }}</template>
+        </Column>
+        <Column header="Sheet" field="sheet_name" style="width: 140px" />
+      </DataTable>
+    </Dialog>
+
+    <!-- Conflict Dialog -->
+    <Dialog :visible="isConflictDialogOpen" modal header="Xác nhận nguồn dữ liệu" class="w-full max-w-lg" @update:visible="isConflictDialogOpen = $event">
+      <p class="text-sm text-ink">
+        Bạn đã nhập file CSV và đồng thời bật <strong>Tự động lấy dữ liệu từ hệ thống</strong>. Vui lòng chọn nguồn dữ liệu để so khớp:
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button label="Cancel" severity="secondary" outlined @click="isConflictDialogOpen = false" />
+          <Button label="Sử dụng file" icon="pi pi-file" severity="info" @click="runCompare('file')" />
+          <Button label="Lấy dữ liệu mới" icon="pi pi-download" @click="runCompare('fetch')" />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- Detail Dialog -->
     <Dialog v-if="ctrl.previewResult.value" :visible="isDetailDialogOpen" class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isDetailDialogOpen = $event">
