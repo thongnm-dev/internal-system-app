@@ -22,3 +22,36 @@ pub fn explorer_open(path: String) -> Result<(), String> {
 pub fn explorer_get_drives() -> Vec<String> {
     explorer_service::get_drives()
 }
+
+#[tauri::command]
+pub fn explorer_rename(path: String, new_name: String) -> Result<(), String> {
+    explorer_service::rename_entry(&path, &new_name)
+}
+
+#[tauri::command]
+pub fn explorer_delete(paths: Vec<String>) -> Result<(), String> {
+    explorer_service::delete_entries(&paths)
+}
+
+#[tauri::command]
+pub fn explorer_create_file(dir: String, name: String) -> Result<String, String> {
+    explorer_service::create_file(&dir, &name)
+}
+
+#[tauri::command]
+pub fn explorer_create_folder(dir: String, name: String) -> Result<String, String> {
+    explorer_service::create_folder(&dir, &name)
+}
+
+#[tauri::command]
+pub async fn explorer_paste(
+    sources: Vec<String>,
+    dest_dir: String,
+    cut: bool,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        explorer_service::paste_entries(&sources, &dest_dir, cut)
+    })
+    .await
+    .map_err(|e| format!("Thread error: {e}"))?
+}

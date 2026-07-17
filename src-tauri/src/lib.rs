@@ -43,7 +43,8 @@ use commands::excel2md_commands::excel2md;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
-    explorer_get_drives, explorer_open, explorer_read_dir, explorer_search,
+    explorer_create_file, explorer_create_folder, explorer_delete, explorer_get_drives,
+    explorer_open, explorer_paste, explorer_read_dir, explorer_rename, explorer_search,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::ai_usage_commands::{
@@ -170,6 +171,11 @@ pub fn run() {
             explorer_search,
             explorer_open,
             explorer_get_drives,
+            explorer_rename,
+            explorer_delete,
+            explorer_create_file,
+            explorer_create_folder,
+            explorer_paste,
             // === AI Usage commands ===
             ai_usage_add_account,
             ai_usage_list_accounts,

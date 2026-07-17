@@ -36,3 +36,23 @@ export function explorerOpen(path: string) {
 export function explorerGetDrives() {
   return safeInvoke<string[]>("explorer_get_drives");
 }
+
+export function explorerRename(path: string, newName: string) {
+  return safeInvoke<void>("explorer_rename", { path, newName });
+}
+
+export function explorerDelete(paths: string[]) {
+  return safeInvoke<void>("explorer_delete", { paths });
+}
+
+export function explorerCreateFile(dir: string, name: string) {
+  return safeInvoke<string>("explorer_create_file", { dir, name });
+}
+
+export function explorerCreateFolder(dir: string, name: string) {
+  return safeInvoke<string>("explorer_create_folder", { dir, name });
+}
+
+export function explorerPaste(sources: string[], destDir: string, cut: boolean) {
+  return safeInvoke<void>("explorer_paste", { sources, destDir, cut });
+}

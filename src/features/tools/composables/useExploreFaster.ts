@@ -4,6 +4,11 @@ import {
   explorerSearch,
   explorerOpen,
   explorerGetDrives,
+  explorerRename,
+  explorerDelete,
+  explorerCreateFile,
+  explorerCreateFolder,
+  explorerPaste,
   type FileEntry,
 } from "@/tauri/commands/explorer";
 import { friendlyError } from "@/tauri/commands/_base";
@@ -196,6 +201,55 @@ export function useExploreFaster() {
     await navigateTo(trimmed);
   }
 
+  async function renameEntry(path: string, newName: string) {
+    try {
+      await explorerRename(path, newName);
+      await refresh();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
+  async function deleteEntries(paths: string[]) {
+    if (paths.length === 0) return;
+    try {
+      await explorerDelete(paths);
+      await refresh();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
+  async function createFile(name: string) {
+    if (!currentPath.value) return;
+    try {
+      await explorerCreateFile(currentPath.value, name);
+      await refresh();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
+  async function createFolder(name: string) {
+    if (!currentPath.value) return;
+    try {
+      await explorerCreateFolder(currentPath.value, name);
+      await refresh();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
+  async function pasteEntries(sources: string[], cut: boolean) {
+    if (!currentPath.value || sources.length === 0) return;
+    try {
+      await explorerPaste(sources, currentPath.value, cut);
+      await refresh();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
   const canGoBack = computed(() => historyIndex.value > 0);
   const canGoForward = computed(() => historyIndex.value < history.value.length - 1);
 
@@ -224,5 +278,10 @@ export function useExploreFaster() {
     openEntry,
     openInExplorer,
     handlePathSubmit,
+    renameEntry,
+    deleteEntries,
+    createFile,
+    createFolder,
+    pasteEntries,
   };
 }

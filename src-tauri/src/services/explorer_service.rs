@@ -206,6 +206,110 @@ pub fn open_in_explorer(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn rename_entry(path: &str, new_name: &str) -> Result<(), String> {
+    let p = Path::new(path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    let parent = p.parent().ok_or("Cannot determine parent directory")?;
+    let new_path = parent.join(new_name);
+    if new_path.exists() {
+        return Err(format!("'{}' already exists", new_name));
+    }
+    fs::rename(p, &new_path).map_err(|e| format!("Rename failed: {e}"))
+}
+
+pub fn delete_entries(paths: &[String]) -> Result<(), String> {
+    for path in paths {
+        let p = Path::new(path);
+        if !p.exists() {
+            continue;
+        }
+        if p.is_dir() {
+            fs::remove_dir_all(p).map_err(|e| format!("Delete folder failed: {e}"))?;
+        } else {
+            fs::remove_file(p).map_err(|e| format!("Delete file failed: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+pub fn create_file(dir: &str, name: &str) -> Result<String, String> {
+    let dir_path = Path::new(dir);
+    if !dir_path.is_dir() {
+        return Err(format!("Not a directory: {dir}"));
+    }
+    let file_path = dir_path.join(name);
+    if file_path.exists() {
+        return Err(format!("'{}' already exists", name));
+    }
+    fs::File::create(&file_path).map_err(|e| format!("Create file failed: {e}"))?;
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+pub fn create_folder(dir: &str, name: &str) -> Result<String, String> {
+    let dir_path = Path::new(dir);
+    if !dir_path.is_dir() {
+        return Err(format!("Not a directory: {dir}"));
+    }
+    let folder_path = dir_path.join(name);
+    if folder_path.exists() {
+        return Err(format!("'{}' already exists", name));
+    }
+    fs::create_dir(&folder_path).map_err(|e| format!("Create folder failed: {e}"))?;
+    Ok(folder_path.to_string_lossy().to_string())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    fs::create_dir_all(dst).map_err(|e| format!("Create dir failed: {e}"))?;
+    for entry in fs::read_dir(src).map_err(|e| format!("Read dir failed: {e}"))? {
+        let entry = entry.map_err(|e| format!("Read entry failed: {e}"))?;
+        let src_child = entry.path();
+        let dst_child = dst.join(entry.file_name());
+        if src_child.is_dir() {
+            copy_dir_recursive(&src_child, &dst_child)?;
+        } else {
+            fs::copy(&src_child, &dst_child).map_err(|e| format!("Copy file failed: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+pub fn paste_entries(sources: &[String], dest_dir: &str, cut: bool) -> Result<(), String> {
+    let dest = Path::new(dest_dir);
+    if !dest.is_dir() {
+        return Err(format!("Destination is not a directory: {dest_dir}"));
+    }
+    for source in sources {
+        let src = Path::new(source);
+        if !src.exists() {
+            continue;
+        }
+        let name = src
+            .file_name()
+            .ok_or_else(|| format!("Invalid filename: {source}"))?;
+        let target = dest.join(name);
+        if cut {
+            if fs::rename(src, &target).is_err() {
+                if src.is_dir() {
+                    copy_dir_recursive(src, &target)?;
+                    fs::remove_dir_all(src)
+                        .map_err(|e| format!("Remove source failed: {e}"))?;
+                } else {
+                    fs::copy(src, &target).map_err(|e| format!("Copy failed: {e}"))?;
+                    fs::remove_file(src)
+                        .map_err(|e| format!("Remove source failed: {e}"))?;
+                }
+            }
+        } else if src.is_dir() {
+            copy_dir_recursive(src, &target)?;
+        } else {
+            fs::copy(src, &target).map_err(|e| format!("Copy failed: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
 pub fn get_drives() -> Vec<String> {
     let mut drives = Vec::new();
     #[cfg(target_os = "windows")]
