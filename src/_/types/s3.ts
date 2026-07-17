@@ -65,3 +65,7 @@ export interface DeleteUploadedItem {
   awsCd: string;
   bugNo: string;
 }
+
+export interface DownloadAvailability {
+  downloadAvailable: boolean;
+}

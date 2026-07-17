@@ -1,5 +1,5 @@
 import { safeInvoke } from "./_base";
-import type { AwsStorage, DeleteUploadedItem, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest } from "@/_/types/s3";
+import type { AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest } from "@/_/types/s3";
 
 export function s3TestConnection() {
   return safeInvoke<string>("s3_test_connection");
@@ -51,4 +51,32 @@ export function s3UploadFolderToS3(folderPath: string, s3Prefix: string) {
 
 export function s3DeleteUploadedItems(items: DeleteUploadedItem[]) {
   return safeInvoke<S3OperationResult>("s3_delete_uploaded_items", { items });
+}
+
+export function s3ListDownloadStorages() {
+  return safeInvoke<AwsStorage[]>("s3_list_download_storages");
+}
+
+export function s3CheckDownloadAvailable(codes: string[]) {
+  return safeInvoke<Record<string, DownloadAvailability>>("s3_check_download_available", { codes });
+}
+
+export function s3GetDownloadList(code: string) {
+  return safeInvoke<string[]>("s3_get_download_list", { code });
+}
+
+export function s3DownloadByStorage(code: string, bugList: string[], localPath: string) {
+  return safeInvoke<S3OperationResult>("s3_download_by_storage", { code, bugList, localPath });
+}
+
+export function s3MoveObjects(code: string, items: string[]) {
+  return safeInvoke<S3OperationResult>("s3_move_objects", { code, items });
+}
+
+export function s3MoveBrowserObjects(keys: string[], destinationPrefix: string) {
+  return safeInvoke<S3OperationResult>("s3_move_browser_objects", { keys, destinationPrefix });
+}
+
+export function s3DeleteByStorage(code: string, items: string[]) {
+  return safeInvoke<S3OperationResult>("s3_delete_by_storage", { code, items });
 }

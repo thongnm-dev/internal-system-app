@@ -79,6 +79,12 @@ pub struct LocalFileEntry {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DownloadAvailability {
+    pub download_available: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct S3OperationResult {
     pub success: bool,
     pub message: String,

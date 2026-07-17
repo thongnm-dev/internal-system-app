@@ -9,6 +9,7 @@ import {
   s3ScanLocalFolder,
   s3DeleteObjects,
   s3CreateFolder,
+  s3MoveBrowserObjects,
 } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { S3Object, S3OperationResult, LocalFileEntry } from "@/_/types/s3";
@@ -28,6 +29,7 @@ export function useS3Browser() {
   const isUploading = ref(false);
   const isDownloading = ref(false);
   const isDeleting = ref(false);
+  const isMoving = ref(false);
   const selectedKeys = ref<Set<string>>(new Set());
   const message = ref("Connecting to S3...");
   const messageMode = ref<MessageMode>("info");
@@ -370,6 +372,39 @@ export function useS3Browser() {
     }
   }
 
+  async function browseFolders(prefix: string): Promise<S3Object[]> {
+    if (!canUseTauriRuntime()) return [];
+    try {
+      const result = await s3ListObjects(prefix);
+      return result.objects.filter((o) => o.isFolder);
+    } catch {
+      return [];
+    }
+  }
+
+  async function moveObjects(keys: string[], destinationPrefix: string): Promise<S3OperationResult | null> {
+    if (keys.length === 0) return null;
+    if (!(await guard.ensureOnline())) return null;
+
+    isMoving.value = true;
+    try {
+      const result = await s3MoveBrowserObjects(keys, destinationPrefix);
+      message.value = result.message;
+      messageMode.value = result.success ? "info" : "error";
+      if (result.success) {
+        selectedKeys.value = new Set();
+        await refresh(true);
+      }
+      return result;
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      return null;
+    } finally {
+      isMoving.value = false;
+    }
+  }
+
   async function createFolder(name: string): Promise<S3OperationResult | null> {
     if (!name.trim()) return null;
     if (!(await guard.ensureOnline())) return null;
@@ -400,6 +435,7 @@ export function useS3Browser() {
     isUploading,
     isDownloading,
     isDeleting,
+    isMoving,
     selectedKeys,
     selectedCount,
     allSelected,
@@ -428,6 +464,8 @@ export function useS3Browser() {
     uploadFolder,
     deleteSelected,
     deleteSingle,
+    moveObjects,
+    browseFolders,
     createFolder,
   };
 }

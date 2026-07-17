@@ -1,4 +1,5 @@
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
+use std::collections::HashMap;
 use crate::services::s3_service;
 
 #[tauri::command]
@@ -107,6 +108,70 @@ pub async fn s3_delete_uploaded_items(
     items: Vec<DeleteUploadedItem>,
 ) -> Result<S3OperationResult, String> {
     s3_service::delete_uploaded_items(items)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_list_download_storages() -> Result<Vec<AwsStorage>, String> {
+    s3_service::list_download_storages()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_check_download_available(
+    codes: Vec<String>,
+) -> Result<HashMap<String, DownloadAvailability>, String> {
+    s3_service::check_download_available(codes)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_get_download_list(code: String) -> Result<Vec<String>, String> {
+    s3_service::get_download_list(code)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_download_by_storage(
+    code: String,
+    bug_list: Vec<String>,
+    local_path: String,
+) -> Result<S3OperationResult, String> {
+    s3_service::download_by_storage(code, bug_list, local_path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_move_objects(
+    code: String,
+    items: Vec<String>,
+) -> Result<S3OperationResult, String> {
+    s3_service::move_s3_objects(code, items)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_move_browser_objects(
+    keys: Vec<String>,
+    destination_prefix: String,
+) -> Result<S3OperationResult, String> {
+    s3_service::move_browser_objects(keys, destination_prefix)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_delete_by_storage(
+    code: String,
+    items: Vec<String>,
+) -> Result<S3OperationResult, String> {
+    s3_service::delete_s3_objects_by_storage(code, items)
         .await
         .map_err(|e| e.to_string())
 }

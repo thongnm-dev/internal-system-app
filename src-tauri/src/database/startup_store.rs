@@ -114,7 +114,9 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_api_key_get_value", include_str!("../../../docs/store-procedure/sp_api_key_get_value.sql")),
         // === AWS Storage ===
         ("sp_aws_storage_select_by_upload", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_upload.sql")),
+        ("sp_aws_storage_select_by_download", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_download.sql")),
         ("sp_aws_storage_select_by_codes", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_codes.sql")),
+        ("sp_aws_storage_select_by_code_list", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_code_list.sql")),
         ("sp_aws_work_folder_get_name", include_str!("../../../docs/store-procedure/sp_aws_work_folder_get_name.sql")),
     ];
 

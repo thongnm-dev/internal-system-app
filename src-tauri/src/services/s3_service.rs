@@ -1,12 +1,13 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
 use crate::utils::pgsql_connect;
 
 use aws_config::Region;
 use aws_credential_types::Credentials;
 use aws_sdk_s3::Client;
 use ini::Ini;
+use std::collections::HashMap;
 use std::path::Path;
 
 pub(crate) fn load_config_from_ini() -> AppResult<S3Config> {
@@ -629,6 +630,407 @@ pub async fn upload_folder(
     } else {
         format!(
             "Uploaded {processed} file(s), {failed} failed.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
+    })
+}
+
+pub async fn list_download_storages() -> AppResult<Vec<AwsStorage>> {
+    crate::database::aws_storage_store::list_by_download().await
+}
+
+pub async fn check_download_available(codes: Vec<String>) -> AppResult<HashMap<String, DownloadAvailability>> {
+    let storages = crate::database::aws_storage_store::list_by_codes(&codes).await?;
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+
+    let mut result = HashMap::new();
+    for storage in &storages {
+        let prefix = format!("{}/{}/{}/", work_folder, storage.name, storage.subscribe);
+        let has_items = client
+            .list_objects_v2()
+            .bucket(&bucket)
+            .prefix(&prefix)
+            .delimiter("/")
+            .send()
+            .await
+            .map(|out| !out.common_prefixes().is_empty())
+            .unwrap_or(false);
+        result.insert(
+            storage.code.clone(),
+            DownloadAvailability {
+                download_available: has_items,
+            },
+        );
+    }
+    Ok(result)
+}
+
+pub async fn get_download_list(code: String) -> AppResult<Vec<String>> {
+    let storages = crate::database::aws_storage_store::list_by_codes(&[code]).await?;
+    let storage = storages
+        .first()
+        .ok_or_else(|| AppError::new("Storage not found".to_string()))?;
+
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let prefix = format!("{}/{}/{}/", work_folder, storage.name, storage.subscribe);
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+
+    let output = client
+        .list_objects_v2()
+        .bucket(&bucket)
+        .prefix(&prefix)
+        .delimiter("/")
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Failed to list download items: {e}")))?;
+
+    let items: Vec<String> = output
+        .common_prefixes()
+        .iter()
+        .filter_map(|p| p.prefix())
+        .filter_map(|p| {
+            p.strip_prefix(&prefix)
+                .map(|s| s.trim_end_matches('/').to_string())
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    Ok(items)
+}
+
+pub async fn download_by_storage(
+    code: String,
+    bug_list: Vec<String>,
+    local_path: String,
+) -> AppResult<S3OperationResult> {
+    let storages = crate::database::aws_storage_store::list_by_codes(&[code]).await?;
+    let storage = storages
+        .first()
+        .ok_or_else(|| AppError::new("Storage not found".to_string()))?;
+
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let base_prefix = format!("{}/{}/{}/", work_folder, storage.name, storage.subscribe);
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let dest = Path::new(&local_path);
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for bug in &bug_list {
+        let prefix = format!("{}{}/", base_prefix, bug);
+        match list_all_objects_recursive(&client, &bucket, &prefix).await {
+            Ok(keys) => {
+                for key in &keys {
+                    let relative = key.strip_prefix(base_prefix.as_str()).unwrap_or(key.as_str());
+                    let local_file = dest.join(relative);
+
+                    if let Some(parent) = local_file.parent() {
+                        if let Err(e) = tokio::fs::create_dir_all(parent).await {
+                            failed += 1;
+                            errors.push(format!("{key}: failed to create directory: {e}"));
+                            continue;
+                        }
+                    }
+
+                    match client
+                        .get_object()
+                        .bucket(&bucket)
+                        .key(key)
+                        .send()
+                        .await
+                    {
+                        Ok(output) => match output.body.collect().await {
+                            Ok(data) => {
+                                if let Err(e) = tokio::fs::write(&local_file, &data.into_bytes()).await {
+                                    failed += 1;
+                                    errors.push(format!("{key}: write failed: {e}"));
+                                } else {
+                                    processed += 1;
+                                }
+                            }
+                            Err(e) => {
+                                failed += 1;
+                                errors.push(format!("{key}: read stream failed: {e}"));
+                            }
+                        },
+                        Err(e) => {
+                            failed += 1;
+                            errors.push(format!("{key}: download failed: {e}"));
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{bug}: list failed: {e}"));
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Tải về thành công {processed} tập tin.")
+    } else {
+        format!(
+            "Tải về {processed} tập tin, {failed} thất bại.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
+    })
+}
+
+pub async fn move_s3_objects(
+    code: String,
+    items: Vec<String>,
+) -> AppResult<S3OperationResult> {
+    let storages = crate::database::aws_storage_store::list_by_codes(&[code.clone()]).await?;
+    let storage = storages
+        .first()
+        .ok_or_else(|| AppError::new("Storage not found".to_string()))?;
+
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let source_prefix = format!("{}/{}/{}/", work_folder, storage.name, storage.subscribe);
+    let target_prefix = format!("{}/{}/", work_folder, storage.name);
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for item in &items {
+        let item_prefix = format!("{}{}/", source_prefix, item);
+        match list_all_objects_recursive(&client, &bucket, &item_prefix).await {
+            Ok(keys) => {
+                for key in &keys {
+                    let relative = key.strip_prefix(source_prefix.as_str()).unwrap_or(key.as_str());
+                    let target_key = format!("{}{}", target_prefix, relative);
+                    let encoded_key = key
+                        .split('/')
+                        .map(|seg| urlencoding::encode(seg).into_owned())
+                        .collect::<Vec<_>>()
+                        .join("/");
+                    let copy_source = format!("{}/{}", bucket, encoded_key);
+
+                    match client
+                        .copy_object()
+                        .bucket(&bucket)
+                        .copy_source(&copy_source)
+                        .key(&target_key)
+                        .send()
+                        .await
+                    {
+                        Ok(_) => {
+                            if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
+                                failed += 1;
+                                errors.push(format!("{key}: delete after copy failed: {e}"));
+                            } else {
+                                processed += 1;
+                            }
+                        }
+                        Err(e) => {
+                            failed += 1;
+                            errors.push(format!("{key}: copy failed: {e}"));
+                        }
+                    }
+                }
+                let _ = client.delete_object().bucket(&bucket).key(&item_prefix).send().await;
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{item}: list failed: {e}"));
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Đã di chuyển thành công {processed} tập tin.")
+    } else {
+        format!(
+            "Di chuyển {processed} tập tin, {failed} thất bại.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
+    })
+}
+
+pub async fn delete_s3_objects_by_storage(
+    code: String,
+    items: Vec<String>,
+) -> AppResult<S3OperationResult> {
+    let storages = crate::database::aws_storage_store::list_by_codes(&[code]).await?;
+    let storage = storages
+        .first()
+        .ok_or_else(|| AppError::new("Storage not found".to_string()))?;
+
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let base_prefix = format!("{}/{}/{}/", work_folder, storage.name, storage.subscribe);
+
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for item in &items {
+        let item_prefix = format!("{}{}/", base_prefix, item);
+        match list_all_objects_recursive(&client, &bucket, &item_prefix).await {
+            Ok(keys) => {
+                let mut item_failed = false;
+                for key in &keys {
+                    if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
+                        failed += 1;
+                        item_failed = true;
+                        errors.push(format!("{key}: {e}"));
+                    }
+                }
+                let _ = client.delete_object().bucket(&bucket).key(&item_prefix).send().await;
+                if !item_failed {
+                    processed += 1;
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{item}: list failed: {e}"));
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Đã xoá thành công {processed} thư mục.")
+    } else {
+        format!(
+            "Đã xoá {processed} thư mục, {failed} thất bại.\n{}",
+            errors.join("\n")
+        )
+    };
+
+    Ok(S3OperationResult {
+        success: failed == 0,
+        message,
+        processed,
+        failed,
+    })
+}
+
+pub async fn move_browser_objects(
+    keys: Vec<String>,
+    destination_prefix: String,
+) -> AppResult<S3OperationResult> {
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+    let mut processed: u32 = 0;
+    let mut failed: u32 = 0;
+    let mut errors: Vec<String> = Vec::new();
+
+    for key in &keys {
+        if key.ends_with('/') {
+            let folder_name = key.trim_end_matches('/')
+                .rsplit('/')
+                .next()
+                .unwrap_or("");
+            match list_all_objects_recursive(&client, &bucket, key).await {
+                Ok(sub_keys) => {
+                    for sub_key in &sub_keys {
+                        let relative = sub_key.strip_prefix(key).unwrap_or(sub_key);
+                        let target_key = format!("{}{}/{}", destination_prefix, folder_name, relative);
+                        let encoded_key = sub_key
+                            .split('/')
+                            .map(|seg| urlencoding::encode(seg).into_owned())
+                            .collect::<Vec<_>>()
+                            .join("/");
+                        let copy_source = format!("{}/{}", bucket, encoded_key);
+                        match client
+                            .copy_object()
+                            .bucket(&bucket)
+                            .copy_source(&copy_source)
+                            .key(&target_key)
+                            .send()
+                            .await
+                        {
+                            Ok(_) => {
+                                if let Err(e) = client.delete_object().bucket(&bucket).key(sub_key).send().await {
+                                    failed += 1;
+                                    errors.push(format!("{sub_key}: delete after copy failed: {e}"));
+                                } else {
+                                    processed += 1;
+                                }
+                            }
+                            Err(e) => {
+                                failed += 1;
+                                errors.push(format!("{sub_key}: copy failed: {e}"));
+                            }
+                        }
+                    }
+                    let _ = client.delete_object().bucket(&bucket).key(key).send().await;
+                }
+                Err(e) => {
+                    failed += 1;
+                    errors.push(format!("{key}: list failed: {e}"));
+                }
+            }
+        } else {
+            let file_name = key.rsplit('/').next().unwrap_or(key);
+            let target_key = format!("{}{}", destination_prefix, file_name);
+            let encoded_key = key
+                .split('/')
+                .map(|seg| urlencoding::encode(seg).into_owned())
+                .collect::<Vec<_>>()
+                .join("/");
+            let copy_source = format!("{}/{}", bucket, encoded_key);
+            match client
+                .copy_object()
+                .bucket(&bucket)
+                .copy_source(&copy_source)
+                .key(&target_key)
+                .send()
+                .await
+            {
+                Ok(_) => {
+                    if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
+                        failed += 1;
+                        errors.push(format!("{key}: delete after copy failed: {e}"));
+                    } else {
+                        processed += 1;
+                    }
+                }
+                Err(e) => {
+                    failed += 1;
+                    errors.push(format!("{key}: copy failed: {e}"));
+                }
+            }
+        }
+    }
+
+    let message = if errors.is_empty() {
+        format!("Đã di chuyển thành công {processed} tập tin.")
+    } else {
+        format!(
+            "Di chuyển {processed} tập tin, {failed} thất bại.\n{}",
             errors.join("\n")
         )
     };

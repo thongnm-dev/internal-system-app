@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from "vue";
+import { ref, computed, onUnmounted, watch } from "vue";
 import { useS3Browser } from "../composables/useS3Browser";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
@@ -20,8 +20,91 @@ const newFolderName = ref("");
 const confirmDeleteTarget = ref<{ keys: string[]; label: string } | null>(null);
 
 const isOperating = computed(
-  () => ctrl.isLoading.value || ctrl.isUploading.value || ctrl.isDownloading.value || ctrl.isDeleting.value,
+  () => ctrl.isLoading.value || ctrl.isUploading.value || ctrl.isDownloading.value || ctrl.isDeleting.value || ctrl.isMoving.value,
 );
+
+// --- More Actions Dropdown ---
+const showMoreActions = ref(false);
+
+function toggleMoreActions() {
+  showMoreActions.value = !showMoreActions.value;
+}
+
+function closeMoreActions() {
+  showMoreActions.value = false;
+}
+
+watch(showMoreActions, (open) => {
+  if (open) {
+    setTimeout(() => window.addEventListener("click", closeMoreActions), 0);
+  } else {
+    window.removeEventListener("click", closeMoreActions);
+  }
+});
+
+// --- Move Dialog ---
+const showMoveDialog = ref(false);
+const moveKeys = ref<Set<string>>(new Set());
+const moveDestPrefix = ref("");
+const moveBrowseFolders = ref<S3Object[]>([]);
+const isLoadingMoveFolders = ref(false);
+
+const moveBreadcrumbs = computed(() => {
+  const parts: { label: string; prefix: string }[] = [{ label: "Root", prefix: "" }];
+  if (!moveDestPrefix.value) return parts;
+  const segments = moveDestPrefix.value.split("/").filter(Boolean);
+  let accumulated = "";
+  for (const seg of segments) {
+    accumulated += seg + "/";
+    parts.push({ label: seg, prefix: accumulated });
+  }
+  return parts;
+});
+
+function openMoveDialog() {
+  closeMoreActions();
+  const keys = Array.from(ctrl.selectedKeys.value);
+  if (keys.length === 0) return;
+  moveKeys.value = new Set(keys);
+  moveDestPrefix.value = ctrl.currentPrefix.value;
+  showMoveDialog.value = true;
+  loadMoveFolders(moveDestPrefix.value);
+}
+
+function closeMoveDialog() {
+  showMoveDialog.value = false;
+  moveKeys.value = new Set();
+  moveBrowseFolders.value = [];
+}
+
+function toggleMoveKey(key: string) {
+  const newSet = new Set(moveKeys.value);
+  if (newSet.has(key)) {
+    newSet.delete(key);
+  } else {
+    newSet.add(key);
+  }
+  moveKeys.value = newSet;
+}
+
+async function loadMoveFolders(prefix: string) {
+  isLoadingMoveFolders.value = true;
+  moveBrowseFolders.value = await ctrl.browseFolders(prefix);
+  isLoadingMoveFolders.value = false;
+}
+
+async function navigateMoveFolder(prefix: string) {
+  moveDestPrefix.value = prefix;
+  await loadMoveFolders(prefix);
+}
+
+async function executeMove() {
+  const keys = Array.from(moveKeys.value);
+  if (keys.length === 0) return;
+  closeMoveDialog();
+  const result = await globalLoading.run(() => ctrl.moveObjects(keys, moveDestPrefix.value));
+  if (result?.success) toast.success("Moved successfully.");
+}
 
 // --- Upload Folder ---
 const showUploadFolder = ref(false);
@@ -288,15 +371,36 @@ function contextCopyKey() {
               <i :class="ctrl.isDownloading.value ? 'pi pi-spinner pi-spin' : 'pi pi-download'" />
               Download
             </button>
-            <button
-              v-if="ctrl.selectedCount.value > 0"
-              class="flex h-8 items-center gap-1.5 rounded-md bg-red-600 px-3 text-xs font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="isOperating"
-              @click="confirmDeleteSelected()"
-            >
-              <i :class="ctrl.isDeleting.value ? 'pi pi-spinner pi-spin' : 'pi pi-trash'" />
-              Delete
-            </button>
+            <div v-if="ctrl.selectedCount.value > 0" class="relative">
+              <button
+                class="flex h-8 items-center gap-1.5 rounded-md border border-divider bg-panel px-3 text-xs font-bold text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="isOperating"
+                @click="toggleMoreActions()"
+              >
+                <i class="pi pi-ellipsis-v" />
+                Actions
+                <i class="pi pi-chevron-down text-[10px]" />
+              </button>
+              <div
+                v-if="showMoreActions"
+                class="absolute right-0 top-full z-50 mt-1 min-w-40 overflow-hidden rounded-md border border-divider bg-panel py-1 shadow-xl"
+                @click.stop
+              >
+                <button
+                  class="flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-semibold text-secondary hover:bg-canvas"
+                  @click="openMoveDialog()"
+                >
+                  <i class="pi pi-arrow-right-arrow-left" /> Move
+                </button>
+                <div class="my-0.5 border-t border-divider" />
+                <button
+                  class="flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-semibold text-red-600 hover:bg-canvas"
+                  @click="closeMoreActions(); confirmDeleteSelected()"
+                >
+                  <i class="pi pi-trash" /> Delete
+                </button>
+              </div>
+            </div>
             <button
               class="flex h-8 w-8 items-center justify-center rounded-md border border-divider bg-panel text-secondary hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="isOperating"
@@ -578,6 +682,106 @@ function contextCopyKey() {
           >
             <i v-if="ctrl.isUploading.value" class="pi pi-spinner pi-spin mr-1" />
             Upload
+          </button>
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Move Dialog -->
+    <Dialog
+      :visible="showMoveDialog"
+      class="rounded-lg bg-panel shadow-xl"
+      :style="{ width: '50vw' }"
+      :closable="!ctrl.isMoving.value"
+      modal
+      @update:visible="(v: boolean) => { if (!v) closeMoveDialog(); }"
+    >
+      <template #header>
+        <h3 class="font-bold text-ink">Move Items</h3>
+      </template>
+
+      <div class="flex flex-col gap-4">
+        <!-- Selected items -->
+        <div>
+          <span class="text-xs font-bold text-muted">Items to move</span>
+          <div class="mt-1 max-h-36 overflow-y-auto rounded-md border border-divider">
+            <div
+              v-for="key in ctrl.selectedKeys.value"
+              :key="key"
+              class="flex items-center gap-2 border-b border-divider px-3 py-1.5 last:border-b-0"
+            >
+              <input
+                type="checkbox"
+                :checked="moveKeys.has(key)"
+                class="accent-brand"
+                @change="toggleMoveKey(key)"
+              />
+              <i :class="key.endsWith('/') ? 'pi pi-folder text-amber-500 text-xs' : 'pi pi-file text-muted text-xs'" />
+              <span class="min-w-0 flex-1 truncate text-xs text-secondary">
+                {{ key.endsWith('/') ? key.slice(0, -1).split('/').pop() : key.split('/').pop() }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination browser -->
+        <div>
+          <span class="text-xs font-bold text-muted">Destination</span>
+          <!-- Breadcrumbs -->
+          <div class="mt-1 flex items-center gap-1 overflow-x-auto text-xs">
+            <template v-for="(crumb, idx) in moveBreadcrumbs" :key="crumb.prefix">
+              <i v-if="idx > 0" class="pi pi-chevron-right text-[8px] text-muted" />
+              <button
+                class="whitespace-nowrap rounded px-1.5 py-0.5 font-semibold hover:bg-canvas"
+                :class="idx === moveBreadcrumbs.length - 1 ? 'text-brand' : 'text-secondary'"
+                @click="navigateMoveFolder(crumb.prefix)"
+              >
+                <i v-if="idx === 0" class="pi pi-server mr-0.5" />
+                {{ crumb.label }}
+              </button>
+            </template>
+          </div>
+          <!-- Folder list -->
+          <div class="mt-1 max-h-44 min-h-[80px] overflow-y-auto rounded-md border border-divider">
+            <div v-if="isLoadingMoveFolders" class="flex items-center justify-center gap-2 py-6">
+              <i class="pi pi-spinner pi-spin text-brand" />
+              <span class="text-xs text-muted">Loading...</span>
+            </div>
+            <div v-else-if="moveBrowseFolders.length === 0" class="py-6 text-center text-xs text-muted">
+              No subfolders
+            </div>
+            <template v-else>
+              <button
+                v-for="folder in moveBrowseFolders"
+                :key="folder.key"
+                class="flex h-9 w-full items-center gap-2 border-b border-divider px-3 text-left last:border-b-0 hover:bg-canvas"
+                @click="navigateMoveFolder(folder.key)"
+              >
+                <i class="pi pi-folder text-amber-500" />
+                <span class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{{ folder.displayName }}</span>
+                <i class="pi pi-chevron-right text-[10px] text-muted" />
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <button
+            class="h-10 rounded-md border border-divider bg-panel px-4 text-sm font-bold text-secondary hover:bg-canvas"
+            :disabled="ctrl.isMoving.value"
+            @click="closeMoveDialog()"
+          >
+            Cancel
+          </button>
+          <button
+            class="h-10 rounded-md bg-brand px-4 text-sm font-bold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="moveKeys.size === 0 || ctrl.isMoving.value"
+            @click="executeMove()"
+          >
+            <i v-if="ctrl.isMoving.value" class="pi pi-spinner pi-spin mr-1" />
+            Move
           </button>
         </div>
       </template>

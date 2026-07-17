@@ -52,8 +52,10 @@ use commands::ai_usage_commands::{
 };
 use commands::ai_chat_commands::ai_chat_complete;
 use commands::s3_commands::{
-    s3_create_folder, s3_delete_objects, s3_delete_uploaded_items, s3_download_objects,
-    s3_list_delete_options, s3_list_objects, s3_list_upload_storages,
+    s3_check_download_available, s3_create_folder, s3_delete_by_storage, s3_delete_objects,
+    s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
+    s3_get_download_list, s3_list_delete_options, s3_list_download_storages,
+    s3_list_objects, s3_list_upload_storages, s3_move_browser_objects, s3_move_objects,
     s3_scan_local_folder, s3_scan_upload_folder, s3_test_connection,
     s3_upload_file, s3_upload_files, s3_upload_folder,
 };
@@ -169,6 +171,13 @@ pub fn run() {
             s3_scan_upload_folder,
             s3_list_delete_options,
             s3_delete_uploaded_items,
+            s3_list_download_storages,
+            s3_check_download_available,
+            s3_get_download_list,
+            s3_download_by_storage,
+            s3_move_objects,
+            s3_move_browser_objects,
+            s3_delete_by_storage,
             // === Sync commands ===
             sync_daily_report,
             // === Collect/Copy tools commands ===

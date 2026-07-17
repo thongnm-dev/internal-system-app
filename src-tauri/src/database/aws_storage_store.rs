@@ -19,6 +19,17 @@ pub async fn list_by_upload() -> AppResult<Vec<AwsStorage>> {
     Ok(rows.iter().map(row_to_storage).collect())
 }
 
+pub async fn list_by_download() -> AppResult<Vec<AwsStorage>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query("SELECT * FROM sp_aws_storage_select_by_download()", &[])
+        .await
+        .map_err(|e| AppError::new(format!("Failed to list download storages: {e}")))?;
+
+    Ok(rows.iter().map(row_to_storage).collect())
+}
+
 pub async fn list_by_codes(codes: &[String]) -> AppResult<Vec<AwsStorage>> {
     if codes.is_empty() {
         return Ok(Vec::new());
@@ -27,12 +38,7 @@ pub async fn list_by_codes(codes: &[String]) -> AppResult<Vec<AwsStorage>> {
 
     let rows = client
         .query(
-            "SELECT id, code, name, name_alias, subscribe,
-                    is_upload, is_download, file_only,
-                    link_available, exclude_subscribe
-             FROM aws_storage
-             WHERE code = ANY($1)
-             ORDER BY code",
+            "SELECT * FROM sp_aws_storage_select_by_code_list($1)",
             &[&codes],
         )
         .await

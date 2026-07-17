@@ -1,28 +1,31 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-
-interface AwsStorage {
-  aws_cd: string;
-  aws_name: string;
-  aws_name_alias?: string;
-  file_only?: boolean;
-}
+import type { AwsStorage } from "@/_/types/s3";
 
 const props = defineProps<{
   awsStorage: AwsStorage;
   ensureOnline: () => Promise<boolean>;
+  getDownloadList: (code: string) => Promise<string[]>;
+  selectFolder: () => Promise<string | null>;
+  downloadFiles: (code: string, bugList: string[], localPath: string) => Promise<void>;
+  moveObjects: (code: string, items: string[]) => Promise<void>;
+  deleteObjects: (code: string, items: string[]) => Promise<void>;
 }>();
+
+const emit = defineEmits<{
+  refreshed: [];
+}>();
+
+const STORAGE_KEY = "download_state";
 
 const expanded = ref(true);
 const items = ref<string[]>([]);
-const isDownloadable = ref(false);
-const isMoveable = ref(false);
-const isLoading = ref(false);
+const isLoadingList = ref(false);
 
 const showDownloadModal = ref(false);
 const showMoveModal = ref(false);
@@ -36,9 +39,11 @@ const tableData = computed(() =>
 
 const selectedBugsList = computed(() => Array.from(selectedBugs.value));
 
+const hasItems = computed(() => items.value.length > 0);
+
 const modalTitle = computed(() => {
   if (showMoveModal.value) {
-    return props.awsStorage.file_only ? "Xoá tập tin ở S3" : "Di chuyển file S3";
+    return props.awsStorage.fileOnly ? "Xoá tập tin ở S3" : "Di chuyển file S3";
   }
   return "Chọn đường dẫn nơi lưu";
 });
@@ -47,13 +52,50 @@ function toggle() {
   expanded.value = !expanded.value;
 }
 
-async function handleRefresh() {
+function loadSavedPath() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const state = JSON.parse(saved);
+      if (state[props.awsStorage.code]?.localPathSync) {
+        destinationPath.value = state[props.awsStorage.code].localPathSync;
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function savePath() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const state = saved ? JSON.parse(saved) : {};
+    state[props.awsStorage.code] = { localPathSync: destinationPath.value };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
+
+async function loadItems() {
   if (!(await props.ensureOnline())) return;
-  // TODO: call backend
+  isLoadingList.value = true;
+  try {
+    items.value = await props.getDownloadList(props.awsStorage.code);
+  } finally {
+    isLoadingList.value = false;
+  }
+}
+
+async function handleRefresh() {
+  await loadItems();
+  emit("refreshed");
 }
 
 async function handleDownload() {
   if (!(await props.ensureOnline())) return;
+  loadSavedPath();
+  errorCheck.value = "";
   showDownloadModal.value = true;
 }
 
@@ -63,8 +105,13 @@ async function handleMove() {
   showMoveModal.value = true;
 }
 
-function chooseDestinationFolder() {
-  // TODO: call Tauri file dialog
+async function chooseDestinationFolder() {
+  const dir = await props.selectFolder();
+  if (dir) {
+    destinationPath.value = dir;
+    errorCheck.value = "";
+    savePath();
+  }
 }
 
 function handleCancelModal() {
@@ -72,12 +119,31 @@ function handleCancelModal() {
   showMoveModal.value = false;
 }
 
-async function handleConfirm() {
-  if (!(await props.ensureOnline())) return;
-  // TODO: call backend for download or move
+async function handleConfirmDownload() {
+  if (!destinationPath.value) {
+    errorCheck.value = "Vui lòng chọn đường dẫn.";
+    return;
+  }
   showDownloadModal.value = false;
-  showMoveModal.value = false;
+  await props.downloadFiles(props.awsStorage.code, items.value, destinationPath.value);
+  await loadItems();
+  emit("refreshed");
 }
+
+async function handleConfirmMove() {
+  showMoveModal.value = false;
+  if (props.awsStorage.fileOnly) {
+    await props.deleteObjects(props.awsStorage.code, Array.from(selectedBugs.value));
+  } else {
+    await props.moveObjects(props.awsStorage.code, Array.from(selectedBugs.value));
+  }
+  await loadItems();
+  emit("refreshed");
+}
+
+onMounted(() => {
+  loadItems();
+});
 </script>
 
 <template>
@@ -88,7 +154,7 @@ async function handleConfirm() {
         <button class="flex flex-1 items-center gap-4 bg-transparent py-2" @click="toggle">
           <i :class="['pi text-xl text-orange-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
           <span class="text-lg font-bold text-surface-800 dark:text-surface-100">
-            {{ awsStorage.aws_name_alias ?? awsStorage.aws_name }}
+            {{ awsStorage.nameAlias || awsStorage.name }}
             <span class="text-red-600">({{ items.length }})</span>
           </span>
         </button>
@@ -99,11 +165,12 @@ async function handleConfirm() {
             severity="secondary"
             outlined
             size="small"
+            :loading="isLoadingList"
             @click="handleRefresh"
           />
           <Button
-            v-if="items.length > 0 && isMoveable"
-            :label="awsStorage.file_only ? 'Xoá trên S3' : 'Di chuyển trên S3'"
+            v-if="hasItems"
+            :label="awsStorage.fileOnly ? 'Xoá trên S3' : 'Di chuyển trên S3'"
             icon="pi pi-eraser"
             severity="danger"
             outlined
@@ -111,7 +178,7 @@ async function handleConfirm() {
             @click="handleMove"
           />
           <Button
-            v-if="items.length > 0 && isDownloadable"
+            v-if="hasItems"
             label="Tải về"
             icon="pi pi-download"
             severity="warn"
@@ -154,7 +221,7 @@ async function handleConfirm() {
           placeholder="No directory selected"
           readonly
         />
-        <Button label="..." severity="secondary" @click="chooseDestinationFolder" />
+        <Button icon="pi pi-folder-open" severity="secondary" @click="chooseDestinationFolder" />
       </div>
       <small v-if="errorCheck" class="text-red-500">{{ errorCheck }}</small>
     </div>
@@ -164,7 +231,7 @@ async function handleConfirm() {
         label="Bắt đầu..."
         icon="pi pi-check"
         :disabled="!destinationPath || !!errorCheck"
-        @click="handleConfirm"
+        @click="handleConfirmDownload"
       />
     </template>
   </Dialog>
@@ -206,13 +273,13 @@ async function handleConfirm() {
           Đường dẫn lưu ở S3
         </h4>
         <div class="rounded-lg border border-red-300 px-3 py-3 font-mono text-sm break-all">
-          {{ awsStorage.aws_name }}
+          {{ awsStorage.name }}
         </div>
       </div>
     </div>
     <template #footer>
       <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCancelModal" />
-      <Button label="Bắt đầu..." icon="pi pi-check" @click="handleConfirm" />
+      <Button label="Bắt đầu..." icon="pi pi-check" @click="handleConfirmMove" />
     </template>
   </Dialog>
 </template>

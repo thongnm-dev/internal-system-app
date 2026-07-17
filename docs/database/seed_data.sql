@@ -68,10 +68,13 @@ ON CONFLICT (key) DO NOTHING;
 
 --- AWS Storage configuration
 truncate table aws_work_folder cascade;
+truncate table aws_storage cascade;
+ALTER SEQUENCE aws_work_folder_id_seq RESTART WITH 1;
+ALTER SEQUENCE aws_storage_id_seq RESTART WITH 1;
+
 INSERT INTO public.aws_work_folder (folder_key, "name") VALUES
 ('CORRECT_BUG_TEST', '80_system/Attach/11_alx/40_バグ管理');
 
-truncate table aws_storage cascade;
 INSERT INTO aws_storage (code,name,subscribe,is_upload,is_download,link_available,name_alias,exclude_subscribe,file_only) VALUES
 	 ('011', '01_起票済（エネコム確認）',        'to_エネコム',              true,false,   '{}','01_起票済',           '{to_エネコム,to_アレクシード（翻訳前）}',  false),
 	 ('012', '01_起票済（エネコム確認）',        'to_アレクシード（翻訳前）', false,true,   '{}','01_起票済（翻訳前）',  '{to_エネコム,to_アレクシード（翻訳前）}',  true),

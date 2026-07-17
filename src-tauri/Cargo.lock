@@ -2863,6 +2863,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tokio",
  "tokio-postgres",
+ "urlencoding",
 ]
 
 [[package]]
