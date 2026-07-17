@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick, watch } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
@@ -19,6 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   refreshed: [];
+  downloaded: [path: string];
 }>();
 
 const STORAGE_KEY = "download_state";
@@ -29,9 +30,13 @@ const isLoadingList = ref(false);
 
 const showDownloadModal = ref(false);
 const showMoveModal = ref(false);
+const showMoveWarning = ref(false);
+const showRedownloadWarning = ref(false);
+const hasDownloaded = ref(false);
 const destinationPath = ref("");
 const errorCheck = ref("");
 const selectedBugs = ref<Set<string>>(new Set());
+const cancelBtnRef = ref<{ $el: HTMLElement } | null>(null);
 
 const tableData = computed(() =>
   items.value.map((bug) => ({ bug_no: bug })),
@@ -94,15 +99,45 @@ async function handleRefresh() {
 
 async function handleDownload() {
   if (!(await props.ensureOnline())) return;
+  if (hasDownloaded.value) {
+    showRedownloadWarning.value = true;
+    return;
+  }
+  openDownloadModal();
+}
+
+function openDownloadModal() {
   loadSavedPath();
   errorCheck.value = "";
   showDownloadModal.value = true;
 }
 
+function confirmRedownload() {
+  showRedownloadWarning.value = false;
+  openDownloadModal();
+}
+
+function dismissRedownloadWarning() {
+  showRedownloadWarning.value = false;
+}
+
 async function handleMove() {
   if (!(await props.ensureOnline())) return;
   selectedBugs.value = new Set(items.value);
+  if (!hasDownloaded.value) {
+    showMoveWarning.value = true;
+    return;
+  }
   showMoveModal.value = true;
+}
+
+function confirmMoveWarning() {
+  showMoveWarning.value = false;
+  showMoveModal.value = true;
+}
+
+function dismissMoveWarning() {
+  showMoveWarning.value = false;
 }
 
 async function chooseDestinationFolder() {
@@ -126,6 +161,8 @@ async function handleConfirmDownload() {
   }
   showDownloadModal.value = false;
   await props.downloadFiles(props.awsStorage.code, items.value, destinationPath.value);
+  hasDownloaded.value = true;
+  emit("downloaded", destinationPath.value);
   await loadItems();
   emit("refreshed");
 }
@@ -140,6 +177,14 @@ async function handleConfirmMove() {
   await loadItems();
   emit("refreshed");
 }
+
+watch(showMoveWarning, (visible) => {
+  if (visible) {
+    nextTick(() => {
+      cancelBtnRef.value?.$el?.focus();
+    });
+  }
+});
 
 onMounted(() => {
   loadItems();
@@ -233,6 +278,58 @@ onMounted(() => {
         :disabled="!destinationPath || !!errorCheck"
         @click="handleConfirmDownload"
       />
+    </template>
+  </Dialog>
+
+  <!-- Redownload warning dialog -->
+  <Dialog
+    v-model:visible="showRedownloadWarning"
+    header="Cảnh báo"
+    :modal="true"
+    :style="{ width: '28rem' }"
+    :closable="true"
+  >
+    <div class="flex items-center gap-3">
+      <i class="pi pi-exclamation-triangle text-3xl text-yellow-500" />
+      <span class="text-sm text-surface-600 dark:text-surface-400">
+        Bạn đã tải về danh sách phiếu bug rồi. Bạn có muốn tải lại không?
+      </span>
+    </div>
+    <template #footer>
+      <Button
+        label="Cancel"
+        icon="pi pi-times"
+        severity="secondary"
+        autofocus
+        @click="dismissRedownloadWarning"
+      />
+      <Button label="Đồng ý" icon="pi pi-check" severity="warn" @click="confirmRedownload" />
+    </template>
+  </Dialog>
+
+  <!-- Move warning dialog -->
+  <Dialog
+    v-model:visible="showMoveWarning"
+    header="Cảnh báo"
+    :modal="true"
+    :style="{ width: '28rem' }"
+    :closable="true"
+  >
+    <div class="flex items-center gap-3">
+      <i class="pi pi-exclamation-triangle text-3xl text-yellow-500" />
+      <span class="text-sm text-surface-600 dark:text-surface-400">
+        Bạn chưa tải về máy. Bạn có chắc chắn muốn thực hiện thao tác này không?
+      </span>
+    </div>
+    <template #footer>
+      <Button
+        ref="cancelBtnRef"
+        label="Cancel"
+        icon="pi pi-times"
+        severity="secondary"
+        @click="dismissMoveWarning"
+      />
+      <Button label="Đồng ý" icon="pi pi-check" severity="danger" @click="confirmMoveWarning" />
     </template>
   </Dialog>
 

@@ -310,6 +310,94 @@ pub fn paste_entries(sources: &[String], dest_dir: &str, cut: bool) -> Result<()
     Ok(())
 }
 
+pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String> {
+    use regex::Regex;
+
+    let src = Path::new(source_dir);
+    let dst = Path::new(dest_dir);
+
+    if !src.is_dir() {
+        return Err(format!("Source is not a directory: {source_dir}"));
+    }
+    if !dst.is_dir() {
+        return Err(format!("Destination is not a directory: {dest_dir}"));
+    }
+
+    let entries: Vec<_> = fs::read_dir(src)
+        .map_err(|e| format!("Read dir failed: {e}"))?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    if entries.is_empty() {
+        return Err("Không tìm thấy thư mục nào trong thư mục nguồn.".to_string());
+    }
+
+    let now = chrono::Local::now();
+    let ym = now.format("%Y%m").to_string();
+    let ymd = now.format("%Y%m%d").to_string();
+
+    let ym_dir = dst.join(&ym);
+    fs::create_dir_all(&ym_dir).map_err(|e| format!("Create dir failed: {e}"))?;
+
+    let history_sub = if !ym_dir.join(&ymd).exists() {
+        ymd.clone()
+    } else {
+        let mut suffix = 2;
+        loop {
+            let name = format!("{}_{:02}", ymd, suffix);
+            if !ym_dir.join(&name).exists() {
+                break name;
+            }
+            suffix += 1;
+        }
+    };
+    let history_dir = ym_dir.join(&history_sub);
+    fs::create_dir_all(&history_dir).map_err(|e| format!("Create history dir failed: {e}"))?;
+
+    let re = Regex::new(r"(\d{4})").unwrap();
+    let mut copied = 0u32;
+
+    for entry in &entries {
+        let folder_name = entry.file_name().to_string_lossy().to_string();
+        let folder_path = entry.path();
+
+        if let Some(caps) = re.captures(&folder_name) {
+            let num: u32 = caps[1].parse().unwrap_or(0);
+            if num > 0 {
+                let start = ((num - 1) / 100) * 100 + 1;
+                let end = start + 99;
+                let range_name = format!("{:04}\u{FF5E}{:04}", start, end);
+
+                let range_dir = dst.join(&range_name);
+                fs::create_dir_all(&range_dir)
+                    .map_err(|e| format!("Create range dir failed: {e}"))?;
+                let range_target = range_dir.join(&folder_name);
+                if !range_target.exists() {
+                    copy_dir_recursive(&folder_path, &range_target)?;
+                }
+
+                let history_target = history_dir.join(&folder_name);
+                if !history_target.exists() {
+                    copy_dir_recursive(&folder_path, &history_target)?;
+                }
+
+                copied += 1;
+            }
+        }
+    }
+
+    if copied == 0 {
+        return Err("Không tìm thấy thư mục nào có mã số 4 chữ số.".to_string());
+    }
+
+    Ok(format!(
+        "Đã copy {} thư mục thành công.\nLịch sử: {}",
+        copied,
+        history_dir.to_string_lossy()
+    ))
+}
+
 pub fn get_drives() -> Vec<String> {
     let mut drives = Vec::new();
     #[cfg(target_os = "windows")]

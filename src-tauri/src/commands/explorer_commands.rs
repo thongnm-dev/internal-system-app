@@ -44,6 +44,18 @@ pub fn explorer_create_folder(dir: String, name: String) -> Result<String, Strin
 }
 
 #[tauri::command]
+pub async fn explorer_copy_bugs(
+    source_dir: String,
+    dest_dir: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        explorer_service::copy_bug_files(&source_dir, &dest_dir)
+    })
+    .await
+    .map_err(|e| format!("Thread error: {e}"))?
+}
+
+#[tauri::command]
 pub async fn explorer_paste(
     sources: Vec<String>,
     dest_dir: String,

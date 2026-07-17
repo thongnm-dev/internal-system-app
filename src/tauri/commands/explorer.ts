@@ -56,3 +56,7 @@ export function explorerCreateFolder(dir: string, name: string) {
 export function explorerPaste(sources: string[], destDir: string, cut: boolean) {
   return safeInvoke<void>("explorer_paste", { sources, destDir, cut });
 }
+
+export function explorerCopyBugs(sourceDir: string, destDir: string) {
+  return safeInvoke<string>("explorer_copy_bugs", { sourceDir, destDir });
+}
