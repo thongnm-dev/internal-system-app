@@ -4,7 +4,7 @@ import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { useToast } from "@/shared/composables/useToast";
 import type { AiChatMessage } from "@/_/types/ai-chat";
 
-export type ProviderId = "chatgpt" | "grok" | "claude" | "gemini";
+export type ProviderId = "gemini" | "groq";
 
 export type AiProvider = {
   id: ProviderId;
@@ -36,33 +36,21 @@ export type ChatSession = {
 
 export const AI_PROVIDERS: AiProvider[] = [
   {
-    id: "chatgpt",
-    label: "ChatGPT",
-    icon: "pi pi-comment",
-    models: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
-  },
-  {
-    id: "claude",
-    label: "Claude",
-    icon: "pi pi-sparkles",
-    models: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-  },
-  {
-    id: "grok",
-    label: "Grok",
-    icon: "pi pi-bolt",
-    models: ["grok-4", "grok-3", "grok-3-mini"],
-  },
-  {
     id: "gemini",
     label: "Gemini",
     icon: "pi pi-google",
-    models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+    models: ["gemini-3.5-flash", "gemini-3.1-flash-lite"],
+  },
+  {
+    id: "groq",
+    label: "Groq",
+    icon: "pi pi-bolt",
+    models: ["meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
   },
 ];
 
 const SESSIONS_KEY = "pjjyuji.ai.chat.sessions";
-const DEFAULT_PROVIDER: ProviderId = "claude";
+const DEFAULT_PROVIDER: ProviderId = "gemini";
 
 function providerFor(id: ProviderId): AiProvider {
   return AI_PROVIDERS.find((p) => p.id === id) ?? AI_PROVIDERS[0];

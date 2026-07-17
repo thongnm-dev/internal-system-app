@@ -1,5 +1,5 @@
 /** Nhà cung cấp AI được hỗ trợ. */
-export type AiChatProvider = "chatgpt" | "grok" | "claude" | "gemini";
+export type AiChatProvider = "gemini" | "groq";
 
 /** Một tin nhắn trong hội thoại gửi lên backend. */
 export type AiChatMessage = {

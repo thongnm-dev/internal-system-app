@@ -35,14 +35,10 @@ pub async fn complete(request: AiChatRequest) -> AppResult<AiChatResponse> {
     let client = build_client()?;
 
     let content = match provider.as_str() {
-        "chatgpt" => {
-            openai_compatible(&client, "https://api.openai.com/v1/chat/completions", &api_key, &request, max_tokens).await?
-        }
-        "grok" => {
-            openai_compatible(&client, "https://api.x.ai/v1/chat/completions", &api_key, &request, max_tokens).await?
-        }
-        "claude" => anthropic(&client, &api_key, &request, max_tokens).await?,
         "gemini" => gemini(&client, &api_key, &request, max_tokens).await?,
+        "groq" => {
+            openai_compatible(&client, "https://api.groq.com/openai/v1/chat/completions", &api_key, &request, max_tokens).await?
+        }
         other => {
             return Err(AppError::new(format!(
                 "Nhà cung cấp không được hỗ trợ: '{other}'."
@@ -67,10 +63,8 @@ fn build_client() -> AppResult<Client> {
 /// Nhãn key_label trong bảng `api_keys` / config.ini tương ứng từng provider.
 fn key_label(provider: &str) -> AppResult<&'static str> {
     match provider {
-        "chatgpt" => Ok("OPENAI_API_KEY"),
-        "grok" => Ok("XAI_API_KEY"),
-        "claude" => Ok("ANTHROPIC_API_KEY"),
         "gemini" => Ok("GEMINI_API_KEY"),
+        "groq" => Ok("GROQ_API_KEY"),
         other => Err(AppError::new(format!(
             "Nhà cung cấp không được hỗ trợ: '{other}'."
         ))),
@@ -166,69 +160,6 @@ async fn openai_compatible(
         .as_str()
         .map(|s| s.to_string())
         .ok_or_else(|| AppError::new("Phản hồi không có nội dung."))
-}
-
-/// Anthropic (Claude) — endpoint `/v1/messages`, header `x-api-key` + `anthropic-version`.
-async fn anthropic(
-    client: &Client,
-    api_key: &str,
-    request: &AiChatRequest,
-    max_tokens: u32,
-) -> AppResult<String> {
-    let messages: Vec<Value> = request
-        .messages
-        .iter()
-        .map(|m| json!({ "role": m.role, "content": m.content }))
-        .collect();
-
-    let mut body = json!({
-        "model": request.model,
-        "max_tokens": max_tokens,
-        "messages": messages,
-    });
-    if let Some(system) = request.system.as_deref() {
-        if !system.trim().is_empty() {
-            body["system"] = json!(system);
-        }
-    }
-
-    let resp = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| AppError::new(format!("Gọi API thất bại: {e}")))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        return Err(error_body("Claude", status, resp).await);
-    }
-
-    let value: Value = resp
-        .json()
-        .await
-        .map_err(|e| AppError::new(format!("Không phân tích được phản hồi: {e}")))?;
-
-    // content là mảng block; ghép nội dung các block type = "text".
-    let text = value["content"]
-        .as_array()
-        .map(|blocks| {
-            blocks
-                .iter()
-                .filter(|b| b["type"] == "text")
-                .filter_map(|b| b["text"].as_str())
-                .collect::<Vec<_>>()
-                .join("")
-        })
-        .unwrap_or_default();
-
-    if text.is_empty() {
-        return Err(AppError::new("Phản hồi không có nội dung."));
-    }
-    Ok(text)
 }
 
 /// Google Gemini — endpoint `generateContent`, header `x-goog-api-key`.

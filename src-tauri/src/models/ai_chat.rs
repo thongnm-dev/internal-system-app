@@ -12,7 +12,7 @@ pub struct AiChatMessage {
 /// Request gửi hội thoại lên một nhà cung cấp AI.
 #[derive(Debug, Deserialize)]
 pub struct AiChatRequest {
-    /// Nhà cung cấp: `chatgpt` | `grok` | `claude` | `gemini`.
+    /// Nhà cung cấp: `gemini` | `groq`.
     pub provider: String,
     /// Model cụ thể của nhà cung cấp (ví dụ `claude-opus-4-8`).
     pub model: String,
