@@ -39,7 +39,7 @@ export const AI_PROVIDERS: AiProvider[] = [
     id: "gemini",
     label: "Gemini",
     icon: "pi pi-google",
-    models: ["gemini-3.5-flash", "gemini-3.1-flash-lite"],
+    models: ["gemini-3.1-flash-lite","gemini-3.5-flash"],
   },
   {
     id: "groq",

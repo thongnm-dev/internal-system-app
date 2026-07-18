@@ -65,13 +65,20 @@ CREATE TABLE IF NOT EXISTS projects (
     code          VARCHAR(20)  NOT NULL UNIQUE,
     name          VARCHAR(200) NOT NULL,
     client        VARCHAR(200) NOT NULL DEFAULT '',
-    project_backlog_key   VARCHAR(20)  NOT NULL DEFAULT '',
-    project_backlog_code   numeric         NOT NULL,
-    project_backlog_name VARCHAR(100) NOT NULL DEFAULT '',
+    -- Thông tin Backlog là tùy chọn (có thể không thiết lập) → cho phép NULL.
+    project_backlog_key   VARCHAR(20)  DEFAULT '',
+    project_backlog_code   numeric,
+    project_backlog_name VARCHAR(100) DEFAULT '',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- Migration cho database đã tồn tại: bỏ ràng buộc NOT NULL trên các cột Backlog.
+-- Idempotent — chạy lại nhiều lần không gây lỗi.
+ALTER TABLE projects ALTER COLUMN project_backlog_key  DROP NOT NULL;
+ALTER TABLE projects ALTER COLUMN project_backlog_code DROP NOT NULL;
+ALTER TABLE projects ALTER COLUMN project_backlog_name DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS project_members (
     id         SERIAL       PRIMARY KEY,

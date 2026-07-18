@@ -49,10 +49,16 @@ use commands::explorer_commands::{
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::ai_usage_commands::{
-    ai_usage_add_account, ai_usage_delete_account, ai_usage_list_accounts,
+    ai_usage_add_account, ai_usage_delete_account, ai_usage_get_settings, ai_usage_get_token,
+    ai_usage_list_accounts, ai_usage_refresh, ai_usage_report_signal, ai_usage_save_settings,
+    ai_usage_set_active, ai_usage_update_account,
 };
 use commands::ai_chat_commands::ai_chat_complete;
 use commands::schedule_commands::read_schedule_excel;
+use commands::sql_editor_commands::{
+    sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
+    sql_save_connection, sql_test_connection,
+};
 use commands::s3_commands::{
     s3_check_download_available, s3_create_folder, s3_delete_by_storage, s3_delete_objects,
     s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
@@ -73,12 +79,19 @@ use commands::s3_commands::{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .setup(|_app| {
+        .setup(|app| {
             // Khởi tạo database chạy nền để không block UI thread
             tauri::async_runtime::spawn(async {
                 if let Err(e) = database::startup_store::init().await {
                     eprintln!("Failed to initialize database tables: {e}");
                 }
+            });
+
+            // Nạp trước dữ liệu AI Usage và chạy poll nền để theo dõi usage + auto-switch.
+            services::ai_usage_service::preload();
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                services::ai_usage_service::run_poll_loop(handle).await;
             });
             Ok(())
         })
@@ -200,11 +213,25 @@ pub fn run() {
             // === AI Usage commands ===
             ai_usage_add_account,
             ai_usage_list_accounts,
+            ai_usage_update_account,
             ai_usage_delete_account,
+            ai_usage_set_active,
+            ai_usage_get_token,
+            ai_usage_report_signal,
+            ai_usage_refresh,
+            ai_usage_get_settings,
+            ai_usage_save_settings,
             // === AI Chat commands ===
             ai_chat_complete,
             // === Schedule commands ===
-            read_schedule_excel
+            read_schedule_excel,
+            // === SQL Editor commands ===
+            sql_list_connections,
+            sql_save_connection,
+            sql_delete_connection,
+            sql_test_connection,
+            sql_get_schema,
+            sql_run_query
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

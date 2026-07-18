@@ -148,6 +148,48 @@ pub async fn connect() -> AppResult<Client> {
     Ok(client)
 }
 
+/// Tạo kết nối mới tới PostgreSQL với một cấu hình cho trước (không đọc `config.ini`).
+///
+/// Dùng cho SQL Editor — mỗi kết nối do người dùng cấu hình được mở riêng.
+pub async fn connect_with(config: &PgConfig) -> AppResult<Client> {
+    let (client, connection) = tokio_postgres::connect(&config.connection_string(), NoTls)
+        .await
+        .map_err(|e| AppError::new(format!("PostgreSQL connection failed: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("PostgreSQL connection error: {e}");
+        }
+    });
+
+    Ok(client)
+}
+
+/// Trích xuất thông báo lỗi chi tiết từ một `tokio_postgres::Error`.
+///
+/// `Display` của `tokio_postgres::Error` chỉ in ra thông báo chung chung
+/// (ví dụ `"db error"`); toàn bộ chi tiết do PostgreSQL trả về (mã lỗi,
+/// message, detail, hint) nằm trong `as_db_error()`. Hàm này gộp chúng lại
+/// để lỗi hiển thị cho người dùng có ý nghĩa.
+pub fn pg_error_detail(e: &tokio_postgres::Error) -> String {
+    match e.as_db_error() {
+        Some(db) => {
+            let mut msg = format!("{}: {}", db.code().code(), db.message());
+            if let Some(detail) = db.detail() {
+                msg.push_str(" — ");
+                msg.push_str(detail);
+            }
+            if let Some(hint) = db.hint() {
+                msg.push_str(" (hint: ");
+                msg.push_str(hint);
+                msg.push(')');
+            }
+            msg
+        }
+        None => e.to_string(),
+    }
+}
+
 /// Chạy một closure bên trong transaction (BEGIN … COMMIT).
 ///
 /// Nếu closure trả về `Err`, transaction sẽ được ROLLBACK tự động.

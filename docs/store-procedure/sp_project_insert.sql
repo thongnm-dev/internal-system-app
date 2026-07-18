@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION sp_project_insert(
     p_name          VARCHAR(200),
     p_client        VARCHAR(200) DEFAULT '',
     p_backlog_key   VARCHAR(20)  DEFAULT '',
-    p_backlog_code  TEXT         DEFAULT '0',
+    p_backlog_code  TEXT         DEFAULT NULL,
     p_backlog_name  VARCHAR(100) DEFAULT ''
 )
 RETURNS TABLE (
@@ -28,7 +28,7 @@ AS $$
 BEGIN
     RETURN QUERY
     INSERT INTO projects (code, name, client, project_backlog_key, project_backlog_code, project_backlog_name)
-    VALUES (p_code, p_name, p_client, p_backlog_key, p_backlog_code::numeric, p_backlog_name)
+    VALUES (p_code, p_name, p_client, p_backlog_key, NULLIF(p_backlog_code, '')::numeric, p_backlog_name)
     RETURNING
         projects.id,
         projects.code,

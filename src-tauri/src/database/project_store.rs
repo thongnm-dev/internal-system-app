@@ -8,6 +8,27 @@ use crate::app::result::AppResult;
 use crate::models::project::{ProjectDetail, ProjectMember, ProjectSummary, ProjectTask};
 use crate::utils::pgsql_connect;
 
+/// Chuyển một chuỗi rỗng (hoặc chỉ chứa khoảng trắng) thành `None`.
+///
+/// Dùng cho các cột numeric/optional: PostgreSQL không ép được `""` sang
+/// numeric, nên phải gửi `NULL` thay vì chuỗi rỗng.
+fn empty_to_none(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
+/// Đọc một cột text có thể NULL, trả về chuỗi rỗng nếu là NULL.
+///
+/// Các trường Backlog là tùy chọn nên có thể NULL trong database; đọc thẳng
+/// vào `String` sẽ panic, vì vậy đọc qua `Option<String>` rồi mặc định "".
+fn get_opt_text(row: &tokio_postgres::Row, col: &str) -> String {
+    row.get::<_, Option<String>>(col).unwrap_or_default()
+}
+
 /// Thêm dự án mới vào database.
 ///
 /// Gọi `sp_project_insert` để tạo bản ghi project, sau đó gọi
@@ -15,6 +36,12 @@ use crate::utils::pgsql_connect;
 /// Toàn bộ thao tác chạy trong một transaction.
 pub async fn insert_project(project: &ProjectDetail) -> AppResult<ProjectDetail> {
     let client = pgsql_connect::connect().await?;
+
+    // Thông tin Backlog là tùy chọn (có thể không thiết lập). Chuỗi rỗng được
+    // gửi thành NULL — riêng `backlog_code` là numeric nên bắt buộc phải NULL.
+    let backlog_key = empty_to_none(&project.backlog_key);
+    let backlog_code = empty_to_none(&project.backlog_code);
+    let backlog_name = empty_to_none(&project.backlog_name);
 
     pgsql_connect::with_transaction(&client, || async {
         let row = client
@@ -24,13 +51,18 @@ pub async fn insert_project(project: &ProjectDetail) -> AppResult<ProjectDetail>
                     &project.code,
                     &project.name,
                     &project.client,
-                    &project.backlog_key,
-                    &project.backlog_code,
-                    &project.backlog_name,
+                    &backlog_key,
+                    &backlog_code,
+                    &backlog_name,
                 ],
             )
             .await
-            .map_err(|e| AppError::new(format!("Failed to insert project: {e}")))?;
+            .map_err(|e| {
+                AppError::new(format!(
+                    "Failed to insert project: {}",
+                    pgsql_connect::pg_error_detail(&e)
+                ))
+            })?;
 
         let id: i32 = row.get("id");
 
@@ -49,9 +81,9 @@ pub async fn insert_project(project: &ProjectDetail) -> AppResult<ProjectDetail>
             code: row.get("code"),
             name: row.get("name"),
             client: row.get("client"),
-            backlog_key: row.get("backlog_key"),
-            backlog_code: row.get("backlog_code"),
-            backlog_name: row.get("backlog_name"),
+            backlog_key: get_opt_text(&row, "backlog_key"),
+            backlog_code: get_opt_text(&row, "backlog_code"),
+            backlog_name: get_opt_text(&row, "backlog_name"),
             is_active: row.get("is_active"),
             members: project.members.clone(),
             created_at: row.get("created_at"),
@@ -69,6 +101,10 @@ pub async fn insert_project(project: &ProjectDetail) -> AppResult<ProjectDetail>
 pub async fn update_project(project_id: i32, project: &ProjectDetail) -> AppResult<ProjectDetail> {
     let client = pgsql_connect::connect().await?;
 
+    let backlog_key = empty_to_none(&project.backlog_key);
+    let backlog_code = empty_to_none(&project.backlog_code);
+    let backlog_name = empty_to_none(&project.backlog_name);
+
     pgsql_connect::with_transaction(&client, || async {
         let row = client
             .query_opt(
@@ -78,13 +114,18 @@ pub async fn update_project(project_id: i32, project: &ProjectDetail) -> AppResu
                     &project.code,
                     &project.name,
                     &project.client,
-                    &project.backlog_key,
-                    &project.backlog_code,
-                    &project.backlog_name,
+                    &backlog_key,
+                    &backlog_code,
+                    &backlog_name,
                 ],
             )
             .await
-            .map_err(|e| AppError::new(format!("Failed to update project: {e}")))?
+            .map_err(|e| {
+                AppError::new(format!(
+                    "Failed to update project: {}",
+                    pgsql_connect::pg_error_detail(&e)
+                ))
+            })?
             .ok_or_else(|| AppError::new(format!("Project '{}' not found.", project_id)))?;
 
         client
@@ -110,9 +151,9 @@ pub async fn update_project(project_id: i32, project: &ProjectDetail) -> AppResu
             code: row.get("code"),
             name: row.get("name"),
             client: row.get("client"),
-            backlog_key: row.get("backlog_key"),
-            backlog_code: row.get("backlog_code"),
-            backlog_name: row.get("backlog_name"),
+            backlog_key: get_opt_text(&row, "backlog_key"),
+            backlog_code: get_opt_text(&row, "backlog_code"),
+            backlog_name: get_opt_text(&row, "backlog_name"),
             is_active: row.get("is_active"),
             members: project.members.clone(),
             created_at: row.get("created_at"),
@@ -146,9 +187,9 @@ pub async fn find_by_id(project_id: i32) -> AppResult<Option<ProjectDetail>> {
                 code: row.get("code"),
                 name: row.get("name"),
                 client: row.get("client"),
-                backlog_key: row.get("backlog_key"),
-                backlog_code: row.get("backlog_code"),
-                backlog_name: row.get("backlog_name"),
+                backlog_key: get_opt_text(&row, "backlog_key"),
+                backlog_code: get_opt_text(&row, "backlog_code"),
+                backlog_name: get_opt_text(&row, "backlog_name"),
                 is_active: row.get("is_active"),
                 members,
                 created_at: row.get("created_at"),
@@ -244,7 +285,12 @@ pub async fn insert_task(task: &ProjectTask) -> AppResult<ProjectTask> {
                 ],
             )
             .await
-            .map_err(|e| AppError::new(format!("Failed to insert project task: {e}")))?;
+            .map_err(|e| {
+                AppError::new(format!(
+                    "Failed to insert project task: {}",
+                    pgsql_connect::pg_error_detail(&e)
+                ))
+            })?;
 
         if !task.categories.is_empty() {
             client

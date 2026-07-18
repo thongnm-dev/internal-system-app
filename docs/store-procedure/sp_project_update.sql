@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION sp_project_update(
     p_name          VARCHAR(200),
     p_client        VARCHAR(200) DEFAULT '',
     p_backlog_key   VARCHAR(20)  DEFAULT '',
-    p_backlog_code  TEXT         DEFAULT '0',
+    p_backlog_code  TEXT         DEFAULT NULL,
     p_backlog_name  VARCHAR(100) DEFAULT ''
 )
 RETURNS TABLE (
@@ -33,7 +33,7 @@ BEGIN
         name                  = p_name,
         client                = p_client,
         project_backlog_key   = p_backlog_key,
-        project_backlog_code  = p_backlog_code::numeric,
+        project_backlog_code  = NULLIF(p_backlog_code, '')::numeric,
         project_backlog_name  = p_backlog_name
     WHERE projects.id = p_id
     RETURNING

@@ -53,6 +53,8 @@ mod commands {
     pub mod ai_chat_commands;
     /// Commands cho đọc file schedule Excel.
     pub mod schedule_commands;
+    /// Commands cho màn hình SQL Editor (quản lý kết nối + chạy query).
+    pub mod sql_editor_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -79,6 +81,10 @@ mod database {
     pub mod api_key_store;
     /// Data access cho bảng `aws_storage` (PostgreSQL).
     pub mod aws_storage_store;
+    /// Lưu trữ cục bộ (JSON file) danh sách account AI + cấu hình usage.
+    pub mod ai_account_store;
+    /// Lưu trữ cục bộ (JSON file) danh sách kết nối của SQL Editor.
+    pub mod sql_connection_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -123,6 +129,8 @@ mod models {
     pub mod ai_chat;
     /// Model cho đọc file schedule Excel.
     pub mod schedule;
+    /// Model cho màn hình SQL Editor (kết nối + kết quả query).
+    pub mod sql_editor;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -165,12 +173,16 @@ mod services {
     pub mod collect_folders_service;
     /// Service cho file explorer nhanh (đọc thư mục, tìm kiếm file).
     pub mod explorer_service;
-    /// Service cho module AI Usage — lưu tạm danh sách account AI trong bộ nhớ.
+    /// Service cho module AI Usage — quản lý account AI, priority, auto-switch.
     pub mod ai_usage_service;
+    /// Probe tình trạng usage cho từng account AI (rate-limit header, v.v.).
+    pub mod ai_usage_probe;
     /// Service cho module AI Chat — gọi API các nhà cung cấp LLM.
     pub mod ai_chat_service;
     /// Service đọc file schedule Excel và trích xuất dữ liệu giờ công.
     pub mod schedule_service;
+    /// Service cho màn hình SQL Editor (quản lý kết nối + chạy query).
+    pub mod sql_editor_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

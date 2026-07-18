@@ -25,7 +25,28 @@ import type { ImportCsvPreviewResult } from "@/_/types/import-csv";
 const auth = useAuthStore();
 const loading = useGlobalLoading();
 const ctrl = useImportCsv();
-const isDetailDialogOpen = ref(false);
+
+// Preview is shown inside a dialog with two views: summary + raw detail.
+const isPreviewDialogOpen = ref(false);
+const previewDialogView = ref<"summary" | "detail">("summary");
+
+// Result of the "Compare" button, rendered in the main Preview section.
+type CompareStatus = "match" | "mismatch" | "csv-only" | "schedule-only";
+type CompareRow = {
+  date: string;
+  csvHours: number;
+  scheduleHours: number;
+  diffHours: number;
+  status: CompareStatus;
+};
+const compareResult = ref<CompareRow[] | null>(null);
+
+function normalizeDate(value: string): string {
+  const m = value.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (!m) return value.trim();
+  const [, y, mo, da] = m;
+  return `${y}-${mo.padStart(2, "0")}-${da.padStart(2, "0")}`;
+}
 
 const schedulePath = ref("");
 const targetMonth = ref<Date>(new Date());
@@ -79,6 +100,14 @@ const scheduleTotalHours = computed(() =>
   scheduleRows.value.reduce((sum, r) => sum + r.hours, 0),
 );
 
+const compareTotals = computed(() => {
+  const rows = compareResult.value ?? [];
+  const csv = rows.reduce((s, r) => s + r.csvHours, 0);
+  const schedule = rows.reduce((s, r) => s + r.scheduleHours, 0);
+  const mismatches = rows.filter((r) => r.status !== "match").length;
+  return { csv, schedule, diff: csv - schedule, mismatches };
+});
+
 async function viewScheduleData() {
   if (!schedulePath.value) return;
   await loading.run(async () => {
@@ -96,6 +125,10 @@ async function viewScheduleData() {
 
 async function previewWithLoading() {
   await loading.run(() => ctrl.previewCsv());
+  if (ctrl.previewResult.value) {
+    previewDialogView.value = "summary";
+    isPreviewDialogOpen.value = true;
+  }
 }
 
 function onCompareClick() {
@@ -109,8 +142,36 @@ function onCompareClick() {
 async function runCompare(source: "file" | "fetch") {
   isConflictDialogOpen.value = false;
   await loading.run(async () => {
-    // TODO: compare logic
-    void source;
+    if (source === "fetch" && !ctrl.previewResult.value) {
+      ctrl.message.value = "Chức năng tự động lấy dữ liệu từ hệ thống chưa được hỗ trợ. Đang so sánh với schedule.";
+      ctrl.messageMode.value = "info";
+    }
+
+    // CSV recorded hours per date (minutes → summed later).
+    const csvByDate = new Map<string, number>();
+    for (const row of ctrl.previewResult.value?.preview_rows ?? []) {
+      const key = normalizeDate(row.date);
+      csvByDate.set(key, (csvByDate.get(key) ?? 0) + row.total_minutes);
+    }
+
+    // Schedule planned hours per date.
+    const scheduleByDate = new Map<string, number>();
+    for (const r of scheduleRows.value) {
+      const key = normalizeDate(r.date);
+      scheduleByDate.set(key, (scheduleByDate.get(key) ?? 0) + r.hours);
+    }
+
+    const allDates = Array.from(new Set([...csvByDate.keys(), ...scheduleByDate.keys()])).sort();
+    compareResult.value = allDates.map((date) => {
+      const csvHours = (csvByDate.get(date) ?? 0) / 60;
+      const scheduleHours = scheduleByDate.get(date) ?? 0;
+      const diffHours = csvHours - scheduleHours;
+      let status: CompareStatus;
+      if (!csvByDate.has(date)) status = "schedule-only";
+      else if (!scheduleByDate.has(date)) status = "csv-only";
+      else status = Math.abs(diffHours) < 0.01 ? "match" : "mismatch";
+      return { date, csvHours, scheduleHours, diffHours, status };
+    });
   });
 }
 
@@ -214,7 +275,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </div>
         <div class="mt-2 flex items-center gap-2">
           <span class="w-24 shrink-0 text-sm font-medium text-muted">Target month</span>
-          <Calendar v-model="targetMonth" view="month" date-format="mm/yy" show-icon icon-display="input" class="w-44" />
+          <Calendar v-model="targetMonth" view="month" date-format="yy/mm" show-icon icon-display="input" class="w-44" />
         </div>
         <div class="mt-2 flex items-center gap-2">
           <span class="w-24 shrink-0 text-sm font-medium text-muted">Target user</span>
@@ -227,37 +288,50 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </div>
         <div class="mt-2 flex items-center justify-end gap-2">
           <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!schedulePath" @click="viewScheduleData()" />
-          <Button icon="pi pi-file-import" label="Preview" :disabled="ctrl.isImporting.value" @click="previewWithLoading()" />
-          <Button icon="pi pi-check-circle" label="Compare" :disabled="!schedulePath" @click="onCompareClick()" />
+          <Button icon="pi pi-file-import" label="Preview" :disabled="!ctrl.csvPath.value || ctrl.isImporting.value" @click="previewWithLoading()" />
+          <Button icon="pi pi-check-circle" label="Compare" :disabled="!ctrl.csvPath.value || !schedulePath" @click="onCompareClick()" />
         </div>
       </div>
     </div>
 
     <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden">
-      <!-- Preview -->
+      <!-- Compare result -->
       <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <div class="flex items-start justify-between gap-3 border-b border-divider px-4 py-3">
           <div class="min-w-0">
             <h3 class="font-bold">Preview</h3>
             <p class="mt-1 truncate text-xs text-muted">
-              {{ ctrl.previewResult.value ? `${ctrl.previewResult.value.source_file_name}${ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : ''}` : 'No CSV data imported yet.' }}
+              {{ compareResult
+                ? `CSV ${compareTotals.csv.toFixed(1)}h vs Schedule ${compareTotals.schedule.toFixed(1)}h — ${compareTotals.mismatches} ngày lệch`
+                : 'Chưa có so sánh. Chọn dữ liệu rồi nhấn Compare.' }}
             </p>
           </div>
-          <Button icon="pi pi-list" label="Show detail" severity="secondary" outlined size="small" :disabled="!ctrl.previewResult.value" title="Show detail list" @click="isDetailDialogOpen = true" />
         </div>
-        <DataTable class="app-data-table min-h-0" empty-message="No data. Select a CSV file, then click Import." :row-class="(row: any) => row.kind === 'project' ? 'bg-emerald-50 font-bold' : 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="previewRows" @row-click="(e: any) => { if (e.data.kind === 'phase') onOpenDetail({ project_code: e.data.project.project_code, project_name: e.data.project.project_name, phase: e.data.phase }); }">
-          <Column header="Project">
-            <template #body="{ data }"><strong v-if="data.kind === 'project'">{{ `${data.project.project_code} ${data.project.project_name}`.trim() }}</strong></template>
+        <DataTable v-if="compareResult" class="app-data-table min-h-0" empty-message="No overlapping dates to compare." :row-class="(row: any) => row.status === 'mismatch' ? 'bg-rose-50' : (row.status === 'match' ? '' : 'bg-amber-50')" scrollable scroll-height="flex" :table-style="{ minWidth: '720px' }" :value="compareResult">
+          <Column header="Date" field="date" style="width: 130px" />
+          <Column header="CSV (hour)" body-class="num" header-class="num" style="width: 120px">
+            <template #body="{ data }">{{ data.csvHours.toFixed(1) }}</template>
           </Column>
-          <Column header="Phase">
+          <Column header="Schedule (hour)" body-class="num" header-class="num" style="width: 140px">
+            <template #body="{ data }">{{ data.scheduleHours.toFixed(1) }}</template>
+          </Column>
+          <Column header="Diff" body-class="num font-bold" header-class="num" style="width: 100px">
             <template #body="{ data }">
-              <template v-if="data.kind === 'project'">All phases</template>
-              <template v-else><span class="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">{{ data.phase.process_code }}</span>{{ data.phase.phase_name }}</template>
+              <span :class="Math.abs(data.diffHours) < 0.01 ? 'text-muted' : 'text-rose-600'">{{ data.diffHours > 0 ? '+' : '' }}{{ data.diffHours.toFixed(1) }}</span>
             </template>
           </Column>
-          <Column header="Rows" body-class="num" header-class="num"><template #body="{ data }">{{ data.rowCount.toLocaleString("en-US") }}</template></Column>
-          <Column header="Total (hour)" body-class="num font-bold text-brand" header-class="num"><template #body="{ data }">{{ formatHourValue(totalMinutes(data.totals)) }}</template></Column>
+          <Column header="Status" style="width: 130px">
+            <template #body="{ data }">
+              <span v-if="data.status === 'match'" class="inline-block rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Match</span>
+              <span v-else-if="data.status === 'mismatch'" class="inline-block rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">Mismatch</span>
+              <span v-else-if="data.status === 'csv-only'" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">CSV only</span>
+              <span v-else class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Schedule only</span>
+            </template>
+          </Column>
         </DataTable>
+        <div v-else class="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted">
+          Nhấn <strong class="mx-1">Compare</strong> để so sánh giờ trong CSV với schedule theo từng ngày.
+        </div>
       </section>
     </div>
 
@@ -297,16 +371,40 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
       </template>
     </Dialog>
 
-    <!-- Detail Dialog -->
-    <Dialog v-if="ctrl.previewResult.value" :visible="isDetailDialogOpen" class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isDetailDialogOpen = $event">
+    <!-- Preview Dialog (summary + detail toggle) -->
+    <Dialog v-if="ctrl.previewResult.value" :visible="isPreviewDialogOpen" modal class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isPreviewDialogOpen = $event">
       <template #header>
-        <div class="min-w-0">
-          <h3 class="truncate text-lg font-bold text-ink">CSV detail</h3>
-          <p class="mt-1 truncate text-sm text-muted">{{ ctrl.previewResult.value.source_file_name }}{{ ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : '' }}</p>
+        <div class="flex w-full items-center justify-between gap-3 pr-8">
+          <div class="min-w-0">
+            <h3 class="truncate text-lg font-bold text-ink">{{ previewDialogView === 'summary' ? 'Preview' : 'CSV detail' }}</h3>
+            <p class="mt-1 truncate text-sm text-muted">{{ ctrl.previewResult.value.source_file_name }}{{ ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : '' }}</p>
+          </div>
+          <Button
+            :icon="previewDialogView === 'summary' ? 'pi pi-list' : 'pi pi-chart-bar'"
+            :label="previewDialogView === 'summary' ? 'Show detail' : 'Show summary'"
+            severity="secondary" outlined size="small"
+            @click="previewDialogView = previewDialogView === 'summary' ? 'detail' : 'summary'" />
         </div>
       </template>
-      <DataTable class="app-data-table min-h-0" empty-message="No CSV rows." scrollable scroll-height="flex" :table-style="{ minWidth: `${Math.max(920, (ctrl.previewResult.value?.raw_headers.filter(h => !hiddenCsvDetailHeaders.has(h)).length ?? 0) * 140)}px` }" :value="ctrl.previewResult.value.raw_rows.map((cells, i) => ({ cells, id: i }))">
-        <Column v-for="(col, idx) in ctrl.previewResult.value.raw_headers.map((h, i) => ({ header: h, index: i })).filter(c => !hiddenCsvDetailHeaders.has(c.header))" :key="`${col.header}-${col.index}`" :header="col.header" :body-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num' : undefined" :header-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num' : undefined">
+
+      <!-- Summary view -->
+      <DataTable v-if="previewDialogView === 'summary'" class="app-data-table min-h-0" empty-message="No data." :row-class="(row: any) => row.kind === 'project' ? 'bg-emerald-50 font-bold' : 'cursor-pointer'" scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="previewRows" @row-click="(e: any) => { if (e.data.kind === 'phase') onOpenDetail({ project_code: e.data.project.project_code, project_name: e.data.project.project_name, phase: e.data.phase }); }">
+        <Column header="Project">
+          <template #body="{ data }"><strong v-if="data.kind === 'project'">{{ `${data.project.project_code} ${data.project.project_name}`.trim() }}</strong></template>
+        </Column>
+        <Column header="Phase">
+          <template #body="{ data }">
+            <template v-if="data.kind === 'project'">All phases</template>
+            <template v-else><span class="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">{{ data.phase.process_code }}</span>{{ data.phase.phase_name }}</template>
+          </template>
+        </Column>
+        <Column header="Rows" body-class="num" header-class="num"><template #body="{ data }">{{ data.rowCount.toLocaleString("en-US") }}</template></Column>
+        <Column header="Total (hour)" body-class="num font-bold text-brand" header-class="num"><template #body="{ data }">{{ formatHourValue(totalMinutes(data.totals)) }}</template></Column>
+      </DataTable>
+
+      <!-- Detail view -->
+      <DataTable v-else class="app-data-table min-h-0" empty-message="No CSV rows." scrollable scroll-height="flex" :table-style="{ minWidth: `${Math.max(920, (ctrl.previewResult.value?.raw_headers.filter(h => !hiddenCsvDetailHeaders.has(h)).length ?? 0) * 140)}px` }" :value="ctrl.previewResult.value.raw_rows.map((cells, i) => ({ cells, id: i }))">
+        <Column v-for="col in ctrl.previewResult.value.raw_headers.map((h, i) => ({ header: h, index: i })).filter(c => !hiddenCsvDetailHeaders.has(c.header))" :key="`${col.header}-${col.index}`" :header="col.header" :body-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num' : undefined" :header-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num' : undefined">
           <template #body="{ data }">{{ ctrl.previewResult.value!.minute_column_indexes.includes(col.index) ? formatCsvMinuteValue(data.cells[col.index]) : (data.cells[col.index] || '') }}</template>
         </Column>
       </DataTable>

@@ -1,5 +1,11 @@
 import { safeInvoke } from "./_base";
-import type { AddAiAccountRequest, AiAccount } from "@/_/types/ai-usage";
+import type {
+  AddAiAccountRequest,
+  AiAccount,
+  AiUsageSettings,
+  ReportUsageSignalRequest,
+  UpdateAiAccountRequest,
+} from "@/_/types/ai-usage";
 
 export function aiUsageAddAccount(request: AddAiAccountRequest) {
   return safeInvoke<AiAccount>("ai_usage_add_account", { request });
@@ -9,6 +15,34 @@ export function aiUsageListAccounts() {
   return safeInvoke<AiAccount[]>("ai_usage_list_accounts");
 }
 
+export function aiUsageUpdateAccount(request: UpdateAiAccountRequest) {
+  return safeInvoke<AiAccount>("ai_usage_update_account", { request });
+}
+
 export function aiUsageDeleteAccount(id: number) {
   return safeInvoke<void>("ai_usage_delete_account", { id });
+}
+
+export function aiUsageSetActive(id: number) {
+  return safeInvoke<void>("ai_usage_set_active", { id });
+}
+
+export function aiUsageGetToken(id: number) {
+  return safeInvoke<string>("ai_usage_get_token", { id });
+}
+
+export function aiUsageReportSignal(request: ReportUsageSignalRequest) {
+  return safeInvoke<void>("ai_usage_report_signal", { request });
+}
+
+export function aiUsageRefresh() {
+  return safeInvoke<AiAccount[]>("ai_usage_refresh");
+}
+
+export function aiUsageGetSettings() {
+  return safeInvoke<AiUsageSettings>("ai_usage_get_settings");
+}
+
+export function aiUsageSaveSettings(settings: AiUsageSettings) {
+  return safeInvoke<void>("ai_usage_save_settings", { settings });
 }
