@@ -113,7 +113,9 @@ export function useAiChat() {
     };
     sessions.value = [session, ...sessions.value];
     activeId.value = session.id;
-    return session;
+    // Return the reactive proxy (not the raw literal) so callers mutate the
+    // tracked instance — otherwise pushes bypass the deep watch and never persist.
+    return activeSession.value ?? session;
   }
 
   function openSession(id: string) {

@@ -24,6 +24,9 @@ const projectId = (route.params.id as string) || "";
 
 const ctrl = useProjectTasks(projectId);
 
+// Chỉ cho phép liên kết Issue Backlog khi dự án đã thiết lập Backlog key.
+const hasBacklog = computed(() => Boolean(ctrl.project.value?.backlog_key));
+
 const categoryNameMap = computed(() => new Map(ctrl.categories.value.map((c) => [c.code, c.name])));
 function categoryName(code: string) {
   return categoryNameMap.value.get(code) ?? code;
@@ -262,6 +265,8 @@ async function saveTask() {
               v-model="form.issueKey"
               class="mt-1 w-full"
               placeholder="Issue Key"
+              :disabled="!hasBacklog || ctrl.projectLoading.value"
+              :title="hasBacklog ? 'Link a Backlog issue key' : 'Project has no Backlog configured'"
             />
           </label>
         </div>

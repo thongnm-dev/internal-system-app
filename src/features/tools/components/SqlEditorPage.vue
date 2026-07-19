@@ -4,11 +4,15 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import { useSqlEditor, type SuggestItem } from "../composables/useSqlEditor";
 import { getCaretCoordinates } from "../utils/caretCoordinates";
+import { highlightSql } from "../utils/highlightSql";
 
 const sql = useSqlEditor();
 
 /** Kết quả của tab đang mở (null nếu tab chưa chạy query nào). */
 const activeResult = computed(() => sql.activeTab.value?.result ?? null);
+
+/** HTML đã tô màu cho lớp phủ highlight (thêm ký tự cuối để căn dòng chót). */
+const highlightedHtml = computed(() => highlightSql(sql.activeTab.value?.query ?? "") + "\n");
 
 /** Nhóm nút thao tác với nội dung query (không phụ thuộc kết nối). */
 const toolbarLeft = [
@@ -50,6 +54,16 @@ function startDrag() {
 
 // ── Autocomplete / suggestions ──────────────────────────────────────────────
 const queryEl = ref<HTMLTextAreaElement | null>(null);
+const highlightEl = ref<HTMLElement | null>(null);
+
+/** Đồng bộ cuộn của lớp highlight theo textarea để hai lớp luôn khớp. */
+function syncScroll() {
+  const el = queryEl.value;
+  const hl = highlightEl.value;
+  if (!el || !hl) return;
+  hl.scrollTop = el.scrollTop;
+  hl.scrollLeft = el.scrollLeft;
+}
 const suggestOpen = ref(false);
 const suggestItems = ref<SuggestItem[]>([]);
 const suggestIndex = ref(0);
@@ -130,7 +144,13 @@ function acceptSuggest(item: SuggestItem | undefined) {
 }
 
 function onQueryInput() {
+  syncScroll();
   updateSuggest(false);
+}
+
+function onQueryScroll() {
+  syncScroll();
+  closeSuggest();
 }
 
 function onQueryKeydown(event: KeyboardEvent) {
@@ -251,9 +271,9 @@ onBeforeUnmount(stopDrag);
               <i class="pi pi-server text-sm text-muted" />
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-semibold text-ink">{{ conn.name }}</p>
-                <p class="truncate text-xs text-muted">
+                <!-- <p class="truncate text-xs text-muted">
                   {{ dbTypeLabel(conn.db_type) }} · {{ conn.host }}:{{ conn.port }}/{{ conn.database }}
-                </p>
+                </p> -->
               </div>
               <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
                 <button
@@ -388,17 +408,24 @@ onBeforeUnmount(stopDrag);
           </button>
         </div>
 
-        <div class="relative">
+        <div class="relative rounded-md border border-divider bg-canvas focus-within:border-brand">
+          <!-- Lớp phủ tô màu (căn khít với textarea trong suốt bên trên). -->
+          <pre
+            ref="highlightEl"
+            aria-hidden="true"
+            class="sql-highlight pointer-events-none absolute inset-0 m-0 overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm"
+            v-html="highlightedHtml"
+          />
           <textarea
             ref="queryEl"
             v-model="sql.activeTab.value.query"
             spellcheck="false"
             placeholder="SELECT * FROM ..."
-            class="min-h-[140px] w-full resize-y rounded-md border border-divider bg-canvas p-3 font-mono text-sm outline-none focus:border-brand"
+            class="sql-input relative block min-h-[140px] w-full resize-y overflow-auto whitespace-pre-wrap break-words bg-transparent p-3 font-mono text-sm text-transparent caret-ink outline-none"
             @keydown="onQueryKeydown"
             @input="onQueryInput"
             @blur="closeSuggest"
-            @scroll="closeSuggest"
+            @scroll="onQueryScroll"
             @click="closeSuggest"
           />
 
@@ -638,3 +665,25 @@ onBeforeUnmount(stopDrag);
     </Dialog>
   </section>
 </template>
+
+<!-- Không dùng `scoped` để class trong v-html (lớp highlight) được áp style. -->
+<style>
+.sql-highlight {
+  color: rgb(var(--color-ink));
+  tab-size: 4;
+}
+.sql-input {
+  caret-color: rgb(var(--color-ink));
+  tab-size: 4;
+}
+/* Bảng màu syntax — light theme */
+.sql-kw { color: #2563eb; font-weight: 600; }
+.sql-str { color: #16a34a; }
+.sql-com { color: #6b7280; font-style: italic; }
+.sql-num { color: #b45309; }
+/* Dark theme */
+[data-theme="dark"] .sql-kw { color: #93c5fd; }
+[data-theme="dark"] .sql-str { color: #86efac; }
+[data-theme="dark"] .sql-com { color: #9ca3af; }
+[data-theme="dark"] .sql-num { color: #fcd34d; }
+</style>

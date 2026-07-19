@@ -7,6 +7,13 @@ use crate::models::backlog::*;
 use crate::services::backlog_service;
 
 #[tauri::command]
+pub async fn backlog_get_base_url() -> Result<String, String> {
+    backlog_service::get_base_url()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn backlog_get_project(project_key: String) -> Result<BacklogProject, String> {
     backlog_service::get_project(&project_key)
         .await

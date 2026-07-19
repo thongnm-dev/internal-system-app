@@ -32,6 +32,10 @@ export type BacklogUser = {
   keyword?: string;
 };
 
+export function backlogGetBaseUrl() {
+  return safeInvoke<string>("backlog_get_base_url");
+}
+
 export function backlogListIssueTypes(projectKey: string) {
   return safeInvoke<BacklogIssueType[]>("backlog_list_issue_types", { projectKey });
 }

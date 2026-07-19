@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import {
   sqlDeleteConnection,
   sqlGetSchema,
@@ -59,7 +59,29 @@ function emptyForm(): SaveSqlConnectionRequest {
   };
 }
 
-export function useSqlEditor() {
+// ── Lưu phiên làm việc (tabs + query đã viết) để giữ khi rời màn hình / khởi động lại ──
+const STORAGE_KEY = "sqlEditor.session";
+
+type PersistedTab = { id: number; title: string; query: string };
+type PersistedSession = {
+  tabs: PersistedTab[];
+  activeTabId: number;
+  activeId: number | null;
+};
+
+function loadSession(): PersistedSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PersistedSession;
+    if (!data || !Array.isArray(data.tabs) || data.tabs.length === 0) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function createSqlEditor() {
   const connections = ref<SqlConnection[]>([]);
   const activeId = ref<number | null>(null);
 
@@ -91,6 +113,42 @@ export function useSqlEditor() {
   const activeTabId = ref<number>(tabs.value[0].id);
   const activeTab = computed(
     () => tabs.value.find((t) => t.id === activeTabId.value) ?? null,
+  );
+
+  // Khôi phục phiên trước (nếu có): chỉ giữ nội dung query, không giữ kết quả.
+  const saved = loadSession();
+  if (saved) {
+    tabs.value = saved.tabs.map((t) => ({
+      id: t.id,
+      title: t.title,
+      query: t.query,
+      result: null,
+      running: false,
+      error: "",
+    }));
+    tabSeq = Math.max(0, ...saved.tabs.map((t) => t.id));
+    activeTabId.value = saved.tabs.some((t) => t.id === saved.activeTabId)
+      ? saved.activeTabId
+      : tabs.value[0].id;
+    if (typeof saved.activeId === "number") activeId.value = saved.activeId;
+  }
+
+  // Lưu lại phiên mỗi khi tab / query / kết nối đang chọn thay đổi.
+  // Getter chỉ chạm vào id/title/query nên reactivity không phải duyệt sâu `result`.
+  watch(
+    () =>
+      JSON.stringify({
+        tabs: tabs.value.map((t) => ({ id: t.id, title: t.title, query: t.query })),
+        activeTabId: activeTabId.value,
+        activeId: activeId.value,
+      } satisfies PersistedSession),
+    (json) => {
+      try {
+        localStorage.setItem(STORAGE_KEY, json);
+      } catch {
+        // Bỏ qua lỗi lưu (ví dụ storage đầy) — không ảnh hưởng thao tác.
+      }
+    },
   );
 
   const loading = ref(false);
@@ -141,6 +199,10 @@ export function useSqlEditor() {
     clearMessages();
     try {
       connections.value = await sqlListConnections();
+      // Bỏ chọn nếu kết nối đang active (khôi phục từ phiên trước) không còn tồn tại.
+      if (activeId.value !== null && !connections.value.some((c) => c.id === activeId.value)) {
+        activeId.value = null;
+      }
       // Tự chọn kết nối đầu tiên nếu chưa có kết nối nào đang active.
       if (activeId.value === null && connections.value.length > 0) {
         activeId.value = connections.value[0].id;
@@ -436,4 +498,13 @@ export function useSqlEditor() {
     copyQuery,
     exportCsv,
   };
+}
+
+// State dùng chung ở phạm vi module (singleton): sống suốt vòng đời app nên khi
+// điều hướng rời màn SQL Editor rồi quay lại, các tab + query vẫn được giữ nguyên.
+let singleton: ReturnType<typeof createSqlEditor> | null = null;
+
+export function useSqlEditor() {
+  if (!singleton) singleton = createSqlEditor();
+  return singleton;
 }

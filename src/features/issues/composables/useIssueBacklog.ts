@@ -123,7 +123,8 @@ async function loadProjects() {
   if (!canUseTauriRuntime()) return;
   try {
     const list = await listProjects();
-    projects.value = list.filter((p) => p.is_active);
+    // Chỉ hiển thị dự án đang hoạt động và đã thiết lập Backlog (project_backlog_key).
+    projects.value = list.filter((p) => p.is_active && Boolean(p.backlog_key));
   } catch {
     projects.value = [];
   }

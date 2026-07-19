@@ -219,6 +219,7 @@ pub async fn list_all() -> AppResult<Vec<ProjectSummary>> {
             is_active: row.get("is_active"),
             created_at: row.get("created_at"),
             member_count: row.get("member_count"),
+            backlog_key: row.get("backlog_key"),
         })
         .collect();
 

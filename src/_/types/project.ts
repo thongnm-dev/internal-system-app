@@ -41,6 +41,8 @@ export type ProjectSummaryResult = {
   is_active: boolean;
   member_count: number;
   created_at: string;
+  /** Backlog key; empty/null means the project has no Backlog configured. */
+  backlog_key: string | null;
 };
 
 export type ProjectTaskResult = {

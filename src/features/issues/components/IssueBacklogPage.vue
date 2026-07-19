@@ -25,6 +25,7 @@ import { canUseTauriRuntime } from "@/tauri/commands/_base";
 import { getProjectDetail } from "@/tauri/commands/project";
 import {
   backlogGetProjectLookup,
+  backlogGetBaseUrl,
   backlogListIssueTypes,
   backlogListPriorities,
   backlogCreateIssue,
@@ -40,6 +41,48 @@ const toast = useToast();
 const globalLoading = useGlobalLoading();
 const initialProject = (route.query.project as string) || "";
 const ctrl = useIssueBacklog(initialProject);
+
+// Khi chưa chọn dự án (hoặc đang tải lookup) thì khóa toàn bộ điều kiện tìm kiếm.
+const searchDisabled = computed(() => !ctrl.criteria.value.project || ctrl.lookupLoading.value);
+
+// --- Mở issue Backlog trong cửa sổ webview để cập nhật trực tiếp ---
+let cachedBaseUrl = "";
+const openingIssue = ref("");
+
+async function openIssueWebview(issueKey: string) {
+  if (!issueKey || !canUseTauriRuntime()) return;
+  openingIssue.value = issueKey;
+  try {
+    if (!cachedBaseUrl) {
+      cachedBaseUrl = (await backlogGetBaseUrl()).replace(/\/+$/, "");
+    }
+    const url = `${cachedBaseUrl}/view/${encodeURIComponent(issueKey)}`;
+    const label = `backlog-issue-${issueKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    const existing = await WebviewWindow.getByLabel(label);
+    if (existing) {
+      await existing.setFocus();
+      return;
+    }
+
+    const win = new WebviewWindow(label, {
+      url,
+      title: `Backlog - ${issueKey}`,
+      width: 1100,
+      height: 820,
+      center: true,
+      resizable: true,
+    });
+    win.once("tauri://error", (event) => {
+      toast.error(`Failed to open issue: ${String(event.payload)}`);
+    });
+  } catch (e) {
+    toast.error(`Failed to open issue: ${String(e)}`);
+  } finally {
+    openingIssue.value = "";
+  }
+}
 
 function toggleStatus(s: string) {
   ctrl.setField("notClosed", false);
@@ -292,7 +335,7 @@ async function executeImport() {
                   ctrl.criteria.value.status.length === 0 && !ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
                 unstyled
-                :disabled="ctrl.lookupLoading.value"
+                :disabled="searchDisabled"
                 @click="selectAll()"
               >
                 All
@@ -305,7 +348,7 @@ async function executeImport() {
                   !ctrl.criteria.value.notClosed && ctrl.criteria.value.status.includes(s) ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
                 unstyled
-                :disabled="ctrl.lookupLoading.value"
+                :disabled="searchDisabled"
                 @click="toggleStatus(s)"
               >
                 {{ s }}
@@ -316,7 +359,7 @@ async function executeImport() {
                   ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
                 ]"
                 unstyled
-                :disabled="ctrl.lookupLoading.value || statusOptions.length === 0"
+                :disabled="searchDisabled || statusOptions.length === 0"
                 @click="selectNotClosed()"
               >
                 Not Closed
@@ -330,7 +373,7 @@ async function executeImport() {
             <span class="text-xs font-bold text-muted">Issue Type</span>
             <select
               class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-              :disabled="ctrl.lookupLoading.value"
+              :disabled="searchDisabled"
               :value="ctrl.criteria.value.issueType"
               @change="ctrl.setField('issueType', ($event.target as HTMLSelectElement).value)"
             >
@@ -343,7 +386,7 @@ async function executeImport() {
               <span class="text-xs font-bold text-muted">Category</span>
               <select
                 class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-                :disabled="ctrl.lookupLoading.value"
+                :disabled="searchDisabled"
                 :value="ctrl.criteria.value.category"
                 @change="ctrl.setField('category', ($event.target as HTMLSelectElement).value)"
               >
@@ -355,6 +398,7 @@ async function executeImport() {
               <span class="text-xs font-bold text-muted">Assignee</span>
               <select
                 class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                :disabled="searchDisabled"
                 :value="ctrl.criteria.value.assignee"
                 @change="ctrl.setField('assignee', ($event.target as HTMLSelectElement).value)"
               >
@@ -371,6 +415,7 @@ async function executeImport() {
             <InputText
               class="mt-1 w-full"
               placeholder="Issue key or subject"
+              :disabled="searchDisabled"
               :model-value="ctrl.criteria.value.keyword"
               @update:model-value="ctrl.setField('keyword', $event as string)"
               @keydown.enter="ctrl.search()"
@@ -390,6 +435,7 @@ async function executeImport() {
                 <span class="text-xs font-bold text-muted">Create date from</span>
                 <Calendar
                   :model-value="ctrl.criteria.value.createDateFrom ? new Date(ctrl.criteria.value.createDateFrom + 'T00:00:00') : null"
+                  :disabled="searchDisabled"
                   class="mt-1 w-full"
                   date-format="yy/mm/dd"
                   placeholder="Select date"
@@ -402,6 +448,7 @@ async function executeImport() {
                 <span class="text-xs font-bold text-muted">Create date to</span>
                 <Calendar
                   :model-value="ctrl.criteria.value.createDateTo ? new Date(ctrl.criteria.value.createDateTo + 'T00:00:00') : null"
+                  :disabled="searchDisabled"
                   class="mt-1 w-full"
                   date-format="yy/mm/dd"
                   placeholder="Select date"
@@ -416,6 +463,7 @@ async function executeImport() {
                 <span class="text-xs font-bold text-muted">Create user</span>
                 <select
                   class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  :disabled="searchDisabled"
                   :value="ctrl.criteria.value.createUser"
                   @change="ctrl.setField('createUser', ($event.target as HTMLSelectElement).value)"
                 >
@@ -427,6 +475,7 @@ async function executeImport() {
                 <span class="text-xs font-bold text-muted">Priority</span>
                 <select
                   class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  :disabled="searchDisabled"
                   :value="ctrl.criteria.value.priorityFilter"
                   @change="ctrl.setField('priorityFilter', ($event.target as HTMLSelectElement).value)"
                 >
@@ -498,6 +547,19 @@ async function executeImport() {
         </Column>
         <Column field="createDate" header="Create Date" body-class="whitespace-nowrap" />
         <Column field="createUser" header="Create User" body-class="whitespace-nowrap" />
+        <Column header="" header-class="w-28" body-class="whitespace-nowrap text-right">
+          <template #body="{ data }">
+            <Button
+              icon="pi pi-external-link"
+              label="View"
+              size="small"
+              outlined
+              :loading="openingIssue === data.issueKey"
+              title="Open the issue in Backlog to update it"
+              @click="openIssueWebview(data.issueKey)"
+            />
+          </template>
+        </Column>
       </DataTable>
     </section>
 

@@ -39,6 +39,9 @@ const ctrl = useProjectTasks(projectId);
 const toast = useToast();
 const globalLoading = useGlobalLoading();
 
+// Chỉ cho phép liên kết Backlog khi dự án đã thiết lập Backlog key.
+const hasBacklog = computed(() => Boolean(ctrl.project.value?.backlog_key));
+
 // --- Backlog import dialog ---
 type BacklogRow = {
   issueKey: string;
@@ -404,7 +407,14 @@ async function importSelected() {
           @change="handleFileChange"
         />
         <Button icon="pi pi-upload" label="Choose CSV file" @click="triggerFileInput" />
-        <Button icon="pi pi-list-check" label="Import from Backlog" outlined @click="openBacklogDialog" />
+        <Button
+          icon="pi pi-list-check"
+          label="Import from Backlog"
+          outlined
+          :disabled="!hasBacklog || ctrl.projectLoading.value"
+          :title="hasBacklog ? 'Import issues from Backlog' : 'Project has no Backlog configured'"
+          @click="openBacklogDialog"
+        />
         <span class="text-sm text-muted">
           CSV columns: <code class="rounded bg-canvas px-1 text-xs">short name</code> (required),
           <code class="rounded bg-canvas px-1 text-xs">description</code>,

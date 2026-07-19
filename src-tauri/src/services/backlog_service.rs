@@ -147,6 +147,13 @@ impl BacklogClient {
     }
 }
 
+/// Trả về base URL của Backlog (đã bỏ dấu `/` và hậu tố `/api/v2`),
+/// dùng để mở trang web của issue: `{base_url}/view/{issueKey}`.
+pub async fn get_base_url() -> AppResult<String> {
+    let client = BacklogClient::resolve().await?;
+    Ok(client.base_url)
+}
+
 pub async fn get_project(project_key: &str) -> AppResult<BacklogProject> {
     let client = BacklogClient::resolve().await?;
     client

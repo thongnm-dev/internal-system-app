@@ -51,6 +51,8 @@ pub struct ProjectSummary {
     /// Số lượng thành viên trong dự án.
     pub member_count: i64,
     pub created_at: String,
+    /// Backlog key của dự án; `None`/rỗng nghĩa là chưa thiết lập Backlog.
+    pub backlog_key: Option<String>,
 }
 
 /// Dữ liệu request từ frontend khi tạo mới hoặc cập nhật dự án.
