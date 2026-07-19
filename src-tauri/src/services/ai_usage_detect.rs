@@ -123,9 +123,12 @@ fn collect(
         .unwrap_or_else(|| account.organization_type.clone());
     let token_expires_at = expires_at.map(format_epoch_ms).unwrap_or_default();
 
+    // Chỉ coi là "đã thêm" khi đã có bản DETECTED (ưu tiên detected). Bản captured
+    // cùng email vẫn để trạng thái "mới" để lần import sẽ nâng cấp thành detected.
     let already_added = existing.iter().any(|a| {
-        (!a.email.is_empty() && a.email.eq_ignore_ascii_case(&email))
-            || (!a.config_dir.is_empty() && paths_equal(&a.config_dir, config_dir_label))
+        a.source == "detected"
+            && ((!a.email.is_empty() && a.email.eq_ignore_ascii_case(&email))
+                || (!a.config_dir.is_empty() && paths_equal(&a.config_dir, config_dir_label)))
     });
 
     out.push(DetectedLogin {

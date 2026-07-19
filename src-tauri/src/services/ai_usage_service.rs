@@ -12,10 +12,12 @@ use tauri::{AppHandle, Emitter};
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::ai_account_store::{self, AiAccountData, StoredAccount};
+use crate::database::ai_profile_store;
 use crate::models::ai_usage::{
-    AddAiAccountRequest, AiAccount, AiUsageSettings, DetectedLogin, ReportUsageSignalRequest,
-    UpdateAiAccountRequest,
+    AddAiAccountRequest, AiAccount, AiUsageSettings, CapturedLogin, DetectedLogin,
+    ReportUsageSignalRequest, UpdateAiAccountRequest,
 };
+use crate::services::ai_usage_capture;
 use crate::services::ai_usage_detect;
 use crate::services::ai_usage_probe;
 use crate::utils::time::current_timestamp;
@@ -34,6 +36,21 @@ fn ensure_loaded(guard: &mut Option<AiAccountData>) {
         let mut data = ai_account_store::load().unwrap_or_default();
         if data.next_id < 1 {
             data.next_id = 1;
+        }
+        // Migrate account cũ (tạo trước khi có field `source`): suy ra nguồn để logic
+        // "ưu tiên detected" hoạt động. Có API key → `manual`; còn lại → `detected`.
+        for account in data.accounts.iter_mut() {
+            if account.source.trim().is_empty() {
+                account.source = if account.api_key.is_empty() {
+                    "detected".to_string()
+                } else {
+                    "manual".to_string()
+                };
+            }
+        }
+        // Migrate chu kỳ poll cũ (60s) → 300s: endpoint usage bị rate-limit nếu gọi dày.
+        if data.settings.poll_interval_secs == 60 {
+            data.settings.poll_interval_secs = 300;
         }
         *guard = Some(data);
     }
@@ -115,6 +132,7 @@ fn to_public(account: &StoredAccount) -> AiAccount {
         config_dir: account.config_dir.clone(),
         email: account.email.clone(),
         subscription_type: account.subscription_type.clone(),
+        source: account.source.clone(),
         priority: account.priority,
         is_active: account.is_active,
         status: account.status.clone(),
@@ -204,6 +222,10 @@ pub fn add_account(request: AddAiAccountRequest) -> AppResult<AiAccount> {
     let config_dir = request.config_dir.unwrap_or_default().trim().to_string();
     let email = request.email.unwrap_or_default().trim().to_string();
     let subscription_type = request.subscription_type.unwrap_or_default().trim().to_string();
+    let source = {
+        let s = request.source.unwrap_or_default().trim().to_string();
+        if s.is_empty() { "manual".to_string() } else { s }
+    };
 
     if name.is_empty() {
         return Err(AppError::new("Account name is required."));
@@ -266,6 +288,7 @@ pub fn add_account(request: AddAiAccountRequest) -> AppResult<AiAccount> {
             config_dir,
             email,
             subscription_type,
+            source,
             priority,
             is_active: false,
             status: "unknown".to_string(),
@@ -309,9 +332,22 @@ pub fn detect_local() -> AppResult<Vec<DetectedLogin>> {
 /// Trả về danh sách account sau khi thêm. Lỗi từng account (vd trùng) được bỏ qua.
 pub fn import_detected() -> AppResult<Vec<AiAccount>> {
     for login in detect_local()? {
-        if login.already_added {
-            continue;
+        // Ưu tiên bản detected: nếu email đã có ở account khác nguồn (captured/manual)
+        // thì thay bằng bản detected; nếu đã là detected thì giữ nguyên, bỏ qua.
+        let existing = read_data(|data| {
+            data.accounts
+                .iter()
+                .find(|a| !a.email.is_empty() && a.email.eq_ignore_ascii_case(&login.email))
+                .map(|a| (a.id, a.source.clone()))
+        });
+        match existing {
+            Some((_, source)) if source == "detected" => continue,
+            Some((id, _)) => {
+                let _ = delete_account(id);
+            }
+            None => {}
         }
+
         let name = if login.display_name.trim().is_empty() {
             login.email.clone()
         } else {
@@ -325,6 +361,7 @@ pub fn import_detected() -> AppResult<Vec<AiAccount>> {
             config_dir: Some(login.config_dir.clone()),
             email: Some(login.email.clone()),
             subscription_type: Some(login.subscription_type.clone()),
+            source: Some("detected".to_string()),
             priority: None,
         };
         let _ = add_account(request);
@@ -332,10 +369,175 @@ pub fn import_detected() -> AppResult<Vec<AiAccount>> {
     list_accounts()
 }
 
+/// Xem trước login Claude đang active trên máy (để capture) — không kèm token.
+pub fn capture_preview() -> AppResult<Option<CapturedLogin>> {
+    Ok(ai_usage_capture::preview())
+}
+
+/// Capture login Claude đang active: lưu OAuth token vào profile (app data dir) rồi
+/// thêm account subscription dạng `captured`. Ưu tiên bản detected nếu đã có cùng email.
+pub fn capture_add(name: Option<String>) -> AppResult<AiAccount> {
+    let captured = ai_usage_capture::capture_current().ok_or_else(|| {
+        AppError::new("Không tìm thấy login Claude đang hoạt động. Hãy chạy `claude /login` trước.")
+    })?;
+
+    let email = captured.email.trim().to_string();
+
+    if !email.is_empty() {
+        // Đã có account cùng email (detected/manual/legacy) → không tạo bản capture
+        // trùng, ưu tiên bản kia (thường là detected — token trong Keychain luôn mới).
+        let authoritative_exists = read_data(|data| {
+            data.accounts
+                .iter()
+                .any(|a| a.source != "captured" && a.email.eq_ignore_ascii_case(&email))
+        });
+        if authoritative_exists {
+            return Err(AppError::new(
+                "Đã có account cùng email trên máy (ưu tiên bản detect). Không tạo bản capture trùng.",
+            ));
+        }
+        // Đã capture trước đó (cùng email) → xoá bản cũ để capture token mới.
+        let old = read_data(|data| {
+            data.accounts
+                .iter()
+                .find(|a| a.source == "captured" && a.email.eq_ignore_ascii_case(&email))
+                .map(|a| a.id)
+        });
+        if let Some(id) = old {
+            let _ = delete_account(id);
+        }
+    }
+
+    let account_name = name
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| {
+            if captured.display_name.trim().is_empty() {
+                email.clone()
+            } else {
+                captured.display_name.clone()
+            }
+        });
+    let subscription_type = captured.subscription_type.clone();
+
+    // Tạo account (id do store cấp) — config_dir = thư mục profile theo id.
+    let id = with_data(|data| {
+        if data.accounts.iter().any(|a| a.name == account_name) {
+            return Err(AppError::new(format!(
+                "Account \"{account_name}\" already exists."
+            )));
+        }
+        let priority = data
+            .accounts
+            .iter()
+            .filter(|a| a.provider == "claude")
+            .map(|a| a.priority)
+            .max()
+            .map(|max| max + 1)
+            .unwrap_or(0);
+
+        let id = data.next_id;
+        data.next_id += 1;
+        let config_dir = ai_profile_store::profile_dir(id).to_string_lossy().to_string();
+
+        data.accounts.push(StoredAccount {
+            id,
+            name: account_name.clone(),
+            api_key: String::new(),
+            account_type: "subscription".to_string(),
+            provider: "claude".to_string(),
+            config_dir,
+            email: email.clone(),
+            subscription_type,
+            source: "captured".to_string(),
+            priority,
+            is_active: false,
+            status: "unknown".to_string(),
+            usage_source: "manual".to_string(),
+            usage_percent: 100.0,
+            reset_at: String::new(),
+            session_percent: 100.0,
+            session_reset_at: String::new(),
+            weekly_percent: 100.0,
+            weekly_reset_at: String::new(),
+            session_count: 0,
+            last_checked_at: String::new(),
+            created_at: current_timestamp(),
+        });
+        recompute_active(data, "claude");
+        Ok(id)
+    })?;
+
+    // Ghi token capture ra profile (ngoài lock ghi file JSON chính).
+    ai_profile_store::save_credentials(id, &captured.claude_ai_oauth)?;
+
+    read_data(|data| data.accounts.iter().find(|a| a.id == id).map(to_public))
+        .ok_or_else(|| AppError::new("Account not found after capture."))
+}
+
+/// Xem trước login Claude tại một `CLAUDE_CONFIG_DIR` (để thêm account thứ 2).
+pub fn config_dir_preview(config_dir: String) -> AppResult<Option<CapturedLogin>> {
+    Ok(ai_usage_capture::read_login_at(config_dir.trim()))
+}
+
+/// Đăng ký account subscription thứ 2 từ một `CLAUDE_CONFIG_DIR` đã login sẵn
+/// (token nằm trong Keychain của dir đó → account `detected`, luôn mới).
+pub fn add_config_dir(config_dir: String, name: Option<String>) -> AppResult<AiAccount> {
+    let dir = config_dir.trim().to_string();
+    if dir.is_empty() {
+        return Err(AppError::new("Config directory is required."));
+    }
+    let login = ai_usage_capture::read_login_at(&dir).ok_or_else(|| {
+        AppError::new(
+            "Không tìm thấy login Claude trong thư mục này. Chạy `CLAUDE_CONFIG_DIR=<dir> claude /login` trước.",
+        )
+    })?;
+
+    let account_name = name
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| {
+            if login.display_name.trim().is_empty() {
+                login.email.clone()
+            } else {
+                login.display_name.clone()
+            }
+        });
+
+    add_account(AddAiAccountRequest {
+        name: account_name,
+        api_key: None,
+        provider: Some("claude".to_string()),
+        account_type: Some("subscription".to_string()),
+        config_dir: Some(dir),
+        email: Some(login.email),
+        subscription_type: Some(login.subscription_type),
+        source: Some("detected".to_string()),
+        priority: None,
+    })
+}
+
 /// Danh sách account, nhóm theo provider rồi tăng dần theo priority.
 pub fn list_accounts() -> AppResult<Vec<AiAccount>> {
     Ok(read_data(|data| {
-        let mut list: Vec<&StoredAccount> = data.accounts.iter().collect();
+        // Ưu tiên detected: ẩn account `captured` nếu đã có account khác (không phải
+        // captured) cùng email — tránh hiển thị trùng thông tin sau khi Refresh.
+        let authoritative_emails: Vec<String> = data
+            .accounts
+            .iter()
+            .filter(|a| a.source != "captured" && !a.email.is_empty())
+            .map(|a| a.email.to_ascii_lowercase())
+            .collect();
+
+        let mut list: Vec<&StoredAccount> = data
+            .accounts
+            .iter()
+            .filter(|a| {
+                !(a.source == "captured"
+                    && !a.email.is_empty()
+                    && authoritative_emails.contains(&a.email.to_ascii_lowercase()))
+            })
+            .collect();
         list.sort_by(|a, b| {
             a.provider
                 .cmp(&b.provider)
@@ -405,7 +607,10 @@ pub fn delete_account(id: i64) -> AppResult<()> {
         }
         recompute_all(data);
         Ok(())
-    })
+    })?;
+    // Dọn profile token đã capture (nếu có).
+    ai_profile_store::delete(id);
+    Ok(())
 }
 
 /// Đánh dấu một account làm active (override thủ công) trong provider của nó.
@@ -537,10 +742,11 @@ pub async fn poll_once(app: &AppHandle) -> AppResult<()> {
 /// Vòng lặp poll nền — chạy suốt vòng đời ứng dụng.
 pub async fn run_poll_loop(app: AppHandle) {
     loop {
+        // Tối thiểu 60s để tránh bị rate-limit endpoint usage của Claude.
         let interval = get_settings()
             .map(|s| s.poll_interval_secs)
-            .unwrap_or(60)
-            .max(15);
+            .unwrap_or(300)
+            .max(60);
         tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
         if let Err(e) = poll_once(&app).await {
             eprintln!("AI usage poll error: {e}");

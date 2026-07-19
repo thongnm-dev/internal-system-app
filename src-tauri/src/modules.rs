@@ -83,6 +83,8 @@ mod database {
     pub mod aws_storage_store;
     /// Lưu trữ cục bộ (JSON file) danh sách account AI + cấu hình usage.
     pub mod ai_account_store;
+    /// Lưu OAuth token đã capture của account subscription vào profile (app data dir).
+    pub mod ai_profile_store;
     /// Lưu trữ cục bộ (JSON file) danh sách kết nối của SQL Editor.
     pub mod sql_connection_store;
 }
@@ -179,6 +181,8 @@ mod services {
     pub mod ai_usage_probe;
     /// Dò các login Claude đã tồn tại trên máy (đọc `.claude.json` + Keychain).
     pub mod ai_usage_detect;
+    /// Capture login Claude đang active → lưu token vào profile (app data dir).
+    pub mod ai_usage_capture;
     /// Service cho module AI Chat — gọi API các nhà cung cấp LLM.
     pub mod ai_chat_service;
     /// Service đọc file schedule Excel và trích xuất dữ liệu giờ công.

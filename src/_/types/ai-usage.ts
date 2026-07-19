@@ -7,6 +7,14 @@ export type AiAccountType = "api" | "admin" | "oauth" | "subscription" | "unknow
 /** Nhà cung cấp AI. Auto-switch chỉ diễn ra trong cùng provider. */
 export type AiProvider = "claude" | "codex";
 
+/**
+ * Nguồn account:
+ * - `detected` — dò từ login local, token trong Keychain (luôn mới).
+ * - `captured` — tool tự capture token → profile trong app data dir (snapshot, có thể hết hạn).
+ * - `manual` — nhập API key / tay.
+ */
+export type AiAccountSource = "detected" | "captured" | "manual";
+
 /** Trạng thái usage của account. */
 export type AiAccountStatus = "healthy" | "low" | "exhausted" | "error" | "unknown";
 
@@ -32,6 +40,8 @@ export type AiAccount = {
   email: string;
   /** Loại subscription (`team` | `claude_pro` | `max` …). */
   subscription_type: string;
+  /** Nguồn account: `detected` | `captured` | `manual`. */
+  source: AiAccountSource;
   /** Thứ tự ưu tiên — số nhỏ = ưu tiên cao hơn. */
   priority: number;
   /** `true` nếu account đang được chọn (active) cho provider của nó. */
@@ -71,7 +81,20 @@ export type AddAiAccountRequest = {
   email?: string;
   /** Loại subscription (khi thêm từ detect login local). */
   subscription_type?: string;
+  /** Nguồn account (`detected` | `captured` | `manual`). Bỏ trống → `manual`. */
+  source?: AiAccountSource;
   priority?: number;
+};
+
+/** Login Claude đang active trên máy (xem trước để capture — không kèm token). */
+export type CapturedLogin = {
+  email: string;
+  display_name: string;
+  subscription_type: string;
+  billing_type: string;
+  /** Token hết hạn (`YYYY-MM-DD HH:MM:SS`, rỗng nếu không đọc được). */
+  token_expires_at: string;
+  has_token: boolean;
 };
 
 /** Một login Claude phát hiện được trên máy (backend dò từ `.claude.json` + Keychain). */

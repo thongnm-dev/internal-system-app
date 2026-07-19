@@ -1,8 +1,8 @@
 //! Tauri command handlers cho module AI Usage.
 
 use crate::models::ai_usage::{
-    AddAiAccountRequest, AiAccount, AiUsageSettings, DetectedLogin, ReportUsageSignalRequest,
-    UpdateAiAccountRequest,
+    AddAiAccountRequest, AiAccount, AiUsageSettings, CapturedLogin, DetectedLogin,
+    ReportUsageSignalRequest, UpdateAiAccountRequest,
 };
 use crate::services::ai_usage_service;
 
@@ -21,6 +21,35 @@ pub async fn ai_usage_detect_local() -> Result<Vec<DetectedLogin>, String> {
 #[tauri::command]
 pub async fn ai_usage_import_detected() -> Result<Vec<AiAccount>, String> {
     ai_usage_service::import_detected().map_err(|e| e.to_string())
+}
+
+/// Xem trước login Claude đang active trên máy (để capture) — không kèm token.
+#[tauri::command]
+pub async fn ai_usage_capture_preview() -> Result<Option<CapturedLogin>, String> {
+    ai_usage_service::capture_preview().map_err(|e| e.to_string())
+}
+
+/// Capture login Claude đang active → lưu token vào profile riêng + thêm account.
+#[tauri::command]
+pub async fn ai_usage_capture_add(name: Option<String>) -> Result<AiAccount, String> {
+    ai_usage_service::capture_add(name).map_err(|e| e.to_string())
+}
+
+/// Xem trước login Claude tại một `CLAUDE_CONFIG_DIR` (thêm account thứ 2).
+#[tauri::command]
+pub async fn ai_usage_config_dir_preview(
+    config_dir: String,
+) -> Result<Option<CapturedLogin>, String> {
+    ai_usage_service::config_dir_preview(config_dir).map_err(|e| e.to_string())
+}
+
+/// Đăng ký account subscription thứ 2 từ một `CLAUDE_CONFIG_DIR` đã login sẵn.
+#[tauri::command]
+pub async fn ai_usage_add_config_dir(
+    config_dir: String,
+    name: Option<String>,
+) -> Result<AiAccount, String> {
+    ai_usage_service::add_config_dir(config_dir, name).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

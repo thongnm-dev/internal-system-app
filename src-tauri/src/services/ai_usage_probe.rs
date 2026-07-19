@@ -16,6 +16,7 @@ use std::time::Duration;
 use reqwest::{Client, StatusCode};
 
 use crate::database::ai_account_store::StoredAccount;
+use crate::database::ai_profile_store;
 use crate::services::ai_usage_detect;
 
 /// Timeout cho mỗi lần probe (giây).
@@ -108,7 +109,13 @@ struct OauthUsageResponse {
 /// phản ánh giới hạn nào sắp chạm trước. Không đọc được token / lỗi mạng → giữ số
 /// liệu cũ (`unknown`/`manual`), không phá vỡ trạng thái hiện có.
 async fn probe_subscription(client: &Client, account: &StoredAccount) -> ProbeOutcome {
-    let Some(token) = ai_usage_detect::read_oauth_token(&account.config_dir) else {
+    // Token nguồn: account `captured` đọc từ profile (app data dir); còn lại từ Keychain.
+    let token = if account.source == "captured" {
+        ai_profile_store::read_access_token(account.id)
+    } else {
+        ai_usage_detect::read_oauth_token(&account.config_dir)
+    };
+    let Some(token) = token else {
         return ProbeOutcome::simple(account.id, "unknown", "manual");
     };
 
@@ -121,17 +128,24 @@ async fn probe_subscription(client: &Client, account: &StoredAccount) -> ProbeOu
         .await;
 
     let response = match response {
+        // Lỗi mạng/timeout tạm thời → giữ nguyên số liệu cũ (không coi là account lỗi).
         Ok(resp) => resp,
-        Err(_) => return ProbeOutcome::simple(account.id, "error", "manual"),
+        Err(_) => return keep_previous(account),
     };
 
-    if !response.status().is_success() {
+    let status = response.status();
+    // Chỉ 401/403 mới là lỗi thật (token hết hạn/không hợp lệ → cần login lại).
+    if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
         return ProbeOutcome::simple(account.id, "error", "manual");
+    }
+    // 429 (poll quá dày) hoặc lỗi tạm thời khác → giữ nguyên số liệu cũ.
+    if !status.is_success() {
+        return keep_previous(account);
     }
 
     let usage = match response.json::<OauthUsageResponse>().await {
         Ok(usage) => usage,
-        Err(_) => return ProbeOutcome::simple(account.id, "error", "manual"),
+        Err(_) => return keep_previous(account),
     };
 
     let (session_percent, session_reset_at) = match usage.five_hour.map(window_remaining) {
@@ -161,6 +175,22 @@ async fn probe_subscription(client: &Client, account: &StoredAccount) -> ProbeOu
         session_reset_at,
         weekly_percent,
         weekly_reset_at,
+    }
+}
+
+/// Giữ nguyên số liệu usage cũ của account (dùng khi 429/lỗi tạm thời) — tất cả
+/// trường `None` nên tầng service không ghi đè, chỉ cập nhật `last_checked_at`.
+fn keep_previous(account: &StoredAccount) -> ProbeOutcome {
+    ProbeOutcome {
+        id: account.id,
+        status: account.status.clone(),
+        usage_percent: None,
+        reset_at: None,
+        usage_source: account.usage_source.clone(),
+        session_percent: None,
+        session_reset_at: None,
+        weekly_percent: None,
+        weekly_reset_at: None,
     }
 }
 

@@ -20,6 +20,9 @@ pub struct AiAccount {
     pub email: String,
     /// Loại subscription (`team` | `claude_pro` | `max` …) khi là account subscription.
     pub subscription_type: String,
+    /// Nguồn account: `detected` (dò từ login local, token trong Keychain — luôn mới),
+    /// `captured` (tool tự capture token → profile trong app data dir), `manual` (API key/nhập tay).
+    pub source: String,
     /// Thứ tự ưu tiên — số nhỏ = ưu tiên cao hơn.
     pub priority: i32,
     /// `true` nếu account đang được chọn (active) cho provider của nó.
@@ -63,8 +66,23 @@ pub struct AddAiAccountRequest {
     pub email: Option<String>,
     /// Loại subscription (điền khi thêm từ detect login local).
     pub subscription_type: Option<String>,
+    /// Nguồn account (`detected` | `captured` | `manual`). Bỏ trống → `manual`.
+    pub source: Option<String>,
     /// Ưu tiên; bỏ trống → tự đặt xuống cuối danh sách của provider.
     pub priority: Option<i32>,
+}
+
+/// Login Claude hiện đang active trên máy (bản xem trước để capture — KHÔNG kèm token).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CapturedLogin {
+    pub email: String,
+    pub display_name: String,
+    pub subscription_type: String,
+    pub billing_type: String,
+    /// Thời điểm token hết hạn (`YYYY-MM-DD HH:MM:SS`, rỗng nếu không đọc được).
+    pub token_expires_at: String,
+    /// Có đọc được OAuth token trong Keychain không.
+    pub has_token: bool,
 }
 
 /// Một login Claude phát hiện được trên máy (đọc từ `.claude.json` + Keychain).
@@ -123,7 +141,8 @@ impl Default for AiUsageSettings {
     fn default() -> Self {
         Self {
             switch_threshold_percent: 10.0,
-            poll_interval_secs: 60,
+            // Endpoint usage của Claude bị rate-limit nếu gọi dày → mặc định 5 phút.
+            poll_interval_secs: 300,
             work_dir: String::new(),
         }
     }

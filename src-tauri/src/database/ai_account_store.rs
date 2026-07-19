@@ -31,6 +31,9 @@ pub struct StoredAccount {
     /// Loại subscription (từ detect login local).
     #[serde(default)]
     pub subscription_type: String,
+    /// Nguồn account: `detected` | `captured` | `manual`.
+    #[serde(default)]
+    pub source: String,
     pub priority: i32,
     pub is_active: bool,
     pub status: String,
@@ -71,12 +74,18 @@ pub struct AiAccountData {
 /// Ưu tiên thư mục chứa file thực thi (production, file có thể ghi cạnh binary);
 /// fallback về `CARGO_MANIFEST_DIR` khi không lấy được đường dẫn exe.
 fn data_path() -> PathBuf {
+    data_dir().join(DATA_FILE)
+}
+
+/// Thư mục chứa dữ liệu cục bộ của module AI Usage (cạnh binary ở production,
+/// `CARGO_MANIFEST_DIR` khi dev). Dùng chung cho profile token đã capture.
+pub fn data_dir() -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            return dir.join(DATA_FILE);
+            return dir.to_path_buf();
         }
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(DATA_FILE)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
 /// Đọc dữ liệu từ file. File chưa tồn tại → trả về mặc định (rỗng).

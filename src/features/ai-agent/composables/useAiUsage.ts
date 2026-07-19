@@ -3,6 +3,10 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { friendlyError } from "@/tauri/commands/_base";
 import {
   aiUsageAddAccount,
+  aiUsageAddConfigDir,
+  aiUsageCaptureAdd,
+  aiUsageCapturePreview,
+  aiUsageConfigDirPreview,
   aiUsageDeleteAccount,
   aiUsageDetectLocal,
   aiUsageGetSettings,
@@ -21,6 +25,7 @@ import type {
   AddAiAccountRequest,
   AiAccount,
   AiUsageSettings,
+  CapturedLogin,
   DetectedLogin,
   UpdateAiAccountRequest,
 } from "@/_/types/ai-usage";
@@ -31,7 +36,7 @@ export function useAiUsage() {
   const accounts = ref<AiAccount[]>([]);
   const settings = ref<AiUsageSettings>({
     switch_threshold_percent: 10,
-    poll_interval_secs: 60,
+    poll_interval_secs: 300,
     work_dir: "",
   });
   const isLoading = ref(false);
@@ -39,6 +44,9 @@ export function useAiUsage() {
   const isRefreshing = ref(false);
   const isDetecting = ref(false);
   const detected = ref<DetectedLogin[]>([]);
+  const capturePreview = ref<CapturedLogin | null>(null);
+  const configDirPreview = ref<CapturedLogin | null>(null);
+  const isCapturing = ref(false);
 
   let unlisten: UnlistenFn | null = null;
 
@@ -125,6 +133,61 @@ export function useAiUsage() {
     }
   }
 
+  /** Nạp bản xem trước login Claude đang active (để capture). */
+  async function loadCapturePreview() {
+    try {
+      capturePreview.value = await aiUsageCapturePreview();
+    } catch (error) {
+      capturePreview.value = null;
+      toast.error(friendlyError(error));
+    }
+  }
+
+  /** Capture login hiện tại → lưu token vào profile + thêm account. */
+  async function captureAdd(name?: string): Promise<boolean> {
+    isCapturing.value = true;
+    try {
+      const account = await aiUsageCaptureAdd(name);
+      toast.success(`Đã capture account "${account.name}".`);
+      await loadAccounts();
+      return true;
+    } catch (error) {
+      toast.error(friendlyError(error));
+      return false;
+    } finally {
+      isCapturing.value = false;
+    }
+  }
+
+  /** Xem trước login tại một CLAUDE_CONFIG_DIR (để thêm account thứ 2). */
+  async function previewConfigDir(configDir: string) {
+    if (!configDir.trim()) {
+      configDirPreview.value = null;
+      return;
+    }
+    try {
+      configDirPreview.value = await aiUsageConfigDirPreview(configDir.trim());
+    } catch {
+      configDirPreview.value = null;
+    }
+  }
+
+  /** Đăng ký account thứ 2 từ một CLAUDE_CONFIG_DIR đã login sẵn. */
+  async function addConfigDir(configDir: string, name?: string): Promise<boolean> {
+    isCapturing.value = true;
+    try {
+      const account = await aiUsageAddConfigDir(configDir.trim(), name);
+      toast.success(`Đã thêm account "${account.name}".`);
+      await loadAccounts();
+      return true;
+    } catch (error) {
+      toast.error(friendlyError(error));
+      return false;
+    } finally {
+      isCapturing.value = false;
+    }
+  }
+
   /** Dò các login Claude đã tồn tại trên máy (không thêm gì). */
   async function detectLocal(): Promise<boolean> {
     isDetecting.value = true;
@@ -199,6 +262,9 @@ export function useAiUsage() {
     isRefreshing,
     isDetecting,
     detected,
+    capturePreview,
+    configDirPreview,
+    isCapturing,
     start,
     loadAccounts,
     addAccount,
@@ -207,6 +273,10 @@ export function useAiUsage() {
     setActive,
     copyToken,
     reportExhausted,
+    loadCapturePreview,
+    captureAdd,
+    previewConfigDir,
+    addConfigDir,
     detectLocal,
     importDetected,
     refresh,

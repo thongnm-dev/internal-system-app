@@ -3,6 +3,7 @@ import type {
   AddAiAccountRequest,
   AiAccount,
   AiUsageSettings,
+  CapturedLogin,
   DetectedLogin,
   ReportUsageSignalRequest,
   UpdateAiAccountRequest,
@@ -18,6 +19,22 @@ export function aiUsageDetectLocal() {
 
 export function aiUsageImportDetected() {
   return safeInvoke<AiAccount[]>("ai_usage_import_detected");
+}
+
+export function aiUsageCapturePreview() {
+  return safeInvoke<CapturedLogin | null>("ai_usage_capture_preview");
+}
+
+export function aiUsageCaptureAdd(name?: string) {
+  return safeInvoke<AiAccount>("ai_usage_capture_add", { name: name ?? null });
+}
+
+export function aiUsageConfigDirPreview(configDir: string) {
+  return safeInvoke<CapturedLogin | null>("ai_usage_config_dir_preview", { configDir });
+}
+
+export function aiUsageAddConfigDir(configDir: string, name?: string) {
+  return safeInvoke<AiAccount>("ai_usage_add_config_dir", { configDir, name: name ?? null });
 }
 
 export function aiUsageListAccounts() {

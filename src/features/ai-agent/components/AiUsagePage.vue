@@ -19,8 +19,10 @@ const accountName = ref("");
 const apiKey = ref("");
 const provider = ref<AiProvider>("claude");
 const showApiKey = ref(false);
-/** Kiểu account đang thêm: subscription (login qua CLAUDE_CONFIG_DIR) hay API key. */
+/** Kiểu account đang thêm: subscription (tool tự capture token) hay API key. */
 const accountKind = ref<"subscription" | "key">("subscription");
+/** Với subscription: capture login hiện tại, hay đăng ký từ một config dir khác. */
+const subMode = ref<"current" | "dir">("current");
 const configDir = ref("");
 
 const showSettings = ref(false);
@@ -40,6 +42,36 @@ async function openDetect() {
 function selectProvider(next: AiProvider) {
   provider.value = next;
   if (next === "codex") accountKind.value = "key";
+}
+
+/** Nạp login hiện tại + prefill tên (chỉ khi tên còn trống). */
+async function loadPreviewAndPrefill() {
+  await ctrl.loadCapturePreview();
+  const preview = ctrl.capturePreview.value;
+  if (preview && !accountName.value.trim()) {
+    accountName.value = preview.display_name || preview.email;
+  }
+}
+
+/** Đổi kiểu account; subscription thì nạp login hiện tại để capture. */
+function selectKind(kind: "subscription" | "key") {
+  accountKind.value = kind;
+  if (kind === "subscription" && subMode.value === "current") void loadPreviewAndPrefill();
+}
+
+/** Đổi giữa "capture login hiện tại" và "đăng ký config dir khác". */
+function selectSubMode(mode: "current" | "dir") {
+  subMode.value = mode;
+  if (mode === "current") void loadPreviewAndPrefill();
+}
+
+/** Preview login tại config dir + prefill tên (khi nhập ô config dir). */
+async function onConfigDirInput() {
+  await ctrl.previewConfigDir(configDir.value);
+  const preview = ctrl.configDirPreview.value;
+  if (preview && !accountName.value.trim()) {
+    accountName.value = preview.display_name || preview.email;
+  }
 }
 
 onMounted(() => {
@@ -63,27 +95,38 @@ function openDialog() {
   provider.value = "claude";
   showApiKey.value = false;
   accountKind.value = "subscription";
+  subMode.value = "current";
   configDir.value = "";
+  ctrl.capturePreview.value = null;
+  ctrl.configDirPreview.value = null;
   isDialogOpen.value = true;
+  void loadPreviewAndPrefill();
 }
 
-/** Form hợp lệ khi có tên + (config dir nếu subscription | key nếu API key). */
+/** Form hợp lệ: subscription cần đọc được login (hiện tại/config dir); API key cần key. */
 const canSaveAccount = computed(() => {
   if (!accountName.value.trim()) return false;
-  return accountKind.value === "subscription"
-    ? !!configDir.value.trim()
-    : !!apiKey.value.trim();
+  if (accountKind.value !== "subscription") return !!apiKey.value.trim();
+  return subMode.value === "current"
+    ? !!ctrl.capturePreview.value?.has_token
+    : !!ctrl.configDirPreview.value?.has_token;
 });
 
 async function saveAccount() {
   if (!canSaveAccount.value) return;
-  const isSub = accountKind.value === "subscription";
+  if (accountKind.value === "subscription") {
+    // Subscription: capture login hiện tại, hoặc đăng ký từ một config dir khác.
+    const ok =
+      subMode.value === "current"
+        ? await ctrl.captureAdd(accountName.value.trim())
+        : await ctrl.addConfigDir(configDir.value.trim(), accountName.value.trim());
+    if (ok) isDialogOpen.value = false;
+    return;
+  }
   const ok = await ctrl.addAccount({
     name: accountName.value.trim(),
     provider: provider.value,
-    account_type: isSub ? "subscription" : undefined,
-    api_key: isSub ? undefined : apiKey.value.trim(),
-    config_dir: isSub ? configDir.value.trim() : undefined,
+    api_key: apiKey.value.trim(),
   });
   if (ok) isDialogOpen.value = false;
 }
@@ -98,7 +141,7 @@ function openSettings() {
 async function saveSettings() {
   const ok = await ctrl.saveSettings({
     switch_threshold_percent: Number(thresholdInput.value) || 0,
-    poll_interval_secs: Math.max(15, Number(intervalInput.value) || 60),
+    poll_interval_secs: Math.max(60, Number(intervalInput.value) || 300),
     work_dir: workDirInput.value.trim(),
   });
   if (ok) showSettings.value = false;
@@ -287,6 +330,20 @@ function resetHint(resetAt: string): string {
                   >
                     {{ account.subscription_type }}
                   </span>
+                  <span
+                    v-if="account.account_type === 'subscription' && account.source"
+                    class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                    :class="account.source === 'detected'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : account.source === 'captured'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-canvas text-muted'"
+                    :title="account.source === 'detected'
+                      ? 'Token trong Keychain — luôn mới'
+                      : 'Token đã capture vào app data dir — có thể hết hạn'"
+                  >
+                    {{ account.source }}
+                  </span>
                 </div>
                 <template v-if="account.account_type === 'subscription'">
                   <p v-if="account.email" class="mt-0.5 truncate text-xs text-muted" :title="account.email">
@@ -371,7 +428,10 @@ function resetHint(resetAt: string): string {
                 v-if="!account.session_reset_at && !account.weekly_reset_at"
                 class="text-[11px] text-muted"
               >
-                Chưa có số liệu — bấm Refresh để đọc usage từ Keychain (login còn hạn).
+                Chưa có số liệu — bấm Refresh để đọc usage (login còn hạn).
+              </p>
+              <p v-if="account.last_checked_at" class="flex items-center gap-1 text-[11px] text-muted">
+                <i class="pi pi-sync" />cập nhật {{ account.last_checked_at }}
               </p>
             </div>
 
@@ -475,14 +535,14 @@ function resetHint(resetAt: string): string {
               size="small"
               :severity="accountKind === 'subscription' ? undefined : 'secondary'"
               :outlined="accountKind !== 'subscription'"
-              @click="accountKind = 'subscription'"
+              @click="selectKind('subscription')"
             />
             <Button
               label="API key"
               size="small"
               :severity="accountKind === 'key' ? undefined : 'secondary'"
               :outlined="accountKind !== 'key'"
-              @click="accountKind = 'key'"
+              @click="selectKind('key')"
             />
           </div>
         </label>
@@ -492,19 +552,79 @@ function resetHint(resetAt: string): string {
           <InputText v-model="accountName" class="mt-1 w-full" placeholder="e.g. personal-claude" autofocus />
         </label>
 
-        <!-- Subscription: cần thư mục CLAUDE_CONFIG_DIR đã login -->
-        <label v-if="accountKind === 'subscription'" class="block">
-          <span class="text-xs font-bold text-muted">Config directory (CLAUDE_CONFIG_DIR) <span class="text-red-500">*</span></span>
-          <InputText
-            v-model="configDir"
-            class="mt-1 w-full font-mono"
-            placeholder="~/.myctool/profiles/personal"
-          />
-          <span class="text-xs text-muted">
-            Thư mục login riêng của account này. Login 1 lần:
-            <code class="rounded bg-canvas px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code>
-          </span>
-        </label>
+        <!-- Subscription: tool tự capture token của login Claude đang active -->
+        <div v-if="accountKind === 'subscription'" class="block space-y-2">
+          <!-- Nguồn login: capture hiện tại hay từ config dir khác (thêm acc thứ 2) -->
+          <div class="flex gap-2">
+            <Button
+              label="Login hiện tại"
+              size="small"
+              :severity="subMode === 'current' ? undefined : 'secondary'"
+              :outlined="subMode !== 'current'"
+              @click="selectSubMode('current')"
+            />
+            <Button
+              label="Config dir khác"
+              size="small"
+              :severity="subMode === 'dir' ? undefined : 'secondary'"
+              :outlined="subMode !== 'dir'"
+              @click="selectSubMode('dir')"
+            />
+          </div>
+
+          <!-- Config dir input (đăng ký account thứ 2 đã login ở dir riêng) -->
+          <label v-if="subMode === 'dir'" class="block">
+            <span class="text-xs font-bold text-muted">CLAUDE_CONFIG_DIR <span class="text-red-500">*</span></span>
+            <InputText
+              v-model="configDir"
+              class="mt-1 w-full font-mono"
+              placeholder="~/.claude-work"
+              @input="onConfigDirInput"
+            />
+            <span class="text-xs text-muted">
+              Login trước 1 lần: <code class="rounded bg-canvas px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code>
+            </span>
+          </label>
+
+          <!-- Preview login đọc được (từ login hiện tại hoặc config dir) -->
+          <div
+            v-if="subMode === 'current' ? ctrl.capturePreview.value?.has_token : ctrl.configDirPreview.value?.has_token"
+            class="rounded-lg border border-divider bg-canvas/50 p-3 text-xs"
+          >
+            <div class="flex items-center gap-2">
+              <i class="pi pi-user text-muted" />
+              <span class="truncate font-semibold text-ink">
+                {{ (subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.email }}
+              </span>
+              <span
+                v-if="(subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.subscription_type"
+                class="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700"
+              >
+                {{ (subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.subscription_type }}
+              </span>
+            </div>
+            <p
+              v-if="(subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.token_expires_at"
+              class="mt-1 text-[11px] text-muted"
+            >
+              <i class="pi pi-clock mr-1" />token hết hạn
+              {{ (subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.token_expires_at }}
+            </p>
+            <p class="mt-1.5 text-[11px] text-muted">
+              {{ subMode === 'current'
+                ? 'Tool sẽ lưu token này vào profile riêng trong app data dir.'
+                : 'Token đọc từ Keychain của config dir này (luôn mới).' }}
+            </p>
+          </div>
+          <p
+            v-else
+            class="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3 text-xs text-amber-700"
+          >
+            {{ subMode === 'current'
+              ? 'Chưa có login Claude đang hoạt động. Chạy `claude /login` rồi mở lại dialog.'
+              : 'Chưa đọc được login ở config dir này. Kiểm tra đường dẫn và đảm bảo đã login.' }}
+          </p>
+        </div>
 
         <!-- API key -->
         <label v-else class="block">
@@ -535,8 +655,8 @@ function resetHint(resetAt: string): string {
         <div class="flex items-center justify-end gap-2">
           <Button label="Cancel" severity="secondary" @click="isDialogOpen = false" />
           <Button
-            :label="ctrl.isSaving.value ? 'Saving...' : 'Save'"
-            :disabled="!canSaveAccount || ctrl.isSaving.value"
+            :label="ctrl.isSaving.value || ctrl.isCapturing.value ? 'Đang lưu...' : 'Save'"
+            :disabled="!canSaveAccount || ctrl.isSaving.value || ctrl.isCapturing.value"
             @click="saveAccount"
           />
         </div>
@@ -572,10 +692,12 @@ function resetHint(resetAt: string): string {
           <input
             v-model="intervalInput"
             type="number"
-            min="15"
+            min="60"
             class="mt-1 w-full rounded border border-divider bg-canvas px-3 py-2 text-ink"
           />
-          <span class="text-xs text-muted">Tối thiểu 15 giây.</span>
+          <span class="text-xs text-muted">
+            Tối thiểu 60 giây (khuyến nghị 300). Endpoint usage của Claude bị rate-limit nếu gọi quá dày.
+          </span>
         </label>
         <label class="block">
           <span class="text-xs font-bold text-muted">Work directory (CLAUDE_CONFIG_WORK_DIR)</span>
