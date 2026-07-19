@@ -9,10 +9,17 @@ pub struct AiAccount {
     pub name: String,
     /// API key đã che bớt (chỉ hiện vài ký tự cuối) — trả về frontend để hiển thị.
     pub api_key_masked: String,
-    /// Loại tài khoản, tự detect từ prefix của API key (api / admin / oauth / unknown).
+    /// Loại tài khoản: `api` | `admin` | `oauth` | `subscription` | `unknown`.
+    /// Với account API key thì tự detect từ prefix; `subscription` do frontend chỉ định.
     pub account_type: String,
     /// Nhà cung cấp: `claude` | `codex`. Auto-switch chỉ diễn ra trong cùng provider.
     pub provider: String,
+    /// Thư mục `CLAUDE_CONFIG_DIR` nơi account subscription đã đăng nhập (rỗng với account API key).
+    pub config_dir: String,
+    /// Email tài khoản (lấy từ `.claude.json` khi detect login local; rỗng nếu chưa rõ).
+    pub email: String,
+    /// Loại subscription (`team` | `claude_pro` | `max` …) khi là account subscription.
+    pub subscription_type: String,
     /// Thứ tự ưu tiên — số nhỏ = ưu tiên cao hơn.
     pub priority: i32,
     /// `true` nếu account đang được chọn (active) cho provider của nó.
@@ -21,10 +28,18 @@ pub struct AiAccount {
     pub status: String,
     /// Nguồn số liệu usage: `billing_api` | `ratelimit_header` | `error_signal` | `manual` | `unknown`.
     pub usage_source: String,
-    /// Phần trăm usage còn lại (0–100).
+    /// Phần trăm usage còn lại (0–100). Với subscription = min(session, weekly).
     pub usage_percent: f64,
     /// Thời điểm reset usage tiếp theo, format `YYYY-MM-DD HH:MM:SS` (hoặc rỗng nếu chưa rõ).
     pub reset_at: String,
+    /// Session hiện tại (cửa sổ 5 giờ) — phần trăm CÒN LẠI (0–100).
+    pub session_percent: f64,
+    /// Thời điểm reset session (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu).
+    pub session_reset_at: String,
+    /// Weekly limit (cửa sổ 7 ngày) — phần trăm CÒN LẠI (0–100).
+    pub weekly_percent: f64,
+    /// Thời điểm reset weekly (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu).
+    pub weekly_reset_at: String,
     /// Số session đã mở với account này.
     pub session_count: i32,
     /// Lần probe usage gần nhất (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa probe).
@@ -36,11 +51,39 @@ pub struct AiAccount {
 #[derive(Debug, Deserialize)]
 pub struct AddAiAccountRequest {
     pub name: String,
-    pub api_key: String,
+    /// API key. Bỏ trống với account subscription (đăng nhập qua `claude /login`).
+    pub api_key: Option<String>,
     /// `claude` | `codex`. Mặc định `claude` nếu bỏ trống.
     pub provider: Option<String>,
+    /// Loại account chỉ định rõ (vd `subscription`); bỏ trống → tự detect từ key.
+    pub account_type: Option<String>,
+    /// Thư mục `CLAUDE_CONFIG_DIR` cho account subscription.
+    pub config_dir: Option<String>,
+    /// Email account (điền khi thêm từ detect login local).
+    pub email: Option<String>,
+    /// Loại subscription (điền khi thêm từ detect login local).
+    pub subscription_type: Option<String>,
     /// Ưu tiên; bỏ trống → tự đặt xuống cuối danh sách của provider.
     pub priority: Option<i32>,
+}
+
+/// Một login Claude phát hiện được trên máy (đọc từ `.claude.json` + Keychain).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DetectedLogin {
+    /// Thư mục config (data dir) của login này, vd `~/.claude` hoặc `<CLAUDE_CONFIG_DIR>`.
+    pub config_dir: String,
+    /// Email tài khoản.
+    pub email: String,
+    /// Tên hiển thị.
+    pub display_name: String,
+    /// Loại subscription (`team` | `claude_pro` | `max` …).
+    pub subscription_type: String,
+    /// Kiểu thanh toán (`apple_subscription` | `stripe` …).
+    pub billing_type: String,
+    /// Thời điểm token hết hạn (`YYYY-MM-DD HH:MM:SS`, rỗng nếu không đọc được Keychain).
+    pub token_expires_at: String,
+    /// Đã có trong danh sách account chưa (khớp theo email hoặc config_dir).
+    pub already_added: bool,
 }
 
 /// Request cập nhật thông tin account (không đổi API key).
@@ -50,6 +93,8 @@ pub struct UpdateAiAccountRequest {
     pub name: Option<String>,
     pub provider: Option<String>,
     pub priority: Option<i32>,
+    /// Đổi thư mục `CLAUDE_CONFIG_DIR` của account subscription.
+    pub config_dir: Option<String>,
 }
 
 /// Tín hiệu usage do skill/automation báo về (ví dụ: dính "usage limit reached").
@@ -69,6 +114,9 @@ pub struct AiUsageSettings {
     pub switch_threshold_percent: f64,
     /// Chu kỳ poll usage nền (giây).
     pub poll_interval_secs: u64,
+    /// Thư mục project (`CLAUDE_CONFIG_WORK_DIR`) nơi user mở terminal làm việc với AI.
+    #[serde(default)]
+    pub work_dir: String,
 }
 
 impl Default for AiUsageSettings {
@@ -76,6 +124,7 @@ impl Default for AiUsageSettings {
         Self {
             switch_threshold_percent: 10.0,
             poll_interval_secs: 60,
+            work_dir: String::new(),
         }
     }
 }

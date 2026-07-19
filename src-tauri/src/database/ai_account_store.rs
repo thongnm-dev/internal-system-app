@@ -22,12 +22,33 @@ pub struct StoredAccount {
     pub api_key: String,
     pub account_type: String,
     pub provider: String,
+    /// Thư mục `CLAUDE_CONFIG_DIR` cho account subscription (rỗng với account API key).
+    #[serde(default)]
+    pub config_dir: String,
+    /// Email account (từ detect login local).
+    #[serde(default)]
+    pub email: String,
+    /// Loại subscription (từ detect login local).
+    #[serde(default)]
+    pub subscription_type: String,
     pub priority: i32,
     pub is_active: bool,
     pub status: String,
     pub usage_source: String,
     pub usage_percent: f64,
     pub reset_at: String,
+    /// Session hiện tại (cửa sổ 5 giờ) — phần trăm CÒN LẠI (0–100).
+    #[serde(default)]
+    pub session_percent: f64,
+    /// Thời điểm reset session (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu).
+    #[serde(default)]
+    pub session_reset_at: String,
+    /// Weekly limit (cửa sổ 7 ngày) — phần trăm CÒN LẠI (0–100).
+    #[serde(default)]
+    pub weekly_percent: f64,
+    /// Thời điểm reset weekly (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu).
+    #[serde(default)]
+    pub weekly_reset_at: String,
     pub session_count: i32,
     pub last_checked_at: String,
     pub created_at: String,

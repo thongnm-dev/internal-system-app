@@ -177,6 +177,8 @@ mod services {
     pub mod ai_usage_service;
     /// Probe tình trạng usage cho từng account AI (rate-limit header, v.v.).
     pub mod ai_usage_probe;
+    /// Dò các login Claude đã tồn tại trên máy (đọc `.claude.json` + Keychain).
+    pub mod ai_usage_detect;
     /// Service cho module AI Chat — gọi API các nhà cung cấp LLM.
     pub mod ai_chat_service;
     /// Service đọc file schedule Excel và trích xuất dữ liệu giờ công.

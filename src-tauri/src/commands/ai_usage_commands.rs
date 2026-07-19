@@ -1,7 +1,7 @@
 //! Tauri command handlers cho module AI Usage.
 
 use crate::models::ai_usage::{
-    AddAiAccountRequest, AiAccount, AiUsageSettings, ReportUsageSignalRequest,
+    AddAiAccountRequest, AiAccount, AiUsageSettings, DetectedLogin, ReportUsageSignalRequest,
     UpdateAiAccountRequest,
 };
 use crate::services::ai_usage_service;
@@ -9,6 +9,18 @@ use crate::services::ai_usage_service;
 #[tauri::command]
 pub async fn ai_usage_add_account(request: AddAiAccountRequest) -> Result<AiAccount, String> {
     ai_usage_service::add_account(request).map_err(|e| e.to_string())
+}
+
+/// Dò các login Claude đã tồn tại trên máy (chưa thêm gì, chỉ trả danh sách).
+#[tauri::command]
+pub async fn ai_usage_detect_local() -> Result<Vec<DetectedLogin>, String> {
+    ai_usage_service::detect_local().map_err(|e| e.to_string())
+}
+
+/// Dò login local rồi tự thêm những login chưa có; trả về danh sách account mới.
+#[tauri::command]
+pub async fn ai_usage_import_detected() -> Result<Vec<AiAccount>, String> {
+    ai_usage_service::import_detected().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

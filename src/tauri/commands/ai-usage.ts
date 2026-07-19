@@ -3,12 +3,21 @@ import type {
   AddAiAccountRequest,
   AiAccount,
   AiUsageSettings,
+  DetectedLogin,
   ReportUsageSignalRequest,
   UpdateAiAccountRequest,
 } from "@/_/types/ai-usage";
 
 export function aiUsageAddAccount(request: AddAiAccountRequest) {
   return safeInvoke<AiAccount>("ai_usage_add_account", { request });
+}
+
+export function aiUsageDetectLocal() {
+  return safeInvoke<DetectedLogin[]>("ai_usage_detect_local");
+}
+
+export function aiUsageImportDetected() {
+  return safeInvoke<AiAccount[]>("ai_usage_import_detected");
 }
 
 export function aiUsageListAccounts() {

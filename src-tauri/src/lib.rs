@@ -49,9 +49,9 @@ use commands::explorer_commands::{
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::ai_usage_commands::{
-    ai_usage_add_account, ai_usage_delete_account, ai_usage_get_settings, ai_usage_get_token,
-    ai_usage_list_accounts, ai_usage_refresh, ai_usage_report_signal, ai_usage_save_settings,
-    ai_usage_set_active, ai_usage_update_account,
+    ai_usage_add_account, ai_usage_delete_account, ai_usage_detect_local, ai_usage_get_settings,
+    ai_usage_get_token, ai_usage_import_detected, ai_usage_list_accounts, ai_usage_refresh,
+    ai_usage_report_signal, ai_usage_save_settings, ai_usage_set_active, ai_usage_update_account,
 };
 use commands::ai_chat_commands::ai_chat_complete;
 use commands::schedule_commands::read_schedule_excel;
@@ -213,6 +213,8 @@ pub fn run() {
             explorer_copy_bugs,
             // === AI Usage commands ===
             ai_usage_add_account,
+            ai_usage_detect_local,
+            ai_usage_import_detected,
             ai_usage_list_accounts,
             ai_usage_update_account,
             ai_usage_delete_account,

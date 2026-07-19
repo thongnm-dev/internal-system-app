@@ -4,8 +4,10 @@ import { friendlyError } from "@/tauri/commands/_base";
 import {
   aiUsageAddAccount,
   aiUsageDeleteAccount,
+  aiUsageDetectLocal,
   aiUsageGetSettings,
   aiUsageGetToken,
+  aiUsageImportDetected,
   aiUsageListAccounts,
   aiUsageRefresh,
   aiUsageReportSignal,
@@ -19,6 +21,7 @@ import type {
   AddAiAccountRequest,
   AiAccount,
   AiUsageSettings,
+  DetectedLogin,
   UpdateAiAccountRequest,
 } from "@/_/types/ai-usage";
 
@@ -26,10 +29,16 @@ export function useAiUsage() {
   const toast = useToast();
 
   const accounts = ref<AiAccount[]>([]);
-  const settings = ref<AiUsageSettings>({ switch_threshold_percent: 10, poll_interval_secs: 60 });
+  const settings = ref<AiUsageSettings>({
+    switch_threshold_percent: 10,
+    poll_interval_secs: 60,
+    work_dir: "",
+  });
   const isLoading = ref(false);
   const isSaving = ref(false);
   const isRefreshing = ref(false);
+  const isDetecting = ref(false);
+  const detected = ref<DetectedLogin[]>([]);
 
   let unlisten: UnlistenFn | null = null;
 
@@ -116,6 +125,36 @@ export function useAiUsage() {
     }
   }
 
+  /** Dò các login Claude đã tồn tại trên máy (không thêm gì). */
+  async function detectLocal(): Promise<boolean> {
+    isDetecting.value = true;
+    try {
+      detected.value = await aiUsageDetectLocal();
+      return true;
+    } catch (error) {
+      toast.error(friendlyError(error));
+      return false;
+    } finally {
+      isDetecting.value = false;
+    }
+  }
+
+  /** Dò + tự thêm những login chưa có vào danh sách account. */
+  async function importDetected() {
+    isDetecting.value = true;
+    try {
+      const before = accounts.value.length;
+      accounts.value = await aiUsageImportDetected();
+      const added = accounts.value.length - before;
+      toast.success(added > 0 ? `Đã thêm ${added} account từ login local.` : "Không có login mới để thêm.");
+      await detectLocal();
+    } catch (error) {
+      toast.error(friendlyError(error));
+    } finally {
+      isDetecting.value = false;
+    }
+  }
+
   async function refresh() {
     isRefreshing.value = true;
     try {
@@ -158,6 +197,8 @@ export function useAiUsage() {
     isLoading,
     isSaving,
     isRefreshing,
+    isDetecting,
+    detected,
     start,
     loadAccounts,
     addAccount,
@@ -166,6 +207,8 @@ export function useAiUsage() {
     setActive,
     copyToken,
     reportExhausted,
+    detectLocal,
+    importDetected,
     refresh,
     saveSettings,
   };

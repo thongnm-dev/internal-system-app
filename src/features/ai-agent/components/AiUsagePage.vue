@@ -19,10 +19,28 @@ const accountName = ref("");
 const apiKey = ref("");
 const provider = ref<AiProvider>("claude");
 const showApiKey = ref(false);
+/** Kiểu account đang thêm: subscription (login qua CLAUDE_CONFIG_DIR) hay API key. */
+const accountKind = ref<"subscription" | "key">("subscription");
+const configDir = ref("");
 
 const showSettings = ref(false);
 const thresholdInput = ref(10);
 const intervalInput = ref(60);
+const workDirInput = ref("");
+
+const showDetect = ref(false);
+
+/** Mở dialog dò login local (dò trước rồi hiện). */
+async function openDetect() {
+  const ok = await ctrl.detectLocal();
+  if (ok) showDetect.value = true;
+}
+
+/** Đổi provider — Codex chưa hỗ trợ subscription nên ép về API key. */
+function selectProvider(next: AiProvider) {
+  provider.value = next;
+  if (next === "codex") accountKind.value = "key";
+}
 
 onMounted(() => {
   void ctrl.start();
@@ -44,15 +62,28 @@ function openDialog() {
   apiKey.value = "";
   provider.value = "claude";
   showApiKey.value = false;
+  accountKind.value = "subscription";
+  configDir.value = "";
   isDialogOpen.value = true;
 }
 
+/** Form hợp lệ khi có tên + (config dir nếu subscription | key nếu API key). */
+const canSaveAccount = computed(() => {
+  if (!accountName.value.trim()) return false;
+  return accountKind.value === "subscription"
+    ? !!configDir.value.trim()
+    : !!apiKey.value.trim();
+});
+
 async function saveAccount() {
-  if (!accountName.value.trim() || !apiKey.value.trim()) return;
+  if (!canSaveAccount.value) return;
+  const isSub = accountKind.value === "subscription";
   const ok = await ctrl.addAccount({
     name: accountName.value.trim(),
-    api_key: apiKey.value.trim(),
     provider: provider.value,
+    account_type: isSub ? "subscription" : undefined,
+    api_key: isSub ? undefined : apiKey.value.trim(),
+    config_dir: isSub ? configDir.value.trim() : undefined,
   });
   if (ok) isDialogOpen.value = false;
 }
@@ -60,6 +91,7 @@ async function saveAccount() {
 function openSettings() {
   thresholdInput.value = ctrl.settings.value.switch_threshold_percent;
   intervalInput.value = ctrl.settings.value.poll_interval_secs;
+  workDirInput.value = ctrl.settings.value.work_dir ?? "";
   showSettings.value = true;
 }
 
@@ -67,6 +99,7 @@ async function saveSettings() {
   const ok = await ctrl.saveSettings({
     switch_threshold_percent: Number(thresholdInput.value) || 0,
     poll_interval_secs: Math.max(15, Number(intervalInput.value) || 60),
+    work_dir: workDirInput.value.trim(),
   });
   if (ok) showSettings.value = false;
 }
@@ -90,6 +123,8 @@ function typeLabel(type: AiAccountType): string {
       return "Admin";
     case "oauth":
       return "OAuth";
+    case "subscription":
+      return "Subscription";
     default:
       return "Unknown";
   }
@@ -103,6 +138,8 @@ function typeBadgeClass(type: AiAccountType): string {
       return "bg-amber-100 text-amber-700";
     case "oauth":
       return "bg-violet-100 text-violet-700";
+    case "subscription":
+      return "bg-sky-100 text-sky-700";
     default:
       return "bg-canvas text-muted";
   }
@@ -158,6 +195,31 @@ function usageBarClass(percent: number): string {
   if (percent <= 30) return "bg-amber-500";
   return "bg-brand";
 }
+
+/**
+ * Diễn giải thời điểm reset (`YYYY-MM-DD HH:MM:SS`) thành chuỗi thân thiện,
+ * ví dụ "còn 2h 15m · 11:10". Trả `"—"` nếu chưa có số liệu.
+ */
+function resetHint(resetAt: string): string {
+  const raw = resetAt?.trim();
+  if (!raw) return "—";
+  // Chuỗi backend là giờ local; thêm khoảng trắng → ISO để Date parse ổn định.
+  const target = new Date(raw.replace(" ", "T"));
+  if (Number.isNaN(target.getTime())) return raw;
+  const diffMs = target.getTime() - Date.now();
+  const clock = raw.slice(11, 16) || "";
+  if (diffMs <= 0) return `sắp reset · ${clock}`;
+  const mins = Math.round(diffMs / 60000);
+  const days = Math.floor(mins / 1440);
+  const hours = Math.floor((mins % 1440) / 60);
+  const rem = mins % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (days === 0 && rem > 0) parts.push(`${rem}m`);
+  const rel = parts.length ? parts.join(" ") : "<1m";
+  return `còn ${rel} · ${clock}`;
+}
 </script>
 
 <template>
@@ -178,6 +240,14 @@ function usageBarClass(percent: number): string {
             severity="secondary"
             :loading="ctrl.isRefreshing.value"
             @click="ctrl.refresh()"
+          />
+          <Button
+            icon="pi pi-search"
+            label="Detect local"
+            severity="secondary"
+            :loading="ctrl.isDetecting.value"
+            title="Dò các login Claude đã đăng nhập trên máy"
+            @click="openDetect"
           />
           <Button icon="pi pi-cog" label="Settings" severity="secondary" @click="openSettings" />
           <Button icon="pi pi-plus" label="Add Account" @click="openDialog" />
@@ -211,8 +281,22 @@ function usageBarClass(percent: number): string {
                   <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]">
                     {{ typeLabel(account.account_type) }}
                   </span>
+                  <span
+                    v-if="account.subscription_type"
+                    class="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
+                  >
+                    {{ account.subscription_type }}
+                  </span>
                 </div>
-                <p class="mt-0.5 font-mono text-xs text-muted">{{ account.api_key_masked }}</p>
+                <template v-if="account.account_type === 'subscription'">
+                  <p v-if="account.email" class="mt-0.5 truncate text-xs text-muted" :title="account.email">
+                    <i class="pi pi-envelope mr-1" />{{ account.email }}
+                  </p>
+                  <p class="mt-0.5 truncate font-mono text-[11px] text-muted" :title="account.config_dir">
+                    <i class="pi pi-folder mr-1" />{{ account.config_dir || "—" }}
+                  </p>
+                </template>
+                <p v-else class="mt-0.5 font-mono text-xs text-muted">{{ account.api_key_masked }}</p>
               </div>
               <Button
                 icon="pi pi-trash"
@@ -233,8 +317,8 @@ function usageBarClass(percent: number): string {
               <span class="text-muted">source: {{ sourceLabel(account.usage_source) }}</span>
             </div>
 
-            <!-- Usage remaining -->
-            <div class="mt-3">
+            <!-- Usage remaining (API / Codex — số liệu tổng hợp) -->
+            <div v-if="account.account_type !== 'subscription'" class="mt-3">
               <div class="flex items-center justify-between text-xs">
                 <span class="font-bold text-muted">Usage remaining</span>
                 <span class="font-bold text-ink">{{ Math.round(account.usage_percent) }}%</span>
@@ -245,6 +329,50 @@ function usageBarClass(percent: number): string {
                   :style="{ width: `${Math.min(100, Math.max(0, account.usage_percent))}%` }"
                 />
               </div>
+            </div>
+
+            <!-- Subscription: session (5h) + weekly (7 ngày) từ OAuth usage endpoint -->
+            <div v-else class="mt-3 space-y-3">
+              <!-- Current session -->
+              <div>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-bold text-muted">Current session</span>
+                  <span class="font-bold text-ink">{{ Math.round(account.session_percent) }}%</span>
+                </div>
+                <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
+                  <div
+                    :class="['h-full rounded-full transition-all', usageBarClass(account.session_percent)]"
+                    :style="{ width: `${Math.min(100, Math.max(0, account.session_percent))}%` }"
+                  />
+                </div>
+                <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
+                  <i class="pi pi-clock" />reset {{ resetHint(account.session_reset_at) }}
+                </p>
+              </div>
+
+              <!-- Weekly limit -->
+              <div>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-bold text-muted">Weekly limit</span>
+                  <span class="font-bold text-ink">{{ Math.round(account.weekly_percent) }}%</span>
+                </div>
+                <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
+                  <div
+                    :class="['h-full rounded-full transition-all', usageBarClass(account.weekly_percent)]"
+                    :style="{ width: `${Math.min(100, Math.max(0, account.weekly_percent))}%` }"
+                  />
+                </div>
+                <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
+                  <i class="pi pi-clock" />reset {{ resetHint(account.weekly_reset_at) }}
+                </p>
+              </div>
+
+              <p
+                v-if="!account.session_reset_at && !account.weekly_reset_at"
+                class="text-[11px] text-muted"
+              >
+                Chưa có số liệu — bấm Refresh để đọc usage từ Keychain (login còn hạn).
+              </p>
             </div>
 
             <!-- Stats -->
@@ -276,6 +404,7 @@ function usageBarClass(percent: number): string {
                 @click="ctrl.setActive(account.id)"
               />
               <Button
+                v-if="account.account_type !== 'subscription'"
                 icon="pi pi-copy"
                 label="Copy token"
                 size="small"
@@ -325,22 +454,60 @@ function usageBarClass(percent: number): string {
               size="small"
               :severity="provider === 'claude' ? undefined : 'secondary'"
               :outlined="provider !== 'claude'"
-              @click="provider = 'claude'"
+              @click="selectProvider('claude')"
             />
             <Button
               label="Codex"
               size="small"
               :severity="provider === 'codex' ? undefined : 'secondary'"
               :outlined="provider !== 'codex'"
-              @click="provider = 'codex'"
+              @click="selectProvider('codex')"
             />
           </div>
         </label>
+
+        <!-- Kiểu account (chỉ Claude có subscription) -->
+        <label v-if="provider === 'claude'" class="block">
+          <span class="text-xs font-bold text-muted">Kiểu tài khoản</span>
+          <div class="mt-1 flex gap-2">
+            <Button
+              label="Subscription"
+              size="small"
+              :severity="accountKind === 'subscription' ? undefined : 'secondary'"
+              :outlined="accountKind !== 'subscription'"
+              @click="accountKind = 'subscription'"
+            />
+            <Button
+              label="API key"
+              size="small"
+              :severity="accountKind === 'key' ? undefined : 'secondary'"
+              :outlined="accountKind !== 'key'"
+              @click="accountKind = 'key'"
+            />
+          </div>
+        </label>
+
         <label class="block">
           <span class="text-xs font-bold text-muted">Account Name <span class="text-red-500">*</span></span>
-          <InputText v-model="accountName" class="mt-1 w-full" placeholder="e.g. team-claude" autofocus />
+          <InputText v-model="accountName" class="mt-1 w-full" placeholder="e.g. personal-claude" autofocus />
         </label>
-        <label class="block">
+
+        <!-- Subscription: cần thư mục CLAUDE_CONFIG_DIR đã login -->
+        <label v-if="accountKind === 'subscription'" class="block">
+          <span class="text-xs font-bold text-muted">Config directory (CLAUDE_CONFIG_DIR) <span class="text-red-500">*</span></span>
+          <InputText
+            v-model="configDir"
+            class="mt-1 w-full font-mono"
+            placeholder="~/.myctool/profiles/personal"
+          />
+          <span class="text-xs text-muted">
+            Thư mục login riêng của account này. Login 1 lần:
+            <code class="rounded bg-canvas px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code>
+          </span>
+        </label>
+
+        <!-- API key -->
+        <label v-else class="block">
           <span class="text-xs font-bold text-muted">API Key / Token <span class="text-red-500">*</span></span>
           <div class="relative mt-1">
             <InputText
@@ -360,8 +527,8 @@ function usageBarClass(percent: number): string {
               @click="showApiKey = !showApiKey"
             />
           </div>
+          <span class="text-xs text-muted">Loại (API / Admin / OAuth) được tự nhận từ prefix của key.</span>
         </label>
-        <p class="text-xs text-muted">Loại tài khoản (API / Admin / OAuth) được tự nhận từ prefix của key.</p>
       </div>
 
       <template #footer>
@@ -369,7 +536,7 @@ function usageBarClass(percent: number): string {
           <Button label="Cancel" severity="secondary" @click="isDialogOpen = false" />
           <Button
             :label="ctrl.isSaving.value ? 'Saving...' : 'Save'"
-            :disabled="!accountName.trim() || !apiKey.trim() || ctrl.isSaving.value"
+            :disabled="!canSaveAccount || ctrl.isSaving.value"
             @click="saveAccount"
           />
         </div>
@@ -410,12 +577,93 @@ function usageBarClass(percent: number): string {
           />
           <span class="text-xs text-muted">Tối thiểu 15 giây.</span>
         </label>
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Work directory (CLAUDE_CONFIG_WORK_DIR)</span>
+          <input
+            v-model="workDirInput"
+            type="text"
+            placeholder="~/Documents/Projects/my-project"
+            class="mt-1 w-full rounded border border-divider bg-canvas px-3 py-2 font-mono text-ink"
+          />
+          <span class="text-xs text-muted">Thư mục project nơi bạn mở terminal làm việc với AI.</span>
+        </label>
       </div>
 
       <template #footer>
         <div class="flex items-center justify-end gap-2">
           <Button label="Cancel" severity="secondary" @click="showSettings = false" />
           <Button label="Save" @click="saveSettings" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Detect local logins dialog -->
+    <Dialog
+      :visible="showDetect"
+      class="w-full max-w-lg rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="showDetect = $event"
+    >
+      <template #header>
+        <h3 class="font-bold text-ink">Login Claude trên máy</h3>
+      </template>
+
+      <div class="space-y-3">
+        <p class="text-xs text-muted">
+          Dò từ <code class="rounded bg-canvas px-1">.claude.json</code> + Keychain. Usage % không có ở
+          local nên chỉ hiển thị email, loại subscription và hạn token.
+        </p>
+
+        <div
+          v-for="login in ctrl.detected.value"
+          :key="login.config_dir + login.email"
+          class="rounded-lg border border-divider bg-canvas/50 p-3"
+        >
+          <div class="flex items-center gap-2">
+            <i class="pi pi-user text-muted" />
+            <span class="truncate font-semibold text-ink" :title="login.email">{{ login.email || "(no email)" }}</span>
+            <span
+              v-if="login.subscription_type"
+              class="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700"
+            >
+              {{ login.subscription_type }}
+            </span>
+            <span
+              class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
+              :class="login.already_added ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+            >
+              {{ login.already_added ? "Đã thêm" : "Mới" }}
+            </span>
+          </div>
+          <div class="mt-1.5 grid gap-0.5 text-[11px] text-muted">
+            <span v-if="login.display_name">{{ login.display_name }}</span>
+            <span class="truncate font-mono" :title="login.config_dir">
+              <i class="pi pi-folder mr-1" />{{ login.config_dir }}
+            </span>
+            <span v-if="login.token_expires_at">
+              <i class="pi pi-clock mr-1" />token hết hạn {{ login.token_expires_at }}
+            </span>
+          </div>
+        </div>
+
+        <p
+          v-if="!ctrl.detected.value.length"
+          class="rounded-lg border border-dashed border-divider p-6 text-center text-sm text-muted"
+        >
+          Không tìm thấy login Claude nào trên máy.
+        </p>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <Button label="Đóng" severity="secondary" @click="showDetect = false" />
+          <Button
+            icon="pi pi-download"
+            :label="ctrl.isDetecting.value ? 'Đang thêm...' : 'Thêm login mới'"
+            :disabled="ctrl.isDetecting.value || !ctrl.detected.value.some((l) => !l.already_added)"
+            @click="ctrl.importDetected()"
+          />
         </div>
       </template>
     </Dialog>

@@ -24,9 +24,9 @@ ON CONFLICT (name) DO NOTHING;
 -- User admin mặc định (password: ad@123456)
 INSERT INTO users (username, password_hash, full_name, position)
 VALUES (
-    'admin',
+    'Thongnm',
     '$2b$12$dTyhgIqskYwXMkSfe6Luyuq0Ve7EMFS7Rrq7Z5eXvx7apv0bk9cOy',
-    'Administrator',
+    'Thongnm',
     'System Admin'
 )
 ON CONFLICT (username) DO NOTHING;
