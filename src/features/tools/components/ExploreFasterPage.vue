@@ -596,7 +596,7 @@ function parentPath(fullPath: string): string {
         <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted" />
         <InputText
           ref="searchInput"
-          class="h-9 w-full rounded-md border border-divider bg-canvas pl-8 pr-8 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+          class="h-9 w-full rounded-md !border !border-divider !bg-canvas !pl-8 !pr-8 text-sm !shadow-none !outline-none focus:!border-brand focus:!ring-2 focus:!ring-emerald-100"
           placeholder="Search files..."
           @input="onSearchInput"
           @keydown="onSearchKeydown"

@@ -250,12 +250,12 @@ export function useProjectSkills() {
     (draft.value as any)[field] = value;
   }
 
-  function saveDraft() {
+  function saveDraft(): boolean {
     const validationError = validateDraft(draft.value);
     if (validationError) {
       message.value = validationError;
       messageMode.value = "error";
-      return;
+      return false;
     }
 
     const nextId = slugify(draft.value.name);
@@ -263,7 +263,7 @@ export function useProjectSkills() {
     if (duplicated) {
       message.value = `A skill named ${draft.value.name} already exists.`;
       messageMode.value = "error";
-      return;
+      return false;
     }
 
     const nextDraft: ManagedSkill = {
@@ -283,6 +283,7 @@ export function useProjectSkills() {
     persistSkills(nextSkills);
     message.value = `Saved ${nextDraft.name}.`;
     messageMode.value = "info";
+    return true;
   }
 
   function resetDraft() {

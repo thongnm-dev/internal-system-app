@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import Button from "primevue/button";
+import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
-import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
-import MessageBanner from "@/shared/components/MessageBanner.vue";
 import {
   skillCategories,
   useProjectSkills,
@@ -30,6 +29,29 @@ const statusOptions = ["Active", "Draft", "Deprecated"] as const;
 const categoryOptions = ["All", ...skillCategories] as const;
 
 const copyMessage = ref("");
+const dialogVisible = ref(false);
+
+const dialogHeader = computed(() =>
+  ctrl.skills.value.some((s) => s.id === ctrl.draft.value.id)
+    ? ctrl.draft.value.name || "Untitled Skill"
+    : "New Skill",
+);
+
+function openSkill(skillId: string) {
+  ctrl.selectSkill(skillId);
+  copyMessage.value = "";
+  dialogVisible.value = true;
+}
+
+function openNewSkill() {
+  ctrl.createSkill();
+  copyMessage.value = "";
+  dialogVisible.value = true;
+}
+
+function saveSkill() {
+  if (ctrl.saveDraft()) dialogVisible.value = false;
+}
 
 async function copyMarkdown() {
   try {
@@ -44,6 +66,7 @@ function confirmDelete() {
   const skillLabel = ctrl.draft.value.name || "this unsaved skill";
   if (window.confirm(`Delete ${skillLabel}?`)) {
     ctrl.deleteDraft();
+    dialogVisible.value = false;
   }
 }
 
@@ -72,35 +95,21 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <!-- Top bar: search, sort, stats, new -->
-    <section class="grid gap-3 rounded-lg border border-divider bg-panel p-4 shadow-sm xl:grid-cols-[minmax(260px,1fr)_auto]">
-      <div class="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_220px]">
-        <label class="block min-w-0">
-          <span class="text-xs font-bold text-muted">Search Skills</span>
-          <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-            <i class="pi pi-search shrink-0 text-muted" />
-            <InputText
-              class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
-              placeholder="Name, tag, category, guidance"
-              :model-value="ctrl.query.value"
-              @update:model-value="ctrl.query.value = $event as string"
-            />
-          </span>
-        </label>
-        <label class="block min-w-0">
-          <span class="text-xs font-bold text-muted">Sort by</span>
-          <select
-            class="mt-1 flex h-10 w-full items-center rounded-md border border-divider bg-panel px-3 text-sm"
-            :value="ctrl.sortKey.value"
-            @change="ctrl.sortKey.value = ($event.target as HTMLSelectElement).value as SkillSortKey"
-          >
-            <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-        </label>
-      </div>
+    <section class="flex flex-wrap items-end gap-3 rounded-lg border border-divider bg-panel p-4 shadow-sm">
+      <label class="block min-w-0 flex-1">
+        <span class="text-xs font-bold text-muted">Search Skills</span>
+        <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+          <i class="pi pi-search shrink-0 text-muted" />
+          <InputText
+            class="w-full min-w-0 flex-1 !border-0 !bg-transparent !p-0 text-sm text-ink !shadow-none !outline-none !ring-0 focus:!border-0 focus:!bg-transparent focus:!shadow-none focus:!outline-none focus:!ring-0"
+            placeholder="Name, tag, category, guidance"
+            :model-value="ctrl.query.value"
+            @update:model-value="ctrl.query.value = $event as string"
+          />
+        </span>
+      </label>
 
-      <div class="flex flex-wrap items-end justify-between gap-2 xl:justify-end">
-        <Button icon="pi pi-plus" label="New" title="Create skill" @click="ctrl.createSkill()" />
-      </div>
+      <Button icon="pi pi-plus" label="New" title="Create skill" class="shrink-0" @click="openNewSkill()" />
     </section>
 
     <!-- Category tabs + view mode -->
@@ -138,20 +147,18 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
       </div>
     </section>
 
-    <MessageBanner :message="ctrl.message.value" :mode="ctrl.messageMode.value" />
-
-    <!-- Main: skill list + detail editor -->
-    <section class="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(360px,1fr)_minmax(420px,520px)]">
+    <!-- Main: skill list -->
+    <section class="flex min-h-0 flex-1 overflow-hidden">
       <!-- Skill list -->
-      <section class="min-h-0 overflow-auto rounded-lg border border-divider bg-panel p-3 shadow-sm">
+      <section class="min-h-0 w-full flex-1 overflow-auto rounded-lg border border-divider bg-panel p-3 shadow-sm">
         <p v-if="ctrl.filteredSkills.value.length === 0" class="p-3 text-sm text-muted">No skills match the current filters.</p>
-        <div v-else :class="ctrl.viewMode.value === 'grid' ? 'grid gap-3 2xl:grid-cols-2' : 'grid gap-2'">
+        <div v-else :class="ctrl.viewMode.value === 'grid' ? 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4' : 'grid gap-2'">
           <Button
             v-for="skill in ctrl.filteredSkills.value"
             :key="skill.id"
             :class="skillCardClass(skill, ctrl.selectedSkillId.value === skill.id, ctrl.viewMode.value)"
             unstyled
-            @click="ctrl.selectSkill(skill.id)"
+            @click="openSkill(skill.id)"
           >
             <span class="min-w-0 flex-1">
               <span class="flex min-w-0 flex-wrap items-center gap-2">
@@ -177,18 +184,18 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
           </Button>
         </div>
       </section>
+    </section>
 
-      <!-- Detail editor -->
-      <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
-        <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
-          <h3 class="font-bold">Skill Details</h3>
-          <div class="flex items-center gap-2">
-            <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined size="small" title="Reset draft" @click="ctrl.resetDraft()" />
-            <Button icon="pi pi-save" label="Save" size="small" title="Save skill" @click="ctrl.saveDraft()" />
-          </div>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-auto p-4">
+    <!-- Detail editor dialog -->
+    <Dialog
+      v-model:visible="dialogVisible"
+      :header="dialogHeader"
+      modal
+      maximizable
+      :style="{ width: '820px' }"
+      :content-style="{ padding: '0' }"
+    >
+      <div class="flex flex-col gap-4 p-4">
           <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Metadata" toggleable>
             <div class="grid gap-3 md:grid-cols-2">
               <label class="block min-w-0 md:col-span-2">
@@ -259,7 +266,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             </div>
           </Fieldset>
 
-          <Fieldset class="mt-4 rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Guidance" toggleable>
+          <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Guidance" toggleable>
             <label class="block min-w-0">
               <span class="text-xs font-bold text-muted">When To Use</span>
               <textarea
@@ -280,43 +287,8 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             </label>
           </Fieldset>
 
-          <Fieldset class="mt-4 rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Catalog Metrics" toggleable :collapsed="true">
-            <div class="grid gap-3 md:grid-cols-3">
-              <label class="block min-w-0">
-                <span class="text-xs font-bold text-muted">Downloads</span>
-                <InputNumber
-                  class="mt-1 w-full"
-                  :model-value="ctrl.draft.value.downloads"
-                  :min="0"
-                  :useGrouping="false"
-                  @update:model-value="ctrl.updateDraft('downloads', $event ?? 0)"
-                />
-              </label>
-              <label class="block min-w-0">
-                <span class="text-xs font-bold text-muted">Stars</span>
-                <InputNumber
-                  class="mt-1 w-full"
-                  :model-value="ctrl.draft.value.stars"
-                  :min="0"
-                  :useGrouping="false"
-                  @update:model-value="ctrl.updateDraft('stars', $event ?? 0)"
-                />
-              </label>
-              <label class="block min-w-0">
-                <span class="text-xs font-bold text-muted">Installs</span>
-                <InputNumber
-                  class="mt-1 w-full"
-                  :model-value="ctrl.draft.value.installs"
-                  :min="0"
-                  :useGrouping="false"
-                  @update:model-value="ctrl.updateDraft('installs', $event ?? 0)"
-                />
-              </label>
-            </div>
-          </Fieldset>
-
           <!-- Generated Markdown -->
-          <section class="mt-4 flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel">
+          <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel">
             <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
               <h3 class="font-bold">Generated Markdown</h3>
               <Button icon="pi pi-copy" label="Copy" severity="secondary" outlined size="small" title="Copy generated markdown" @click="copyMarkdown()" />
@@ -324,12 +296,17 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             <p v-if="copyMessage" class="border-b border-divider px-4 py-2 text-xs text-muted">{{ copyMessage }}</p>
             <pre class="max-h-72 overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-ink">{{ ctrl.generatedMarkdown.value }}</pre>
           </section>
+      </div>
 
-          <div class="mt-4 flex justify-end">
-            <Button icon="pi pi-trash" label="Delete" severity="danger" outlined size="small" title="Delete skill" @click="confirmDelete" />
+      <template #footer>
+        <div class="flex w-full items-center justify-between gap-2">
+          <Button icon="pi pi-trash" label="Delete" severity="danger" outlined size="small" title="Delete skill" @click="confirmDelete" />
+          <div class="flex items-center gap-2">
+            <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined size="small" title="Reset draft" @click="ctrl.resetDraft()" />
+            <Button icon="pi pi-save" label="Save" size="small" title="Save skill" @click="saveSkill()" />
           </div>
         </div>
-      </section>
-    </section>
+      </template>
+    </Dialog>
   </section>
 </template>

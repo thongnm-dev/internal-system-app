@@ -11,6 +11,8 @@
     "core:webview:allow-create-webview-window",
     "dialog:default",
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "updater:default",
+    "process:default"
   ]
 }
