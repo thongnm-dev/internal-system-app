@@ -103,10 +103,21 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_user_username_exists", include_str!("../../../docs/store-procedure/sp_user_username_exists.sql")),
         ("sp_user_role_sync", include_str!("../../../docs/store-procedure/sp_user_role_sync.sql")),
         ("sp_role_select_list", include_str!("../../../docs/store-procedure/sp_role_select_list.sql")),
+        ("sp_role_select_detail_list", include_str!("../../../docs/store-procedure/sp_role_select_detail_list.sql")),
+        ("sp_role_insert", include_str!("../../../docs/store-procedure/sp_role_insert.sql")),
+        ("sp_role_update", include_str!("../../../docs/store-procedure/sp_role_update.sql")),
+        ("sp_role_delete", include_str!("../../../docs/store-procedure/sp_role_delete.sql")),
+        ("sp_role_name_exists", include_str!("../../../docs/store-procedure/sp_role_name_exists.sql")),
         // === Menu Config ===
         ("sp_menu_config_select_list", include_str!("../../../docs/store-procedure/sp_menu_config_select_list.sql")),
         ("sp_menu_config_upsert", include_str!("../../../docs/store-procedure/sp_menu_config_upsert.sql")),
         ("sp_menu_config_delete_all", include_str!("../../../docs/store-procedure/sp_menu_config_delete_all.sql")),
+        // === Menu Permission ===
+        ("sp_menu_permission_role_select", include_str!("../../../docs/store-procedure/sp_menu_permission_role_select.sql")),
+        ("sp_menu_permission_role_sync", include_str!("../../../docs/store-procedure/sp_menu_permission_role_sync.sql")),
+        ("sp_menu_permission_user_select", include_str!("../../../docs/store-procedure/sp_menu_permission_user_select.sql")),
+        ("sp_menu_permission_user_sync", include_str!("../../../docs/store-procedure/sp_menu_permission_user_sync.sql")),
+        ("sp_menu_permission_effective_select", include_str!("../../../docs/store-procedure/sp_menu_permission_effective_select.sql")),
         // === API Keys ===
         ("sp_api_key_select_by_user", include_str!("../../../docs/store-procedure/sp_api_key_select_by_user.sql")),
         ("sp_api_key_delete_by_user", include_str!("../../../docs/store-procedure/sp_api_key_delete_by_user.sql")),

@@ -17,6 +17,8 @@ export type MenuKey =
   | "aiUsage"
   | "governanceMenus"
   | "governanceUsers"
+  | "governanceRoles"
+  | "governancePermissions"
   | "governanceLogs"
   | "copyTools"
   | "settings";

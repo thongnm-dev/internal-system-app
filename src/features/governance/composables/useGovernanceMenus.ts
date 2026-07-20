@@ -80,6 +80,34 @@ export function useGovernanceMenus() {
     draft.value = item ? { ...item } : null;
   }
 
+  function startCreate() {
+    editingKey.value = null;
+    draft.value = {
+      key: "",
+      title: "",
+      path: "",
+      icon: "pi-circle",
+      group: "—",
+      visible: true,
+      order: items.value.length,
+    };
+  }
+
+  function keyExists(key: string) {
+    return items.value.some((i) => i.key === key.trim());
+  }
+
+  async function createDraft(): Promise<boolean> {
+    if (!draft.value) return false;
+    const key = draft.value.key.trim();
+    if (!key || !draft.value.title.trim() || keyExists(key)) return false;
+    const newItem = { ...draft.value, key };
+    items.value = [...items.value, newItem];
+    await persistItem(newItem);
+    draft.value = null;
+    return true;
+  }
+
   function updateDraft<K extends keyof MenuItemConfig>(field: K, value: MenuItemConfig[K]) {
     if (draft.value) draft.value[field] = value;
   }
@@ -151,6 +179,9 @@ export function useGovernanceMenus() {
     error,
     fetchItems,
     selectItem,
+    startCreate,
+    keyExists,
+    createDraft,
     updateDraft,
     saveDraft,
     resetDraft,

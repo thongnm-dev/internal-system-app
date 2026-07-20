@@ -41,6 +41,18 @@
     border-color: #0d9373 !important;
   }
 
+  /* Inputs embedded inside a bordered wrapper (icon + field) — keep them
+     transparent so the wrapper owns the background/border/focus ring. */
+  .embedded-input.p-inputtext,
+  .force-light .embedded-input.p-inputtext,
+  .embedded-input.p-inputtext:enabled:hover,
+  .embedded-input.p-inputtext:enabled:focus,
+  .force-light .embedded-input.p-inputtext:enabled:focus {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
   .force-light .p-checkbox .p-checkbox-box {
     background: #ffffff !important;
     border-color: #e5e7eb !important;

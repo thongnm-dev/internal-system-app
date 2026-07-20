@@ -270,6 +270,27 @@ CREATE TABLE IF NOT EXISTS menu_configs (
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- Phân quyền menu theo role: có bản ghi = role được phép truy cập menu đó.
+CREATE TABLE IF NOT EXISTS role_menu_permissions (
+    role_id    INTEGER     NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    menu_key   VARCHAR(50) NOT NULL REFERENCES menu_configs(key) ON DELETE CASCADE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (role_id, menu_key)
+);
+
+-- Phân quyền menu riêng cho từng user — ghi đè kết quả tổng hợp từ role.
+-- `is_allowed = TRUE` là cấp thêm quyền, `FALSE` là thu hồi quyền role đã cấp.
+CREATE TABLE IF NOT EXISTS user_menu_permissions (
+    user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    menu_key   VARCHAR(50) NOT NULL REFERENCES menu_configs(key) ON DELETE CASCADE,
+    is_allowed BOOLEAN     NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, menu_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_role_menu_perm_menu ON role_menu_permissions(menu_key);
+CREATE INDEX IF NOT EXISTS idx_user_menu_perm_menu ON user_menu_permissions(menu_key);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id         SERIAL       PRIMARY KEY,
     user_id    INTEGER      REFERENCES users(id) ON DELETE SET NULL,

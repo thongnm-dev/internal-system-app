@@ -128,6 +128,20 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Manage system users, roles, and access permissions.",
   },
   {
+    key: "governanceRoles",
+    path: "/governance/roles",
+    requiresAuth: true,
+    title: "Roles",
+    subtitle: "Manage system roles and their descriptions.",
+  },
+  {
+    key: "governancePermissions",
+    path: "/governance/permissions",
+    requiresAuth: true,
+    title: "Permissions",
+    subtitle: "Grant or revoke sidebar menu access per role and per user.",
+  },
+  {
     key: "governanceLogs",
     path: "/governance/logs",
     requiresAuth: true,
@@ -309,6 +323,16 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/governance/users",
     component: () => import("@/features/governance/components/GovernanceUsersPage.vue"),
     meta: { key: "governanceUsers" as MenuKey, requiresAuth: true },
+  },
+  {
+    path: "/governance/roles",
+    component: () => import("@/features/governance/components/GovernanceRolesPage.vue"),
+    meta: { key: "governanceRoles" as MenuKey, requiresAuth: true },
+  },
+  {
+    path: "/governance/permissions",
+    component: () => import("@/features/governance/components/GovernancePermissionsPage.vue"),
+    meta: { key: "governancePermissions" as MenuKey, requiresAuth: true },
   },
   {
     path: "/governance/logs",

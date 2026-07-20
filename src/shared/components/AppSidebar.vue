@@ -64,6 +64,8 @@ const groups: MenuGroup[] = [
       { id: "projectSkills", icon: "pi-book" },
       { id: "governanceMenus", icon: "pi-bars" },
       { id: "governanceUsers", icon: "pi-users" },
+      { id: "governanceRoles", icon: "pi-shield" },
+      { id: "governancePermissions", icon: "pi-lock" },
       { id: "governanceLogs", icon: "pi-history" },
     ],
   },

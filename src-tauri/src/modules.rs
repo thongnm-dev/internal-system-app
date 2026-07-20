@@ -35,8 +35,12 @@ mod commands {
     pub mod system_commands;
     /// Commands cho module quản lý người dùng.
     pub mod user_commands;
+    /// Commands cho module quản lý role (governance).
+    pub mod role_commands;
     /// Commands cho module quản lý menu (governance).
     pub mod menu_config_commands;
+    /// Commands cho module phân quyền menu theo user/role (governance).
+    pub mod menu_permission_commands;
     /// Commands cho Backlog API integration.
     pub mod backlog_commands;
     /// Commands cho S3 browser (list, download, upload, delete).
@@ -71,8 +75,12 @@ mod database {
     pub mod startup_store;
     /// Data access cho module quản lý người dùng.
     pub mod user_store;
+    /// Data access cho module quản lý role (governance).
+    pub mod role_store;
     /// Data access cho bảng `menu_configs` (PostgreSQL).
     pub mod menu_config_store;
+    /// Data access cho bảng `role_menu_permissions` và `user_menu_permissions`.
+    pub mod menu_permission_store;
     /// Data access cho bảng `api_keys` (PostgreSQL).
     pub mod api_key_store;
     /// Data access cho bảng `aws_storage` (PostgreSQL).
@@ -109,8 +117,12 @@ mod models {
     pub mod system;
     /// Model cho module quản lý người dùng.
     pub mod user;
+    /// Model cho module quản lý role (governance).
+    pub mod role;
     /// Model cho module quản lý menu (governance).
     pub mod menu_config;
+    /// Model cho module phân quyền menu theo user/role (governance).
+    pub mod menu_permission;
     /// Model cho Backlog API responses.
     pub mod backlog;
     /// Model cho S3 browser (config, object, operation result).
@@ -157,8 +169,12 @@ mod services {
     pub mod system_service;
     /// Service cho module quản lý người dùng.
     pub mod user_service;
+    /// Service cho module quản lý role (governance).
+    pub mod role_service;
     /// Service cho module quản lý menu (governance).
     pub mod menu_config_service;
+    /// Service cho module phân quyền menu theo user/role (governance).
+    pub mod menu_permission_service;
     /// Service cho Backlog API integration.
     pub mod backlog_service;
     /// Service cho S3 browser operations.

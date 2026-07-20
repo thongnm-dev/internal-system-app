@@ -61,8 +61,9 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 7),
     ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 8),
     ('governanceUsers', 'Users',             '/governance/users',  'pi-users',      'Governance', TRUE, 9),
-    ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 10),
-    ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 11)
+    ('governancePermissions', 'Permissions',  '/governance/permissions', 'pi-lock', 'Governance', TRUE, 10),
+    ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 11),
+    ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 12)
 ON CONFLICT (key) DO NOTHING;
 
 --- AWS Storage configuration

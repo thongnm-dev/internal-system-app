@@ -34,6 +34,7 @@ use commands::user_commands::{
     change_user_password, create_user, delete_user, get_user_detail, list_roles, list_users,
     update_user,
 };
+use commands::role_commands::{create_role, delete_role, list_role_details, update_role};
 use commands::backlog_commands::{
     backlog_check_config, backlog_create_issue, backlog_get_base_url, backlog_get_issue,
     backlog_get_project, backlog_get_project_lookup, backlog_list_categories,
@@ -49,6 +50,10 @@ use commands::explorer_commands::{
     explorer_search,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
+use commands::menu_permission_commands::{
+    list_effective_menu_permissions, list_role_menu_permissions, list_user_menu_permissions,
+    save_role_menu_permissions, save_user_menu_permissions,
+};
 use commands::ai_usage_commands::{
     ai_usage_add_account, ai_usage_add_config_dir, ai_usage_capture_add, ai_usage_capture_preview,
     ai_usage_config_dir_preview, ai_usage_delete_account, ai_usage_detect_local,
@@ -165,10 +170,21 @@ pub fn run() {
             delete_user,
             change_user_password,
             list_roles,
+            // === Role management commands ===
+            list_role_details,
+            create_role,
+            update_role,
+            delete_role,
             // === Menu config commands ===
             list_menu_configs,
             save_menu_config,
             save_all_menu_configs,
+            // === Menu permission commands ===
+            list_role_menu_permissions,
+            save_role_menu_permissions,
+            list_user_menu_permissions,
+            save_user_menu_permissions,
+            list_effective_menu_permissions,
             // === Backlog API commands ===
             backlog_check_config,
             backlog_get_base_url,
