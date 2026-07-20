@@ -44,7 +44,7 @@ async function submitLogin() {
 </script>
 
 <template>
-  <main class="grid min-h-screen place-items-center bg-canvas px-6 text-ink">
+  <main class="force-light grid min-h-screen place-items-center bg-canvas px-6 text-ink" data-theme="light">
     <section class="w-full max-w-[420px] rounded-lg border border-divider bg-panel p-6 shadow-sm">
       <div class="flex items-center gap-3">
         <div class="flex h-11 w-11 items-center justify-center rounded-md bg-brand text-white">
@@ -59,7 +59,7 @@ async function submitLogin() {
       <form class="mt-6 space-y-4" @submit.prevent="submitLogin">
         <label class="block">
           <span class="text-xs font-bold text-muted">Username</span>
-          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
             <i class="pi pi-user shrink-0 text-muted" />
             <InputText
               v-model="username"
@@ -73,15 +73,18 @@ async function submitLogin() {
 
         <label class="block">
           <span class="text-xs font-bold text-muted">Password</span>
-          <Password
-            v-model="password"
-            class="mt-1 w-full"
-            input-class="w-full"
-            autocomplete="current-password"
-            placeholder="password"
-            :feedback="false"
-            toggle-mask
-          />
+          <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 text-ink hover:border-brand focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
+            <i class="pi pi-lock shrink-0 text-muted" />
+            <Password
+              v-model="password"
+              class="h-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none [&_input]:h-full [&_input]:w-full [&_input]:border-0 [&_input]:bg-transparent [&_input]:shadow-none [&_input]:outline-none"
+              input-class="!border-0 !bg-transparent !shadow-none !outline-none !ring-0 !p-0"
+              autocomplete="current-password"
+              placeholder="password"
+              :feedback="false"
+              toggle-mask
+            />
+          </div>
         </label>
 
         <div class="flex cursor-pointer items-center gap-2 select-none">
@@ -91,7 +94,7 @@ async function submitLogin() {
 
         <p
           v-if="error"
-          class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
+          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500"
         >
           {{ error }}
         </p>
@@ -113,3 +116,26 @@ async function submitLogin() {
     </section>
   </main>
 </template>
+
+<style scoped>
+:deep(.p-inputtext) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+:deep(.p-inputtext:enabled:focus),
+:deep(.p-inputtext:focus) {
+  border: 0;
+  box-shadow: none;
+  outline: none;
+}
+
+:deep(.p-password) {
+  height: 100%;
+}
+</style>

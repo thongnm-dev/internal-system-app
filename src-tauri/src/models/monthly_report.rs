@@ -1,8 +1,6 @@
 //! Các kiểu dữ liệu cho module lịch sử import báo cáo tháng.
 //!
-//! Phân biệt các mức chi tiết: `ImportCsvResult` (kết quả import),
-//! `ImportBatchSummary` (danh sách), `ImportBatchListItem` (tìm kiếm),
-//! `ImportBatchDetail` (chi tiết một batch).
+//! `ImportCsvResult` (kết quả import), `ImportBatchSummary` (danh sách).
 
 use crate::models::import_csv::ImportPreviewRow;
 use serde::Serialize;
@@ -43,51 +41,4 @@ pub struct ImportBatchSummary {
     pub imported_by: String,
     pub row_count: i64,
     pub total_minutes: i64,
-}
-
-/// Điều kiện tìm kiếm batch import từ frontend.
-#[derive(serde::Deserialize)]
-pub struct ImportBatchSearchCriteria {
-    /// Lọc từ tháng (format YYYY-MM, inclusive).
-    pub target_month_from: Option<String>,
-    /// Lọc đến tháng (format YYYY-MM, inclusive).
-    pub target_month_to: Option<String>,
-    /// Lọc theo tên báo cáo (substring match).
-    pub report_name: Option<String>,
-    /// Từ khóa tìm kiếm tự do (tìm trong report_name, note, file name, imported_by).
-    pub keyword: Option<String>,
-}
-
-/// Một batch import trong kết quả tìm kiếm.
-#[derive(Serialize)]
-pub struct ImportBatchListItem {
-    pub id: i64,
-    pub report_name: String,
-    pub note: String,
-    pub source_file_name: String,
-    pub imported_at: String,
-    pub imported_by: String,
-    pub target_month_from: String,
-    pub target_month_to: String,
-    pub row_count: i64,
-    pub total_minutes: i64,
-}
-
-/// Thông tin chi tiết đầy đủ của một batch import,
-/// bao gồm danh sách preview rows để hiển thị lại dữ liệu đã import.
-#[derive(Serialize)]
-pub struct ImportBatchDetail {
-    pub id: i64,
-    pub report_name: String,
-    pub note: String,
-    pub source_path: String,
-    pub source_file_name: String,
-    pub imported_at: String,
-    pub imported_by: String,
-    pub target_month_from: String,
-    pub target_month_to: String,
-    pub row_count: i64,
-    pub total_minutes: i64,
-    /// Dữ liệu dòng preview để hiển thị bảng trên giao diện chi tiết.
-    pub preview_rows: Vec<ImportPreviewRow>,
 }

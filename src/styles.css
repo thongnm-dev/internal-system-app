@@ -12,6 +12,52 @@
     font-size: 15px;
   }
 
+  .force-light {
+    --color-canvas: 250 250 249;
+    --color-panel: 255 255 255;
+    --color-ink: 15 23 42;
+    --color-brand: 13 147 115;
+    --color-text-secondary: 71 85 105;
+    --color-text-muted: 148 163 184;
+    --color-border: 229 231 235;
+    --color-border-light: 243 244 246;
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    --shadow-panel: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03);
+    color: rgb(var(--color-ink));
+    background: rgb(var(--color-canvas));
+  }
+
+  .force-light .p-inputtext,
+  .force-light .p-password-input,
+  .force-light .p-inputnumber-input {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .force-light .p-inputtext:enabled:focus,
+  .force-light .p-password-input:enabled:focus,
+  .force-light .p-inputnumber-input:enabled:focus {
+    border-color: #0d9373 !important;
+  }
+
+  .force-light .p-checkbox .p-checkbox-box {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .force-light .p-button {
+    background: #0d9373 !important;
+    border-color: #0d9373 !important;
+  }
+
+  .force-light .p-button.p-button-secondary,
+  .force-light .p-button.p-button-outlined {
+    background: transparent !important;
+    color: #0f172a !important;
+    border-color: #e5e7eb !important;
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -51,7 +97,7 @@
 
 @layer components {
   .startup-loading-gif {
-    @apply inline-flex h-10 w-24 items-center justify-center gap-2 rounded-full bg-white/80 shadow-sm ring-1 ring-slate-200;
+    @apply inline-flex h-10 w-24 items-center justify-center gap-2 rounded-full bg-panel shadow-sm ring-1 ring-divider;
   }
 
   .startup-loading-gif > span {

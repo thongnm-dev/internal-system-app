@@ -5,7 +5,8 @@ const companyBackground =
 
 <template>
   <main
-    class="flex h-screen min-h-[640px] min-w-[900px] items-center justify-center overflow-hidden bg-canvas text-ink"
+    class="force-light flex h-screen min-h-[640px] min-w-[900px] items-center justify-center overflow-hidden bg-canvas text-ink"
+    data-theme="light"
   >
     <section
       aria-live="polite"

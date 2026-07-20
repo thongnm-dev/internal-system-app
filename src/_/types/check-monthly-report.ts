@@ -31,16 +31,3 @@ export type ImportCsvPreviewResult = {
   raw_rows: string[][];
   minute_column_indexes: number[];
 };
-
-export type ImportBatchSummary = {
-  id: number;
-  source_file_name: string;
-  imported_at: string;
-  report_name: string;
-  note: string;
-  target_month_from: string;
-  target_month_to: string;
-  imported_by: string;
-  row_count: number;
-  total_minutes: number;
-};

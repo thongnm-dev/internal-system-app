@@ -20,9 +20,8 @@ use commands::daily_report_commands::{
 use commands::db_config_commands::{
     check_database_status, get_database_config, save_database_config, test_database_config,
 };
-use commands::import_commands::{
-    get_import_batch_detail, import_monthly_report_csv, list_import_batches,
-    preview_monthly_report_csv, search_import_batches,
+use commands::monthly_report_commands::{
+    import_monthly_report_csv, list_import_batches, preview_monthly_report_csv,
 };
 use commands::project_commands::{
     create_project, create_project_task, delete_project, delete_project_task,
@@ -124,8 +123,6 @@ pub fn run() {
             preview_monthly_report_csv,
             import_monthly_report_csv,
             list_import_batches,
-            search_import_batches,
-            get_import_batch_detail,
             // === Excel → Markdown command ===
             excel2md,
             // === Project CRUD commands ===

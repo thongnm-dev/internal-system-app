@@ -129,7 +129,8 @@ function acknowledge() {
 
 <template>
   <main
-    class="flex h-screen min-h-[640px] min-w-[900px] items-center justify-center overflow-hidden bg-canvas text-ink"
+    class="force-light flex h-screen min-h-[640px] min-w-[900px] items-center justify-center overflow-hidden bg-canvas text-ink"
+    data-theme="light"
   >
     <section
       class="flex w-full max-w-md flex-col gap-6 rounded-xl border border-divider bg-panel p-8 shadow-card"
@@ -138,7 +139,7 @@ function acknowledge() {
       <div class="flex flex-col items-center gap-3 text-center">
         <span
           aria-hidden="true"
-          class="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-brand"
+          class="flex h-16 w-16 items-center justify-center rounded-full bg-brand/10 text-brand"
         >
           <i class="pi pi-database text-2xl" />
         </span>
@@ -156,7 +157,7 @@ function acknowledge() {
 
       <p
         v-if="database.statusMessage.value && database.isConfigured.value"
-        class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+        class="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-500"
       >
         {{ database.statusMessage.value }}
       </p>
@@ -177,6 +178,7 @@ function acknowledge() {
             <InputNumber
               v-model="form.port"
               class="mt-1 w-full"
+              input-class="w-full"
               :min="1"
               :max="65535"
               :useGrouping="false"
@@ -263,7 +265,7 @@ function acknowledge() {
           <span
             :class="[
               'flex h-8 w-8 items-center justify-center rounded-full',
-              dialog?.type === 'success' ? 'bg-emerald-50 text-brand' : 'bg-red-50 text-red-600',
+              dialog?.type === 'success' ? 'bg-brand/10 text-brand' : 'bg-red-500/10 text-red-500',
             ]"
           >
             <i :class="dialog?.type === 'success' ? 'pi pi-check' : 'pi pi-times'" />

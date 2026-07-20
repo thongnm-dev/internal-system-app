@@ -1,9 +1,5 @@
 import { safeInvoke } from "./_base";
-import type { ImportBatchSummary, ImportCsvPreviewResult, ImportCsvResult } from "@/_/types/import-csv";
-
-export function listImportBatches() {
-  return safeInvoke<ImportBatchSummary[]>("list_import_batches");
-}
+import type { ImportCsvPreviewResult, ImportCsvResult } from "@/_/types/check-monthly-report";
 
 export function previewMonthlyReportCsv(path: string) {
   return safeInvoke<ImportCsvPreviewResult>("preview_monthly_report_csv", { path });

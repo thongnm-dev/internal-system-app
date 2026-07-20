@@ -26,7 +26,7 @@ mod commands {
     /// Command chuyển đổi Excel → Markdown.
     pub mod excel2md_commands;
     /// Commands cho import CSV báo cáo tháng.
-    pub mod import_commands;
+    pub mod monthly_report_commands;
     /// Commands cho module quản lý dự án.
     pub mod project_commands;
     /// Commands cho module cài đặt ứng dụng.
@@ -147,9 +147,7 @@ mod services {
     pub mod db_config_service;
     /// Service chuyển đổi Excel → Markdown (gọi script Python).
     pub mod excel2md_service;
-    /// Service preview và đọc dữ liệu import CSV.
-    pub mod import_csv_service;
-    /// Service lưu trữ và truy vấn lịch sử import báo cáo tháng.
+    /// Service preview, đọc dữ liệu import CSV, và lưu trữ lịch sử import báo cáo tháng.
     pub mod monthly_report_service;
     /// Service kiểm tra kết nối internet.
     pub mod network_service;

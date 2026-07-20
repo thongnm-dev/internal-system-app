@@ -9,7 +9,7 @@ import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import { useAuthStore } from "@/app/stores/auth";
-import { useImportCsv } from "../composables/useImportCsv";
+import { useCheckMonthlyReport } from "../composables/useCheckMonthlyReport";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
@@ -20,11 +20,11 @@ import type {
   ProjectSummary,
   SelectedPhaseDetail,
 } from "@/_/types/analysis";
-import type { ImportCsvPreviewResult } from "@/_/types/import-csv";
+import type { ImportCsvPreviewResult } from "@/_/types/check-monthly-report";
 
 const auth = useAuthStore();
 const loading = useGlobalLoading();
-const ctrl = useImportCsv();
+const ctrl = useCheckMonthlyReport();
 
 // Preview is shown inside a dialog with two views: summary + raw detail.
 const isPreviewDialogOpen = ref(false);
