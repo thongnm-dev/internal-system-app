@@ -32,6 +32,10 @@ export type BacklogUser = {
   keyword?: string;
 };
 
+export function backlogCheckConfig() {
+  return safeInvoke<void>("backlog_check_config");
+}
+
 export function backlogGetBaseUrl() {
   return safeInvoke<string>("backlog_get_base_url");
 }

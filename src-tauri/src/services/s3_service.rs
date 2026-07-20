@@ -1,7 +1,7 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
-use crate::utils::pgsql_connect;
+use crate::utils::app_config;
 
 use aws_config::Region;
 use aws_credential_types::Credentials;
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 pub(crate) fn load_config_from_ini() -> AppResult<S3Config> {
-    let path = pgsql_connect::config_path();
+    let path = app_config::config_path();
     let ini = Ini::load_from_file(&path).map_err(|e| {
         AppError::new(format!("Failed to load config.ini at {}: {e}", path.display()))
     })?;

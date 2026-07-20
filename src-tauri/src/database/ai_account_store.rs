@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::result::AppResult;
 use crate::models::ai_usage::AiUsageSettings;
-use crate::utils::app_data;
+use crate::utils::app_config;
 
 /// Tên file dữ liệu cục bộ.
 const DATA_FILE: &str = "ai_accounts.json";
@@ -76,7 +76,7 @@ fn data_path() -> PathBuf {
 
 /// Thư mục AppData dùng chung cho dữ liệu cục bộ (account, profile, v.v.).
 pub fn data_dir() -> PathBuf {
-    app_data::data_dir()
+    app_config::data_dir()
 }
 
 /// Đọc dữ liệu từ file. File chưa tồn tại → trả về mặc định (rỗng).

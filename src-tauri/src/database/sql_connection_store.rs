@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::result::AppResult;
 use crate::models::sql_editor::SqlConnection;
-use crate::utils::app_data;
+use crate::utils::app_config;
 
 /// Tên file dữ liệu cục bộ.
 const DATA_FILE: &str = "sql_connections.json";
@@ -26,7 +26,7 @@ pub struct SqlConnectionData {
 }
 
 fn data_path() -> PathBuf {
-    app_data::data_dir().join(DATA_FILE)
+    app_config::data_dir().join(DATA_FILE)
 }
 
 /// Đọc dữ liệu từ file. File chưa tồn tại → trả về mặc định (rỗng).

@@ -35,9 +35,10 @@ use commands::user_commands::{
     update_user,
 };
 use commands::backlog_commands::{
-    backlog_create_issue, backlog_get_base_url, backlog_get_issue, backlog_get_project,
-    backlog_get_project_lookup, backlog_list_categories, backlog_list_issue_types,
-    backlog_list_issues, backlog_list_priorities, backlog_list_project_users, backlog_list_statuses,
+    backlog_check_config, backlog_create_issue, backlog_get_base_url, backlog_get_issue,
+    backlog_get_project, backlog_get_project_lookup, backlog_list_categories,
+    backlog_list_issue_types, backlog_list_issues, backlog_list_priorities,
+    backlog_list_project_users, backlog_list_statuses,
 };
 use commands::excel2md_commands::excel2md;
 use commands::sync_commands::sync_daily_report;
@@ -169,6 +170,7 @@ pub fn run() {
             save_menu_config,
             save_all_menu_configs,
             // === Backlog API commands ===
+            backlog_check_config,
             backlog_get_base_url,
             backlog_get_project,
             backlog_list_issue_types,

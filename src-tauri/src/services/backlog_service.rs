@@ -9,7 +9,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::api_key_store;
 use crate::models::backlog::*;
-use crate::utils::pgsql_connect;
+use crate::utils::app_config;
 use ini::Ini;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
@@ -40,7 +40,7 @@ impl BacklogClient {
     }
 
     fn from_ini() -> AppResult<Self> {
-        let path = pgsql_connect::config_path();
+        let path = app_config::config_path();
         let ini = Ini::load_from_file(&path).map_err(|e| {
             AppError::new(format!("Failed to load config.ini at {}: {e}", path.display()))
         })?;
@@ -145,6 +145,14 @@ impl BacklogClient {
             .await
             .map_err(|e| AppError::new(format!("Failed to parse Backlog response: {e}")))
     }
+}
+
+pub async fn check_config() -> AppResult<()> {
+    BacklogClient::resolve().await.map_err(|e| {
+        let path = app_config::config_path();
+        AppError::new(format!("{e} (config path: {})", path.display()))
+    })?;
+    Ok(())
 }
 
 /// Trả về base URL của Backlog (đã bỏ dấu `/` và hậu tố `/api/v2`),

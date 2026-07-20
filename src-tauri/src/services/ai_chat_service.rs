@@ -16,7 +16,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::api_key_store;
 use crate::models::ai_chat::{AiChatRequest, AiChatResponse};
-use crate::utils::pgsql_connect;
+use crate::utils::app_config;
 
 /// Tên nhóm trong bảng `api_keys` cho các key AI.
 const AI_KEY_NAME: &str = "AI";
@@ -102,7 +102,7 @@ async fn resolve_api_key(provider: &str, override_key: Option<&str>) -> AppResul
 }
 
 fn api_key_from_ini(label: &str) -> Option<String> {
-    let path = pgsql_connect::config_path();
+    let path = app_config::config_path();
     let ini = Ini::load_from_file(&path).ok()?;
     let section = ini.section(Some("ai"))?;
     section.get(label).map(|s| s.to_string())

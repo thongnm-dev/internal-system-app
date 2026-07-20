@@ -1,6 +1,7 @@
 import { computed, ref, watch } from "vue";
 import { listProjects } from "@/tauri/commands/project";
 import {
+  backlogCheckConfig,
   backlogListStatuses,
   backlogListCategories,
   backlogListIssueTypes,
@@ -69,6 +70,10 @@ export const categories = ref<string[]>([]);
 export const assignees = ref<string[]>([]);
 export const priorityOptions = ref<string[]>([]);
 export const uniqueCreateUsers = ref<string[]>([]);
+
+const configError = ref("");
+const configChecking = ref(false);
+const configReady = ref(false);
 
 const lookupLoading = ref(false);
 const lookupError = ref("");
@@ -357,13 +362,28 @@ export function useIssueBacklog(initialProject = "") {
     loadProjectLookups("");
   }
 
-  loadProjects();
-
-  if (initialProject) {
-    resolveProjectInfo(initialProject).then(({ backlogKey }) => {
-      if (backlogKey) loadProjectLookups(backlogKey);
-    });
+  async function checkConfig() {
+    if (!canUseTauriRuntime()) return;
+    configChecking.value = true;
+    configError.value = "";
+    try {
+      await backlogCheckConfig();
+      configReady.value = true;
+      loadProjects();
+      if (initialProject) {
+        resolveProjectInfo(initialProject).then(({ backlogKey }) => {
+          if (backlogKey) loadProjectLookups(backlogKey);
+        });
+      }
+    } catch (e) {
+      configError.value = String(e);
+      configReady.value = false;
+    } finally {
+      configChecking.value = false;
+    }
   }
 
-  return { criteria, filteredItems, canOpenImport, setField, search, onPage, reset, lookupLoading, lookupError, searchError, totalCount, first, pageSize };
+  checkConfig();
+
+  return { criteria, filteredItems, canOpenImport, setField, search, onPage, reset, lookupLoading, lookupError, searchError, totalCount, first, pageSize, configError, configChecking, checkConfig };
 }
