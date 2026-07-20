@@ -5,8 +5,9 @@ import { getSystemInfo } from "@/tauri/commands/system";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { useAuthStore } from "@/app/stores/auth";
+import { useMenuStore } from "@/app/stores/menu";
 import { loginRoute } from "@/app/router/routes";
-import type { MessageMode } from "@/_/types/app";
+import type { MenuKey, MessageMode } from "@/_/types/app";
 import type { SystemInfo } from "@/_/types/system";
 
 const BOOTSTRAP_MIN_DURATION_MS = 900;
@@ -34,6 +35,7 @@ export function useAppShell() {
 
   const router = useRouter();
   const auth = useAuthStore();
+  const menu = useMenuStore();
   const network = useNetworkStatus();
   const database = useDatabaseStatus();
 
@@ -99,6 +101,20 @@ export function useAppShell() {
     // of flashing the app.
     if (online) {
       await database.check();
+    }
+
+    // Load the remembered user's effective menu permissions before revealing
+    // the shell so the sidebar renders already filtered (no flash of denied
+    // menus) and the router guard has data to act on.
+    if (auth.isAuthenticated && auth.user && database.isConnected.value) {
+      await menu.load(auth.user.user_id);
+
+      // A remembered session may have deep-linked into a now-denied menu; the
+      // beforeEach guard won't fire without a navigation, so redirect here.
+      const currentKey = router.currentRoute.value.meta.key as MenuKey | undefined;
+      if (currentKey && !menu.canAccess(currentKey)) {
+        router.replace("/overview");
+      }
     }
 
     isBootstrapping.value = false;

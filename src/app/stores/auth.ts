@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { useMenuStore } from "@/app/stores/menu";
 import type { LoginResponse } from "@/_/types/auth";
 
 type AuthUser = {
@@ -37,6 +38,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   function logout() {
     user.value = null;
+    useMenuStore().clear();
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
   }
 

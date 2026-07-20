@@ -6,12 +6,14 @@ import Checkbox from "primevue/checkbox";
 import InputText from "primevue/inputtext";
 import Password from "primevue/password";
 import { useAuthStore } from "@/app/stores/auth";
+import { useMenuStore } from "@/app/stores/menu";
 import { defaultRoute } from "@/app/router/routes";
 import { friendlyError } from "@/tauri/commands/_base";
 import { login as tauriLogin } from "@/tauri/commands/auth";
 
 const router = useRouter();
 const auth = useAuthStore();
+const menu = useMenuStore();
 
 const username = ref("");
 const password = ref("");
@@ -34,6 +36,7 @@ async function submitLogin() {
       password: password.value.trim(),
     });
     auth.setUser(response, rememberMe.value);
+    await menu.load(response.user_id);
     router.push(auth.returnPath ?? defaultRoute.path);
   } catch (e) {
     error.value = friendlyError(e);

@@ -53,9 +53,14 @@
     box-shadow: none !important;
   }
 
-  .force-light .p-checkbox .p-checkbox-box {
+  .force-light .p-checkbox:not(.p-checkbox-checked) .p-checkbox-box {
     background: #ffffff !important;
     border-color: #e5e7eb !important;
+  }
+
+  .force-light .p-checkbox.p-checkbox-checked .p-checkbox-box {
+    background: #0d9373 !important;
+    border-color: #0d9373 !important;
   }
 
   .force-light .p-button {

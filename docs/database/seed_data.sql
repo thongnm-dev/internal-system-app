@@ -57,14 +57,33 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('dailyWorkNotes',  'Daily Work Notes',  '/daily-work-notes',  'pi-pencil',     '—',          TRUE, 3),
     ('dailyReport',     'Daily Report',      '/daily-report',      'pi-calendar',   '—',          TRUE, 4),
     ('excel2md',        'Excel to Markdown', '/excel2md',          'pi-file',       'Tools',      TRUE, 5),
-    ('checkMonthlyReport', 'Check Monthly Report', '/check-monthly-report', 'pi-database', 'Tools', TRUE, 6),
-    ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 7),
-    ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 8),
-    ('governanceUsers', 'Users',             '/governance/users',  'pi-users',      'Governance', TRUE, 9),
-    ('governancePermissions', 'Permissions',  '/governance/permissions', 'pi-lock', 'Governance', TRUE, 10),
-    ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 11),
-    ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 12)
+    ('copyTools',       'Copy Tools',        '/copy-tools',        'pi-copy',       'Tools',      TRUE, 6),
+    ('checkMonthlyReport', 'Check Monthly Report', '/check-monthly-report', 'pi-database', 'Tools', TRUE, 7),
+    ('sqlEditor',       'SQL Editor',        '/sql-editor',        'pi-server',     'Tools',      TRUE, 8),
+    ('exploreFaster',   'Explore Faster',    '/explore-faster',    'pi-compass',    'Tools',      TRUE, 9),
+    ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
+    ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),
+    ('cloudS3Download', 'S3 Download',       '/cloud/s3-download', 'pi-download',   'Cloud',      TRUE, 12),
+    ('aiChat',          'AI Chat',           '/ai/chat',           'pi-comments',   'AI Agent',   TRUE, 13),
+    ('aiUsage',         'AI Usage',          '/ai/usage',          'pi-chart-bar',  'AI Agent',   TRUE, 14),
+    ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 15),
+    ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 16),
+    ('governanceUsers', 'Users',             '/governance/users',  'pi-users',      'Governance', TRUE, 17),
+    ('governanceRoles', 'Roles',             '/governance/roles',  'pi-shield',     'Governance', TRUE, 18),
+    ('governancePermissions', 'Permissions',  '/governance/permissions', 'pi-lock', 'Governance', TRUE, 19),
+    ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 20),
+    ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 21)
 ON CONFLICT (key) DO NOTHING;
+
+-- Cấp toàn bộ menu cho role admin. Bắt buộc: sidebar/route giờ lấy hoàn toàn
+-- từ menu_configs + quyền hiệu lực, mặc định mọi quyền là FALSE, nên nếu không
+-- seed dòng này thì admin đăng nhập vào sẽ thấy sidebar rỗng.
+INSERT INTO role_menu_permissions (role_id, menu_key)
+SELECT r.id, m.key
+FROM roles r
+CROSS JOIN menu_configs m
+WHERE r.name = 'admin'
+ON CONFLICT (role_id, menu_key) DO NOTHING;
 
 --- AWS Storage configuration
 truncate table aws_work_folder cascade;

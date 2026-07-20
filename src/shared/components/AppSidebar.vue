@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import Button from "primevue/button";
-import { appRoutes } from "@/app/router/routes";
+import { useMenuStore } from "@/app/stores/menu";
 import type { MenuKey } from "@/_/types/app";
 
 const props = defineProps<{
@@ -14,87 +14,34 @@ const emit = defineEmits<{
   toggleCollapse: [];
 }>();
 
-const items: { id: MenuKey; icon: string }[] = [
-  { id: "overview", icon: "pi-home" },
-  { id: "projects", icon: "pi-table" },
-  { id: "issueBacklog", icon: "pi-list-check" },
-  { id: "dailyWorkNotes", icon: "pi-pencil" },
-  { id: "dailyReport", icon: "pi-calendar" },
-];
+const menu = useMenuStore();
 
-type MenuGroup = {
-  label: string;
-  icon: string;
-  children: { id: MenuKey; icon: string }[];
+// menu_configs chỉ lưu label nhóm (menu_group), không có icon nhóm — icon là
+// dữ liệu trình bày nên map tĩnh ở đây, có fallback cho nhóm mới.
+const GROUP_ICONS: Record<string, string> = {
+  Tools: "pi-wrench",
+  Cloud: "pi-cloud",
+  "AI Agent": "pi-sparkles",
+  Governance: "pi-shield",
 };
+const groupIcon = (label: string) => GROUP_ICONS[label] ?? "pi-folder";
 
-const groups: MenuGroup[] = [
-  {
-    label: "Tools",
-    icon: "pi-wrench",
-    children: [
-      { id: "excel2md", icon: "pi-file" },
-      { id: "copyTools", icon: "pi-copy" },
-      { id: "checkMonthlyReport", icon: "pi-database" },
-      { id: "sqlEditor", icon: "pi-server" },
-      { id: "exploreFaster", icon: "pi-compass" },
-    ],
-  },
-  {
-    label: "Cloud",
-    icon: "pi-cloud",
-    children: [
-      { id: "cloudS3", icon: "pi-folder-open" },
-      { id: "cloudS3Upload", icon: "pi-upload" },
-      { id: "cloudS3Download", icon: "pi-download" },
-    ],
-  },
-  {
-    label: "AI Agent",
-    icon: "pi-sparkles",
-    children: [
-      { id: "aiChat", icon: "pi-comments" },
-      { id: "aiUsage", icon: "pi-chart-bar" },
-    ],
-  },
-  {
-    label: "Governance",
-    icon: "pi-shield",
-    children: [
-      { id: "projectSkills", icon: "pi-book" },
-      { id: "governanceMenus", icon: "pi-bars" },
-      { id: "governanceUsers", icon: "pi-users" },
-      { id: "governanceRoles", icon: "pi-shield" },
-      { id: "governancePermissions", icon: "pi-lock" },
-      { id: "governanceLogs", icon: "pi-history" },
-    ],
-  },
-];
+const groupOpen = ref<Record<string, boolean>>({});
 
-const groupKeySet = new Map<string, Set<MenuKey>>(
-  groups.map((g) => [g.label, new Set(g.children.map((c) => c.id))]),
-);
+function isGroupActive(items: { key: string }[]) {
+  return items.some((i) => i.key === props.activeMenu);
+}
 
-const groupOpen = ref<Record<string, boolean>>(
-  Object.fromEntries(groups.map((g) => [g.label, false])),
-);
-
+// Tự mở nhóm chứa menu đang active (kể cả khi menu vừa được nạp từ store).
 watch(
-  () => props.activeMenu,
-  (key) => {
-    for (const g of groups) {
-      if (groupKeySet.get(g.label)!.has(key)) groupOpen.value[g.label] = true;
+  [() => props.activeMenu, () => menu.groups],
+  ([key]) => {
+    for (const g of menu.groups) {
+      if (g.items.some((i) => i.key === key)) groupOpen.value[g.label] = true;
     }
   },
   { immediate: true },
 );
-
-const settingsRoute = appRoutes.find((r) => r.key === "settings");
-const settingsLabel = settingsRoute?.title ?? "Settings";
-
-function labelFor(id: MenuKey): string {
-  return appRoutes.find((r) => r.key === id)?.title ?? id;
-}
 
 function tooltipOpts(label: string) {
   return { value: label, disabled: !props.isCollapsed, showDelay: 300 };
@@ -134,93 +81,93 @@ function tooltipOpts(label: string) {
 
     <nav :class="['flex-1 space-y-1 overflow-y-auto overflow-x-hidden', isCollapsed ? 'p-2' : 'p-3']">
       <Button
-        v-for="item in items"
-        :key="item.id"
-        v-tooltip.right="tooltipOpts(labelFor(item.id))"
+        v-for="item in menu.topLevelItems"
+        :key="item.key"
+        v-tooltip.right="tooltipOpts(item.title)"
         :class="[
           'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
           isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
-          activeMenu === item.id
+          activeMenu === item.key
             ? 'bg-sidebar-active text-sidebar-text-active'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
         ]"
         unstyled
-        @click="emit('menuChange', item.id)"
+        @click="emit('menuChange', item.key as MenuKey)"
       >
         <i :class="`pi ${item.icon} shrink-0`" />
-        <span v-if="!isCollapsed">{{ labelFor(item.id) }}</span>
+        <span v-if="!isCollapsed">{{ item.title }}</span>
       </Button>
 
       <!-- Collapsible groups -->
-      <template v-for="g in groups" :key="g.label">
+      <template v-for="g in menu.groups" :key="g.label">
         <Button
           v-if="isCollapsed"
           v-tooltip.right="tooltipOpts(g.label)"
           :class="[
             'flex h-10 w-full items-center justify-center rounded-md text-sm font-semibold transition',
-            groupKeySet.get(g.label)!.has(activeMenu)
+            isGroupActive(g.items)
               ? 'bg-sidebar-active text-sidebar-text-active'
               : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
           ]"
           unstyled
           @click="groupOpen[g.label] = !groupOpen[g.label]"
         >
-          <i :class="`pi ${g.icon} shrink-0`" />
+          <i :class="`pi ${groupIcon(g.label)} shrink-0`" />
         </Button>
 
         <Button
           v-if="!isCollapsed"
           :class="[
             'flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold transition',
-            groupKeySet.get(g.label)!.has(activeMenu)
+            isGroupActive(g.items)
               ? 'text-sidebar-text-active'
               : 'text-sidebar-text hover:text-sidebar-text-active',
           ]"
           unstyled
           @click="groupOpen[g.label] = !groupOpen[g.label]"
         >
-          <i :class="`pi ${g.icon} shrink-0`" />
+          <i :class="`pi ${groupIcon(g.label)} shrink-0`" />
           <span class="flex-1">{{ g.label }}</span>
           <i :class="['pi shrink-0 text-xs transition-transform', groupOpen[g.label] ? 'pi-chevron-down' : 'pi-chevron-right']" />
         </Button>
 
         <template v-if="groupOpen[g.label]">
           <Button
-            v-for="child in g.children"
-            :key="child.id"
-            v-tooltip.right="tooltipOpts(labelFor(child.id))"
+            v-for="child in g.items"
+            :key="child.key"
+            v-tooltip.right="tooltipOpts(child.title)"
             :class="[
               'flex h-9 w-full items-center rounded-md text-sm font-medium transition',
               isCollapsed ? 'justify-center px-0' : 'gap-3 pl-9 pr-3 text-left',
-              activeMenu === child.id
+              activeMenu === child.key
                 ? 'bg-sidebar-active text-sidebar-text-active'
                 : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
             ]"
             unstyled
-            @click="emit('menuChange', child.id)"
+            @click="emit('menuChange', child.key as MenuKey)"
           >
             <i :class="`pi ${child.icon} shrink-0 text-xs`" />
-            <span v-if="!isCollapsed">{{ labelFor(child.id) }}</span>
+            <span v-if="!isCollapsed">{{ child.title }}</span>
           </Button>
         </template>
       </template>
     </nav>
 
-    <div :class="['border-t border-sidebar-border text-sm text-sidebar-text', isCollapsed ? 'p-2' : 'p-4']">
+    <div v-if="menu.settingsMenu" :class="['border-t border-sidebar-border text-sm text-sidebar-text', isCollapsed ? 'p-2' : 'p-4']">
       <Button
-        v-tooltip.right="tooltipOpts(settingsLabel)"
+        v-tooltip.right="tooltipOpts(menu.settingsMenu.title)"
         :class="[
           'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
           isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
-          activeMenu === 'settings'
+          activeMenu === menu.settingsMenu.key
             ? 'bg-sidebar-active text-sidebar-text-active'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
         ]"
         unstyled
-        @click="emit('menuChange', 'settings')"
+        @click="emit('menuChange', (menu.settingsMenu?.key ?? 'settings') as MenuKey)"
       >
-        <i class="pi pi-cog shrink-0" />
-        <span v-if="!isCollapsed">{{ settingsLabel }}</span>
+        <i :class="`pi ${menu.settingsMenu.icon} shrink-0`" />
+        <span v-if="!isCollapsed">{{ menu.settingsMenu.title }}</span>
       </Button>
     </div>
   </aside>
