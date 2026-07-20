@@ -318,7 +318,7 @@ async function executeImport() {
     >
       <span
         aria-hidden="true"
-        class="flex h-20 w-20 items-center justify-center rounded-full bg-red-50 text-red-600"
+        class="config-error-icon flex h-20 w-20 items-center justify-center rounded-full"
       >
         <svg class="h-10 w-10" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066Z" />
@@ -335,7 +335,7 @@ async function executeImport() {
         </p>
       </div>
 
-      <div class="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+      <div class="config-error-box rounded-md border px-4 py-2 text-sm">
         {{ ctrl.configError.value }}
       </div>
 
@@ -711,3 +711,25 @@ async function executeImport() {
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+.config-error-icon {
+  background: #fef2f2;
+  color: #dc2626;
+}
+[data-theme='dark'] .config-error-icon {
+  background: #450a0a;
+  color: #f87171;
+}
+
+.config-error-box {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+[data-theme='dark'] .config-error-box {
+  border-color: #991b1b;
+  background: #450a0a;
+  color: #fca5a5;
+}
+</style>

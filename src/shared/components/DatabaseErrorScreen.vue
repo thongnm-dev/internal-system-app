@@ -17,7 +17,7 @@ const database = useDatabaseStatus();
     >
       <span
         aria-hidden="true"
-        class="flex h-20 w-20 items-center justify-center rounded-full bg-red-50 text-red-600"
+        class="flex h-20 w-20 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400"
       >
         <i class="pi pi-database text-3xl" />
       </span>

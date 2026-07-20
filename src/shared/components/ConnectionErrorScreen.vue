@@ -22,7 +22,7 @@ const emit = defineEmits<{
     >
       <span
         aria-hidden="true"
-        class="flex h-20 w-20 items-center justify-center rounded-full bg-red-50 text-red-600"
+        class="config-error-icon flex h-20 w-20 items-center justify-center rounded-full"
       >
         <svg
           class="h-10 w-10"
@@ -57,3 +57,14 @@ const emit = defineEmits<{
     </section>
   </main>
 </template>
+
+<style scoped>
+.config-error-icon {
+  background: #fef2f2;
+  color: #dc2626;
+}
+[data-theme='dark'] .config-error-icon {
+  background: #450a0a;
+  color: #f87171;
+}
+</style>
