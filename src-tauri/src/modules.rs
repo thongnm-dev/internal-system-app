@@ -200,4 +200,6 @@ mod utils {
     pub mod pgsql_connect;
     /// Hàm tiện ích lấy timestamp hiện tại.
     pub mod time;
+    /// Đường dẫn thư mục AppData dùng chung cho dữ liệu cục bộ.
+    pub mod app_data;
 }

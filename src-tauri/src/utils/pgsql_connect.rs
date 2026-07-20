@@ -231,22 +231,34 @@ where
     }
 }
 
+/// Template mặc định cho `config.ini`, được embed vào binary lúc compile.
+/// Chỉ dùng để tạo file khi cài đặt mới (file chưa tồn tại).
+const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../../config/config.ini");
+
 /// Xác định đường dẫn tới file `config.ini`.
 ///
 /// Production: `exe_dir/config/config.ini`.
 /// Development: fallback về `CARGO_MANIFEST_DIR/config.ini`.
+///
+/// Nếu file chưa tồn tại (cài đặt mới), tự tạo từ template embedded.
 pub fn config_path() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()));
 
     if let Some(dir) = &exe_dir {
-        // Ưu tiên config/config.ini (có file hoặc có thư mục config/)
         let config_dir = dir.join("config");
         let candidate = config_dir.join("config.ini");
-        if candidate.exists() || config_dir.exists() {
+
+        if candidate.exists() {
             return candidate;
         }
+
+        // Cài đặt mới: tạo config.ini từ template embedded
+        if let Ok(()) = std::fs::create_dir_all(&config_dir) {
+            let _ = std::fs::write(&candidate, DEFAULT_CONFIG_TEMPLATE);
+        }
+        return candidate;
     }
 
     // Fallback: cạnh .exe trực tiếp (tương thích cũ)

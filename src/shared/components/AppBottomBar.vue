@@ -13,7 +13,7 @@ const auth = useAuthStore();
 const updater = useAppUpdater();
 
 onMounted(() => {
-  void updater.checkAndDownload();
+  updater.startPolling();
 });
 
 function onUpdateClick(): void {

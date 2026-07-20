@@ -1,7 +1,9 @@
-import { computed, ref, shallowRef } from "vue";
+import { computed, ref, shallowRef, onUnmounted } from "vue";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { canUseTauriRuntime } from "@/tauri/commands/_base";
+
+const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 phút
 
 /**
  * Trạng thái vòng đời của bản cập nhật hiển thị trên thanh trạng thái.
@@ -135,6 +137,27 @@ export function useAppUpdater() {
     }
   }
 
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  function startPolling(): void {
+    stopPolling();
+    void checkAndDownload();
+    intervalId = setInterval(() => {
+      if (status.value !== "ready" && status.value !== "installing") {
+        void checkAndDownload();
+      }
+    }, CHECK_INTERVAL_MS);
+  }
+
+  function stopPolling(): void {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  }
+
+  onUnmounted(stopPolling);
+
   return {
     status,
     version,
@@ -144,6 +167,7 @@ export function useAppUpdater() {
     totalBytes,
     isActive,
     checkAndDownload,
+    startPolling,
     install,
   };
 }

@@ -34,4 +34,5 @@ bcrypt = "0.17"
 regex = "1"
 jwalk = "0.8"
 urlencoding = "2"
+dirs = "5"
 calamine = { version = "0.26", features = ["dates"] }

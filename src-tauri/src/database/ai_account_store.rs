@@ -1,8 +1,8 @@
 //! Tầng lưu trữ cục bộ cho module AI Usage.
 //!
 //! Danh sách account AI (kèm token gốc) và cấu hình được lưu trong một file JSON
-//! `ai_accounts.json` đặt cạnh file thực thi (production) hoặc trong thư mục
-//! `CARGO_MANIFEST_DIR` (development) — KHÔNG đẩy token lên database dùng chung.
+//! `ai_accounts.json` trong thư mục AppData (`%LOCALAPPDATA%\management-systems`)
+//! — KHÔNG đẩy token lên database dùng chung.
 
 use std::path::PathBuf;
 
@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::result::AppResult;
 use crate::models::ai_usage::AiUsageSettings;
+use crate::utils::app_data;
 
 /// Tên file dữ liệu cục bộ.
 const DATA_FILE: &str = "ai_accounts.json";
@@ -69,23 +70,13 @@ pub struct AiAccountData {
     pub settings: AiUsageSettings,
 }
 
-/// Xác định đường dẫn tới file `ai_accounts.json`.
-///
-/// Ưu tiên thư mục chứa file thực thi (production, file có thể ghi cạnh binary);
-/// fallback về `CARGO_MANIFEST_DIR` khi không lấy được đường dẫn exe.
 fn data_path() -> PathBuf {
     data_dir().join(DATA_FILE)
 }
 
-/// Thư mục chứa dữ liệu cục bộ của module AI Usage (cạnh binary ở production,
-/// `CARGO_MANIFEST_DIR` khi dev). Dùng chung cho profile token đã capture.
+/// Thư mục AppData dùng chung cho dữ liệu cục bộ (account, profile, v.v.).
 pub fn data_dir() -> PathBuf {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            return dir.to_path_buf();
-        }
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    app_data::data_dir()
 }
 
 /// Đọc dữ liệu từ file. File chưa tồn tại → trả về mặc định (rỗng).
