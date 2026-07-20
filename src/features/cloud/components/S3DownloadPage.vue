@@ -5,13 +5,18 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import ProgressSpinner from "primevue/progressspinner";
 import S3DownloadCard from "./S3DownloadCard.vue";
+import S3ConfigError from "./S3ConfigError.vue";
 import { useS3Download } from "../composables/useS3Download";
+import { useS3ConfigGuard } from "../composables/useS3ConfigGuard";
 import { explorerReadDir, explorerCopyBugs } from "@/tauri/commands/explorer";
 import type { FileEntry } from "@/tauri/commands/explorer";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { friendlyError } from "@/tauri/commands/_base";
+
+const s3Guard = useS3ConfigGuard();
+s3Guard.checkConfig();
 
 const {
   isLoading,
@@ -104,7 +109,14 @@ async function handleRefresh() {
 </script>
 
 <template>
-  <div class="flex h-full flex-col gap-4">
+  <S3ConfigError
+    v-if="s3Guard.configError.value"
+    :error="s3Guard.configError.value"
+    :is-checking="s3Guard.configChecking.value"
+    @retry="s3Guard.checkConfig()"
+  />
+
+  <div v-else class="flex h-full flex-col gap-4">
     <!-- Loading -->
     <div v-if="isLoading" class="flex h-full items-center justify-center">
       <ProgressSpinner style="width: 40px; height: 40px" />

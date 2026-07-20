@@ -1,6 +1,26 @@
 import { safeInvoke } from "./_base";
 import type { AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest } from "@/_/types/s3";
 
+export type S3Config = {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+  bucket: string;
+  endpointUrl?: string;
+};
+
+export function s3CheckConfig() {
+  return safeInvoke<void>("s3_check_config");
+}
+
+export function s3GetConfig() {
+  return safeInvoke<S3Config>("s3_get_config");
+}
+
+export function s3SaveConfig(config: S3Config) {
+  return safeInvoke<void>("s3_save_config", { config });
+}
+
 export function s3TestConnection() {
   return safeInvoke<string>("s3_test_connection");
 }

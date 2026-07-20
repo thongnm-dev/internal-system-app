@@ -4,15 +4,20 @@ import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import InputText from "primevue/inputtext";
 import { useS3Browser } from "../composables/useS3Browser";
+import { useS3ConfigGuard } from "../composables/useS3ConfigGuard";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
+import S3ConfigError from "./S3ConfigError.vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { S3Object, LocalFileEntry } from "@/_/types/s3";
+
+const s3Guard = useS3ConfigGuard();
+s3Guard.checkConfig();
 
 const ctrl = useS3Browser();
 const toast = useToast();
@@ -314,7 +319,14 @@ function contextCopyKey() {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+  <S3ConfigError
+    v-if="s3Guard.configError.value"
+    :error="s3Guard.configError.value"
+    :is-checking="s3Guard.configChecking.value"
+    @retry="s3Guard.checkConfig()"
+  />
+
+  <section v-else class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <!-- Message -->
     <MessageBanner :message="ctrl.message.value" :mode="ctrl.messageMode.value" />
 

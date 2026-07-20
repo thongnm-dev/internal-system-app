@@ -57,6 +57,55 @@ fn build_client(config: &S3Config) -> AppResult<(Client, String)> {
     Ok((client, config.bucket.clone()))
 }
 
+pub fn get_config() -> AppResult<S3Config> {
+    load_config_from_ini()
+}
+
+pub fn save_config(config: &S3Config) -> AppResult<()> {
+    let path = app_config::config_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            AppError::new(format!("Failed to create config directory {}: {e}", parent.display()))
+        })?;
+    }
+
+    let mut ini = if path.exists() {
+        Ini::load_from_file(&path).unwrap_or_else(|_| Ini::new())
+    } else {
+        Ini::new()
+    };
+
+    let mut section = ini.with_section(Some("S3 bucket"));
+    section
+        .set("AWS_REGION", &config.region)
+        .set("AWS_ACCESS_KEY_ID", &config.access_key_id)
+        .set("AWS_SECRET_ACCESS_KEY", &config.secret_access_key)
+        .set("AWS_S3_BUCKET", &config.bucket);
+
+    if let Some(ref endpoint) = config.endpoint_url {
+        section.set("AWS_ENDPOINT_URL", endpoint);
+    }
+
+    ini.write_to_file(&path).map_err(|e| {
+        AppError::new(format!("Failed to write config.ini at {}: {e}", path.display()))
+    })?;
+    Ok(())
+}
+
+pub fn check_config() -> AppResult<()> {
+    let config = load_config_from_ini()?;
+    if config.access_key_id.is_empty() {
+        return Err(AppError::new("AWS Access Key ID chưa được cấu hình."));
+    }
+    if config.secret_access_key.is_empty() {
+        return Err(AppError::new("AWS Secret Access Key chưa được cấu hình."));
+    }
+    if config.bucket.is_empty() {
+        return Err(AppError::new("AWS S3 Bucket chưa được cấu hình."));
+    }
+    Ok(())
+}
+
 pub async fn test_connection() -> AppResult<String> {
     let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;

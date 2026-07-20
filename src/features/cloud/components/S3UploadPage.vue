@@ -8,8 +8,13 @@ import Checkbox from "primevue/checkbox";
 import Select from "primevue/select";
 import ProgressSpinner from "primevue/progressspinner";
 import S3UploadCard from "./S3UploadCard.vue";
+import S3ConfigError from "./S3ConfigError.vue";
 import { useS3Upload } from "../composables/useS3Upload";
+import { useS3ConfigGuard } from "../composables/useS3ConfigGuard";
 import type { AwsStorage, ScannedFile, UploadFileRequest } from "@/_/types/s3";
+
+const s3Guard = useS3ConfigGuard();
+s3Guard.checkConfig();
 
 const {
   uploadStorages,
@@ -93,7 +98,14 @@ function handleCloseModal() {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <S3ConfigError
+    v-if="s3Guard.configError.value"
+    :error="s3Guard.configError.value"
+    :is-checking="s3Guard.configChecking.value"
+    @retry="s3Guard.checkConfig()"
+  />
+
+  <div v-else class="space-y-4">
     <!-- Loading -->
     <div v-if="isLoading" class="flex items-center justify-center py-16">
       <ProgressSpinner style="width: 40px; height: 40px" />

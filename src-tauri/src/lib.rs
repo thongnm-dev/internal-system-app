@@ -63,11 +63,11 @@ use commands::sql_editor_commands::{
     sql_save_connection, sql_test_connection,
 };
 use commands::s3_commands::{
-    s3_check_download_available, s3_create_folder, s3_delete_by_storage, s3_delete_objects,
-    s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
-    s3_get_download_list, s3_list_delete_options, s3_list_download_storages,
+    s3_check_config, s3_check_download_available, s3_create_folder, s3_delete_by_storage,
+    s3_delete_objects, s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
+    s3_get_config, s3_get_download_list, s3_list_delete_options, s3_list_download_storages,
     s3_list_objects, s3_list_upload_storages, s3_move_browser_objects, s3_move_objects,
-    s3_scan_local_folder, s3_scan_upload_folder, s3_test_connection,
+    s3_save_config, s3_scan_local_folder, s3_scan_upload_folder, s3_test_connection,
     s3_upload_file, s3_upload_files, s3_upload_folder,
 };
 
@@ -183,6 +183,9 @@ pub fn run() {
             backlog_get_project_lookup,
             backlog_create_issue,
             // === S3 commands ===
+            s3_check_config,
+            s3_get_config,
+            s3_save_config,
             s3_test_connection,
             s3_list_objects,
             s3_download_objects,

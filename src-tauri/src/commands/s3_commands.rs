@@ -1,6 +1,21 @@
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3Config, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
 use std::collections::HashMap;
 use crate::services::s3_service;
+
+#[tauri::command]
+pub fn s3_check_config() -> Result<(), String> {
+    s3_service::check_config().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn s3_get_config() -> Result<S3Config, String> {
+    s3_service::get_config().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn s3_save_config(config: S3Config) -> Result<(), String> {
+    s3_service::save_config(&config).map_err(|e| e.to_string())
+}
 
 #[tauri::command]
 pub async fn s3_test_connection() -> Result<String, String> {
