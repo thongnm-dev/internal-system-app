@@ -4,7 +4,7 @@
 //! liệt kê lịch sử import.
 
 use crate::models::import_csv::ImportCsvPreviewResult;
-use crate::models::monthly_report::{ImportBatchSummary, ImportCsvResult};
+use crate::models::monthly_report::{CompareRow, ImportBatchSummary, ImportCsvResult};
 use crate::services::monthly_report_service;
 use tauri::Manager;
 
@@ -42,4 +42,22 @@ pub fn list_import_batches(app: tauri::AppHandle) -> Result<Vec<ImportBatchSumma
         .app_data_dir()
         .map_err(|error| error.to_string())?;
     monthly_report_service::list_import_batches(&app_data_dir).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn compare_monthly_report(
+    csv_path: String,
+    schedule_path: String,
+    target_year: i32,
+    target_month: u32,
+    user_filter: Option<String>,
+) -> Result<Vec<CompareRow>, String> {
+    monthly_report_service::compare_csv_with_schedule(
+        &csv_path,
+        &schedule_path,
+        target_year,
+        target_month,
+        &user_filter.unwrap_or_default(),
+    )
+    .map_err(|error| error.to_string())
 }

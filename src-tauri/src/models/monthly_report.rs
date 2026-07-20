@@ -3,7 +3,7 @@
 //! `ImportCsvResult` (kết quả import), `ImportBatchSummary` (danh sách).
 
 use crate::models::import_csv::ImportPreviewRow;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Kết quả trả về frontend ngay sau khi import CSV thành công.
 /// Bao gồm cả dữ liệu thô để hiển thị bảng xác nhận.
@@ -21,6 +21,27 @@ pub struct ImportCsvResult {
     pub raw_headers: Vec<String>,
     pub raw_rows: Vec<Vec<String>>,
     pub minute_column_indexes: Vec<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CompareStatus {
+    #[serde(rename = "match")]
+    Match,
+    #[serde(rename = "mismatch")]
+    Mismatch,
+    #[serde(rename = "csv-only")]
+    CsvOnly,
+    #[serde(rename = "schedule-only")]
+    ScheduleOnly,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CompareRow {
+    pub date: String,
+    pub csv_hours: f64,
+    pub schedule_hours: f64,
+    pub diff_hours: f64,
+    pub status: CompareStatus,
 }
 
 /// Tóm tắt một batch import, dùng cho danh sách gần đây.

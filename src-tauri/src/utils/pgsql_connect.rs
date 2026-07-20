@@ -10,9 +10,22 @@ use std::path::PathBuf;
 use tokio_postgres::{Client, NoTls};
 
 impl PgConfig {
-    /// Ghi cấu hình xuống `config.ini` (section `[database]`), ghi đè nếu đã có.
+    /// Ghi cấu hình xuống `config.ini` (section `[database]`).
+    /// Đọc file hiện tại trước để giữ nguyên các section khác, chỉ cập nhật `[database]`.
     pub fn save_to_ini(&self) -> AppResult<()> {
-        let mut ini = Ini::new();
+        let path = config_path();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                AppError::new(format!("Failed to create config directory {}: {e}", parent.display()))
+            })?;
+        }
+
+        let mut ini = if path.exists() {
+            Ini::load_from_file(&path).unwrap_or_else(|_| Ini::new())
+        } else {
+            Ini::new()
+        };
+
         ini.with_section(Some("database"))
             .set("host", &self.host)
             .set("port", self.port.to_string())
@@ -20,7 +33,6 @@ impl PgConfig {
             .set("user", &self.user)
             .set("password", &self.password);
 
-        let path = config_path();
         ini.write_to_file(&path).map_err(|e| {
             AppError::new(format!("Failed to write config.ini at {}: {e}", path.display()))
         })?;
@@ -221,15 +233,24 @@ where
 
 /// Xác định đường dẫn tới file `config.ini`.
 ///
-/// Ưu tiên tìm cạnh file thực thi (production build),
-/// nếu không tìm thấy thì fallback về thư mục `CARGO_MANIFEST_DIR` (development).
+/// Production: `exe_dir/config/config.ini`.
+/// Development: fallback về `CARGO_MANIFEST_DIR/config.ini`.
 pub fn config_path() -> PathBuf {
-    // Production: config.ini nằm cạnh file .exe
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()));
 
-    if let Some(dir) = exe_dir {
+    if let Some(dir) = &exe_dir {
+        // Ưu tiên config/config.ini (có file hoặc có thư mục config/)
+        let config_dir = dir.join("config");
+        let candidate = config_dir.join("config.ini");
+        if candidate.exists() || config_dir.exists() {
+            return candidate;
+        }
+    }
+
+    // Fallback: cạnh .exe trực tiếp (tương thích cũ)
+    if let Some(dir) = &exe_dir {
         let candidate = dir.join("config.ini");
         if candidate.exists() {
             return candidate;

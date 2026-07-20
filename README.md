@@ -55,11 +55,25 @@ tag `v*`, build cho macOS/Linux/Windows, ký artifact và sinh `latest.json` qua
      `release.yml`). Chỉ cần tạo secret này thủ công nếu muốn dùng một
      Personal Access Token riêng (ví dụ để publish sang repo khác).
 
-4. **Phát hành bản cập nhật** — push tag đúng định dạng `v*` (vd `v1.0.0`):
+4. **Phát hành bản cập nhật** — dùng script bump-version để cập nhật version
+   ở cả 3 file (`package.json`, `src-tauri/tauri.conf.json`,
+   `src-tauri/Cargo.toml`), commit và tạo tag tự động:
 
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   # Git Bash / WSL
+   ./scripts/bump-version.sh 1.0.0
+
+   # PowerShell
+   .\scripts\bump-version.ps1 1.0.0
+
+   # Hoặc qua npm (cần Git Bash)
+   npm run version:bump -- 1.0.0
+   ```
+
+   Sau đó push lên remote:
+
+   ```bash
+   git push && git push --tags
    ```
 
    Workflow `release.yml` sẽ tự build, ký từng artifact bằng

@@ -1,10 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { previewMonthlyReportCsv } from "@/tauri/commands/check-monthly-report";
+import { compareMonthlyReport, previewMonthlyReportCsv } from "@/tauri/commands/check-monthly-report";
 import type { MessageMode } from "@/_/types/app";
-import type { ImportCsvPreviewResult, ImportCsvResult } from "@/_/types/check-monthly-report";
+import type { CompareRow, ImportCsvPreviewResult, ImportCsvResult } from "@/_/types/check-monthly-report";
 
 export function useCheckMonthlyReport() {
   const csvPath = ref("");
@@ -13,6 +13,20 @@ export function useCheckMonthlyReport() {
   const message = ref("No CSV imported. Upload a CSV file to create monthly report check data.");
   const messageMode = ref<MessageMode>("info");
   const isImporting = ref(false);
+
+  const schedulePath = ref("");
+  const targetMonth = ref<Date>(new Date());
+  const targetUser = ref("");
+  const compareResult = ref<CompareRow[] | null>(null);
+  const isComparing = ref(false);
+
+  const compareTotals = computed(() => {
+    const rows = compareResult.value ?? [];
+    const csv = rows.reduce((s, r) => s + r.csv_hours, 0);
+    const schedule = rows.reduce((s, r) => s + r.schedule_hours, 0);
+    const mismatches = rows.filter((r) => r.status !== "match").length;
+    return { csv, schedule, diff: csv - schedule, mismatches };
+  });
 
   function updateCsvPath(value: string) {
     csvPath.value = value;
@@ -62,9 +76,44 @@ export function useCheckMonthlyReport() {
     }
   }
 
+  async function runCompare() {
+    if (!csvPath.value || !schedulePath.value) return;
+    isComparing.value = true;
+    try {
+      const year = targetMonth.value.getFullYear();
+      const month = targetMonth.value.getMonth() + 1;
+      compareResult.value = await compareMonthlyReport(
+        csvPath.value,
+        schedulePath.value,
+        year,
+        month,
+        targetUser.value || undefined,
+      );
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      compareResult.value = null;
+    } finally {
+      isComparing.value = false;
+    }
+  }
+
+  watch(
+    [csvPath, schedulePath, targetMonth, targetUser],
+    () => {
+      if (csvPath.value && schedulePath.value) {
+        runCompare();
+      } else {
+        compareResult.value = null;
+      }
+    },
+  );
+
   return {
     csvPath, isImporting, message, messageMode,
     pickCsvFile, previewCsv, previewResult, result,
     updateCsvPath,
+    schedulePath, targetMonth, targetUser,
+    compareResult, compareTotals, isComparing, runCompare,
   };
 }

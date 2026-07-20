@@ -7,8 +7,10 @@ use crate::app::result::AppResult;
 use crate::database::csv_reader::{self, CsvImportData};
 use crate::database::report_store::{self, StoredImportBatch};
 use crate::models::import_csv::{ImportCsvPreviewResult, ImportPreviewRow, WorkRecord};
-use crate::models::monthly_report::{ImportBatchSummary, ImportCsvResult};
+use crate::models::monthly_report::{CompareRow, CompareStatus, ImportBatchSummary, ImportCsvResult};
+use crate::services::schedule_service;
 use crate::utils::time::current_timestamp;
+use std::collections::{BTreeSet, HashMap};
 use std::env;
 use std::path::Path;
 
@@ -177,4 +179,74 @@ fn current_username() -> String {
     env::var("USERNAME")
         .or_else(|_| env::var("USER"))
         .unwrap_or_else(|_| "unknown".to_string())
+}
+
+fn normalize_date(value: &str) -> String {
+    let parts: Vec<&str> = value.split(|c: char| !c.is_ascii_digit()).filter(|s| !s.is_empty()).collect();
+    if parts.len() >= 3 {
+        format!("{}-{:0>2}-{:0>2}", parts[0], parts[1], parts[2])
+    } else {
+        value.trim().to_string()
+    }
+}
+
+pub fn compare_csv_with_schedule(
+    csv_path: &str,
+    schedule_path: &str,
+    target_year: i32,
+    target_month: u32,
+    user_filter: &str,
+) -> AppResult<Vec<CompareRow>> {
+    let csv_data = csv_reader::read_csv_import_data(csv_path)?;
+    let preview_rows = build_preview_rows(&csv_data.records);
+
+    let schedule = schedule_service::read_schedule(schedule_path, target_year, target_month, user_filter)?;
+
+    let mut csv_by_date: HashMap<String, f64> = HashMap::new();
+    for row in &preview_rows {
+        let key = normalize_date(&row.date);
+        *csv_by_date.entry(key).or_default() += row.total_minutes as f64;
+    }
+
+    let target_month_str = format!("{target_month:02}/{target_year}");
+    let [mm, yyyy] = {
+        let parts: Vec<&str> = target_month_str.split('/').collect();
+        [parts[0], parts[1]]
+    };
+    let mut schedule_by_date: HashMap<String, f64> = HashMap::new();
+    for worker in &schedule.workers {
+        for day in &worker.days {
+            let date = format!("{yyyy}/{mm}/{}", day.day);
+            let key = normalize_date(&date);
+            for entry in &day.entries {
+                *schedule_by_date.entry(key.clone()).or_default() += entry.hours;
+            }
+        }
+    }
+
+    let all_dates: BTreeSet<String> = csv_by_date.keys().chain(schedule_by_date.keys()).cloned().collect();
+
+    let rows = all_dates
+        .into_iter()
+        .map(|date| {
+            let csv_minutes = csv_by_date.get(&date).copied().unwrap_or(0.0);
+            let csv_hours = csv_minutes / 60.0;
+            let schedule_hours = schedule_by_date.get(&date).copied().unwrap_or(0.0);
+            let diff_hours = csv_hours - schedule_hours;
+            let has_csv = csv_by_date.contains_key(&date);
+            let has_schedule = schedule_by_date.contains_key(&date);
+            let status = if !has_csv {
+                CompareStatus::ScheduleOnly
+            } else if !has_schedule {
+                CompareStatus::CsvOnly
+            } else if diff_hours.abs() < 0.01 {
+                CompareStatus::Match
+            } else {
+                CompareStatus::Mismatch
+            };
+            CompareRow { date, csv_hours, schedule_hours, diff_hours, status }
+        })
+        .collect();
+
+    Ok(rows)
 }

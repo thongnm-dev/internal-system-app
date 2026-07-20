@@ -31,3 +31,13 @@ export type ImportCsvPreviewResult = {
   raw_rows: string[][];
   minute_column_indexes: number[];
 };
+
+export type CompareStatus = "match" | "mismatch" | "csv-only" | "schedule-only";
+
+export type CompareRow = {
+  date: string;
+  csv_hours: number;
+  schedule_hours: number;
+  diff_hours: number;
+  status: CompareStatus;
+};

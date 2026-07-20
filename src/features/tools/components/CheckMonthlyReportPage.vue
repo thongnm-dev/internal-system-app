@@ -2,7 +2,6 @@
 import { computed, ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import Calendar from "primevue/calendar";
-import Checkbox from "primevue/checkbox";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
@@ -26,33 +25,11 @@ const auth = useAuthStore();
 const loading = useGlobalLoading();
 const ctrl = useCheckMonthlyReport();
 
-// Preview is shown inside a dialog with two views: summary + raw detail.
+ctrl.targetUser.value = auth.user?.username ?? "";
+
 const isPreviewDialogOpen = ref(false);
 const previewDialogView = ref<"summary" | "detail">("summary");
 
-// Result of the "Compare" button, rendered in the main Preview section.
-type CompareStatus = "match" | "mismatch" | "csv-only" | "schedule-only";
-type CompareRow = {
-  date: string;
-  csvHours: number;
-  scheduleHours: number;
-  diffHours: number;
-  status: CompareStatus;
-};
-const compareResult = ref<CompareRow[] | null>(null);
-
-function normalizeDate(value: string): string {
-  const m = value.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
-  if (!m) return value.trim();
-  const [, y, mo, da] = m;
-  return `${y}-${mo.padStart(2, "0")}-${da.padStart(2, "0")}`;
-}
-
-const schedulePath = ref("");
-const targetMonth = ref<Date>(new Date());
-const targetUser = ref(auth.user?.username ?? "");
-const autoFetchData = ref(false);
-const isConflictDialogOpen = ref(false);
 const isScheduleDialogOpen = ref(false);
 const scheduleData = ref<ScheduleResult | null>(null);
 
@@ -100,21 +77,13 @@ const scheduleTotalHours = computed(() =>
   scheduleRows.value.reduce((sum, r) => sum + r.hours, 0),
 );
 
-const compareTotals = computed(() => {
-  const rows = compareResult.value ?? [];
-  const csv = rows.reduce((s, r) => s + r.csvHours, 0);
-  const schedule = rows.reduce((s, r) => s + r.scheduleHours, 0);
-  const mismatches = rows.filter((r) => r.status !== "match").length;
-  return { csv, schedule, diff: csv - schedule, mismatches };
-});
-
 async function viewScheduleData() {
-  if (!schedulePath.value) return;
+  if (!ctrl.schedulePath.value) return;
   await loading.run(async () => {
     try {
-      const year = targetMonth.value.getFullYear();
-      const month = targetMonth.value.getMonth() + 1;
-      scheduleData.value = await readScheduleExcel(schedulePath.value, year, month, targetUser.value || undefined);
+      const year = ctrl.targetMonth.value.getFullYear();
+      const month = ctrl.targetMonth.value.getMonth() + 1;
+      scheduleData.value = await readScheduleExcel(ctrl.schedulePath.value, year, month, ctrl.targetUser.value || undefined);
       isScheduleDialogOpen.value = true;
     } catch (e) {
       ctrl.message.value = friendlyError(e);
@@ -131,50 +100,6 @@ async function previewWithLoading() {
   }
 }
 
-function onCompareClick() {
-  if (ctrl.csvPath.value && autoFetchData.value) {
-    isConflictDialogOpen.value = true;
-    return;
-  }
-  runCompare(autoFetchData.value ? "fetch" : "file");
-}
-
-async function runCompare(source: "file" | "fetch") {
-  isConflictDialogOpen.value = false;
-  await loading.run(async () => {
-    if (source === "fetch" && !ctrl.previewResult.value) {
-      ctrl.message.value = "Chức năng tự động lấy dữ liệu từ hệ thống chưa được hỗ trợ. Đang so sánh với schedule.";
-      ctrl.messageMode.value = "info";
-    }
-
-    // CSV recorded hours per date (minutes → summed later).
-    const csvByDate = new Map<string, number>();
-    for (const row of ctrl.previewResult.value?.preview_rows ?? []) {
-      const key = normalizeDate(row.date);
-      csvByDate.set(key, (csvByDate.get(key) ?? 0) + row.total_minutes);
-    }
-
-    // Schedule planned hours per date.
-    const scheduleByDate = new Map<string, number>();
-    for (const r of scheduleRows.value) {
-      const key = normalizeDate(r.date);
-      scheduleByDate.set(key, (scheduleByDate.get(key) ?? 0) + r.hours);
-    }
-
-    const allDates = Array.from(new Set([...csvByDate.keys(), ...scheduleByDate.keys()])).sort();
-    compareResult.value = allDates.map((date) => {
-      const csvHours = (csvByDate.get(date) ?? 0) / 60;
-      const scheduleHours = scheduleByDate.get(date) ?? 0;
-      const diffHours = csvHours - scheduleHours;
-      let status: CompareStatus;
-      if (!csvByDate.has(date)) status = "schedule-only";
-      else if (!scheduleByDate.has(date)) status = "csv-only";
-      else status = Math.abs(diffHours) < 0.01 ? "match" : "mismatch";
-      return { date, csvHours, scheduleHours, diffHours, status };
-    });
-  });
-}
-
 async function pickScheduleFile() {
   if (!canUseTauriRuntime()) {
     ctrl.message.value = tauriRuntimeMessage;
@@ -187,7 +112,7 @@ async function pickScheduleFile() {
       filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
     });
     if (typeof selected === "string") {
-      schedulePath.value = selected;
+      ctrl.schedulePath.value = selected;
     }
   } catch (e) {
     ctrl.message.value = friendlyError(e);
@@ -249,7 +174,6 @@ function formatCsvMinuteValue(value: string | undefined): string {
 }
 
 function onOpenDetail(detail: SelectedPhaseDetail) {
-  // placeholder for phase detail
   void detail;
 }
 </script>
@@ -268,28 +192,23 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </div>
         <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
           <InputText class="min-w-0 flex-1" placeholder="Select schedule Excel file..."
-          :model-value="schedulePath"
+          :model-value="ctrl.schedulePath.value"
           readonly
           />
           <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel" @click="pickScheduleFile()" />
         </div>
         <div class="mt-2 flex items-center gap-2">
           <span class="w-24 shrink-0 text-sm font-medium text-muted">Target month</span>
-          <Calendar v-model="targetMonth" view="month" date-format="yy/mm" show-icon icon-display="input" class="w-44" />
+          <Calendar v-model="ctrl.targetMonth.value" view="month" date-format="yy/mm" show-icon icon-display="input" class="w-44" />
         </div>
         <div class="mt-2 flex items-center gap-2">
           <span class="w-24 shrink-0 text-sm font-medium text-muted">Target user</span>
-          <InputText v-model="targetUser" placeholder="Worker name" class="w-44" />
-        </div>
-        <div class="mt-2 flex items-center gap-2">
-          <span class="w-24 shrink-0 text-sm font-medium text-muted"></span>
-          <Checkbox v-model="autoFetchData" input-id="autoFetch" :binary="true" />
-          <label for="autoFetch" class="cursor-pointer text-sm text-ink">Tự động lấy dữ liệu từ hệ thống</label>
+          <InputText v-model="ctrl.targetUser.value" placeholder="Worker name" class="w-44" />
         </div>
         <div class="mt-2 flex items-center justify-end gap-2">
-          <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!schedulePath" @click="viewScheduleData()" />
+          <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!ctrl.schedulePath.value" @click="viewScheduleData()" />
           <Button icon="pi pi-file-import" label="Preview" :disabled="!ctrl.csvPath.value || ctrl.isImporting.value" @click="previewWithLoading()" />
-          <Button icon="pi pi-check-circle" label="Compare" :disabled="!ctrl.csvPath.value || !schedulePath" @click="onCompareClick()" />
+          <Button icon="pi pi-sync" label="Re-compare" :disabled="!ctrl.csvPath.value || !ctrl.schedulePath.value || ctrl.isComparing.value" @click="ctrl.runCompare()" />
         </div>
       </div>
     </div>
@@ -301,23 +220,23 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <div class="min-w-0">
             <h3 class="font-bold">Preview</h3>
             <p class="mt-1 truncate text-xs text-muted">
-              {{ compareResult
-                ? `CSV ${compareTotals.csv.toFixed(1)}h vs Schedule ${compareTotals.schedule.toFixed(1)}h — ${compareTotals.mismatches} ngày lệch`
-                : 'Chưa có so sánh. Chọn dữ liệu rồi nhấn Compare.' }}
+              {{ ctrl.compareResult.value
+                ? `CSV ${ctrl.compareTotals.value.csv.toFixed(1)}h vs Schedule ${ctrl.compareTotals.value.schedule.toFixed(1)}h — ${ctrl.compareTotals.value.mismatches} ngày lệch`
+                : ctrl.isComparing.value ? 'Đang so sánh...' : 'Chưa có so sánh. Chọn CSV và schedule file để tự động so sánh.' }}
             </p>
           </div>
         </div>
-        <DataTable v-if="compareResult" class="app-data-table min-h-0" empty-message="No overlapping dates to compare." :row-class="(row: any) => row.status === 'mismatch' ? 'bg-rose-50' : (row.status === 'match' ? '' : 'bg-amber-50')" scrollable scroll-height="flex" :table-style="{ minWidth: '720px' }" :value="compareResult">
+        <DataTable v-if="ctrl.compareResult.value" class="app-data-table min-h-0" empty-message="No overlapping dates to compare." :row-class="(row: any) => row.status === 'mismatch' ? 'bg-rose-50' : (row.status === 'match' ? '' : 'bg-amber-50')" scrollable scroll-height="flex" :table-style="{ minWidth: '720px' }" :value="ctrl.compareResult.value">
           <Column header="Date" field="date" style="width: 130px" />
           <Column header="CSV (hour)" body-class="num" header-class="num" style="width: 120px">
-            <template #body="{ data }">{{ data.csvHours.toFixed(1) }}</template>
+            <template #body="{ data }">{{ data.csv_hours.toFixed(1) }}</template>
           </Column>
           <Column header="Schedule (hour)" body-class="num" header-class="num" style="width: 140px">
-            <template #body="{ data }">{{ data.scheduleHours.toFixed(1) }}</template>
+            <template #body="{ data }">{{ data.schedule_hours.toFixed(1) }}</template>
           </Column>
           <Column header="Diff" body-class="num font-bold" header-class="num" style="width: 100px">
             <template #body="{ data }">
-              <span :class="Math.abs(data.diffHours) < 0.01 ? 'text-muted' : 'text-rose-600'">{{ data.diffHours > 0 ? '+' : '' }}{{ data.diffHours.toFixed(1) }}</span>
+              <span :class="Math.abs(data.diff_hours) < 0.01 ? 'text-muted' : 'text-rose-600'">{{ data.diff_hours > 0 ? '+' : '' }}{{ data.diff_hours.toFixed(1) }}</span>
             </template>
           </Column>
           <Column header="Status" style="width: 130px">
@@ -330,7 +249,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           </Column>
         </DataTable>
         <div v-else class="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted">
-          Nhấn <strong class="mx-1">Compare</strong> để so sánh giờ trong CSV với schedule theo từng ngày.
+          Chọn file CSV và schedule Excel để tự động so sánh giờ theo từng ngày.
         </div>
       </section>
     </div>
@@ -355,20 +274,6 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </Column>
         <Column header="Sheet" field="sheet_name" style="width: 140px" />
       </DataTable>
-    </Dialog>
-
-    <!-- Conflict Dialog -->
-    <Dialog :visible="isConflictDialogOpen" modal header="Xác nhận nguồn dữ liệu" class="w-full max-w-lg" @update:visible="isConflictDialogOpen = $event">
-      <p class="text-sm text-ink">
-        Bạn đã nhập file CSV và đồng thời bật <strong>Tự động lấy dữ liệu từ hệ thống</strong>. Vui lòng chọn nguồn dữ liệu để so khớp:
-      </p>
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined @click="isConflictDialogOpen = false" />
-          <Button label="Sử dụng file" icon="pi pi-file" severity="info" @click="runCompare('file')" />
-          <Button label="Lấy dữ liệu mới" icon="pi pi-download" @click="runCompare('fetch')" />
-        </div>
-      </template>
     </Dialog>
 
     <!-- Preview Dialog (summary + detail toggle) -->
