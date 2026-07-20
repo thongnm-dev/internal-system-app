@@ -402,7 +402,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
     </Dialog>
 
     <!-- Preview Dialog (summary + detail toggle) -->
-    <Dialog v-if="ctrl.previewResult.value" :visible="isPreviewDialogOpen" modal class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isPreviewDialogOpen = $event">
+    <Dialog v-if="ctrl.previewResult.value" :visible="isPreviewDialogOpen" modal class="w-full overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxWidth: 'min(95vw, 1600px)', maxHeight: '86vh' }" @update:visible="isPreviewDialogOpen = $event">
       <template #header>
         <div class="flex w-full items-center justify-between gap-3 pr-8">
           <div class="min-w-0">
@@ -433,8 +433,8 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
       </DataTable>
 
       <!-- Detail view -->
-      <DataTable v-else class="app-data-table min-h-0" empty-message="No CSV rows." scrollable scroll-height="flex" :table-style="{ minWidth: `${Math.max(920, (ctrl.previewResult.value?.raw_headers.filter(h => !hiddenCsvDetailHeaders.has(h)).length ?? 0) * 140)}px` }" :value="ctrl.previewResult.value.raw_rows.map((cells, i) => ({ cells, id: i }))">
-        <Column v-for="col in ctrl.previewResult.value.raw_headers.map((h, i) => ({ header: h, index: i })).filter(c => !hiddenCsvDetailHeaders.has(c.header))" :key="`${col.header}-${col.index}`" :header="col.header" :body-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num' : undefined" :header-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num' : undefined">
+      <DataTable v-else class="app-data-table min-h-0" empty-message="No CSV rows." scrollable scroll-height="65vh" :table-style="{ minWidth: `${Math.max(920, (ctrl.previewResult.value?.raw_headers.filter(h => !hiddenCsvDetailHeaders.has(h)).length ?? 0) * 140)}px` }" :value="ctrl.previewResult.value.raw_rows.map((cells, i) => ({ cells, id: i }))">
+        <Column v-for="col in ctrl.previewResult.value.raw_headers.map((h, i) => ({ header: h, index: i })).filter(c => !hiddenCsvDetailHeaders.has(c.header))" :key="`${col.header}-${col.index}`" :header="col.header" :body-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num whitespace-nowrap' : 'whitespace-nowrap'" :header-class="ctrl.previewResult.value.minute_column_indexes.includes(col.index) ? 'num whitespace-nowrap' : 'whitespace-nowrap'">
           <template #body="{ data }">{{ ctrl.previewResult.value!.minute_column_indexes.includes(col.index) ? formatCsvMinuteValue(data.cells[col.index]) : (data.cells[col.index] || '') }}</template>
         </Column>
       </DataTable>

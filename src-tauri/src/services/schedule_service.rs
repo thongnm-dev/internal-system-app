@@ -35,7 +35,8 @@ pub fn read_schedule(
             continue;
         }
 
-        let last_row = match get_last_row(&range) {
+        let operation_row = find_operation_row(&range);
+        let last_row = match operation_row {
             Some(r) => r.saturating_sub(2),
             None => continue,
         };
@@ -105,8 +106,19 @@ pub fn read_schedule(
 
                 let process_category = get_cell_text_merged(&range, r, process_category_col);
 
+                let phase = if process_category.is_empty() {
+                    if let Some(op_row) = operation_row {
+                        let operation = get_cell_text_merged(&range, op_row, col);
+                        map_operation_to_process_code(&operation)
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    map_phase(&process_category)
+                };
+
                 let entry = WorkInfoEntry {
-                    phase: map_phase(&process_category),
+                    phase,
                     job_id: bug_id.clone(),
                     job_name: job_name.clone(),
                     hours,
@@ -165,7 +177,7 @@ fn is_schedule_sheet(range: &Range<Data>) -> bool {
     val.contains("開発スケジュール") && val.contains("Development Schedule")
 }
 
-fn get_last_row(range: &Range<Data>) -> Option<usize> {
+fn find_operation_row(range: &Range<Data>) -> Option<usize> {
     let (rows, _) = range.get_size();
     for r in (0..rows).rev() {
         let text = get_cell_text(range, r, 0);
@@ -174,6 +186,18 @@ fn get_last_row(range: &Range<Data>) -> Option<usize> {
         }
     }
     None
+}
+
+fn map_operation_to_process_code(operation: &str) -> String {
+    match operation.trim() {
+        "PD" | "RW PD" => "9".to_string(),
+        "QA" => "40".to_string(),
+        "PG" => "10".to_string(),
+        "UT" => "11".to_string(),
+        "RW PG" => "48".to_string(),
+        "第三者" => "49".to_string(),
+        _ => operation.trim().to_string(),
+    }
 }
 
 fn find_header_row(range: &Range<Data>) -> Option<usize> {
