@@ -61,16 +61,12 @@ mod commands {
 mod database {
     /// Data access cho module xác thực người dùng.
     pub mod auth_store;
-    /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.
-    pub mod csv_reader;
     /// Data access cho bảng `daily_work_notes` (PostgreSQL).
     pub mod daily_note_store;
     /// Data access cho bảng `daily_report_entries` và `daily_report_tasks`.
     pub mod daily_report_store;
     /// Data access cho bảng `projects` và `project_members` (PostgreSQL).
     pub mod project_store;
-    /// Lưu trữ lịch sử import CSV dưới dạng JSON file.
-    pub mod report_store;
     /// Khởi tạo database (tạo bảng + stored procedure) khi app khởi động.
     pub mod startup_store;
     /// Data access cho module quản lý người dùng.
@@ -147,7 +143,9 @@ mod services {
     pub mod db_config_service;
     /// Service chuyển đổi Excel → Markdown (gọi script Python).
     pub mod excel2md_service;
-    /// Service preview, đọc dữ liệu import CSV, và lưu trữ lịch sử import báo cáo tháng.
+    /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.
+    pub mod csv_reader_service;
+    /// Service preview và so sánh dữ liệu CSV báo cáo tháng.
     pub mod monthly_report_service;
     /// Service kiểm tra kết nối internet.
     pub mod network_service;

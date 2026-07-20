@@ -32,12 +32,30 @@ export type ImportCsvPreviewResult = {
   minute_column_indexes: number[];
 };
 
-export type CompareStatus = "match" | "mismatch" | "csv-only" | "schedule-only";
+export type CompareStatus = "match" | "mismatch" | "csv-only" | "schedule-only" | "csv-only-warning";
+
+export type CsvDetail = {
+  job_id: string;
+  work_content: string;
+  hours: number;
+};
+
+export type ScheduleDetail = {
+  job_id: string;
+  job_name: string;
+  sheet_name: string;
+  hours: number;
+};
 
 export type CompareRow = {
   date: string;
+  phase: string;
+  process_code: string;
+  project_name: string;
   csv_hours: number;
   schedule_hours: number;
   diff_hours: number;
   status: CompareStatus;
+  csv_details: CsvDetail[];
+  schedule_details: ScheduleDetail[];
 };

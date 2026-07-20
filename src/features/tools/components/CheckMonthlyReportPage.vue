@@ -173,6 +173,100 @@ function formatCsvMinuteValue(value: string | undefined): string {
   return formatHourValue(minutes);
 }
 
+type CompareTableRow = {
+  id: string;
+  date: string;
+  kind: "phase" | "detail";
+  phase: string;
+  process_code: string;
+  csv_hours: number;
+  schedule_hours: number;
+  diff_hours: number;
+  status: string;
+  job_id: string;
+  sheet_name: string;
+};
+
+const compareTableRows = computed<CompareTableRow[]>(() => {
+  if (!ctrl.compareResult.value) return [];
+  const rows: CompareTableRow[] = [];
+  for (const cr of ctrl.compareResult.value) {
+    rows.push({
+      id: `${cr.date}-${cr.phase}-phase`,
+      date: cr.date,
+      kind: "phase",
+      phase: cr.phase,
+      process_code: cr.process_code,
+      csv_hours: cr.csv_hours,
+      schedule_hours: cr.schedule_hours,
+      diff_hours: cr.diff_hours,
+      status: cr.status,
+      job_id: "",
+      sheet_name: "",
+    });
+
+    if (cr.schedule_details.length > 0) {
+      const csvMap = new Map<string, number>();
+      for (const d of cr.csv_details) {
+        if (d.job_id) csvMap.set(d.job_id, (csvMap.get(d.job_id) ?? 0) + d.hours);
+      }
+      const schedMap = new Map<string, { hours: number; sheet_name: string }>();
+      for (const d of cr.schedule_details) {
+        const existing = schedMap.get(d.job_id);
+        if (existing) {
+          existing.hours += d.hours;
+        } else {
+          schedMap.set(d.job_id, { hours: d.hours, sheet_name: d.sheet_name });
+        }
+      }
+      const allJobIds = [...new Set([...csvMap.keys(), ...schedMap.keys()])].sort();
+      for (const jobId of allJobIds) {
+        const csvH = csvMap.get(jobId) ?? 0;
+        const schH = schedMap.get(jobId)?.hours ?? 0;
+        rows.push({
+          id: `${cr.date}-${cr.phase}-${jobId}`,
+          date: cr.date,
+          kind: "detail",
+          phase: cr.phase,
+          process_code: "",
+          csv_hours: csvH,
+          schedule_hours: schH,
+          diff_hours: csvH - schH,
+          status: cr.status,
+          job_id: jobId,
+          sheet_name: schedMap.get(jobId)?.sheet_name ?? "",
+        });
+      }
+    } else {
+      for (let i = 0; i < cr.csv_details.length; i++) {
+        const d = cr.csv_details[i];
+        rows.push({
+          id: `${cr.date}-${cr.phase}-csv-${i}`,
+          date: cr.date,
+          kind: "detail",
+          phase: cr.phase,
+          process_code: "",
+          csv_hours: d.hours,
+          schedule_hours: 0,
+          diff_hours: d.hours,
+          status: cr.status,
+          job_id: d.work_content,
+          sheet_name: "",
+        });
+      }
+    }
+  }
+  return rows;
+});
+
+function compareRowClass(row: any) {
+  if (row.kind !== 'phase') return '';
+  if (row.status === 'mismatch') return 'bg-rose-50';
+  if (row.status === 'csv-only-warning') return 'bg-orange-50';
+  if (row.status === 'match') return '';
+  return 'bg-amber-50';
+}
+
 function onOpenDetail(detail: SelectedPhaseDetail) {
   void detail;
 }
@@ -208,7 +302,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         <div class="mt-2 flex items-center justify-end gap-2">
           <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!ctrl.schedulePath.value" @click="viewScheduleData()" />
           <Button icon="pi pi-file-import" label="Preview" :disabled="!ctrl.csvPath.value || ctrl.isImporting.value" @click="previewWithLoading()" />
-          <Button icon="pi pi-sync" label="Re-compare" :disabled="!ctrl.csvPath.value || !ctrl.schedulePath.value || ctrl.isComparing.value" @click="ctrl.runCompare()" />
+          <Button icon="pi pi-sync" label="Compare" :disabled="!ctrl.csvPath.value || !ctrl.schedulePath.value || ctrl.isComparing.value" @click="loading.run(() => ctrl.runCompare())" />
         </div>
       </div>
     </div>
@@ -221,30 +315,61 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
             <h3 class="font-bold">Preview</h3>
             <p class="mt-1 truncate text-xs text-muted">
               {{ ctrl.compareResult.value
-                ? `CSV ${ctrl.compareTotals.value.csv.toFixed(1)}h vs Schedule ${ctrl.compareTotals.value.schedule.toFixed(1)}h — ${ctrl.compareTotals.value.mismatches} ngày lệch`
+                ? `CSV ${ctrl.compareTotals.value.csv.toFixed(1)}h vs Schedule ${ctrl.compareTotals.value.schedule.toFixed(1)}h — ${ctrl.compareTotals.value.mismatches} dòng lệch` + (ctrl.compareTotals.value.warnings > 0 ? ` — ${ctrl.compareTotals.value.warnings} warning` : '')
                 : ctrl.isComparing.value ? 'Đang so sánh...' : 'Chưa có so sánh. Chọn CSV và schedule file để tự động so sánh.' }}
             </p>
           </div>
         </div>
-        <DataTable v-if="ctrl.compareResult.value" class="app-data-table min-h-0" empty-message="No overlapping dates to compare." :row-class="(row: any) => row.status === 'mismatch' ? 'bg-rose-50' : (row.status === 'match' ? '' : 'bg-amber-50')" scrollable scroll-height="flex" :table-style="{ minWidth: '720px' }" :value="ctrl.compareResult.value">
-          <Column header="Date" field="date" style="width: 130px" />
-          <Column header="CSV (hour)" body-class="num" header-class="num" style="width: 120px">
-            <template #body="{ data }">{{ data.csv_hours.toFixed(1) }}</template>
-          </Column>
-          <Column header="Schedule (hour)" body-class="num" header-class="num" style="width: 140px">
-            <template #body="{ data }">{{ data.schedule_hours.toFixed(1) }}</template>
-          </Column>
-          <Column header="Diff" body-class="num font-bold" header-class="num" style="width: 100px">
+        <DataTable v-if="ctrl.compareResult.value" class="app-data-table min-h-0" empty-message="No overlapping dates to compare." :row-class="compareRowClass" row-group-mode="subheader" group-rows-by="date" scrollable scroll-height="flex" :table-style="{ minWidth: '920px' }" :value="compareTableRows" :pt="{ rowGroupHeaderCell: { colspan: 7 } }">
+          <template #groupheader="{ data }">
+            <strong class="text-sm">{{ data.date }}</strong>
+          </template>
+          <Column header="Phase" style="width: 170px">
             <template #body="{ data }">
-              <span :class="Math.abs(data.diff_hours) < 0.01 ? 'text-muted' : 'text-rose-600'">{{ data.diff_hours > 0 ? '+' : '' }}{{ data.diff_hours.toFixed(1) }}</span>
+              <template v-if="data.kind === 'phase'">
+                <span v-if="data.process_code" class="mr-1.5 inline-block min-w-7 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">{{ data.process_code }}</span>
+                <span>{{ data.phase }}</span>
+              </template>
             </template>
           </Column>
-          <Column header="Status" style="width: 130px">
+          <Column header="Job ID" style="width: 120px">
             <template #body="{ data }">
-              <span v-if="data.status === 'match'" class="inline-block rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Match</span>
-              <span v-else-if="data.status === 'mismatch'" class="inline-block rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">Mismatch</span>
-              <span v-else-if="data.status === 'csv-only'" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">CSV only</span>
-              <span v-else class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Schedule only</span>
+              <span v-if="data.kind !== 'phase'">{{ data.job_id }}</span>
+            </template>
+          </Column>
+          <Column header="CSV (h)" body-class="num" header-class="num" style="width: 90px">
+            <template #body="{ data }">
+              <span v-if="data.kind === 'phase'" class="font-bold">{{ data.csv_hours ? data.csv_hours.toFixed(1) : '-' }}</span>
+              <span v-else-if="data.csv_hours">{{ data.csv_hours.toFixed(1) }}</span>
+            </template>
+          </Column>
+          <Column header="Schedule (h)" body-class="num" header-class="num" style="width: 110px">
+            <template #body="{ data }">
+              <span v-if="data.kind === 'phase'" class="font-bold">{{ data.schedule_hours ? data.schedule_hours.toFixed(1) : '-' }}</span>
+              <span v-else-if="data.schedule_hours">{{ data.schedule_hours.toFixed(1) }}</span>
+            </template>
+          </Column>
+          <Column header="Diff" body-class="num font-bold" header-class="num" style="width: 80px">
+            <template #body="{ data }">
+              <template v-if="data.kind === 'phase'">
+                <span :class="Math.abs(data.diff_hours) < 0.01 ? 'text-muted' : 'text-rose-600'">{{ data.diff_hours > 0 ? '+' : '' }}{{ data.diff_hours.toFixed(1) }}</span>
+              </template>
+            </template>
+          </Column>
+          <Column header="Sheet" style="width: 130px">
+            <template #body="{ data }">
+              <span v-if="data.kind === 'detail' && data.sheet_name">{{ data.sheet_name }}</span>
+            </template>
+          </Column>
+          <Column header="Status" style="width: 120px">
+            <template #body="{ data }">
+              <template v-if="data.kind === 'phase'">
+                <span v-if="data.status === 'match'" class="inline-block rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Match</span>
+                <span v-else-if="data.status === 'mismatch'" class="inline-block rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">Mismatch</span>
+                <span v-else-if="data.status === 'csv-only'" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">CSV only</span>
+                <span v-else-if="data.status === 'csv-only-warning'" class="inline-block rounded bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-800">⚠ CSV only</span>
+                <span v-else class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Schedule only</span>
+              </template>
             </template>
           </Column>
         </DataTable>

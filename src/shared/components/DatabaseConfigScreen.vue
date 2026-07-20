@@ -5,11 +5,16 @@ import InputText from "primevue/inputtext";
 import Password from "primevue/password";
 import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
+import { useRouter } from "vue-router";
 import { friendlyError } from "@/tauri/commands/_base";
 import { getDatabaseConfig, testDatabaseConfig } from "@/tauri/commands/database-config";
 import type { DatabaseStatus, SaveDatabaseConfigRequest } from "@/_/types/database-config";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
+import { useAuthStore } from "@/app/stores/auth";
+import { loginRoute } from "@/app/router/routes";
 
+const router = useRouter();
+const auth = useAuthStore();
 const database = useDatabaseStatus();
 
 const form = ref<SaveDatabaseConfigRequest>({
@@ -122,7 +127,9 @@ function acknowledge() {
   if (proceed && pendingStatus) {
     const status = pendingStatus;
     pendingStatus = null;
+    auth.logout();
     database.applyStatus(status);
+    router.push(loginRoute.path);
   }
 }
 </script>

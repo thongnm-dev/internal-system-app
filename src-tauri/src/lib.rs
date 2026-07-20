@@ -21,8 +21,7 @@ use commands::db_config_commands::{
     check_database_status, get_database_config, save_database_config, test_database_config,
 };
 use commands::monthly_report_commands::{
-    compare_monthly_report, import_monthly_report_csv, list_import_batches,
-    preview_monthly_report_csv,
+    compare_monthly_report, preview_monthly_report_csv,
 };
 use commands::project_commands::{
     create_project, create_project_task, delete_project, delete_project_task,
@@ -122,8 +121,6 @@ pub fn run() {
             save_settings,
             // === Import CSV commands ===
             preview_monthly_report_csv,
-            import_monthly_report_csv,
-            list_import_batches,
             compare_monthly_report,
             // === Excel → Markdown command ===
             excel2md,

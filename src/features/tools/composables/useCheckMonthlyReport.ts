@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { compareMonthlyReport, previewMonthlyReportCsv } from "@/tauri/commands/check-monthly-report";
@@ -24,8 +24,9 @@ export function useCheckMonthlyReport() {
     const rows = compareResult.value ?? [];
     const csv = rows.reduce((s, r) => s + r.csv_hours, 0);
     const schedule = rows.reduce((s, r) => s + r.schedule_hours, 0);
-    const mismatches = rows.filter((r) => r.status !== "match").length;
-    return { csv, schedule, diff: csv - schedule, mismatches };
+    const mismatches = rows.filter((r) => r.status !== "match" && r.status !== "csv-only-warning").length;
+    const warnings = rows.filter((r) => r.status === "csv-only-warning").length;
+    return { csv, schedule, diff: csv - schedule, mismatches, warnings };
   });
 
   function updateCsvPath(value: string) {
@@ -97,17 +98,6 @@ export function useCheckMonthlyReport() {
       isComparing.value = false;
     }
   }
-
-  watch(
-    [csvPath, schedulePath, targetMonth, targetUser],
-    () => {
-      if (csvPath.value && schedulePath.value) {
-        runCompare();
-      } else {
-        compareResult.value = null;
-      }
-    },
-  );
 
   return {
     csvPath, isImporting, message, messageMode,
