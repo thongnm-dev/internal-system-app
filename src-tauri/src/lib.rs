@@ -5,6 +5,7 @@
 
 include!("modules.rs");
 
+use tauri::Manager;
 use commands::auth_commands::login;
 use commands::daily_note_commands::{
     create_daily_note, delete_daily_note, get_daily_note_counts, get_daily_notes_by_date,
@@ -84,6 +85,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
+                    .expect("failed to load app icon");
+                let _ = window.set_icon(icon);
+            }
+
             // Khởi tạo database chạy nền để không block UI thread
             tauri::async_runtime::spawn(async {
                 if let Err(e) = database::startup_store::init().await {

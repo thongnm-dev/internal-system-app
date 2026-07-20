@@ -14,12 +14,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'   # Apple Silicon
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest'   # Intel
-            args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
+          # - platform: 'macos-latest'   # Apple Silicon
+          #   args: '--target aarch64-apple-darwin'
+          # - platform: 'macos-latest'   # Intel
+          #   args: '--target x86_64-apple-darwin'
+          # - platform: 'ubuntu-22.04'
+          #   args: ''
           - platform: 'windows-latest'
             args: ''
 
@@ -45,7 +45,7 @@ jobs:
 
       - name: Install frontend deps
         run: npm ci
-        working-directory: ./app
+        # working-directory: .
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -54,9 +54,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: ./app
+          # projectPath: ./app
           tagName: ${{ github.ref_name }}
-          releaseName: 'Collect Input ${{ github.ref_name }}'
+          releaseName: 'Management Systems ${{ github.ref_name }}'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

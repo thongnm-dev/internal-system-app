@@ -4,16 +4,10 @@
 //! danh từ `~/.claude.json`. Blob token được ghi vào app data dir (xem
 //! [`crate::database::ai_profile_store`]); phần định danh dùng để tạo account.
 
-#[cfg(target_os = "macos")]
-use std::process::Command;
-
 use chrono::{Local, TimeZone};
 use serde_json::Value;
 
 use crate::models::ai_usage::CapturedLogin;
-
-/// Keychain service của login mặc định (macOS).
-const DEFAULT_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
 /// Dữ liệu capture đầy đủ (kèm blob token) — chỉ dùng nội bộ backend.
 pub struct Captured {
@@ -71,30 +65,16 @@ pub fn preview() -> Option<CapturedLogin> {
     })
 }
 
-/// Đọc blob `claudeAiOauth` (dạng JSON Value) từ Keychain mặc định (macOS).
+/// Đọc blob `claudeAiOauth` (dạng JSON Value) từ credential store mặc định.
 fn read_default_keychain_oauth() -> Option<Value> {
-    #[cfg(target_os = "macos")]
-    {
-        let output = Command::new("security")
-            .args(["find-generic-password", "-s", DEFAULT_KEYCHAIN_SERVICE, "-w"])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let text = String::from_utf8(output.stdout).ok()?;
-        let blob: Value = serde_json::from_str(text.trim()).ok()?;
-        blob.get("claudeAiOauth").cloned()
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        None
-    }
+    let text = crate::services::ai_usage_detect::read_credential_blob("")?;
+    let blob: Value = serde_json::from_str(&text).ok()?;
+    blob.get("claudeAiOauth").cloned()
 }
 
 /// Đọc `oauthAccount` từ `~/.claude.json` → (email, display_name, billing_type, org_type).
 fn read_default_identity() -> Option<(String, String, String, String)> {
-    let home = std::env::var_os("HOME")?;
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
     let path = std::path::PathBuf::from(home).join(".claude.json");
     read_identity_file(&path)
 }
@@ -141,14 +121,15 @@ pub fn read_login_at(config_dir: &str) -> Option<CapturedLogin> {
 /// Mở rộng `~` đầu đường dẫn thành thư mục home.
 fn expand_tilde(path: &str) -> std::path::PathBuf {
     let trimmed = path.trim();
+    let home = || std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
     if trimmed == "~" {
-        if let Some(home) = std::env::var_os("HOME") {
-            return std::path::PathBuf::from(home);
+        if let Some(h) = home() {
+            return std::path::PathBuf::from(h);
         }
     }
     if let Some(rest) = trimmed.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME") {
-            return std::path::PathBuf::from(home).join(rest);
+        if let Some(h) = home() {
+            return std::path::PathBuf::from(h).join(rest);
         }
     }
     std::path::PathBuf::from(trimmed)

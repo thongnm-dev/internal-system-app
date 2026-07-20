@@ -16,12 +16,14 @@ use std::process::Command;
 
 use chrono::{Local, TimeZone};
 use serde::Deserialize;
+#[cfg(target_os = "macos")]
 use sha2::{Digest, Sha256};
 
 use crate::database::ai_account_store::StoredAccount;
 use crate::models::ai_usage::DetectedLogin;
 
 /// Keychain service cho config dir mặc định (macOS).
+#[cfg(target_os = "macos")]
 const DEFAULT_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
 /// Phần `oauthAccount` trong `.claude.json`.
@@ -149,49 +151,50 @@ fn read_claude_json(path: &Path) -> Option<OauthAccount> {
     parsed.oauth_account
 }
 
-/// Đọc `subscriptionType` + `expiresAt` từ Keychain cho một `config_dir` (macOS).
-/// Thử các service khả dĩ, lấy entry đầu tiên đọc được. Best-effort.
+/// Đọc `subscriptionType` + `expiresAt` từ credential store cho một `config_dir`.
+/// Best-effort: macOS dùng Keychain, Windows/Linux đọc file `.credentials.json`.
 fn read_keychain_meta(config_dir: &str) -> (Option<String>, Option<i64>) {
-    keychain_services_for(config_dir)
-        .into_iter()
-        .find_map(|service| read_keychain_oauth(&service))
+    read_credential_blob(config_dir)
+        .and_then(|text| serde_json::from_str::<KeychainBlob>(&text).ok())
+        .and_then(|blob| blob.claude_ai_oauth)
         .map(|oauth| (oauth.subscription_type, oauth.expires_at))
         .unwrap_or((None, None))
 }
 
-/// Đọc blob `claudeAiOauth` từ một Keychain service (macOS). Best-effort.
-fn read_keychain_oauth(service: &str) -> Option<KeychainClaudeOauth> {
+/// Đọc blob credential (dạng String) cho một `config_dir`.
+/// macOS: Keychain service. Windows/Linux: đọc file `.credentials.json` trong config dir.
+pub(crate) fn read_credential_blob(config_dir: &str) -> Option<String> {
     #[cfg(target_os = "macos")]
     {
-        let output = Command::new("security")
-            .args(["find-generic-password", "-s", service, "-w"])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let text = String::from_utf8(output.stdout).ok()?;
-        let blob: KeychainBlob = serde_json::from_str(text.trim()).ok()?;
-        blob.claude_ai_oauth
+        keychain_services_for(config_dir)
+            .into_iter()
+            .find_map(|service| {
+                let output = Command::new("security")
+                    .args(["find-generic-password", "-s", &service, "-w"])
+                    .output()
+                    .ok()?;
+                if !output.status.success() {
+                    return None;
+                }
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            })
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = service;
-        None
+        let dir = if is_default_config_dir(config_dir) {
+            home_dir()?.join(".claude")
+        } else {
+            expand_tilde(config_dir)
+        };
+        std::fs::read_to_string(dir.join(".credentials.json")).ok()
     }
 }
 
-/// Các tên Keychain service khả dĩ ứng với một `config_dir`, xếp theo độ ưu tiên.
-///
-/// Khớp thuật toán của Claude Code (hàm `Ky` trong bundle):
-/// - `CLAUDE_CONFIG_DIR` **không set** (login mặc định) → `Claude Code-credentials`.
-/// - `CLAUDE_CONFIG_DIR=X` → `Claude Code-credentials-<hash>`, với
-///   `hash` = 8 hex đầu của `SHA-256(X)` — **X là chuỗi env thô** (đã `.normalize("NFC")`),
-///   KHÔNG phải path đã resolve.
-///
-/// Vì app không biết user set `CLAUDE_CONFIG_DIR` dưới dạng nào (đường dẫn tuyệt đối,
-/// có `~`, hay có `/` cuối), ta thử vài biến thể của chuỗi đã lưu để tăng khả năng khớp.
-pub fn keychain_services_for(config_dir: &str) -> Vec<String> {
+/// Các tên Keychain service khả dĩ ứng với một `config_dir`, xếp theo độ ưu tiên (macOS).
+#[cfg(target_os = "macos")]
+fn keychain_services_for(config_dir: &str) -> Vec<String> {
     let dir = config_dir.trim();
     if is_default_config_dir(dir) {
         return vec![DEFAULT_KEYCHAIN_SERVICE.to_string()];
@@ -215,7 +218,8 @@ pub fn keychain_services_for(config_dir: &str) -> Vec<String> {
         .collect()
 }
 
-/// 8 ký tự hex đầu của SHA-256 chuỗi (giống `createHash("sha256").digest("hex").substring(0,8)`).
+/// 8 ký tự hex đầu của SHA-256 chuỗi (macOS Keychain hash).
+#[cfg(target_os = "macos")]
 fn sha256_hex8(input: &str) -> String {
     let digest = Sha256::digest(input.as_bytes());
     digest.iter().take(4).map(|b| format!("{b:02x}")).collect()
@@ -233,12 +237,13 @@ fn is_default_config_dir(config_dir: &str) -> bool {
     }
 }
 
-/// Đọc OAuth access token của một account subscription từ Keychain (macOS).
-/// Thử lần lượt các service khả dĩ; trả token đầu tiên đọc được. `None` nếu không có.
+/// Đọc OAuth access token của một account subscription từ credential store.
+/// macOS: Keychain, Windows/Linux: `.credentials.json`. `None` nếu không có.
 pub fn read_oauth_token(config_dir: &str) -> Option<String> {
-    keychain_services_for(config_dir)
-        .into_iter()
-        .find_map(|service| read_keychain_oauth(&service).and_then(|oauth| oauth.access_token))
+    read_credential_blob(config_dir)
+        .and_then(|text| serde_json::from_str::<KeychainBlob>(&text).ok())
+        .and_then(|blob| blob.claude_ai_oauth)
+        .and_then(|oauth| oauth.access_token)
         .map(|token| token.trim().to_string())
         .filter(|token| !token.is_empty())
 }
@@ -253,9 +258,11 @@ fn format_epoch_ms(ms: i64) -> String {
     }
 }
 
-/// Thư mục home của user (`$HOME`).
+/// Thư mục home của user (`$HOME` trên macOS/Linux, `USERPROFILE` trên Windows).
 fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
 }
 
 /// Mở rộng `~` đầu đường dẫn thành thư mục home.
