@@ -358,8 +358,8 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <label for="autoFetch" class="cursor-pointer text-sm text-ink">Tự động lấy dữ liệu CSV từ hệ thống nội bộ</label>
         </div>
         <div class="mt-2 flex items-center justify-end gap-2">
-          <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!ctrl.schedulePath.value" @click="viewScheduleData()" />
-          <Button icon="pi pi-file-import" label="Preview" :disabled="(!ctrl.csvPath.value && !ctrl.autoFetchEnabled.value) || ctrl.isImporting.value || ctrl.isFetchingFromSystem.value" @click="previewWithLoading()" />
+          <Button icon="pi pi-eye" severity="info" outlined label="View schedule" :disabled="!ctrl.schedulePath.value" @click="viewScheduleData()" />
+          <Button icon="pi pi-file-import" label="View CSV" :disabled="(!ctrl.csvPath.value && !ctrl.autoFetchEnabled.value) || ctrl.isImporting.value || ctrl.isFetchingFromSystem.value" @click="previewWithLoading()" />
           <Button icon="pi pi-sync" label="Compare" :disabled="(!ctrl.csvPath.value && !ctrl.autoFetchEnabled.value) || !ctrl.schedulePath.value || ctrl.isComparing.value || ctrl.isFetchingFromSystem.value" @click="handleCompareClick()" />
         </div>
       </div>
