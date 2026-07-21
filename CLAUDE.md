@@ -95,7 +95,7 @@ Each feature folder follows the pattern:
 
 **Routing** — Vue Router with `createWebHashHistory()`. Routes defined in `src/app/router/routes.ts`. Only `/settings` requires authentication. Navigation guard in `src/app/router/index.ts`.
 
-**Auth** — Pinia store (`src/app/stores/auth.ts`). Login stores a `{ username }` object in localStorage (`pjjyuji.auth.session`). Protected routes redirect to `/login` with a `returnPath`.
+**Auth** — Pinia store (`src/app/stores/auth.ts`). Login stores a `{ username }` object in localStorage (`msh.auth.session`). Protected routes redirect to `/login` with a `returnPath`.
 
 **Layout shell** (`src/App.vue`) — collapsible sidebar (240px expanded / 72px collapsed) + header + `<router-view>` + bottom bar.
 

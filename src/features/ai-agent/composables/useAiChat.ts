@@ -45,11 +45,11 @@ export const AI_PROVIDERS: AiProvider[] = [
     id: "groq",
     label: "Groq",
     icon: "pi pi-bolt",
-    models: ["meta-llama/llama-4-scout-17b-16e-instruct", "openai/gpt-oss-120b", "openai/gpt-oss-20b"],
+    models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
   },
 ];
 
-const SESSIONS_KEY = "pjjyuji.ai.chat.sessions";
+const SESSIONS_KEY = "msh.ai.chat.sessions";
 const DEFAULT_PROVIDER: ProviderId = "gemini";
 
 function providerFor(id: ProviderId): AiProvider {

@@ -11,7 +11,7 @@ type AuthUser = {
   roles: string[];
 };
 
-const AUTH_STORAGE_KEY = "pjjyuji.auth.session";
+const AUTH_STORAGE_KEY = "msh.auth.session";
 
 export const useAuthStore = defineStore("auth", () => {
   const user = ref<AuthUser | null>(null);

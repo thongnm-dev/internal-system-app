@@ -25,7 +25,7 @@ type StoredSettings = {
   user: UserSettings;
 };
 
-const SETTINGS_KEY = "pjjyuji.app.settings";
+const SETTINGS_KEY = "msh.app.settings";
 
 const defaultSettings: StoredSettings = {
   user: {

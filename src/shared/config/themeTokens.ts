@@ -90,7 +90,7 @@ export function applyTheme(mode: ThemeMode) {
 
 export function applyStoredTheme() {
   try {
-    const saved = window.localStorage.getItem("pjjyuji.app.settings");
+    const saved = window.localStorage.getItem("msh.app.settings");
     if (!saved) {
       applyTheme("light");
       return;
