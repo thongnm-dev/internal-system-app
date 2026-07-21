@@ -77,6 +77,7 @@ export function useCheckMonthlyReport() {
     } catch (e) {
       message.value = friendlyError(e);
       messageMode.value = "error";
+      previewResult.value = null;
     } finally {
       isImporting.value = false;
     }
@@ -122,7 +123,10 @@ export function useCheckMonthlyReport() {
 
   async function previewAutoFetch() {
     const path = await fetchFromSystem();
-    if (!path) return;
+    if (!path) {
+      previewResult.value = null;
+      return;
+    }
     isImporting.value = true;
     message.value = "Fetching CSV from system for preview...";
     messageMode.value = "info";
