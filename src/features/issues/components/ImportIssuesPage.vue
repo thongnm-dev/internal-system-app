@@ -1,126 +1,258 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute } from "vue-router";
+import { ref, computed } from "vue";
 import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
-import MessageBanner from "@/shared/components/MessageBanner.vue";
-import { useImportIssues, priorityTone } from "../composables/useImportIssues";
+import Checkbox from "primevue/checkbox";
+import Dialog from "primevue/dialog";
+import { open } from "@tauri-apps/plugin-dialog";
+import { canUseTauriRuntime, safeInvoke } from "@/tauri/commands/_base";
+import { getProjectDetail } from "@/tauri/commands/project";
+import {
+  backlogGetProjectLookup,
+  backlogListIssueTypes,
+  backlogListPriorities,
+  backlogCreateIssue,
+  type BacklogIssueType as BacklogIssueTypeModel,
+  type BacklogPriority as BacklogPriorityModel,
+} from "@/tauri/commands/backlog";
+import { projects } from "../composables/useIssueBacklog";
+import { useToast } from "@/shared/composables/useToast";
+import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 
-const route = useRoute();
-const initialProject = (route.query.project as string) || "";
-const ctrl = useImportIssues(initialProject);
+type IssueCsvRow = {
+  subject: string;
+  description: string;
+  issueType: string;
+  assignee: string;
+  startDate: string;
+  dueDate: string;
+  estimatedHours: string;
+  actualHours: string;
+  categories: string;
+  version: string;
+  milestones: string;
+  priority: string;
+  parentIssue: string;
+};
 
-const fileInputRef = ref<HTMLInputElement | null>(null);
+type ImportRow = IssueCsvRow & { _selected: boolean; _row: number };
 
-function onFileChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  ctrl.selectFile(input.files?.[0] ?? null);
+const props = defineProps<{
+  visible: boolean;
+  projectCode: string;
+}>();
+
+const emit = defineEmits<{
+  "update:visible": [value: boolean];
+}>();
+
+const toast = useToast();
+const globalLoading = useGlobalLoading();
+
+const importRows = ref<ImportRow[]>([]);
+const importError = ref("");
+const importing = ref(false);
+const importProgress = ref({ done: 0, total: 0 });
+const importSelectedCount = computed(() => importRows.value.filter((r) => r._selected).length);
+
+function onShow() {
+  importRows.value = [];
+  importError.value = "";
 }
 
-function formatEmpty(value: string) {
-  return value || "-";
+function close() {
+  emit("update:visible", false);
+}
+
+async function browseAndParseImportCsv() {
+  const path = await open({
+    title: "Select issue CSV file",
+    filters: [{ name: "CSV", extensions: ["csv"] }],
+    multiple: false,
+    directory: false,
+  });
+  if (!path) return;
+
+  importError.value = "";
+  importRows.value = [];
+
+  try {
+    const parsed = await safeInvoke<IssueCsvRow[]>("parse_issue_csv", { path });
+    if (parsed.length === 0) {
+      importError.value = "No valid rows found in the CSV file.";
+      return;
+    }
+    importRows.value = parsed
+      .filter((r) => r.subject)
+      .map((r, i) => ({ ...r, _selected: true, _row: i + 2 }));
+  } catch (e) {
+    importError.value = String(e);
+  }
+}
+
+function toggleImportAll(checked: boolean) {
+  importRows.value.forEach((r) => (r._selected = checked));
+}
+
+async function executeImport() {
+  if (!canUseTauriRuntime()) return;
+  if (!props.projectCode) { importError.value = "Please select a project first."; return; }
+
+  const selected = importRows.value.filter((r) => r._selected);
+  if (!selected.length) return;
+
+  importing.value = true;
+  importError.value = "";
+  importProgress.value = { done: 0, total: selected.length };
+
+  globalLoading.start();
+  try {
+    const proj = projects.value.find((p) => p.code === props.projectCode);
+    if (!proj) throw new Error("Project not found.");
+
+    const detail = await getProjectDetail(proj.id);
+    const backlogKey = detail.backlog_key;
+    if (!backlogKey) throw new Error("Project has no Backlog key configured.");
+
+    const [lookup, typesList, prioList] = await Promise.all([
+      backlogGetProjectLookup(backlogKey),
+      backlogListIssueTypes(backlogKey),
+      backlogListPriorities(),
+    ]);
+
+    const projectId = Number(lookup.projectId);
+    const typeMap = new Map(typesList.map((t: BacklogIssueTypeModel) => [t.name, t.id]));
+    const prioMap = new Map(prioList.map((p: BacklogPriorityModel) => [p.name, p.id]));
+
+    const defaultTypeId = typesList[0]?.id;
+    const defaultPrioId = prioList.find((p: BacklogPriorityModel) => p.name === "Normal")?.id ?? prioList[0]?.id;
+    if (!defaultTypeId || !defaultPrioId) throw new Error("Could not resolve default issue type or priority.");
+
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const row of selected) {
+      try {
+        await backlogCreateIssue({
+          projectId,
+          summary: row.subject,
+          issueTypeId: typeMap.get(row.issueType) ?? defaultTypeId,
+          priorityId: prioMap.get(row.priority) ?? defaultPrioId,
+          description: row.description || undefined,
+          startDate: row.startDate || undefined,
+          dueDate: row.dueDate || undefined,
+          estimatedHours: row.estimatedHours ? Number(row.estimatedHours) : undefined,
+          actualHours: row.actualHours ? Number(row.actualHours) : undefined,
+        });
+        successCount++;
+      } catch (e) {
+        errors.push(`Row ${row._row} (${row.subject}): ${e}`);
+      }
+      importProgress.value = { done: importProgress.value.done + 1, total: selected.length };
+    }
+
+    if (errors.length > 0) {
+      importError.value = `${successCount} created, ${errors.length} failed:\n${errors.slice(0, 5).join("\n")}`;
+      toast.info(`Imported ${successCount}/${selected.length} issues.`);
+    } else {
+      toast.success(`Imported ${successCount} issue${successCount !== 1 ? "s" : ""} to Backlog successfully.`);
+      close();
+    }
+  } catch (e) {
+    importError.value = String(e);
+  } finally {
+    importing.value = false;
+    globalLoading.stop();
+  }
 }
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-file-import text-xl text-brand" />
-        <h3 class="font-bold">Import issues</h3>
+  <Dialog
+    :visible="props.visible"
+    header="Import Issues to Backlog"
+    modal
+    maximizable
+    :style="{ width: '960px' }"
+    :content-style="{ padding: '0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
+    @update:visible="emit('update:visible', $event)"
+    @show="onShow"
+  >
+    <div class="border-b border-divider px-4 py-3">
+      <div class="flex items-center gap-3">
+        <Button icon="pi pi-upload" label="Choose CSV file" size="small" @click="browseAndParseImportCsv" />
+        <span class="text-xs text-muted">
+          Backlog CSV format: <code class="rounded bg-canvas px-1">Subject</code>,
+          <code class="rounded bg-canvas px-1">Description</code>,
+          <code class="rounded bg-canvas px-1">Issue Type</code>,
+          <code class="rounded bg-canvas px-1">Priority</code>, ...
+        </span>
       </div>
-
-      <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,320px)_minmax(0,1fr)_auto_auto]">
-        <label class="block min-w-0">
-          <span class="text-xs font-bold text-muted">Project</span>
-          <select
-            class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            :value="ctrl.projectCode.value"
-            @change="ctrl.projectCode.value = ($event.target as HTMLSelectElement).value"
-          >
-            <option value="">Select project</option>
-            <option
-              v-for="opt in ctrl.projectOptions.value"
-              :key="opt.value"
-              :value="opt.value"
-            >
-              {{ opt.label }}
-            </option>
-          </select>
-        </label>
-
-        <label class="block min-w-0">
-          <span class="text-xs font-bold text-muted">CSV file</span>
-          <div class="mt-1 flex h-10 items-center rounded-md border border-divider bg-panel px-3 text-sm text-secondary">
-            <span class="min-w-0 truncate">{{ ctrl.selectedFile.value?.name ?? "Select issues CSV file..." }}</span>
-          </div>
-        </label>
-
-        <div class="flex items-end">
-          <input
-            ref="fileInputRef"
-            class="hidden"
-            type="file"
-            accept=".csv,text/csv"
-            @change="onFileChange"
-          />
-          <Button icon="pi pi-folder-open" label="Browse" severity="secondary" outlined title="Browse CSV" class="w-full" @click="fileInputRef?.click()" />
+      <p v-if="importError" class="mt-3 whitespace-pre-line rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+        {{ importError }}
+      </p>
+      <div v-if="importing" class="mt-3">
+        <div class="flex items-center gap-2 text-sm text-muted">
+          <i class="pi pi-spin pi-spinner text-brand" />
+          Importing {{ importProgress.done }} / {{ importProgress.total }}...
         </div>
-
-        <div class="flex items-end">
-          <Button icon="pi pi-file-import" label="Import" class="w-full" :disabled="ctrl.isImporting.value" @click="ctrl.importCsv()" />
+        <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-canvas">
+          <div class="h-full rounded-full bg-brand transition-all" :style="{ width: `${importProgress.total ? (importProgress.done / importProgress.total) * 100 : 0}%` }" />
         </div>
       </div>
-    </section>
+    </div>
 
-    <MessageBanner :message="ctrl.message.value" :mode="ctrl.messageMode.value" />
+    <div v-if="importRows.length === 0 && !importError" class="flex flex-1 items-center justify-center p-12">
+      <p class="text-sm text-muted">Upload a CSV file to preview issues.</p>
+    </div>
 
-    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
-      <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <div class="min-w-0">
-          <h3 class="font-bold">Imported issue list</h3>
-          <p class="mt-1 truncate text-xs text-muted">
-            {{ ctrl.selectedProject.value ? ctrl.selectedProject.value.label : "No project selected" }}
-            {{ ctrl.selectedFile.value ? ` / ${ctrl.selectedFile.value.name}` : "" }}
-          </p>
-        </div>
-        <span class="text-xs text-muted">{{ ctrl.rows.value.length.toLocaleString("en-US") }} issues</span>
+    <template v-if="importRows.length > 0">
+      <div class="flex items-center gap-3 border-b border-divider px-4 py-2">
+        <Checkbox
+          :model-value="importRows.length > 0 && importSelectedCount === importRows.length"
+          :binary="true"
+          class="h-4 w-4 accent-brand"
+          @update:model-value="toggleImportAll($event as boolean)"
+        />
+        <span class="text-sm font-bold text-ink">{{ importSelectedCount }} / {{ importRows.length }} selected</span>
       </div>
 
-      <DataTable
-        class="app-data-table min-h-0"
-        empty-message="No imported issues. Select a project and CSV file, then click Import."
-        scrollable
-        scroll-height="flex"
-        :table-style="{ minWidth: '1680px' }"
-        :value="ctrl.rows.value"
-      >
-        <Column field="subject" header="Subject" body-class="max-w-[280px] truncate font-bold text-ink" />
-        <Column field="description" header="Description" body-class="max-w-[320px] truncate" />
-        <Column field="issueType" header="Issue Type" body-class="whitespace-nowrap" />
-        <Column field="assignee" header="Assignee" body-class="whitespace-nowrap" />
-        <Column field="startDate" header="Start Date" body-class="whitespace-nowrap" />
-        <Column field="dueDate" header="Due Date" body-class="whitespace-nowrap" />
-        <Column header="Estimated Hours" body-class="num" header-class="num">
-          <template #body="{ data }">{{ formatEmpty(data.estimatedHours) }}</template>
-        </Column>
-        <Column header="Actual Hours" body-class="num" header-class="num">
-          <template #body="{ data }">{{ formatEmpty(data.actualHours) }}</template>
-        </Column>
-        <Column field="categories" header="Categories" body-class="max-w-[220px] truncate" />
-        <Column field="version" header="Version" body-class="whitespace-nowrap" />
-        <Column field="milestones" header="Milestones" body-class="whitespace-nowrap" />
-        <Column header="Priority" body-class="whitespace-nowrap">
-          <template #body="{ data }">
-            <span v-if="data.priority" :class="['rounded px-2 py-1 text-xs font-bold', priorityTone(data.priority)]">{{ data.priority }}</span>
-          </template>
-        </Column>
-        <Column field="parentIssue" header="Parent issue" body-class="whitespace-nowrap" />
-        <Column field="bugTypes" header="Bug Types" body-class="whitespace-nowrap" />
-        <Column field="bugSeverityLevels" header="Bug severity levels" body-class="whitespace-nowrap" />
-        <Column field="testPhase" header="Test Phase" body-class="whitespace-nowrap" />
-      </DataTable>
-    </section>
-  </section>
+      <div class="min-h-0 flex-1 overflow-auto">
+        <DataTable
+          class="app-data-table"
+          :value="importRows"
+          :table-style="{ minWidth: '900px' }"
+        >
+          <Column header="" header-class="w-12" body-class="text-center w-12">
+            <template #body="{ data }">
+              <Checkbox v-model="data._selected" :binary="true" class="h-4 w-4 accent-brand" />
+            </template>
+          </Column>
+          <Column field="_row" header="Row" header-class="w-14" body-class="font-mono text-xs text-muted w-14" />
+          <Column field="subject" header="Subject" body-class="font-bold text-ink max-w-[260px] truncate" />
+          <Column field="issueType" header="Type" header-class="w-24" body-class="whitespace-nowrap text-xs" />
+          <Column field="assignee" header="Assignee" header-class="w-28" body-class="whitespace-nowrap" />
+          <Column field="priority" header="Priority" header-class="w-20" body-class="whitespace-nowrap text-xs" />
+          <Column header="Est." header-class="w-16 num" body-class="num">
+            <template #body="{ data }">{{ data.estimatedHours || '-' }}</template>
+          </Column>
+          <Column field="startDate" header="Start" header-class="w-24" body-class="whitespace-nowrap text-xs" />
+          <Column field="dueDate" header="Due" header-class="w-24" body-class="whitespace-nowrap text-xs" />
+        </DataTable>
+      </div>
+    </template>
+
+    <template #footer>
+      <div class="flex items-center justify-end gap-2 pt-4">
+        <Button label="Cancel" severity="secondary" outlined @click="close" />
+        <Button
+          icon="pi pi-file-import"
+          :label="`Import ${importSelectedCount} issue${importSelectedCount !== 1 ? 's' : ''}`"
+          :disabled="importSelectedCount === 0 || importing"
+          @click="executeImport"
+        />
+      </div>
+    </template>
+  </Dialog>
 </template>

@@ -3,7 +3,6 @@ export type MenuKey =
   | "projects"
   | "projectSkills"
   | "issueBacklog"
-  | "importIssues"
   | "excel2md"
   | "sqlEditor"
   | "exploreFaster"

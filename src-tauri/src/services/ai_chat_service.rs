@@ -3,8 +3,7 @@
 //! Rust không có SDK chính thức cho các nhà cung cấp này nên toàn bộ gọi qua
 //! HTTP thô bằng `reqwest`. API key được resolve theo thứ tự ưu tiên:
 //! 1. Trường `api_key` trong request (ghi đè trực tiếp).
-//! 2. Bảng `api_keys` trong database (name = `AI`, key_label theo provider).
-//! 3. Section `[ai]` trong `config.ini`.
+//! 2. Section `[ai]` trong `config.ini`.
 
 use std::time::Duration;
 
@@ -14,12 +13,8 @@ use serde_json::{json, Value};
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::database::api_key_store;
 use crate::models::ai_chat::{AiChatRequest, AiChatResponse};
 use crate::utils::app_config;
-
-/// Tên nhóm trong bảng `api_keys` cho các key AI.
-const AI_KEY_NAME: &str = "AI";
 /// Token đầu ra mặc định nếu request không chỉ định.
 const DEFAULT_MAX_TOKENS: u32 = 4096;
 
@@ -30,7 +25,7 @@ pub async fn complete(request: AiChatRequest) -> AppResult<AiChatResponse> {
     }
 
     let provider = request.provider.trim().to_lowercase();
-    let api_key = resolve_api_key(&provider, request.api_key.as_deref()).await?;
+    let api_key = resolve_api_key(&provider, request.api_key.as_deref())?;
     let max_tokens = request.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS);
     let client = build_client()?;
 
@@ -60,7 +55,7 @@ fn build_client() -> AppResult<Client> {
         .map_err(|e| AppError::new(format!("Không tạo được HTTP client: {e}")))
 }
 
-/// Nhãn key_label trong bảng `api_keys` / config.ini tương ứng từng provider.
+/// Nhãn key_label trong config.ini tương ứng từng provider.
 fn key_label(provider: &str) -> AppResult<&'static str> {
     match provider {
         "gemini" => Ok("GEMINI_API_KEY"),
@@ -71,8 +66,8 @@ fn key_label(provider: &str) -> AppResult<&'static str> {
     }
 }
 
-/// Resolve API key theo thứ tự: request override → DB → config.ini.
-async fn resolve_api_key(provider: &str, override_key: Option<&str>) -> AppResult<String> {
+/// Resolve API key theo thứ tự: request override → config.ini.
+fn resolve_api_key(provider: &str, override_key: Option<&str>) -> AppResult<String> {
     if let Some(key) = override_key {
         let key = key.trim();
         if !key.is_empty() {
@@ -82,13 +77,6 @@ async fn resolve_api_key(provider: &str, override_key: Option<&str>) -> AppResul
 
     let label = key_label(provider)?;
 
-    if let Ok(key) = api_key_store::get_value(AI_KEY_NAME, label).await {
-        let key = key.trim().to_string();
-        if !key.is_empty() {
-            return Ok(key);
-        }
-    }
-
     if let Some(key) = api_key_from_ini(label) {
         let key = key.trim().to_string();
         if !key.is_empty() {
@@ -97,7 +85,7 @@ async fn resolve_api_key(provider: &str, override_key: Option<&str>) -> AppResul
     }
 
     Err(AppError::new(format!(
-        "Chưa cấu hình API key cho {provider}. Thêm '{label}' vào section [ai] trong config.ini hoặc bảng api_keys, hoặc nhập trực tiếp."
+        "Chưa cấu hình API key cho {provider}. Thêm '{label}' vào section [ai] trong config.ini hoặc nhập trực tiếp."
     )))
 }
 

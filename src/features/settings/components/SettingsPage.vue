@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import Password from "primevue/password";
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
-const { settings, apiKeyCount, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage, updateApiKey, addApiKey, removeApiKey } =
+const { settings, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage } =
   useSettings();
 
 const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string; disabled?: boolean }[] = [
@@ -98,55 +97,8 @@ const themeOptions = [
             <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
         </section>
-
-        <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-          <span class="text-sm font-bold text-muted">API keys</span>
-          <strong class="mt-2 block text-3xl text-ink">{{ apiKeyCount }}</strong>
-          <p class="mt-1 text-sm text-muted">configured links</p>
-        </section>
       </div>
     </div>
-
-    <section class="mt-4 rounded-lg border border-divider bg-panel p-4 shadow-sm">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <i class="pi pi-key text-xl text-brand" />
-          <h3 class="font-bold">API key settings</h3>
-        </div>
-        <Button icon="pi pi-plus" label="Add key" size="small" @click="addApiKey" />
-      </div>
-
-      <div class="mt-4 space-y-3">
-        <div
-          v-for="ak in settings.apiKeys"
-          :key="ak.id"
-          class="grid grid-cols-[minmax(160px,240px)_minmax(180px,260px)_minmax(0,1fr)_40px] gap-2"
-        >
-          <InputText
-            class="h-10 rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            placeholder="Application name *"
-            :model-value="ak.name"
-            @update:model-value="updateApiKey(ak.id, 'name', $event as string)"
-          />
-          <InputText
-            class="h-10 rounded-md border border-divider bg-panel px-3 font-mono text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
-            placeholder="KEY LABEL *"
-            :model-value="ak.keyLabel"
-            @update:model-value="updateApiKey(ak.id, 'keyLabel', ($event as string).toUpperCase())"
-          />
-          <Password
-            class="min-w-0"
-            input-class="w-full"
-            placeholder="API key *"
-            :model-value="ak.apiKey"
-            :feedback="false"
-            toggle-mask
-            @update:model-value="updateApiKey(ak.id, 'apiKey', $event as string)"
-          />
-          <Button icon="pi pi-trash" severity="secondary" outlined title="Remove API key" @click="removeApiKey(ak.id)" />
-        </div>
-      </div>
-    </section>
 
     <div
       class="sticky bottom-0 mt-4 flex items-center justify-end gap-2 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm"

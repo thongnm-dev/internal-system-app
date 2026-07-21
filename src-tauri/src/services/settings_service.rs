@@ -3,12 +3,10 @@
 //! Tất cả dữ liệu settings đều đọc/ghi từ database:
 //! - User profile → bảng `users`
 //! - Theme, language → bảng `user_settings`
-//! - API keys → bảng `api_keys`
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::database::api_key_store;
-use crate::models::settings::{ApiKeySetting, AppSettings, SaveSettingsRequest, UserProfile};
+use crate::models::settings::{AppSettings, SaveSettingsRequest, UserProfile};
 use crate::utils::pgsql_connect;
 
 pub async fn get_settings(user_id: i32) -> AppResult<AppSettings> {
@@ -43,22 +41,10 @@ pub async fn get_settings(user_id: i32) -> AppResult<AppSettings> {
         None => ("light".to_string(), "vi".to_string()),
     };
 
-    let api_rows = api_key_store::list_by_user_id(user_id).await?;
-    let api_keys = api_rows
-        .into_iter()
-        .map(|r| ApiKeySetting {
-            id: r.id,
-            name: r.name,
-            key_label: r.key_label,
-            api_key: r.api_key,
-        })
-        .collect();
-
     Ok(AppSettings {
         user,
         theme,
         language,
-        api_keys,
     })
 }
 
@@ -106,20 +92,6 @@ pub async fn save_settings(request: SaveSettingsRequest) -> AppResult<AppSetting
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to save user settings: {e}")))?;
-
-    let api_key_rows: Vec<api_key_store::ApiKeyRow> = request
-        .api_keys
-        .iter()
-        .filter(|k| !k.name.trim().is_empty())
-        .map(|k| api_key_store::ApiKeyRow {
-            id: k.id.clone(),
-            name: k.name.trim().to_string(),
-            key_label: k.key_label.trim().to_string(),
-            api_key: k.api_key.trim().to_string(),
-        })
-        .collect();
-
-    api_key_store::sync_for_user(user_id, &api_key_rows).await?;
 
     get_settings(user_id).await
 }

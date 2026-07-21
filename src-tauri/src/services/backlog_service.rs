@@ -2,12 +2,10 @@
 //!
 //! Sử dụng reqwest HTTP client để gọi Backlog REST API v2.
 //! Xác thực bằng API key qua query parameter `apiKey`.
-//! Thông tin kết nối được đọc từ bảng `api_keys` trong database
-//! với `name = 'ALX_BACKLOG'`.
+//! Thông tin kết nối được đọc từ section `[backlog]` trong `config.ini`.
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::database::api_key_store;
 use crate::models::backlog::*;
 use crate::utils::app_config;
 use ini::Ini;
@@ -15,7 +13,6 @@ use reqwest::Client;
 use serde::de::DeserializeOwned;
 use std::time::Duration;
 
-const BACKLOG_NAME: &str = "ALX_BACKLOG";
 const BACKLOG_URL_LABEL: &str = "ALX_BACKLOG_URL";
 const BACKLOG_APIKEY_LABEL: &str = "ALX_BACKLOG_APIKEY";
 
@@ -26,29 +23,16 @@ struct BacklogClient {
 }
 
 impl BacklogClient {
-    async fn resolve() -> AppResult<Self> {
-        if let Ok(client) = Self::from_db().await {
-            return Ok(client);
-        }
-        Self::from_ini()
-    }
-
-    async fn from_db() -> AppResult<Self> {
-        let base_url = api_key_store::get_value(BACKLOG_NAME, BACKLOG_URL_LABEL).await?;
-        let api_key = api_key_store::get_value(BACKLOG_NAME, BACKLOG_APIKEY_LABEL).await?;
-        Self::build(&base_url, &api_key)
-    }
-
-    fn from_ini() -> AppResult<Self> {
+    fn resolve() -> AppResult<Self> {
         let path = app_config::config_path();
-        let ini = Ini::load_from_file(&path).map_err(|e| {
-            AppError::new(format!("Failed to load config.ini at {}: {e}", path.display()))
+        let ini = Ini::load_from_file(&path).map_err(|_| {
+            AppError::new("Backlog chưa được cấu hình. Vui lòng thiết lập URL và API Key.")
         })?;
 
         let section = ini
             .section(Some("backlog"))
             .ok_or_else(|| AppError::new(
-                "Backlog chưa được cấu hình. Thêm section [backlog] trong config.ini hoặc cấu hình trong Settings → API Keys."
+                "Backlog chưa được cấu hình. Vui lòng thiết lập URL và API Key."
             ))?;
 
         let base_url = section.get(BACKLOG_URL_LABEL).unwrap_or("").to_string();
@@ -147,8 +131,8 @@ impl BacklogClient {
     }
 }
 
-pub async fn check_config() -> AppResult<()> {
-    BacklogClient::resolve().await?;
+pub fn check_config() -> AppResult<()> {
+    BacklogClient::resolve()?;
     Ok(())
 }
 
@@ -196,52 +180,52 @@ pub fn save_config(config: &BacklogConfig) -> AppResult<()> {
 /// Trả về base URL của Backlog (đã bỏ dấu `/` và hậu tố `/api/v2`),
 /// dùng để mở trang web của issue: `{base_url}/view/{issueKey}`.
 pub async fn get_base_url() -> AppResult<String> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     Ok(client.base_url)
 }
 
 pub async fn get_project(project_key: &str) -> AppResult<BacklogProject> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client
         .get(&format!("projects/{project_key}"), &[])
         .await
 }
 
 pub async fn list_issue_types(project_key: &str) -> AppResult<Vec<BacklogIssueType>> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client
         .get(&format!("projects/{project_key}/issueTypes"), &[])
         .await
 }
 
 pub async fn list_statuses(project_key: &str) -> AppResult<Vec<BacklogStatus>> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client
         .get(&format!("projects/{project_key}/statuses"), &[])
         .await
 }
 
 pub async fn list_categories(project_key: &str) -> AppResult<Vec<BacklogCategory>> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client
         .get(&format!("projects/{project_key}/categories"), &[])
         .await
 }
 
 pub async fn list_priorities() -> AppResult<Vec<BacklogPriority>> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client.get("priorities", &[]).await
 }
 
 pub async fn list_project_users(project_key: &str) -> AppResult<Vec<BacklogUser>> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client
         .get(&format!("projects/{project_key}/users"), &[])
         .await
 }
 
 pub async fn list_issues(query: BacklogIssueQuery) -> AppResult<BacklogIssueList> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
 
     let count_str = query.count.to_string();
     let offset_str = query.offset.to_string();
@@ -358,7 +342,7 @@ pub async fn list_issues(query: BacklogIssueQuery) -> AppResult<BacklogIssueList
 }
 
 pub async fn get_issue(issue_key: &str) -> AppResult<BacklogIssue> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
     client.get(&format!("issues/{issue_key}"), &[]).await
 }
 
@@ -372,7 +356,7 @@ pub async fn get_project_lookup(project_key: &str) -> AppResult<BacklogProjectLo
 }
 
 pub async fn create_issue(req: BacklogCreateIssueRequest) -> AppResult<BacklogIssue> {
-    let client = BacklogClient::resolve().await?;
+    let client = BacklogClient::resolve()?;
 
     let mut params: Vec<(String, String)> = vec![
         ("projectId".to_string(), req.project_id.to_string()),

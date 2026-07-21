@@ -26,8 +26,8 @@ INSERT INTO users (username, password_hash, full_name, position)
 VALUES (
     'Thongnm',
     '$2b$12$dTyhgIqskYwXMkSfe6Luyuq0Ve7EMFS7Rrq7Z5eXvx7apv0bk9cOy',
-    'Thongnm',
-    'System Admin'
+    'Nguyen Minh Thong',
+    'Admin'
 )
 ON CONFLICT (username) DO NOTHING;
 
@@ -102,3 +102,12 @@ INSERT INTO aws_storage (code,name,subscribe,is_upload,is_download,link_availabl
 	 ('04',  '04_対応中（アレクシード確認）',    'to_アレクシード',          false,true,   '{03,05}','04_対応中',      '{to_アレクシード}',                       false),
 	 ('05',  '05_対応済（アレクシード確認）',     'to_エネコム',             true,false,   '{}','05_対応済',           '{to_エネコム}',                          false),
 	 ('06',  '06_完了（エネコム確認）',          'to_完了',                 false,false,  '{}','06_完了',             '{to_完了}',                              false);
+
+-- Project mặc định
+INSERT INTO public.projects (id, code, "name", client, project_backlog_key, project_backlog_code, project_backlog_name, is_active) VALUES
+    (1, '00000785', '【エネコム】41_ESS_TT_Test (総合テスト)', 'ENERCOM', 'EC41_ESS_IT_TEST', 661712, 'ESS_結合テスト', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Project member mặc định
+INSERT INTO public.project_members (id, project_id, username, "name") VALUES(1, 1, 'Thongnm', 'Thongnm')
+ON CONFLICT (id) DO NOTHING;

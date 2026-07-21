@@ -1,16 +1,13 @@
 //! Tauri command handlers cho Backlog API integration.
 //!
-//! Thông tin kết nối (URL + API key) được đọc tự động từ bảng `api_keys`
-//! trong database với `name = 'ALX_BACKLOG'`.
+//! Thông tin kết nối (URL + API key) được đọc từ section `[backlog]` trong `config.ini`.
 
 use crate::models::backlog::*;
 use crate::services::backlog_service;
 
 #[tauri::command]
-pub async fn backlog_check_config() -> Result<(), String> {
-    backlog_service::check_config()
-        .await
-        .map_err(|e| e.to_string())
+pub fn backlog_check_config() -> Result<(), String> {
+    backlog_service::check_config().map_err(|e| e.to_string())
 }
 
 #[tauri::command]

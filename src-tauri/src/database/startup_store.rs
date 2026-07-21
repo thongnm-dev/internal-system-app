@@ -118,11 +118,6 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_menu_permission_user_select", include_str!("../../../docs/store-procedure/sp_menu_permission_user_select.sql")),
         ("sp_menu_permission_user_sync", include_str!("../../../docs/store-procedure/sp_menu_permission_user_sync.sql")),
         ("sp_menu_permission_effective_select", include_str!("../../../docs/store-procedure/sp_menu_permission_effective_select.sql")),
-        // === API Keys ===
-        ("sp_api_key_select_by_user", include_str!("../../../docs/store-procedure/sp_api_key_select_by_user.sql")),
-        ("sp_api_key_delete_by_user", include_str!("../../../docs/store-procedure/sp_api_key_delete_by_user.sql")),
-        ("sp_api_key_insert", include_str!("../../../docs/store-procedure/sp_api_key_insert.sql")),
-        ("sp_api_key_get_value", include_str!("../../../docs/store-procedure/sp_api_key_get_value.sql")),
         // === AWS Storage ===
         ("sp_aws_storage_select_by_upload", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_upload.sql")),
         ("sp_aws_storage_select_by_download", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_download.sql")),

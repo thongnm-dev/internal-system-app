@@ -36,12 +36,6 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Search, review, and manage project backlog issues.",
   },
   {
-    key: "importIssues",
-    path: "/import-issues",
-    title: "Import Issues",
-    subtitle: "Import issue CSV data into a selected project.",
-  },
-  {
     key: "excel2md",
     path: "/excel2md",
     title: "Excel to Markdown",
@@ -248,11 +242,6 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/issue-backlog",
     component: () => import("@/features/issues/components/IssueBacklogPage.vue"),
     meta: { key: "issueBacklog" as MenuKey },
-  },
-  {
-    path: "/import-issues",
-    component: () => import("@/features/issues/components/ImportIssuesPage.vue"),
-    meta: { key: "importIssues" as MenuKey },
   },
   {
     path: "/excel2md",

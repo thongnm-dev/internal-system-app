@@ -14,8 +14,9 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     RETURN QUERY
-    SELECT pm.username, pm.name
+    SELECT pm.username, u.full_name AS name
     FROM project_members pm
+    INNER JOIN users u ON pm.username = u.username
     WHERE pm.project_id = p_project_id
     ORDER BY pm.username;
 END;

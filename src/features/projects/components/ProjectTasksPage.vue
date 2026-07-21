@@ -9,6 +9,7 @@ import MultiSelect from "primevue/multiselect";
 import Calendar from "primevue/calendar";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
+import Select from "primevue/select";
 import { useAuthStore } from "@/app/stores/auth";
 import { friendlyError } from "@/tauri/commands/_base";
 import {
@@ -227,10 +228,13 @@ async function saveTask() {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
             <span class="text-xs font-bold text-muted">Assignee</span>
-            <InputText
+            <Select
               v-model="form.assignee"
+              :options="ctrl.project.value?.members ?? []"
+              option-label="name"
+              option-value="username"
+              placeholder="Select assignee"
               class="mt-1 w-full"
-              placeholder="Username"
             />
           </label>
           <label class="block">

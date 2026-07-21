@@ -43,6 +43,7 @@ use commands::backlog_commands::{
     backlog_save_config,
 };
 use commands::excel2md_commands::excel2md;
+use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
@@ -130,6 +131,7 @@ pub fn run() {
             // === Import CSV commands ===
             preview_monthly_report_csv,
             compare_monthly_report,
+            parse_issue_csv,
             // === Excel → Markdown command ===
             excel2md,
             // === Project CRUD commands ===

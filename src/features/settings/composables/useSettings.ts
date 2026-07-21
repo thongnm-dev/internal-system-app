@@ -4,7 +4,7 @@ import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { getSettings, saveSettings } from "@/tauri/commands/settings";
 import { useAuthStore } from "@/app/stores/auth";
 import { useToast } from "@/shared/composables/useToast";
-import type { AppSettings as TauriAppSettings, ApiKeySetting as TauriApiKeySetting } from "@/_/types/settings";
+import type { AppSettings as TauriAppSettings } from "@/_/types/settings";
 
 export type ThemeMode = "light" | "dark";
 export type LanguageCode = "vi" | "en" | "ja";
@@ -19,15 +19,7 @@ export type UserSettings = {
   position: string;
 };
 
-export type ApiKeySetting = {
-  id: string;
-  name: string;
-  keyLabel: string;
-  apiKey: string;
-};
-
 type StoredSettings = {
-  apiKeys: ApiKeySetting[];
   language: LanguageCode;
   theme: ThemeMode;
   user: UserSettings;
@@ -47,7 +39,6 @@ const defaultSettings: StoredSettings = {
   },
   theme: "light",
   language: "vi",
-  apiKeys: [],
 };
 
 function fromTauri(ts: TauriAppSettings): StoredSettings {
@@ -63,12 +54,6 @@ function fromTauri(ts: TauriAppSettings): StoredSettings {
     },
     theme: ts.theme === "dark" ? "dark" : "light",
     language: isLanguageCode(ts.language) ? ts.language : "vi",
-    apiKeys: ts.api_keys.map((k: TauriApiKeySetting) => ({
-      id: k.id,
-      name: k.name,
-      keyLabel: k.key_label,
-      apiKey: k.api_key,
-    })),
   };
 }
 
@@ -86,12 +71,6 @@ function toTauriRequest(s: StoredSettings, userId: number) {
     },
     theme: s.theme,
     language: s.language,
-    api_keys: s.apiKeys.map((k) => ({
-      id: k.id,
-      name: k.name,
-      key_label: k.keyLabel,
-      api_key: k.apiKey,
-    })),
   };
 }
 
@@ -104,7 +83,6 @@ function loadSettingsFromLocal(): StoredSettings {
       user: { ...defaultSettings.user, ...parsed.user },
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: isLanguageCode(parsed.language) ? parsed.language : defaultSettings.language,
-      apiKeys: Array.isArray(parsed.apiKeys) ? parsed.apiKeys : [],
     };
   } catch {
     return { ...defaultSettings };
@@ -128,10 +106,6 @@ export function useSettings() {
   const error = ref<string | null>(null);
 
   const userId = computed(() => authStore.user?.user_id ?? 0);
-
-  const apiKeyCount = computed(
-    () => settings.value.apiKeys.filter((k) => k.name.trim() && k.apiKey.trim()).length,
-  );
 
   const isDirty = computed(() => JSON.stringify(settings.value) !== JSON.stringify(savedSnapshot.value));
 
@@ -196,22 +170,8 @@ export function useSettings() {
     settings.value.language = language;
   }
 
-  function updateApiKey(id: string, key: keyof Omit<ApiKeySetting, "id">, value: string) {
-    const item = settings.value.apiKeys.find((k) => k.id === id);
-    if (item) item[key] = value;
-  }
-
-  function addApiKey() {
-    settings.value.apiKeys.push({ id: crypto.randomUUID(), name: "", keyLabel: "", apiKey: "" });
-  }
-
-  function removeApiKey(id: string) {
-    settings.value.apiKeys = settings.value.apiKeys.filter((k) => k.id !== id);
-  }
-
   return {
     settings,
-    apiKeyCount,
     isDirty,
     loading,
     error,
@@ -220,8 +180,5 @@ export function useSettings() {
     updateUser,
     updateTheme,
     updateLanguage,
-    updateApiKey,
-    addApiKey,
-    removeApiKey,
   };
 }

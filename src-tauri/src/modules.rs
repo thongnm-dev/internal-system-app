@@ -59,6 +59,8 @@ mod commands {
     pub mod schedule_commands;
     /// Commands cho màn hình SQL Editor (quản lý kết nối + chạy query).
     pub mod sql_editor_commands;
+    /// Commands cho import CSV issue (parse file CSV issue từ frontend).
+    pub mod issue_csv_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -81,8 +83,6 @@ mod database {
     pub mod menu_config_store;
     /// Data access cho bảng `role_menu_permissions` và `user_menu_permissions`.
     pub mod menu_permission_store;
-    /// Data access cho bảng `api_keys` (PostgreSQL).
-    pub mod api_key_store;
     /// Data access cho bảng `aws_storage` (PostgreSQL).
     pub mod aws_storage_store;
     /// Lưu trữ cục bộ (JSON file) danh sách account AI + cấu hình usage.
@@ -141,6 +141,8 @@ mod models {
     pub mod schedule;
     /// Model cho màn hình SQL Editor (kết nối + kết quả query).
     pub mod sql_editor;
+    /// Model cho import CSV issue.
+    pub mod issue_csv;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -201,6 +203,8 @@ mod services {
     pub mod schedule_service;
     /// Service cho màn hình SQL Editor (quản lý kết nối + chạy query).
     pub mod sql_editor_service;
+    /// Service parse CSV issue (dùng CsvReader có sẵn).
+    pub mod issue_csv_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).
