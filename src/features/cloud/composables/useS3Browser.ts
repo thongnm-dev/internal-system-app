@@ -10,6 +10,7 @@ import {
   s3DeleteObjects,
   s3CreateFolder,
   s3MoveBrowserObjects,
+  s3GetBrowserAllowedPrefixes,
 } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { S3Object, S3OperationResult, LocalFileEntry } from "@/_/types/s3";
@@ -33,6 +34,7 @@ export function useS3Browser() {
   const selectedKeys = ref<Set<string>>(new Set());
   const message = ref("Connecting to S3...");
   const messageMode = ref<MessageMode>("info");
+  const allowedPrefixes = ref<string[]>([]);
 
   const breadcrumbs = computed(() => {
     const parts: { label: string; prefix: string }[] = [{ label: bucketName.value || "Bucket", prefix: "" }];
@@ -52,6 +54,19 @@ export function useS3Browser() {
     () => objects.value.length > 0 && selectedKeys.value.size === objects.value.length,
   );
 
+  const actionsAllowed = computed(() => {
+    if (allowedPrefixes.value.length === 0) return false;
+    return allowedPrefixes.value.some((prefix) => currentPrefix.value.startsWith(prefix));
+  });
+
+  async function loadAllowedPrefixes() {
+    try {
+      allowedPrefixes.value = await s3GetBrowserAllowedPrefixes();
+    } catch {
+      allowedPrefixes.value = [];
+    }
+  }
+
   async function loadAndConnect() {
     if (!canUseTauriRuntime()) return;
     if (!(await guard.ensureOnline())) return;
@@ -61,7 +76,7 @@ export function useS3Browser() {
       isConnected.value = true;
       message.value = result;
       messageMode.value = "info";
-      await refresh(true);
+      await Promise.all([refresh(true), loadAllowedPrefixes()]);
     } catch (e) {
       message.value = friendlyError(e);
       messageMode.value = "error";
@@ -442,6 +457,7 @@ export function useS3Browser() {
     message,
     messageMode,
     breadcrumbs,
+    actionsAllowed,
 
     showOfflineDialog: guard.showOfflineDialog,
     offlineMessage: guard.offlineMessage,

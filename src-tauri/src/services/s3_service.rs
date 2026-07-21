@@ -691,6 +691,10 @@ pub async fn upload_folder(
     })
 }
 
+pub async fn get_browser_allowed_prefixes() -> AppResult<Vec<String>> {
+    crate::database::aws_storage_store::list_browser_allowed_prefixes("CORRECT_BUG_TEST").await
+}
+
 pub async fn list_download_storages() -> AppResult<Vec<AwsStorage>> {
     crate::database::aws_storage_store::list_by_download().await
 }

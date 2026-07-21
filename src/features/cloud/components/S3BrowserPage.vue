@@ -358,17 +358,19 @@ function contextCopyKey() {
             <span v-if="ctrl.selectedCount.value > 0" class="mr-1 text-xs font-bold text-brand">
               {{ ctrl.selectedCount.value }} selected
             </span>
+            <template v-if="ctrl.actionsAllowed.value">
+              <Button
+                :icon="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'"
+                label="Upload"
+                size="small"
+                :disabled="isOperating"
+                @click="handleUpload()"
+              />
+              <Button icon="pi pi-folder-open" label="Upload Folder" severity="secondary" outlined size="small" :disabled="isOperating" @click="openUploadFolderDialog()" />
+              <Button icon="pi pi-folder-plus" label="New Folder" severity="secondary" outlined size="small" :disabled="isOperating" @click="openCreateFolder()" />
+            </template>
             <Button
-              :icon="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : 'pi pi-upload'"
-              label="Upload"
-              size="small"
-              :disabled="isOperating"
-              @click="handleUpload()"
-            />
-            <Button icon="pi pi-folder-open" label="Upload Folder" severity="secondary" outlined size="small" :disabled="isOperating" @click="openUploadFolderDialog()" />
-            <Button icon="pi pi-folder-plus" label="New Folder" severity="secondary" outlined size="small" :disabled="isOperating" @click="openCreateFolder()" />
-            <Button
-              v-if="ctrl.selectedCount.value > 0"
+              v-if="ctrl.actionsAllowed.value && ctrl.selectedCount.value > 0"
               :icon="ctrl.isDownloading.value ? 'pi pi-spinner pi-spin' : 'pi pi-download'"
               label="Download"
               severity="secondary"
@@ -377,7 +379,7 @@ function contextCopyKey() {
               :disabled="isOperating"
               @click="handleDownloadSelected()"
             />
-            <div v-if="ctrl.selectedCount.value > 0" class="relative">
+            <div v-if="ctrl.actionsAllowed.value && ctrl.selectedCount.value > 0" class="relative">
               <Button icon="pi pi-ellipsis-v" label="Actions" severity="secondary" outlined size="small" :disabled="isOperating" @click="toggleMoreActions()" />
               <div
                 v-if="showMoreActions"
@@ -456,7 +458,7 @@ function contextCopyKey() {
             {{ formatDate(data.lastModified) }}
           </template>
         </Column>
-        <Column header="" :sortable="false" style="width: 80px">
+        <Column v-if="ctrl.actionsAllowed.value" header="" :sortable="false" style="width: 80px">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
               <Button icon="pi pi-download" severity="secondary" text rounded size="small" title="Download" @click.stop="ctrl.downloadSingle(data.key)" />
@@ -475,10 +477,12 @@ function contextCopyKey() {
       @click.stop
       @contextmenu.prevent
     >
-      <Button icon="pi pi-download" label="Download" text size="small" class="w-full justify-start" @click="contextDownload()" />
+      <Button v-if="ctrl.actionsAllowed.value" icon="pi pi-download" label="Download" text size="small" class="w-full justify-start" @click="contextDownload()" />
       <Button icon="pi pi-copy" label="Copy Key" text size="small" class="w-full justify-start" @click="contextCopyKey()" />
-      <div class="my-1 border-t border-divider" />
-      <Button icon="pi pi-trash" label="Delete" text severity="danger" size="small" class="w-full justify-start" @click="contextDelete()" />
+      <template v-if="ctrl.actionsAllowed.value">
+        <div class="my-1 border-t border-divider" />
+        <Button icon="pi pi-trash" label="Delete" text severity="danger" size="small" class="w-full justify-start" @click="contextDelete()" />
+      </template>
     </div>
 
     <!-- Create Folder Dialog -->

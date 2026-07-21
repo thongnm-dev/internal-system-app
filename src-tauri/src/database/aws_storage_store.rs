@@ -77,6 +77,20 @@ pub async fn get_work_folder_name(folder_key: &str) -> AppResult<String> {
     Ok(row.get("name"))
 }
 
+pub async fn list_browser_allowed_prefixes(folder_key: &str) -> AppResult<Vec<String>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query(
+            "SELECT * FROM sp_aws_storage_select_browser_allowed($1)",
+            &[&folder_key],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to list browser-allowed prefixes: {e}")))?;
+
+    Ok(rows.iter().map(|r| r.get("allowed_prefix")).collect())
+}
+
 fn row_to_storage(row: &tokio_postgres::Row) -> AwsStorage {
     AwsStorage {
         id: row.get("id"),

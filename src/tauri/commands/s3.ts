@@ -100,3 +100,7 @@ export function s3MoveBrowserObjects(keys: string[], destinationPrefix: string) 
 export function s3DeleteByStorage(code: string, items: string[]) {
   return safeInvoke<S3OperationResult>("s3_delete_by_storage", { code, items });
 }
+
+export function s3GetBrowserAllowedPrefixes() {
+  return safeInvoke<string[]>("s3_get_browser_allowed_prefixes");
+}

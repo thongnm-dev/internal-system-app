@@ -128,6 +128,13 @@ pub async fn s3_delete_uploaded_items(
 }
 
 #[tauri::command]
+pub async fn s3_get_browser_allowed_prefixes() -> Result<Vec<String>, String> {
+    s3_service::get_browser_allowed_prefixes()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn s3_list_download_storages() -> Result<Vec<AwsStorage>, String> {
     s3_service::list_download_storages()
         .await

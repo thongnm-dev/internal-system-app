@@ -129,6 +129,7 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_aws_storage_select_by_codes", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_codes.sql")),
         ("sp_aws_storage_select_by_code_list", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_code_list.sql")),
         ("sp_aws_work_folder_get_name", include_str!("../../../docs/store-procedure/sp_aws_work_folder_get_name.sql")),
+        ("sp_aws_storage_select_browser_allowed", include_str!("../../../docs/store-procedure/sp_aws_storage_select_browser_allowed.sql")),
     ];
 
     let mut errors = Vec::new();
