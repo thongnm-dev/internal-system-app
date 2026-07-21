@@ -45,17 +45,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS api_keys (
-    id         VARCHAR(36)  PRIMARY KEY,
-    user_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name       VARCHAR(200) NOT NULL,
-    key_label  VARCHAR(200) NOT NULL DEFAULT '',
-    api_key    TEXT         NOT NULL,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
-
 -- ============================================================================
 -- PROJECTS
 -- ============================================================================
