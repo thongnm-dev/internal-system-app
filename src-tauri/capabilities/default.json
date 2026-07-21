@@ -13,6 +13,7 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "updater:default",
-    "process:default"
+    "process:default",
+    "notification:default"
   ]
 }

@@ -92,6 +92,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
@@ -113,6 +114,12 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 services::ai_usage_service::run_poll_loop(handle).await;
+            });
+
+            // Theo dõi nền storage S3 → bắn notification khi có tài liệu mới.
+            let s3_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                services::s3_watch_service::run_poll_loop(s3_handle).await;
             });
             Ok(())
         })

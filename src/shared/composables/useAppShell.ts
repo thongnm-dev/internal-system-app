@@ -1,7 +1,10 @@
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { friendlyError } from "@/tauri/commands/_base";
 import { getSystemInfo } from "@/tauri/commands/system";
+import { onS3NewDocuments } from "@/tauri/events";
+import { useToast } from "@/shared/composables/useToast";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { useAuthStore } from "@/app/stores/auth";
@@ -38,8 +41,10 @@ export function useAppShell() {
   const menu = useMenuStore();
   const network = useNetworkStatus();
   const database = useDatabaseStatus();
+  const toast = useToast();
 
   let pollTimer: number | undefined;
+  let unlistenS3NewDocs: UnlistenFn | undefined;
 
   // Re-verify the database whenever connectivity is (re)established while it is
   // not yet confirmed connected — e.g. the app was launched offline and the
@@ -125,12 +130,20 @@ export function useAppShell() {
 
     void setCurrentWindowResizable(true);
     pollTimer = window.setInterval(() => void refreshSystemInfo(), 1000);
+
+    // Song song với notification native, hiện toast in-app khi poll nền phát
+    // hiện tài liệu S3 mới (chỉ có tác dụng khi user đang mở app).
+    unlistenS3NewDocs = await onS3NewDocuments((payload) => {
+      const detail = payload.storages.map((s) => s.name).join(", ");
+      toast.info(`Có ${payload.total} tài liệu mới trên S3${detail ? ` — ${detail}` : ""}`);
+    });
   });
 
   onUnmounted(() => {
     if (pollTimer !== undefined) {
       window.clearInterval(pollTimer);
     }
+    unlistenS3NewDocs?.();
     void setCurrentWindowResizable(true);
   });
 

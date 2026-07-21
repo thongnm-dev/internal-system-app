@@ -181,6 +181,8 @@ mod services {
     pub mod backlog_service;
     /// Service cho S3 browser operations.
     pub mod s3_service;
+    /// Theo dõi nền storage S3 và bắn notification khi có tài liệu mới.
+    pub mod s3_watch_service;
     /// Service đồng bộ dữ liệu lên hệ thống nội bộ (Selenium automation).
     pub mod sync_service;
     /// Service gom/copy file (collect input) theo keyword hoặc danh sách.
