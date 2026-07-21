@@ -57,3 +57,10 @@ pub async fn list_roles() -> Result<Vec<String>, String> {
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn get_staff_no(username: String) -> Result<String, String> {
+    user_service::get_staff_no(&username)
+        .await
+        .map_err(|e| e.to_string())
+}

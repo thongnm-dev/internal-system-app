@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     phone         VARCHAR(50)  NOT NULL DEFAULT '',
     address       TEXT         NOT NULL DEFAULT '',
     position      VARCHAR(100) NOT NULL DEFAULT '',
+    staff_no      VARCHAR(100) NOT NULL DEFAULT '',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
@@ -62,12 +63,6 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
-
--- Migration cho database đã tồn tại: bỏ ràng buộc NOT NULL trên các cột Backlog.
--- Idempotent — chạy lại nhiều lần không gây lỗi.
-ALTER TABLE projects ALTER COLUMN project_backlog_key  DROP NOT NULL;
-ALTER TABLE projects ALTER COLUMN project_backlog_code DROP NOT NULL;
-ALTER TABLE projects ALTER COLUMN project_backlog_name DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS project_members (
     id         SERIAL       PRIMARY KEY,

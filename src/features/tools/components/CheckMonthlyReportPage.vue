@@ -2,17 +2,20 @@
 import { computed, ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import Calendar from "primevue/calendar";
+import Checkbox from "primevue/checkbox";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
+import RadioButton from "primevue/radiobutton";
 import { useAuthStore } from "@/app/stores/auth";
 import { useCheckMonthlyReport } from "../composables/useCheckMonthlyReport";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
+import { useToast } from "@/shared/composables/useToast";
 import { readScheduleExcel, type ScheduleResult } from "@/tauri/commands/schedule";
 import type {
   AnalysisResult,
@@ -23,9 +26,16 @@ import type { ImportCsvPreviewResult } from "@/_/types/check-monthly-report";
 
 const auth = useAuthStore();
 const loading = useGlobalLoading();
+const toast = useToast();
 const ctrl = useCheckMonthlyReport();
 
 ctrl.targetUser.value = auth.user?.username ?? "";
+
+function showMessageToast() {
+  if (!ctrl.message.value) return;
+  if (ctrl.messageMode.value === "error") toast.error(ctrl.message.value);
+  else toast.info(ctrl.message.value);
+}
 
 const isPreviewDialogOpen = ref(false);
 const previewDialogView = ref<"summary" | "detail">("summary");
@@ -92,11 +102,55 @@ async function viewScheduleData() {
   });
 }
 
+const isSourceConflictDialogOpen = ref(false);
+const selectedDataSource = ref<"csv" | "auto">("csv");
+const sourceConflictAction = ref<"preview" | "compare">("preview");
+
+function openSourceConflictDialog(action: "preview" | "compare") {
+  selectedDataSource.value = "csv";
+  sourceConflictAction.value = action;
+  isSourceConflictDialogOpen.value = true;
+}
+
 async function previewWithLoading() {
-  await loading.run(() => ctrl.previewCsv());
+  if (ctrl.autoFetchEnabled.value && ctrl.csvPath.value) {
+    openSourceConflictDialog("preview");
+    return;
+  }
+  await runPreview(ctrl.autoFetchEnabled.value ? "auto" : "csv");
+}
+
+async function runPreview(source: "csv" | "auto") {
+  if (source === "auto") {
+    await loading.run(() => ctrl.previewAutoFetch());
+    showMessageToast();
+  } else {
+    await loading.run(() => ctrl.previewCsv());
+  }
   if (ctrl.previewResult.value) {
     previewDialogView.value = "summary";
     isPreviewDialogOpen.value = true;
+  }
+}
+
+async function handleCompareClick() {
+  if (ctrl.autoFetchEnabled.value && ctrl.csvPath.value) {
+    openSourceConflictDialog("compare");
+  } else if (ctrl.autoFetchEnabled.value) {
+    await loading.run(() => ctrl.runCompare("auto"));
+    showMessageToast();
+  } else {
+    loading.run(() => ctrl.runCompare("csv"));
+  }
+}
+
+async function confirmSourceSelection() {
+  isSourceConflictDialogOpen.value = false;
+  if (sourceConflictAction.value === "preview") {
+    await runPreview(selectedDataSource.value);
+  } else {
+    await loading.run(() => ctrl.runCompare(selectedDataSource.value));
+    if (selectedDataSource.value === "auto") showMessageToast();
   }
 }
 
@@ -299,10 +353,14 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <span class="w-24 shrink-0 text-sm font-medium text-muted">Target user</span>
           <InputText v-model="ctrl.targetUser.value" placeholder="Worker name" class="w-44" />
         </div>
+        <div class="mt-3 flex items-center gap-2">
+          <Checkbox v-model="ctrl.autoFetchEnabled.value" :binary="true" input-id="autoFetch" />
+          <label for="autoFetch" class="cursor-pointer text-sm text-ink">Tự động lấy dữ liệu CSV từ hệ thống nội bộ</label>
+        </div>
         <div class="mt-2 flex items-center justify-end gap-2">
           <Button icon="pi pi-eye" severity="info" outlined label="View schedule data" :disabled="!ctrl.schedulePath.value" @click="viewScheduleData()" />
-          <Button icon="pi pi-file-import" label="Preview" :disabled="!ctrl.csvPath.value || ctrl.isImporting.value" @click="previewWithLoading()" />
-          <Button icon="pi pi-sync" label="Compare" :disabled="!ctrl.csvPath.value || !ctrl.schedulePath.value || ctrl.isComparing.value" @click="loading.run(() => ctrl.runCompare())" />
+          <Button icon="pi pi-file-import" label="Preview" :disabled="(!ctrl.csvPath.value && !ctrl.autoFetchEnabled.value) || ctrl.isImporting.value || ctrl.isFetchingFromSystem.value" @click="previewWithLoading()" />
+          <Button icon="pi pi-sync" label="Compare" :disabled="(!ctrl.csvPath.value && !ctrl.autoFetchEnabled.value) || !ctrl.schedulePath.value || ctrl.isComparing.value || ctrl.isFetchingFromSystem.value" @click="handleCompareClick()" />
         </div>
       </div>
     </div>
@@ -399,6 +457,27 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         </Column>
         <Column header="Sheet" field="sheet_name" style="width: 140px" />
       </DataTable>
+    </Dialog>
+
+    <!-- Data Source Conflict Dialog -->
+    <Dialog :visible="isSourceConflictDialogOpen" modal header="Chọn nguồn dữ liệu CSV" class="w-full max-w-md rounded-lg bg-panel shadow-2xl" @update:visible="isSourceConflictDialogOpen = $event">
+      <p class="mb-4 text-sm text-muted">Bạn đã chọn file CSV và bật tự động lấy dữ liệu. Vui lòng chọn nguồn dữ liệu để so sánh:</p>
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <RadioButton v-model="selectedDataSource" input-id="srcCsv" value="csv" />
+          <label for="srcCsv" class="cursor-pointer text-sm text-ink">Sử dụng file CSV đã chọn</label>
+        </div>
+        <div class="flex items-center gap-2">
+          <RadioButton v-model="selectedDataSource" input-id="srcAuto" value="auto" />
+          <label for="srcAuto" class="cursor-pointer text-sm text-ink">Tự động lấy dữ liệu từ hệ thống nội bộ</label>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button label="Hủy" severity="secondary" outlined @click="isSourceConflictDialogOpen = false" />
+          <Button label="Xác nhận" @click="confirmSourceSelection()" />
+        </div>
+      </template>
     </Dialog>
 
     <!-- Preview Dialog (summary + detail toggle) -->

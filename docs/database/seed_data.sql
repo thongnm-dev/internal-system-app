@@ -22,12 +22,13 @@ VALUES ('viewer', 'Read-only access')
 ON CONFLICT (name) DO NOTHING;
 
 -- User admin mặc định (password: ad@123456)
-INSERT INTO users (username, password_hash, full_name, position)
+INSERT INTO users (username, password_hash, full_name, position, staff_no)
 VALUES (
     'Thongnm',
     '$2b$12$dTyhgIqskYwXMkSfe6Luyuq0Ve7EMFS7Rrq7Z5eXvx7apv0bk9cOy',
     'Nguyen Minh Thong',
-    'Admin'
+    'Admin',
+    '10137'
 )
 ON CONFLICT (username) DO NOTHING;
 

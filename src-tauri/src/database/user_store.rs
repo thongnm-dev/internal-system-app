@@ -213,6 +213,23 @@ pub async fn list_roles() -> AppResult<Vec<String>> {
     Ok(rows.iter().map(|r| r.get("name")).collect())
 }
 
+pub async fn get_staff_no(username: &str) -> AppResult<String> {
+    let client = pgsql_connect::connect().await?;
+
+    let row = client
+        .query_opt(
+            "SELECT staff_no FROM users WHERE username = $1",
+            &[&username],
+        )
+        .await
+        .map_err(|e| AppError::new(format!("Failed to query staff_no: {e}")))?
+        .ok_or_else(|| AppError::new(format!("User '{username}' not found.")))?;
+
+    let staff_no: Option<String> = row.get("staff_no");
+    staff_no.filter(|s| !s.is_empty())
+        .ok_or_else(|| AppError::new(format!("Staff No is not set for user '{username}'.")))
+}
+
 async fn load_roles(
     client: &tokio_postgres::Client,
     user_id: i32,

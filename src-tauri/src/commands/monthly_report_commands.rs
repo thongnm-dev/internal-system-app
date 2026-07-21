@@ -7,6 +7,17 @@ use crate::models::import_csv::ImportCsvPreviewResult;
 use crate::models::monthly_report::CompareRow;
 use crate::services::monthly_report_service;
 
+#[tauri::command]
+pub async fn fetch_csv_from_system(
+    date_from: String,
+    date_to: String,
+    staff: String,
+) -> Result<String, String> {
+    monthly_report_service::fetch_csv_from_url(&date_from, &date_to, &staff)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Preview nội dung file CSV trước khi import.
 /// Trả về dữ liệu đã parse và dữ liệu thô để hiển thị trên giao diện.
 #[tauri::command]

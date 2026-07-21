@@ -2,7 +2,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { computed, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { compareMonthlyReport, previewMonthlyReportCsv } from "@/tauri/commands/check-monthly-report";
+import { compareMonthlyReport, fetchCsvFromSystem, previewMonthlyReportCsv } from "@/tauri/commands/check-monthly-report";
+import { getStaffNo } from "@/tauri/commands/user";
 import type { MessageMode } from "@/_/types/app";
 import type { CompareRow, ImportCsvPreviewResult, ImportCsvResult } from "@/_/types/check-monthly-report";
 
@@ -13,6 +14,10 @@ export function useCheckMonthlyReport() {
   const message = ref("No CSV imported. Upload a CSV file to create monthly report check data.");
   const messageMode = ref<MessageMode>("info");
   const isImporting = ref(false);
+
+  const autoFetchEnabled = ref(false);
+  const autoFetchedCsvPath = ref("");
+  const isFetchingFromSystem = ref(false);
 
   const schedulePath = ref("");
   const targetMonth = ref<Date>(new Date());
@@ -77,14 +82,81 @@ export function useCheckMonthlyReport() {
     }
   }
 
-  async function runCompare() {
-    if (!csvPath.value || !schedulePath.value) return;
+  async function resolveStaffNo(): Promise<string | null> {
+    if (!targetUser.value.trim()) {
+      message.value = "Target user is required for auto-fetch.";
+      messageMode.value = "error";
+      return null;
+    }
+    try {
+      return await getStaffNo(targetUser.value);
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      return null;
+    }
+  }
+
+  async function fetchFromSystem(): Promise<string | null> {
+    const staff = await resolveStaffNo();
+    if (!staff) return null;
+    isFetchingFromSystem.value = true;
+    try {
+      const year = targetMonth.value.getFullYear();
+      const month = targetMonth.value.getMonth() + 1;
+      const lastDay = new Date(year, month, 0).getDate();
+      const mm = String(month).padStart(2, "0");
+      const dateFrom = `${year}/${mm}/01`;
+      const dateTo = `${year}/${mm}/${String(lastDay).padStart(2, "0")}`;
+      const path = await fetchCsvFromSystem(dateFrom, dateTo, staff);
+      autoFetchedCsvPath.value = path;
+      return path;
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      return null;
+    } finally {
+      isFetchingFromSystem.value = false;
+    }
+  }
+
+  async function previewAutoFetch() {
+    const path = await fetchFromSystem();
+    if (!path) return;
+    isImporting.value = true;
+    message.value = "Fetching CSV from system for preview...";
+    messageMode.value = "info";
+    try {
+      const r = await previewMonthlyReportCsv(path);
+      previewResult.value = r;
+      result.value = null;
+      message.value = `Fetched ${r.row_count.toLocaleString("en-US")} rows from system.`;
+      messageMode.value = "info";
+    } catch (e) {
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+    } finally {
+      isImporting.value = false;
+    }
+  }
+
+  async function runCompare(source?: "csv" | "auto") {
+    const resolvedSource = source ?? "csv";
+    let effectiveCsvPath = csvPath.value;
+
+    if (resolvedSource === "auto") {
+      const path = await fetchFromSystem();
+      if (!path) return;
+      effectiveCsvPath = path;
+    }
+
+    if (!effectiveCsvPath || !schedulePath.value) return;
     isComparing.value = true;
     try {
       const year = targetMonth.value.getFullYear();
       const month = targetMonth.value.getMonth() + 1;
       compareResult.value = await compareMonthlyReport(
-        csvPath.value,
+        effectiveCsvPath,
         schedulePath.value,
         year,
         month,
@@ -103,6 +175,8 @@ export function useCheckMonthlyReport() {
     csvPath, isImporting, message, messageMode,
     pickCsvFile, previewCsv, previewResult, result,
     updateCsvPath,
+    autoFetchEnabled, autoFetchedCsvPath, isFetchingFromSystem,
+    previewAutoFetch,
     schedulePath, targetMonth, targetUser,
     compareResult, compareTotals, isComparing, runCompare,
   };

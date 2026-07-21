@@ -34,3 +34,7 @@ export function changeUserPassword(userId: number, request: ChangePasswordReques
 export function listRoles() {
   return safeInvoke<string[]>("list_roles");
 }
+
+export function getStaffNo(username: string) {
+  return safeInvoke<string>("get_staff_no", { username });
+}

@@ -21,7 +21,7 @@ use commands::db_config_commands::{
     check_database_status, get_database_config, save_database_config, test_database_config,
 };
 use commands::monthly_report_commands::{
-    compare_monthly_report, preview_monthly_report_csv,
+    compare_monthly_report, fetch_csv_from_system, preview_monthly_report_csv,
 };
 use commands::project_commands::{
     create_project, create_project_task, delete_project, delete_project_task,
@@ -31,8 +31,8 @@ use commands::project_commands::{
 use commands::settings_commands::{get_settings, save_settings};
 use commands::system_commands::{check_internet_connection, get_system_info};
 use commands::user_commands::{
-    change_user_password, create_user, delete_user, get_user_detail, list_roles, list_users,
-    update_user,
+    change_user_password, create_user, delete_user, get_staff_no, get_user_detail, list_roles,
+    list_users, update_user,
 };
 use commands::role_commands::{create_role, delete_role, list_role_details, update_role};
 use commands::backlog_commands::{
@@ -131,6 +131,7 @@ pub fn run() {
             // === Import CSV commands ===
             preview_monthly_report_csv,
             compare_monthly_report,
+            fetch_csv_from_system,
             parse_issue_csv,
             // === Excel → Markdown command ===
             excel2md,
@@ -173,6 +174,7 @@ pub fn run() {
             list_users,
             delete_user,
             change_user_password,
+            get_staff_no,
             list_roles,
             // === Role management commands ===
             list_role_details,

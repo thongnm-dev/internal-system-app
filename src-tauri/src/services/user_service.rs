@@ -114,3 +114,7 @@ pub async fn change_password(user_id: i32, request: ChangePasswordRequest) -> Ap
 pub async fn list_roles() -> AppResult<Vec<String>> {
     user_store::list_roles().await
 }
+
+pub async fn get_staff_no(username: &str) -> AppResult<String> {
+    user_store::get_staff_no(username).await
+}

@@ -3,12 +3,105 @@
 //! Cung cấp chức năng preview (xem trước) file CSV trước khi import
 //! và so sánh dữ liệu CSV với lịch làm việc.
 
+use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::services::csv_reader_service;
 use crate::models::import_csv::{ImportCsvPreviewResult, ImportPreviewRow, WorkRecord};
 use crate::models::monthly_report::{CompareRow, CompareStatus, CsvDetail, ScheduleDetail};
 use crate::services::schedule_service;
+use crate::utils::app_config;
+use ini::Ini;
 use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
+
+fn load_config() -> AppResult<(String, String, String)> {
+    let path = app_config::config_path();
+    let ini = Ini::load_from_file(&path)
+        .map_err(|e| AppError::new(format!("Cannot read config.ini: {e}")))?;
+    let section = ini.section(Some("INTERNAL"))
+        .ok_or_else(|| AppError::new("Missing [INTERNAL] section in config.ini"))?;
+    let base_url = section.get("BASE_URL")
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| AppError::new("Missing BASE_URL in [INTERNAL] config"))?
+        .to_string();
+    let username = section.get("USERNAME")
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| AppError::new("Missing USERNAME in [INTERNAL] config"))?
+        .to_string();
+    let password = section.get("PASSWORD")
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| AppError::new("Missing PASSWORD in [INTERNAL] config"))?
+        .to_string();
+    Ok((base_url, username, password))
+}
+
+pub async fn fetch_csv_from_url(
+    date_from: &str,
+    date_to: &str,
+    staff: &str,
+) -> AppResult<String> {
+    let (base_url, username, password) = load_config()?;
+
+    let jar = Arc::new(reqwest::cookie::Jar::default());
+    let client = reqwest::Client::builder()
+        .cookie_provider(jar)
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| AppError::new(format!("Failed to build HTTP client: {e}")))?;
+
+    let login_url = format!("{base_url}/login");
+    let login_resp = client
+        .post(&login_url)
+        .form(&[("txtUserName", username.as_str()), ("txtPass", password.as_str())])
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Login failed: {e}")))?;
+
+    if !login_resp.status().is_success() && !login_resp.status().is_redirection() {
+        return Err(AppError::new(format!(
+            "Login returned status {}",
+            login_resp.status()
+        )));
+    }
+
+    let csv_url = format!("{base_url}/pjjyujidatacsv");
+    let params: Vec<(&str, &str)> = vec![
+        ("txtExtractionPeriodFrom", date_from),
+        ("txtExtractionPeriodTo", date_to),
+        ("cmbOutputCsvMethod", "1"),
+        ("handle", "exportCSV"),
+        ("projectCd", ""),
+        ("shm001", staff),
+    ];
+    let response = client
+        .post(&csv_url)
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Failed to fetch CSV: {e}")))?;
+
+    if !response.status().is_success() {
+        return Err(AppError::new(format!(
+            "Server returned status {}",
+            response.status()
+        )));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| AppError::new(format!("Failed to read response: {e}")))?;
+
+    if bytes.is_empty() {
+        return Err(AppError::new("Server returned empty response"));
+    }
+
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join("pjjyuji_auto_fetch.csv");
+    std::fs::write(&temp_path, &bytes)?;
+
+    Ok(temp_path.to_string_lossy().to_string())
+}
 
 /// Preview nội dung file CSV: parse dữ liệu và trả về kết quả tóm tắt.
 /// Frontend sử dụng kết quả này để hiển thị bảng xác nhận trước khi import.
