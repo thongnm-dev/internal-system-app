@@ -22,6 +22,10 @@ function onUpdateClick(): void {
   }
 }
 
+function onCheckUpdate(): void {
+  void updater.checkNow();
+}
+
 function formatDateTime(value: string): string {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}:\d{2})$/);
   if (match) {
@@ -54,8 +58,8 @@ function formatDateTime(value: string): string {
       <i class="pi pi-globe shrink-0 text-brand" />
       <strong class="min-w-0 truncate text-ink">{{ props.info.ip_address }}</strong>
     </span>
-    <!-- Trạng thái cập nhật: đang tải (%) / sẵn sàng cài / lỗi -->
-    <template v-if="updater.isActive.value || updater.status.value === 'error'">
+
+    <template v-if="updater.isTauri">
       <span
         v-if="updater.status.value === 'checking'"
         class="status-item ml-auto flex items-center gap-2"
@@ -100,19 +104,32 @@ function formatDateTime(value: string): string {
         <span class="min-w-0 truncate">Đang cài đặt…</span>
       </span>
 
-      <span
+      <button
         v-else-if="updater.status.value === 'error'"
-        class="status-item ml-auto flex items-center gap-2 text-red-600"
+        type="button"
+        class="status-item ml-auto flex items-center gap-2 rounded text-red-600 hover:underline"
         :title="updater.errorMessage.value ?? 'Không thể cập nhật'"
+        @click="onCheckUpdate"
       >
         <i class="pi pi-exclamation-triangle shrink-0" />
-        <span class="min-w-0 truncate">Cập nhật thất bại</span>
-      </span>
+        <span class="min-w-0 truncate">Cập nhật thất bại. Thử lại</span>
+      </button>
+
+      <button
+        v-else
+        type="button"
+        class="status-item ml-auto flex items-center gap-2 rounded text-muted hover:text-brand"
+        title="Kiểm tra bản cập nhật"
+        @click="onCheckUpdate"
+      >
+        <i class="pi pi-sync shrink-0" />
+        <span class="min-w-0 truncate">Kiểm tra cập nhật</span>
+      </button>
     </template>
 
     <span
       class="status-item flex items-center gap-2"
-      :class="updater.isActive.value || updater.status.value === 'error' ? '' : 'ml-auto'"
+      :class="updater.isTauri ? '' : 'ml-auto'"
       title="Version"
     >
       <i class="pi pi-desktop shrink-0 text-brand" />
