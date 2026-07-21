@@ -5,7 +5,6 @@
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::database::startup_store;
 use crate::models::db_config::{DatabaseConfig, DatabaseStatus, SaveDatabaseConfigRequest};
 use crate::utils::pgsql_connect::{self, PgConfig};
 
