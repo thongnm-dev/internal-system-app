@@ -3002,7 +3002,7 @@ dependencies = [
 
 [[package]]
 name = "management_systems"
-version = "1.0.6"
+version = "1.0.7"
 dependencies = [
  "aws-config",
  "aws-credential-types",

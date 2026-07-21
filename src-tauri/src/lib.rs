@@ -99,12 +99,14 @@ pub fn run() {
                 let _ = window.set_icon(icon);
             }
 
-            // Khởi tạo database chạy nền để không block UI thread
-            tauri::async_runtime::spawn(async {
-                if let Err(e) = database::startup_store::init().await {
-                    eprintln!("Failed to initialize database tables: {e}");
-                }
-            });
+            // Khởi tạo database chạy nền (chỉ dev — production dùng bảng/SP có sẵn)
+            if cfg!(debug_assertions) {
+                tauri::async_runtime::spawn(async {
+                    if let Err(e) = database::startup_store::init().await {
+                        eprintln!("Failed to initialize database tables: {e}");
+                    }
+                });
+            }
 
             // Nạp trước dữ liệu AI Usage và chạy poll nền để theo dõi usage + auto-switch.
             services::ai_usage_service::preload();

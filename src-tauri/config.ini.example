@@ -1,7 +1,7 @@
 [database]
 host = localhost
 port = 5432
-dbname = management_systems
+dbname = dev_msh
 user = postgres
 password = postgres
 
@@ -14,6 +14,11 @@ AWS_REGION=
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 AWS_S3_BUCKET=
+
+[INTERNAL]
+BASE_URL=http://192.168.10.89
+USERNAME=thongnm
+PASSWORD=minhthong@94
 
 [ai]
 GEMINI_API_KEY=

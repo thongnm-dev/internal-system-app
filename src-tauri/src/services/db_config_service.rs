@@ -98,9 +98,6 @@ pub async fn save_config(request: SaveDatabaseConfigRequest) -> AppResult<Databa
     // Ghi cấu hình xuống config.ini.
     config.save_to_ini()?;
 
-    // Khởi tạo bảng + stored procedure với cấu hình vừa lưu.
-    startup_store::init().await?;
-
     Ok(DatabaseStatus {
         configured: true,
         connected: true,
