@@ -36,10 +36,11 @@ use commands::user_commands::{
 };
 use commands::role_commands::{create_role, delete_role, list_role_details, update_role};
 use commands::backlog_commands::{
-    backlog_check_config, backlog_create_issue, backlog_get_base_url, backlog_get_issue,
-    backlog_get_project, backlog_get_project_lookup, backlog_list_categories,
-    backlog_list_issue_types, backlog_list_issues, backlog_list_priorities,
-    backlog_list_project_users, backlog_list_statuses,
+    backlog_check_config, backlog_create_issue, backlog_get_base_url, backlog_get_config,
+    backlog_get_issue, backlog_get_project, backlog_get_project_lookup,
+    backlog_list_categories, backlog_list_issue_types, backlog_list_issues,
+    backlog_list_priorities, backlog_list_project_users, backlog_list_statuses,
+    backlog_save_config,
 };
 use commands::excel2md_commands::excel2md;
 use commands::sync_commands::sync_daily_report;
@@ -188,6 +189,8 @@ pub fn run() {
             list_effective_menu_permissions,
             // === Backlog API commands ===
             backlog_check_config,
+            backlog_get_config,
+            backlog_save_config,
             backlog_get_base_url,
             backlog_get_project,
             backlog_list_issue_types,

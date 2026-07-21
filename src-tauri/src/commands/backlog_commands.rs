@@ -14,6 +14,16 @@ pub async fn backlog_check_config() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn backlog_get_config() -> Result<BacklogConfig, String> {
+    backlog_service::get_config().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn backlog_save_config(config: BacklogConfig) -> Result<(), String> {
+    backlog_service::save_config(&config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn backlog_get_base_url() -> Result<String, String> {
     backlog_service::get_base_url()
         .await

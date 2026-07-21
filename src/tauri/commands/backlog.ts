@@ -32,8 +32,21 @@ export type BacklogUser = {
   keyword?: string;
 };
 
+export type BacklogConfig = {
+  url: string;
+  apiKey: string;
+};
+
 export function backlogCheckConfig() {
   return safeInvoke<void>("backlog_check_config");
+}
+
+export function backlogGetConfig() {
+  return safeInvoke<BacklogConfig>("backlog_get_config");
+}
+
+export function backlogSaveConfig(config: BacklogConfig) {
+  return safeInvoke<void>("backlog_save_config", { config });
 }
 
 export function backlogGetBaseUrl() {

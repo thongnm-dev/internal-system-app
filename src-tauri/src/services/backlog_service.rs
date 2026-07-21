@@ -148,9 +148,47 @@ impl BacklogClient {
 }
 
 pub async fn check_config() -> AppResult<()> {
-    BacklogClient::resolve().await.map_err(|e| {
-        let path = app_config::config_path();
-        AppError::new(format!("{e} (config path: {})", path.display()))
+    BacklogClient::resolve().await?;
+    Ok(())
+}
+
+pub fn get_config() -> AppResult<BacklogConfig> {
+    let path = app_config::config_path();
+    let ini = Ini::load_from_file(&path).unwrap_or_else(|_| Ini::new());
+
+    let section = ini.section(Some("backlog"));
+    let url = section
+        .and_then(|s| s.get(BACKLOG_URL_LABEL))
+        .unwrap_or("")
+        .to_string();
+    let api_key = section
+        .and_then(|s| s.get(BACKLOG_APIKEY_LABEL))
+        .unwrap_or("")
+        .to_string();
+
+    Ok(BacklogConfig { url, api_key })
+}
+
+pub fn save_config(config: &BacklogConfig) -> AppResult<()> {
+    let path = app_config::config_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            AppError::new(format!("Không thể tạo thư mục cấu hình: {e}"))
+        })?;
+    }
+
+    let mut ini = if path.exists() {
+        Ini::load_from_file(&path).unwrap_or_else(|_| Ini::new())
+    } else {
+        Ini::new()
+    };
+
+    ini.with_section(Some("backlog"))
+        .set(BACKLOG_URL_LABEL, &config.url)
+        .set(BACKLOG_APIKEY_LABEL, &config.api_key);
+
+    ini.write_to_file(&path).map_err(|e| {
+        AppError::new(format!("Không thể lưu cấu hình: {e}"))
     })?;
     Ok(())
 }

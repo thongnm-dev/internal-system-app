@@ -1,6 +1,13 @@
 //! Các kiểu dữ liệu (model) cho Backlog API responses.
 
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklogConfig {
+    pub url: String,
+    pub api_key: String,
+}
 /// Thông tin dự án từ Backlog API.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

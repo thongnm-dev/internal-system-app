@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import Button from "primevue/button";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
@@ -9,6 +9,7 @@ import Fieldset from "primevue/fieldset";
 import Calendar from "primevue/calendar";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import BacklogConfigError from "./BacklogConfigError.vue";
 import {
   assignees,
   priorityOptions,
@@ -36,7 +37,6 @@ import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
 const globalLoading = useGlobalLoading();
 const initialProject = (route.query.project as string) || "";
@@ -69,7 +69,7 @@ async function openIssueWebview(issueKey: string) {
     const win = new WebviewWindow(label, {
       url,
       title: `Backlog - ${issueKey}`,
-      width: 1100,
+      width: 1600,
       height: 820,
       center: true,
       resizable: true,
@@ -306,56 +306,11 @@ async function executeImport() {
 </script>
 
 <template>
-  <!-- Backlog config error: block all functionality -->
-  <section
+  <BacklogConfigError
     v-if="ctrl.configError.value"
-    class="flex min-h-0 flex-1 items-center justify-center overflow-hidden"
-  >
-    <div
-      role="alert"
-      aria-live="assertive"
-      class="flex max-w-md select-none flex-col items-center gap-6 px-8 text-center"
-    >
-      <span
-        aria-hidden="true"
-        class="config-error-icon flex h-20 w-20 items-center justify-center rounded-full"
-      >
-        <svg class="h-10 w-10" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066Z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-        </svg>
-      </span>
-
-      <div class="flex flex-col gap-2">
-        <h1 class="text-lg font-semibold text-ink">Lỗi cấu hình Backlog</h1>
-        <p class="text-sm text-secondary">
-          Chức năng Issue Backlog yêu cầu cấu hình kết nối Backlog API.
-          Vui lòng thiết lập <strong>URL</strong> và <strong>API Key</strong> trong
-          mục <strong>Settings → API Keys</strong> hoặc section <code class="rounded bg-canvas px-1">[backlog]</code> trong file <code class="rounded bg-canvas px-1">config.ini</code>.
-        </p>
-      </div>
-
-      <div class="config-error-box rounded-md border px-4 py-2 text-sm">
-        {{ ctrl.configError.value }}
-      </div>
-
-      <div class="flex gap-3">
-        <Button
-          icon="pi pi-cog"
-          label="Mở Settings"
-          @click="router.push('/settings')"
-        />
-        <Button
-          :icon="ctrl.configChecking.value ? 'pi pi-spinner pi-spin' : undefined"
-          :label="ctrl.configChecking.value ? 'Đang kiểm tra...' : 'Thử lại'"
-          :disabled="ctrl.configChecking.value"
-          severity="secondary"
-          outlined
-          @click="ctrl.checkConfig()"
-        />
-      </div>
-    </div>
-  </section>
+    :is-checking="ctrl.configChecking.value"
+    @retry="ctrl.checkConfig()"
+  />
 
   <section v-else class="flex min-h-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto">
     <Fieldset
@@ -712,24 +667,3 @@ async function executeImport() {
   </section>
 </template>
 
-<style scoped>
-.config-error-icon {
-  background: #fef2f2;
-  color: #dc2626;
-}
-[data-theme='dark'] .config-error-icon {
-  background: #450a0a;
-  color: #f87171;
-}
-
-.config-error-box {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-[data-theme='dark'] .config-error-box {
-  border-color: #991b1b;
-  background: #450a0a;
-  color: #fca5a5;
-}
-</style>
