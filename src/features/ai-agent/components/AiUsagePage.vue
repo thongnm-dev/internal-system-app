@@ -74,7 +74,7 @@ async function browseConfigDir() {
   }
 }
 
-/** Preview login tại config dir + prefill tên. Nếu chưa login thì hỏi mở terminal. */
+/** Preview login tại config dir + prefill tên. */
 async function onConfigDirInput() {
   const dir = configDir.value.trim();
   if (!dir) return;
@@ -83,12 +83,21 @@ async function onConfigDirInput() {
   if (preview && !accountName.value.trim()) {
     accountName.value = preview.display_name || preview.email;
   }
-  if (!preview) {
-    terminalConfigDir.value = dir;
-    terminalWorkDir.value = "";
-    terminalIsLogin.value = true;
-    showTerminal.value = true;
-  }
+}
+
+/** Mở terminal dialog để login tại config dir hiện tại. */
+function openLoginForConfigDir() {
+  const dir = configDir.value.trim();
+  if (!dir) return;
+  terminalConfigDir.value = dir;
+  terminalWorkDir.value = "";
+  terminalIsLogin.value = true;
+  showTerminal.value = true;
+}
+
+/** Re-check login sau khi đã login xong trong terminal. */
+async function recheckConfigDir() {
+  await onConfigDirInput();
 }
 
 onMounted(() => {
@@ -643,14 +652,32 @@ function resetHint(resetAt: string): string {
               Chạy <code class="rounded bg-amber-100 px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code> để lấy token.
             </p>
           </div>
-          <p
+          <div
             v-else
             class="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3 text-xs text-amber-700"
           >
-            {{ subMode === 'current'
-              ? 'Chưa có login Claude đang hoạt động. Chạy `claude /login` rồi mở lại dialog.'
-              : 'Chưa đọc được login ở config dir này. Kiểm tra đường dẫn và đảm bảo đã tạo .claude.json.' }}
-          </p>
+            <p>
+              {{ subMode === 'current'
+                ? 'Chưa có login Claude đang hoạt động. Chạy `claude /login` rồi mở lại dialog.'
+                : 'Chưa đọc được login ở config dir này.' }}
+            </p>
+            <div v-if="subMode === 'dir' && configDir.trim()" class="mt-2 flex gap-2">
+              <Button
+                icon="pi pi-terminal"
+                label="Mở terminal để login"
+                size="small"
+                severity="warn"
+                @click="openLoginForConfigDir"
+              />
+              <Button
+                icon="pi pi-refresh"
+                label="Kiểm tra lại"
+                size="small"
+                severity="secondary"
+                @click="recheckConfigDir"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- API key -->
