@@ -54,9 +54,12 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
-/// Ghi log lỗi rồi chuyển thành `String` — dùng cho `.map_err(log_err)` ở tầng command.
-pub fn log_err(e: impl Debug) -> String {
-    let msg = format!("{e:?}");
-    log::error!("{msg}");
-    msg
+/// Ghi log lỗi (dạng Debug chi tiết) rồi trả về thông báo sạch (dạng Display)
+/// cho frontend — dùng cho `.map_err(log_err)` ở tầng command.
+///
+/// Ghi log giữ nguyên `{e:?}` (ví dụ `AppError { message: "..." }`) để tiện chẩn đoán,
+/// nhưng chuỗi trả về frontend chỉ là nội dung message, không kèm wrapper.
+pub fn log_err(e: impl Debug + Display) -> String {
+    log::error!("{e:?}");
+    e.to_string()
 }

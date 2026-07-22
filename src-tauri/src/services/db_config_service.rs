@@ -6,7 +6,48 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::db_config::{DatabaseConfig, DatabaseStatus, SaveDatabaseConfigRequest};
+use crate::utils::network;
 use crate::utils::pgsql_connect::{self, PgConfig};
+
+/// Thông báo hướng dẫn khi máy không truy cập được mạng nội bộ công ty.
+const VPN_REQUIRED_MESSAGE: &str = "Không thể truy cập mạng nội bộ công ty. \
+Database chỉ kết nối được trong mạng nội bộ — vui lòng kết nối VPN công ty rồi thử lại.";
+
+/// Thử kết nối database; nếu thất bại thì chẩn đoán thêm nguyên nhân mạng.
+///
+/// Vì database không public ra ngoài (chỉ nằm trong mạng nội bộ công ty), khi
+/// không kết nối được ta xác minh mạng bằng hai tín hiệu (chạy song song):
+/// - `is_tcp_reachable`: có mở được TCP tới chính `host:port` của database không.
+/// - `is_company_egress_ip`: IP public hiện tại có phải IP công ty cấp không.
+///
+/// Kết luận **chưa vào mạng công ty / cần VPN** khi: không mở được TCP tới host
+/// database, HOẶC xác nhận IP public không thuộc dải công ty. Ngược lại (host
+/// mở được TCP và IP public hợp lệ/không xác định) → giữ nguyên lỗi gốc, vì đây
+/// là lỗi cấu hình/dịch vụ (host/port/user/password).
+async fn connect_with_network_check(config: &PgConfig) -> AppResult<()> {
+    match pgsql_connect::test_connection(config).await {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let (host_reachable, company_egress) = tokio::join!(
+                network::is_tcp_reachable(&config.host, config.port),
+                network::is_company_egress_ip(),
+            );
+            log::warn!(
+                "Kết nối database thất bại (host={}:{}, tcp_reachable={}, company_egress={:?}): {}",
+                config.host,
+                config.port,
+                host_reachable,
+                company_egress,
+                e
+            );
+            if !host_reachable || company_egress == Some(false) {
+                Err(AppError::new(VPN_REQUIRED_MESSAGE))
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
 
 /// Kiểm tra trạng thái cấu hình database.
 ///
@@ -25,7 +66,7 @@ pub async fn check_status() -> DatabaseStatus {
         }
     };
 
-    match pgsql_connect::test_connection(&config).await {
+    match connect_with_network_check(&config).await {
         Ok(_) => DatabaseStatus {
             configured: true,
             connected: true,
@@ -78,7 +119,7 @@ fn build_config(request: &SaveDatabaseConfigRequest) -> AppResult<PgConfig> {
 /// Dùng cho nút "Kiểm tra" trên màn hình cấu hình.
 pub async fn test_config(request: SaveDatabaseConfigRequest) -> AppResult<()> {
     let config = build_config(&request)?;
-    pgsql_connect::test_connection(&config).await
+    connect_with_network_check(&config).await
 }
 
 /// Lưu cấu hình database.
@@ -92,7 +133,7 @@ pub async fn save_config(request: SaveDatabaseConfigRequest) -> AppResult<Databa
     let config = build_config(&request)?;
 
     // Xác nhận kết nối được trước khi ghi cấu hình.
-    pgsql_connect::test_connection(&config).await?;
+    connect_with_network_check(&config).await?;
 
     // Ghi cấu hình xuống config.ini.
     config.save_to_ini()?;

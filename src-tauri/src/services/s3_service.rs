@@ -94,14 +94,11 @@ pub fn save_config(config: &S3Config) -> AppResult<()> {
 
 pub fn check_config() -> AppResult<()> {
     let config = load_config_from_ini()?;
-    if config.access_key_id.is_empty() {
-        return Err(AppError::new("AWS Access Key ID chưa được cấu hình."));
-    }
-    if config.secret_access_key.is_empty() {
-        return Err(AppError::new("AWS Secret Access Key chưa được cấu hình."));
-    }
-    if config.bucket.is_empty() {
-        return Err(AppError::new("AWS S3 Bucket chưa được cấu hình."));
+    if config.access_key_id.is_empty()
+        || config.secret_access_key.is_empty()
+        || config.bucket.is_empty()
+    {
+        return Err(AppError::new("Thông tin cấu hình S3 chưa được thiết lập"));
     }
     Ok(())
 }

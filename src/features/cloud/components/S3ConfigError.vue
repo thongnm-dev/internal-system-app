@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import { s3GetConfig, s3SaveConfig, type S3Config } from "@/tauri/commands/s3";
 import { useToast } from "@/shared/composables/useToast";
 
-defineProps<{
+const props = defineProps<{
   error: string;
   isChecking: boolean;
 }>();
@@ -14,6 +14,13 @@ defineProps<{
 const emit = defineEmits<{
   (event: "retry"): void;
 }>();
+
+// Chỉ lấy message từ backend (bóc tách wrapper 'AppError { message: "..." }') để hiển thị.
+const displayError = computed(() => {
+  const raw = props.error || "";
+  const match = raw.match(/message:\s*"([^"]*)"/);
+  return match ? match[1] : raw;
+});
 
 const toast = useToast();
 const showDialog = ref(false);
@@ -117,7 +124,7 @@ async function saveConfig() {
       </div>
 
       <div class="config-error-box rounded-md border px-4 py-2 text-sm">
-        {{ error }}
+        {{ displayError }}
       </div>
 
       <div class="flex gap-3">

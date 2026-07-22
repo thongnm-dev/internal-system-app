@@ -1,6 +1,6 @@
 //! Tiện ích kiểm tra kết nối mạng và lấy địa chỉ IP local.
 
-use std::net::{IpAddr, SocketAddr, TcpStream, UdpSocket};
+use std::net::{IpAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -51,7 +51,10 @@ pub async fn is_internet_reachable() -> bool {
     false
 }
 
-/// Đọc danh sách IP nội bộ từ `[IPADRESS]` trong `config.ini`.
+/// Đọc danh sách IP public công ty từ `[IPADRESS].IPADRESS_LIST` trong `config.ini`.
+///
+/// Đây là các IP egress mà công ty cấp để truy xuất ra ngoài — khi máy ở trong
+/// mạng công ty (hoặc VPN full-tunnel), IP public của máy sẽ là một trong số này.
 /// Trả về `Vec` rỗng nếu chưa cấu hình hoặc file không tồn tại.
 fn load_ip_list() -> Vec<IpAddr> {
     let path = app_config::config_path();
@@ -77,33 +80,90 @@ fn load_ip_list() -> Vec<IpAddr> {
         .collect()
 }
 
-/// Kiểm tra máy có nằm trong mạng nội bộ công ty (hoặc kết nối VPN) hay không.
+/// Danh sách endpoint trả về IP public (egress) của máy dưới dạng text thuần.
+const PUBLIC_IP_PROBES: [&str; 2] = [
+    "https://checkip.amazonaws.com",
+    "https://api.ipify.org",
+];
+
+/// Lấy địa chỉ IP public (egress) hiện tại của máy — tức IP mà internet nhìn thấy.
 ///
-/// Đọc danh sách IP từ `[IPADRESS].IPADRESS_LIST` trong `config.ini`.
-/// Nếu chưa cấu hình → trả `true` (bỏ qua kiểm tra).
-/// Nếu đã cấu hình → thử TCP connect tới từng IP; bất kỳ IP nào phản hồi
-/// (kể cả connection-refused) nghĩa là mạng nội bộ đang khả dụng.
-pub async fn is_internal_reachable() -> bool {
-    let ips = load_ip_list();
-    if ips.is_empty() {
-        return true;
-    }
+/// Thử lần lượt các endpoint, trả về IP đầu tiên parse được. Timeout: 5 giây.
+/// Trả `None` nếu không truy vấn được (mất mạng / timeout / phản hồi không hợp lệ).
+pub async fn public_ip() -> Option<IpAddr> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .ok()?;
 
-    for ip in ips {
-        let reachable = tokio::task::spawn_blocking(move || {
-            let addr = SocketAddr::new(ip, 80);
-            match TcpStream::connect_timeout(&addr, Duration::from_secs(3)) {
-                Ok(_) => true,
-                Err(e) => e.kind() == std::io::ErrorKind::ConnectionRefused,
+    for url in PUBLIC_IP_PROBES {
+        if let Ok(resp) = client.get(url).send().await {
+            if let Ok(text) = resp.text().await {
+                if let Ok(ip) = IpAddr::from_str(text.trim()) {
+                    return Some(ip);
+                }
             }
-        })
-        .await
-        .unwrap_or(false);
-
-        if reachable {
-            return true;
         }
     }
 
-    false
+    None
+}
+
+/// Xác nhận IP public hiện tại có nằm trong danh sách IP công ty cấp
+/// (`[IPADRESS].IPADRESS_LIST`) hay không.
+///
+/// - `Some(true)`  → IP public khớp IP công ty → đang ở trong mạng công ty / VPN.
+/// - `Some(false)` → lấy được IP public nhưng KHÔNG khớp → không ở mạng công ty.
+/// - `None`        → chưa cấu hình danh sách IP hoặc không lấy được IP public
+///   → không xác định được (không nên dùng để kết luận).
+pub async fn is_company_egress_ip() -> Option<bool> {
+    let ips = load_ip_list();
+    if ips.is_empty() {
+        return None;
+    }
+    let current = public_ip().await?;
+    Some(ips.contains(&current))
+}
+
+/// Kiểm tra máy có nằm trong mạng công ty (hoặc kết nối VPN) hay không.
+///
+/// Dựa trên xác nhận IP public: chỉ trả `false` khi chắc chắn IP public KHÔNG
+/// thuộc dải công ty. Nếu chưa cấu hình IP hoặc không lấy được IP public thì
+/// trả `true` (không chặn — tránh báo nhầm khi không đủ dữ liệu).
+pub async fn is_internal_reachable() -> bool {
+    !matches!(is_company_egress_ip().await, Some(false))
+}
+
+/// Kiểm tra có mở được kết nối TCP tới `host:port` hay không.
+///
+/// Dùng để phân biệt lỗi mạng (chưa vào mạng nội bộ / chưa VPN) với lỗi
+/// dịch vụ/cấu hình khi kết nối database thất bại:
+/// - `Ok` hoặc `ConnectionRefused` → host tồn tại trong mạng (chỉ là cổng
+///   không mở / dịch vụ chưa chạy) → coi như **reachable**.
+/// - Timeout / no route / DNS không resolve (thường gặp khi off-VPN với host
+///   nội bộ) → **không reachable**.
+pub async fn is_tcp_reachable(host: &str, port: u16) -> bool {
+    let host = host.trim().to_string();
+    if host.is_empty() {
+        return false;
+    }
+
+    tokio::task::spawn_blocking(move || {
+        let addrs = match (host.as_str(), port).to_socket_addrs() {
+            Ok(addrs) => addrs,
+            // Không resolve được DNS (vd hostname nội bộ khi chưa VPN).
+            Err(_) => return false,
+        };
+
+        for addr in addrs {
+            match TcpStream::connect_timeout(&addr, Duration::from_secs(3)) {
+                Ok(_) => return true,
+                Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => return true,
+                Err(_) => continue,
+            }
+        }
+        false
+    })
+    .await
+    .unwrap_or(false)
 }
