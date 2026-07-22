@@ -65,7 +65,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),
     ('cloudS3Download', 'S3 Download',       '/cloud/s3-download', 'pi-download',   'Cloud',      TRUE, 12),
-    ('cloudS3UploadHistory', 'S3 Upload History', '/cloud/s3-upload-history', 'pi-history', 'Cloud', true, 13),
+    ('cloudS3UploadHistory', 'S3 Upload History', '/cloud/s3-upload-history', 'pi-check-square', 'Cloud', true, 13),
     ('cloudS3DownloadHistory', 'S3 Download History', '/cloud/s3-download-history', 'pi-history', 'Cloud', true, 14),
     ('aiChat',          'AI Chat',           '/ai/chat',           'pi-comments',   'AI Agent',   TRUE, 15),
     ('aiUsage',         'AI Usage',          '/ai/usage',          'pi-chart-bar',  'AI Agent',   TRUE, 16),
