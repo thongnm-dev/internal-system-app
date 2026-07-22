@@ -96,6 +96,18 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Download files from S3 storage to local directories.",
   },
   {
+    key: "cloudS3DownloadHistory",
+    path: "/cloud/s3-download-history",
+    title: "S3 Download History",
+    subtitle: "Search and review S3 download history records.",
+  },
+  {
+    key: "cloudS3UploadHistory",
+    path: "/cloud/s3-upload-history",
+    title: "S3 Upload History",
+    subtitle: "Search and review S3 upload history records.",
+  },
+  {
     key: "aiChat",
     path: "/ai/chat",
     title: "AI Chat",
@@ -141,6 +153,20 @@ export const appRoutes: AppRoute[] = [
     requiresAuth: true,
     title: "Logs",
     subtitle: "View system activity logs and audit trails.",
+  },
+  {
+    key: "governanceAppConfig",
+    path: "/governance/app-config",
+    requiresAuth: true,
+    title: "App Config",
+    subtitle: "View and edit application configuration (config.ini).",
+  },
+  {
+    key: "governanceStoreProcedure",
+    path: "/governance/store-procedure",
+    requiresAuth: true,
+    title: "Store Procedure",
+    subtitle: "Manage and execute CREATE OR REPLACE for all stored procedures.",
   },
   {
     key: "settings",
@@ -294,6 +320,16 @@ export const vueRoutes: RouteRecordRaw[] = [
     meta: { key: "cloudS3Download" as MenuKey },
   },
   {
+    path: "/cloud/s3-download-history",
+    component: () => import("@/features/cloud/components/S3DownloadHistoryPage.vue"),
+    meta: { key: "cloudS3DownloadHistory" as MenuKey },
+  },
+  {
+    path: "/cloud/s3-upload-history",
+    component: () => import("@/features/cloud/components/S3UploadHistoryPage.vue"),
+    meta: { key: "cloudS3UploadHistory" as MenuKey },
+  },
+  {
     path: "/ai/chat",
     component: () => import("@/features/ai-agent/components/AiChatPage.vue"),
     meta: { key: "aiChat" as MenuKey },
@@ -327,6 +363,16 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/governance/logs",
     component: () => import("@/features/governance/components/GovernanceLogsPage.vue"),
     meta: { key: "governanceLogs" as MenuKey, requiresAuth: true },
+  },
+  {
+    path: "/governance/app-config",
+    component: () => import("@/features/governance/components/AppConfigPage.vue"),
+    meta: { key: "governanceAppConfig" as MenuKey, requiresAuth: true },
+  },
+  {
+    path: "/governance/store-procedure",
+    component: () => import("@/features/governance/components/StoreProcedurePage.vue"),
+    meta: { key: "governanceStoreProcedure" as MenuKey, requiresAuth: true },
   },
   {
     path: "/settings",

@@ -1,0 +1,224 @@
+<script setup lang="ts">
+import { onMounted } from "vue";
+import DataTable from "primevue/datatable";
+import Column from "primevue/column";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import Dialog from "primevue/dialog";
+import SelectButton from "primevue/selectbutton";
+import { ref } from "vue";
+import { useStoreProcedure } from "../composables/useStoreProcedure";
+import { useToast } from "@/shared/composables/useToast";
+
+const ctrl = useStoreProcedure();
+const toast = useToast();
+const confirmExecute = ref(false);
+
+function openConfirm() {
+  confirmExecute.value = true;
+}
+
+async function handleExecute() {
+  confirmExecute.value = false;
+  const allOk = await ctrl.executeAll();
+  if (allOk) {
+    toast.success(`All ${ctrl.summary.value?.total} stored procedures executed successfully.`);
+  } else {
+    toast.error(
+      `${ctrl.summary.value?.error_count} of ${ctrl.summary.value?.total} stored procedures failed.`,
+    );
+  }
+}
+
+const statusOptions = [
+  { label: "All", value: "all" },
+  { label: "Success", value: "success" },
+  { label: "Error", value: "error" },
+];
+
+onMounted(() => ctrl.init());
+</script>
+
+<template>
+  <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+    <!-- Error banner -->
+    <p
+      v-if="ctrl.error.value"
+      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+    >
+      {{ ctrl.error.value }}
+    </p>
+
+    <!-- Action bar -->
+    <section class="flex items-center justify-between rounded-lg border border-divider bg-panel p-4 shadow-sm">
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-muted">
+          {{ ctrl.procedures.value.length }} stored procedures
+        </span>
+        <template v-if="ctrl.hasResults.value && ctrl.summary.value">
+          <span class="text-xs text-muted">|</span>
+          <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 dark:bg-green-950 dark:text-green-400">
+            <i class="pi pi-check text-[10px]" />
+            {{ ctrl.summary.value.success_count }}
+          </span>
+          <span
+            v-if="ctrl.summary.value.error_count > 0"
+            class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-400"
+          >
+            <i class="pi pi-times text-[10px]" />
+            {{ ctrl.summary.value.error_count }}
+          </span>
+        </template>
+      </div>
+      <div class="flex items-center gap-2">
+        <Button
+          v-if="ctrl.hasResults.value"
+          icon="pi pi-refresh"
+          label="Reset"
+          severity="secondary"
+          outlined
+          @click="ctrl.resetResults()"
+        />
+        <Button
+          icon="pi pi-database"
+          label="Execute All"
+          severity="warning"
+          :loading="ctrl.executing.value"
+          @click="openConfirm"
+        />
+      </div>
+    </section>
+
+    <!-- Filter bar -->
+    <section class="flex items-center gap-3 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm">
+      <InputText
+        class="h-9 w-64"
+        placeholder="Filter by name..."
+        :model-value="ctrl.filterText.value"
+        @update:model-value="ctrl.filterText.value = $event as string"
+      />
+      <SelectButton
+        v-if="ctrl.hasResults.value"
+        :model-value="ctrl.filterStatus.value"
+        :options="statusOptions"
+        option-label="label"
+        option-value="value"
+        :allow-empty="false"
+        @update:model-value="ctrl.filterStatus.value = $event"
+      />
+    </section>
+
+    <!-- SP table -->
+    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+      <DataTable
+        class="app-data-table min-h-0"
+        :empty-message="ctrl.loading.value ? 'Loading...' : 'No stored procedures found.'"
+        scrollable
+        scroll-height="flex"
+        :table-style="{ minWidth: '640px' }"
+        :value="ctrl.filteredResults.value"
+        paginator
+        :rows="50"
+        :rows-per-page-options="[30, 50, 100]"
+        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+      >
+        <Column header="#" body-class="font-mono text-xs text-muted" :style="{ width: '60px' }">
+          <template #body="{ index }">
+            {{ index + 1 }}
+          </template>
+        </Column>
+        <Column field="name" header="Procedure Name">
+          <template #body="{ data }">
+            <div class="flex items-center gap-2.5">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">
+                <i class="pi pi-code text-xs" />
+              </span>
+              <span class="font-mono text-sm font-semibold text-ink">{{ data.name }}</span>
+            </div>
+          </template>
+        </Column>
+        <Column header="Status" header-class="text-center" body-class="text-center" :style="{ width: '120px' }">
+          <template #body="{ data }">
+            <template v-if="ctrl.hasResults.value">
+              <span
+                v-if="data.success"
+                class="inline-flex items-center gap-1 rounded-md bg-green-50 px-2.5 py-1 text-xs font-bold text-green-700 dark:bg-green-950 dark:text-green-400"
+              >
+                <i class="pi pi-check-circle text-[11px]" />
+                OK
+              </span>
+              <span
+                v-else
+                class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700 dark:bg-red-950 dark:text-red-400"
+              >
+                <i class="pi pi-times-circle text-[11px]" />
+                Error
+              </span>
+            </template>
+            <span
+              v-else
+              class="inline-flex items-center gap-1 rounded-md bg-canvas px-2.5 py-1 text-xs text-muted"
+            >
+              <i class="pi pi-minus text-[11px]" />
+              Pending
+            </span>
+          </template>
+        </Column>
+        <Column header="Message" :style="{ minWidth: '200px' }">
+          <template #body="{ data }">
+            <span
+              v-if="ctrl.hasResults.value && data.message && data.message !== 'OK'"
+              :class="[
+                'text-xs',
+                data.success ? 'text-muted' : 'text-red-600 dark:text-red-400',
+              ]"
+            >
+              {{ data.message }}
+            </span>
+            <span v-else class="text-xs text-muted">—</span>
+          </template>
+        </Column>
+      </DataTable>
+    </section>
+
+    <!-- Confirm dialog -->
+    <Dialog
+      :visible="confirmExecute"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="confirmExecute = $event"
+    >
+      <template #header>
+        <h3 class="font-bold text-ink">Confirm Execute</h3>
+      </template>
+      <div class="space-y-3">
+        <p class="text-sm text-secondary">
+          This will run <strong>CREATE OR REPLACE</strong> for all
+          <strong>{{ ctrl.procedures.value.length }}</strong> stored procedures
+          against the connected database.
+        </p>
+        <p class="text-xs text-muted">
+          Existing functions will be replaced. This action is safe for production databases
+          as it only updates function definitions.
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <Button
+            label="Cancel"
+            severity="secondary"
+            @click="confirmExecute = false"
+          />
+          <Button
+            icon="pi pi-database"
+            label="Execute All"
+            severity="warning"
+            @click="handleExecute"
+          />
+        </div>
+      </template>
+    </Dialog>
+  </section>
+</template>

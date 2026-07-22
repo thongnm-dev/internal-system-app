@@ -69,3 +69,56 @@ export interface DeleteUploadedItem {
 export interface DownloadAvailability {
   downloadAvailable: boolean;
 }
+
+export interface DownloadByStorageResult {
+  success: boolean;
+  message: string;
+  processed: number;
+  failed: number;
+  syncPath: string;
+}
+
+export interface DownloadHistorySearchParams {
+  fromDate: string;
+  toDate: string;
+  awsCd: string;
+  bugNo: string;
+  isMovedAtLocal: boolean;
+  isMovedAtS3: boolean;
+}
+
+export interface DownloadHistorySearchItem {
+  id: number;
+  downloadYmd: string;
+  awsCd: string;
+  awsName: string;
+  isMovedAtLocal: boolean;
+  bugNo: string;
+}
+
+export interface UploadHistorySearchParams {
+  fromDate: string;
+  toDate: string;
+  awsCd: string;
+  bugNo: string;
+  isMovedAtS3: boolean;
+}
+
+export interface UploadHistorySearchItem {
+  uploadYmd: string;
+  awsName: string;
+  isMovedAtS3: boolean;
+  bugNo: string;
+  attFiles: string;
+}
+
+export interface DownloadHistoryItem {
+  id: number;
+  downloadYmd: string;
+  downloadHms: string;
+  syncPath: string;
+  downloadCount: number;
+  isMovedAtLocal: boolean;
+  awsName: string;
+  awsNameAlias: string;
+}

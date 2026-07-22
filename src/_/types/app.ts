@@ -12,6 +12,8 @@ export type MenuKey =
   | "cloudS3"
   | "cloudS3Upload"
   | "cloudS3Download"
+  | "cloudS3DownloadHistory"
+  | "cloudS3UploadHistory"
   | "aiChat"
   | "aiUsage"
   | "governanceMenus"
@@ -19,6 +21,8 @@ export type MenuKey =
   | "governanceRoles"
   | "governancePermissions"
   | "governanceLogs"
+  | "governanceAppConfig"
+  | "governanceStoreProcedure"
   | "copyTools"
   | "settings";
 

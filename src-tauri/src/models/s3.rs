@@ -91,3 +91,68 @@ pub struct S3OperationResult {
     pub processed: u32,
     pub failed: u32,
 }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadByStorageResult {
+    pub success: bool,
+    pub message: String,
+    pub processed: u32,
+    pub failed: u32,
+    pub sync_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadHistorySearchParams {
+    pub from_date: String,
+    pub to_date: String,
+    pub aws_cd: String,
+    pub bug_no: String,
+    pub is_moved_at_local: bool,
+    pub is_moved_at_s3: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadHistorySearchItem {
+    pub id: i32,
+    pub download_ymd: String,
+    pub aws_cd: String,
+    pub aws_name: String,
+    pub is_moved_at_local: bool,
+    pub bug_no: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadHistoryItem {
+    pub id: i32,
+    pub download_ymd: String,
+    pub download_hms: String,
+    pub sync_path: String,
+    pub download_count: i32,
+    pub is_moved_at_local: bool,
+    pub aws_name: String,
+    pub aws_name_alias: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadHistorySearchParams {
+    pub from_date: String,
+    pub to_date: String,
+    pub aws_cd: String,
+    pub bug_no: String,
+    pub is_moved_at_s3: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadHistorySearchItem {
+    pub upload_ymd: String,
+    pub aws_name: String,
+    pub is_moved_at_s3: bool,
+    pub bug_no: String,
+    pub att_files: String,
+}

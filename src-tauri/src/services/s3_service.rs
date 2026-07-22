@@ -1,6 +1,6 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
 use crate::utils::app_config;
 
 use aws_config::Region;
@@ -504,6 +504,8 @@ pub async fn upload_files(
     storage_name: String,
     subscribe: String,
     create_folder_same_name: bool,
+    aws_cd: String,
+    user_id: String,
 ) -> AppResult<S3OperationResult> {
     let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
 
@@ -557,6 +559,34 @@ pub async fn upload_files(
         }
     }
 
+    if processed > 0 {
+        let now = chrono::Local::now();
+        let date_ymd = now.format("%Y%m%d").to_string();
+        let time_hms = now.format("%H%M%S").to_string();
+
+        let details: Vec<crate::database::upload_store::UploadFileDetail> = files
+            .iter()
+            .map(|f| crate::database::upload_store::UploadFileDetail {
+                bug_no: f.parent_name.clone(),
+                file_name: f.name.clone(),
+                file_path: f.local_path.clone(),
+            })
+            .collect();
+
+        if let Err(e) = crate::database::upload_store::insert_upload(
+            &aws_cd,
+            &date_ymd,
+            &time_hms,
+            &user_id,
+            create_folder_same_name,
+            &details,
+        )
+        .await
+        {
+            eprintln!("Failed to save upload history: {e}");
+        }
+    }
+
     let message = if errors.is_empty() {
         format!("Uploaded {processed} file(s) successfully.")
     } else {
@@ -572,6 +602,12 @@ pub async fn upload_files(
         processed,
         failed,
     })
+}
+
+pub async fn search_upload_history(
+    params: UploadHistorySearchParams,
+) -> AppResult<Vec<UploadHistorySearchItem>> {
+    crate::database::upload_store::search_upload_history(&params).await
 }
 
 pub async fn scan_local_folder(folder_path: String) -> AppResult<Vec<LocalFileEntry>> {
@@ -766,8 +802,9 @@ pub async fn download_by_storage(
     code: String,
     bug_list: Vec<String>,
     local_path: String,
-) -> AppResult<S3OperationResult> {
-    let storages = crate::database::aws_storage_store::list_by_codes(&[code]).await?;
+    user_id: String,
+) -> AppResult<DownloadByStorageResult> {
+    let storages = crate::database::aws_storage_store::list_by_codes(&[code.clone()]).await?;
     let storage = storages
         .first()
         .ok_or_else(|| AppError::new("Storage not found".to_string()))?;
@@ -777,10 +814,25 @@ pub async fn download_by_storage(
 
     let config = load_config_from_ini()?;
     let (client, bucket) = build_client(&config)?;
-    let dest = Path::new(&local_path);
+
+    let now = chrono::Local::now();
+    let date_ymd = now.format("%Y%m%d").to_string();
+    let time_hm = now.format("%H%M").to_string();
+    let time_hms = now.format("%H%M%S").to_string();
+
+    let sync_path = format!(
+        "{}/{}/{}/{}",
+        local_path.trim_end_matches(['/', '\\']),
+        storage.name,
+        date_ymd,
+        time_hm
+    );
+    let dest = Path::new(&sync_path);
+
     let mut processed: u32 = 0;
     let mut failed: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
+    let mut download_details: Vec<crate::database::download_store::DownloadDetail> = Vec::new();
 
     for bug in &bug_list {
         let prefix = format!("{}{}/", base_prefix, bug);
@@ -812,6 +864,12 @@ pub async fn download_by_storage(
                                     errors.push(format!("{key}: write failed: {e}"));
                                 } else {
                                     processed += 1;
+                                    download_details.push(
+                                        crate::database::download_store::DownloadDetail {
+                                            bug_no: bug.clone(),
+                                            sync_path: local_file.to_string_lossy().to_string(),
+                                        },
+                                    );
                                 }
                             }
                             Err(e) => {
@@ -833,6 +891,21 @@ pub async fn download_by_storage(
         }
     }
 
+    if !download_details.is_empty() {
+        if let Err(e) = crate::database::download_store::insert_download(
+            &code,
+            &date_ymd,
+            &time_hms,
+            &user_id,
+            &sync_path,
+            &download_details,
+        )
+        .await
+        {
+            eprintln!("Failed to save download history: {e}");
+        }
+    }
+
     let message = if errors.is_empty() {
         format!("Tải về thành công {processed} tập tin.")
     } else {
@@ -842,12 +915,27 @@ pub async fn download_by_storage(
         )
     };
 
-    Ok(S3OperationResult {
+    Ok(DownloadByStorageResult {
         success: failed == 0,
         message,
         processed,
         failed,
+        sync_path,
     })
+}
+
+pub async fn get_download_history(user_id: String) -> AppResult<Vec<DownloadHistoryItem>> {
+    crate::database::download_store::get_download_history(&user_id).await
+}
+
+pub async fn search_download_history(
+    params: DownloadHistorySearchParams,
+) -> AppResult<Vec<DownloadHistorySearchItem>> {
+    crate::database::download_store::search_download_history(&params).await
+}
+
+pub async fn update_download_moved_local(id: i32, path_copied: String) -> AppResult<()> {
+    crate::database::download_store::update_moved_at_local(id, &path_copied).await
 }
 
 pub async fn move_s3_objects(
@@ -911,6 +999,12 @@ pub async fn move_s3_objects(
                 failed += 1;
                 errors.push(format!("{item}: list failed: {e}"));
             }
+        }
+    }
+
+    if processed > 0 {
+        if let Err(e) = crate::database::download_store::update_moved_at_s3(&code, &items).await {
+            eprintln!("Failed to update is_moved_at_s3: {e}");
         }
     }
 

@@ -7,12 +7,15 @@ import {
   s3DownloadByStorage,
   s3MoveObjects,
   s3DeleteByStorage,
+  s3GetDownloadHistory,
+  s3UpdateDownloadMovedLocal,
 } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { AwsStorage, DownloadAvailability } from "@/_/types/s3";
+import type { AwsStorage, DownloadAvailability, DownloadHistoryItem } from "@/_/types/s3";
 import { useCloudGuard } from "./useCloudGuard";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
+import { useAuthStore } from "@/app/stores/auth";
 
 const POLL_INTERVAL = 15 * 60 * 1000;
 
@@ -20,11 +23,13 @@ export function useS3Download() {
   const guard = useCloudGuard();
   const toast = useToast();
   const loading = useGlobalLoading();
+  const authStore = useAuthStore();
 
   const downloadStorages = ref<AwsStorage[]>([]);
   const downloadable = ref<Record<string, DownloadAvailability>>({});
   const isLoading = ref(false);
   const isReloading = ref(false);
+  const downloadHistory = ref<DownloadHistoryItem[]>([]);
 
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -98,19 +103,24 @@ export function useS3Download() {
     code: string,
     bugList: string[],
     localPath: string,
-  ) {
-    if (bugList.length === 0) return;
-    if (!(await guard.ensureOnline())) return;
+  ): Promise<string | null> {
+    if (bugList.length === 0) return null;
+    if (!(await guard.ensureOnline())) return null;
     loading.start();
     try {
-      const result = await s3DownloadByStorage(code, bugList, localPath);
+      const userId = authStore.user?.username || "";
+      const result = await s3DownloadByStorage(code, bugList, localPath, userId);
       if (result.success) {
         toast.success(result.message);
+        await loadHistory();
+        return result.syncPath;
       } else {
         toast.error(result.message);
+        return null;
       }
     } catch (e) {
       toast.error(friendlyError(e));
+      return null;
     } finally {
       loading.stop();
     }
@@ -152,6 +162,27 @@ export function useS3Download() {
     }
   }
 
+  async function updateMovedLocal(id: number, pathCopied: string) {
+    try {
+      await s3UpdateDownloadMovedLocal(id, pathCopied);
+      await loadHistory();
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
+  async function loadHistory() {
+    if (!canUseTauriRuntime()) return;
+    try {
+      const userId = authStore.user?.username || "";
+      if (userId) {
+        downloadHistory.value = await s3GetDownloadHistory(userId);
+      }
+    } catch {
+      // silent — history is non-critical
+    }
+  }
+
   function startPolling() {
     stopPolling();
     pollTimer = setInterval(() => {
@@ -168,6 +199,7 @@ export function useS3Download() {
 
   onMounted(() => {
     loadDownloadStorages();
+    loadHistory();
     startPolling();
   });
 
@@ -182,6 +214,7 @@ export function useS3Download() {
     isReloading,
     hasDownloadable,
     downloadableStorages,
+    downloadHistory,
 
     showOfflineDialog: guard.showOfflineDialog,
     offlineMessage: guard.offlineMessage,
@@ -195,5 +228,7 @@ export function useS3Download() {
     moveObjects,
     deleteObjects,
     checkAvailability,
+    loadHistory,
+    updateMovedLocal,
   };
 }

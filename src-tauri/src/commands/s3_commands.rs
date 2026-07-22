@@ -1,4 +1,4 @@
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3Config, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest};
+use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
 use std::collections::HashMap;
 use crate::services::s3_service;
 
@@ -105,8 +105,19 @@ pub async fn s3_upload_files(
     storage_name: String,
     subscribe: String,
     create_folder_same_name: bool,
+    aws_cd: String,
+    user_id: String,
 ) -> Result<S3OperationResult, String> {
-    s3_service::upload_files(files, storage_name, subscribe, create_folder_same_name)
+    s3_service::upload_files(files, storage_name, subscribe, create_folder_same_name, aws_cd, user_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_search_upload_history(
+    params: UploadHistorySearchParams,
+) -> Result<Vec<UploadHistorySearchItem>, String> {
+    s3_service::search_upload_history(params)
         .await
         .map_err(|e| e.to_string())
 }
@@ -162,8 +173,37 @@ pub async fn s3_download_by_storage(
     code: String,
     bug_list: Vec<String>,
     local_path: String,
-) -> Result<S3OperationResult, String> {
-    s3_service::download_by_storage(code, bug_list, local_path)
+    user_id: String,
+) -> Result<DownloadByStorageResult, String> {
+    s3_service::download_by_storage(code, bug_list, local_path, user_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_get_download_history(
+    user_id: String,
+) -> Result<Vec<DownloadHistoryItem>, String> {
+    s3_service::get_download_history(user_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_update_download_moved_local(
+    id: i32,
+    path_copied: String,
+) -> Result<(), String> {
+    s3_service::update_download_moved_local(id, path_copied)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn s3_search_download_history(
+    params: DownloadHistorySearchParams,
+) -> Result<Vec<DownloadHistorySearchItem>, String> {
+    s3_service::search_download_history(params)
         .await
         .map_err(|e| e.to_string())
 }

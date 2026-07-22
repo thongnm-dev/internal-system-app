@@ -16,3 +16,10 @@ pub fn get_system_info() -> SystemInfo {
 pub async fn check_internet_connection() -> bool {
     network_service::check_connection().await
 }
+
+/// Kiểm tra máy có nằm trong mạng nội bộ công ty (hoặc VPN) hay không.
+/// Trả về `true` nếu chưa cấu hình IP nội bộ hoặc ít nhất một IP phản hồi.
+#[tauri::command]
+pub async fn check_internal_connection() -> bool {
+    network_service::check_internal().await
+}

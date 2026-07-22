@@ -17,5 +17,5 @@ src/**/*.d.ts.map
 src-tauri/target/
 src-tauri/config.ini
 src-tauri/config/
-**toolsold/**
+**toolold/**
 **~/**

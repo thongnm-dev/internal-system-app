@@ -8,3 +8,7 @@ export function getSystemInfo() {
 export function checkInternetConnection() {
   return safeInvoke<boolean>("check_internet_connection");
 }
+
+export function checkInternalConnection() {
+  return safeInvoke<boolean>("check_internal_connection");
+}

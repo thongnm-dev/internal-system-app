@@ -1,5 +1,5 @@
 import { safeInvoke } from "./_base";
-import type { AwsStorage, DeleteUploadedItem, DownloadAvailability, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest } from "@/_/types/s3";
+import type { AwsStorage, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams } from "@/_/types/s3";
 
 export type S3Config = {
   accessKeyId: string;
@@ -53,8 +53,12 @@ export function s3ScanUploadFolder(dirPath: string) {
   return safeInvoke<ScannedFile[]>("s3_scan_upload_folder", { dirPath });
 }
 
-export function s3UploadFiles(files: UploadFileRequest[], storageName: string, subscribe: string, createFolderSameName: boolean) {
-  return safeInvoke<S3OperationResult>("s3_upload_files", { files, storageName, subscribe, createFolderSameName });
+export function s3UploadFiles(files: UploadFileRequest[], storageName: string, subscribe: string, createFolderSameName: boolean, awsCd: string, userId: string) {
+  return safeInvoke<S3OperationResult>("s3_upload_files", { files, storageName, subscribe, createFolderSameName, awsCd, userId });
+}
+
+export function s3SearchUploadHistory(params: UploadHistorySearchParams) {
+  return safeInvoke<UploadHistorySearchItem[]>("s3_search_upload_history", { params });
 }
 
 export function s3ListDeleteOptions(destinationCode: string) {
@@ -85,8 +89,20 @@ export function s3GetDownloadList(code: string) {
   return safeInvoke<string[]>("s3_get_download_list", { code });
 }
 
-export function s3DownloadByStorage(code: string, bugList: string[], localPath: string) {
-  return safeInvoke<S3OperationResult>("s3_download_by_storage", { code, bugList, localPath });
+export function s3DownloadByStorage(code: string, bugList: string[], localPath: string, userId: string) {
+  return safeInvoke<DownloadByStorageResult>("s3_download_by_storage", { code, bugList, localPath, userId });
+}
+
+export function s3GetDownloadHistory(userId: string) {
+  return safeInvoke<DownloadHistoryItem[]>("s3_get_download_history", { userId });
+}
+
+export function s3UpdateDownloadMovedLocal(id: number, pathCopied: string) {
+  return safeInvoke<void>("s3_update_download_moved_local", { id, pathCopied });
+}
+
+export function s3SearchDownloadHistory(params: DownloadHistorySearchParams) {
+  return safeInvoke<DownloadHistorySearchItem[]>("s3_search_download_history", { params });
 }
 
 export function s3MoveObjects(code: string, items: string[]) {

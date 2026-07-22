@@ -29,7 +29,7 @@ use commands::project_commands::{
     update_project, update_project_task,
 };
 use commands::settings_commands::{get_settings, save_settings};
-use commands::system_commands::{check_internet_connection, get_system_info};
+use commands::system_commands::{check_internal_connection, check_internet_connection, get_system_info};
 use commands::user_commands::{
     change_user_password, create_user, delete_user, get_staff_no, get_user_detail, list_roles,
     list_users, update_user,
@@ -69,14 +69,18 @@ use commands::sql_editor_commands::{
     sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
     sql_save_connection, sql_test_connection,
 };
+use commands::app_config_commands::{
+    execute_stored_procedures, get_app_config, list_stored_procedures, save_app_config,
+};
 use commands::s3_commands::{
     s3_check_config, s3_check_download_available, s3_create_folder, s3_delete_by_storage,
     s3_delete_objects, s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
-    s3_get_browser_allowed_prefixes, s3_get_config, s3_get_download_list,
-    s3_list_delete_options, s3_list_download_storages, s3_list_objects,
+    s3_get_browser_allowed_prefixes, s3_get_config, s3_get_download_history,
+    s3_get_download_list, s3_list_delete_options, s3_list_download_storages, s3_list_objects,
     s3_list_upload_storages, s3_move_browser_objects, s3_move_objects, s3_save_config,
-    s3_scan_local_folder, s3_scan_upload_folder, s3_test_connection, s3_upload_file,
-    s3_upload_files, s3_upload_folder,
+    s3_scan_local_folder, s3_scan_upload_folder, s3_search_download_history,
+    s3_search_upload_history, s3_test_connection, s3_update_download_moved_local,
+    s3_upload_file, s3_upload_files, s3_upload_folder,
 };
 
 /// Khởi chạy ứng dụng Tauri desktop.
@@ -129,6 +133,7 @@ pub fn run() {
             // === System commands ===
             get_system_info,
             check_internet_connection,
+            check_internal_connection,
             // === Database config commands ===
             check_database_status,
             get_database_config,
@@ -239,6 +244,10 @@ pub fn run() {
             s3_move_objects,
             s3_move_browser_objects,
             s3_delete_by_storage,
+            s3_get_download_history,
+            s3_search_download_history,
+            s3_update_download_moved_local,
+            s3_search_upload_history,
             s3_get_browser_allowed_prefixes,
             // === Sync commands ===
             sync_daily_report,
@@ -284,7 +293,13 @@ pub fn run() {
             sql_delete_connection,
             sql_test_connection,
             sql_get_schema,
-            sql_run_query
+            sql_run_query,
+            // === App Config commands ===
+            get_app_config,
+            save_app_config,
+            // === Store Procedure management commands ===
+            list_stored_procedures,
+            execute_stored_procedures
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

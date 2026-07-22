@@ -61,6 +61,8 @@ mod commands {
     pub mod sql_editor_commands;
     /// Commands cho import CSV issue (parse file CSV issue từ frontend).
     pub mod issue_csv_commands;
+    /// Commands cho cấu hình ứng dụng (config.ini) và quản lý Store Procedure.
+    pub mod app_config_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -85,6 +87,10 @@ mod database {
     pub mod menu_permission_store;
     /// Data access cho bảng `aws_storage` (PostgreSQL).
     pub mod aws_storage_store;
+    /// Data access cho bảng `download_hdr` và `download_dtl` (lịch sử download S3).
+    pub mod download_store;
+    /// Data access cho bảng `upload_hdr`, `upload_dtl`, `upload_attach` (lịch sử upload S3).
+    pub mod upload_store;
     /// Lưu trữ cục bộ (JSON file) danh sách account AI + cấu hình usage.
     pub mod ai_account_store;
     /// Lưu OAuth token đã capture của account subscription vào profile (app data dir).
@@ -143,6 +149,8 @@ mod models {
     pub mod sql_editor;
     /// Model cho import CSV issue.
     pub mod issue_csv;
+    /// Model cho cấu hình ứng dụng (config.ini) và quản lý Store Procedure.
+    pub mod app_config;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -207,6 +215,10 @@ mod services {
     pub mod sql_editor_service;
     /// Service parse CSV issue (dùng CsvReader có sẵn).
     pub mod issue_csv_service;
+    /// Service đọc/ghi toàn bộ config.ini.
+    pub mod app_config_service;
+    /// Service quản lý Store Procedure — liệt kê và thực thi CREATE OR REPLACE.
+    pub mod sp_management_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

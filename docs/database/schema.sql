@@ -317,6 +317,68 @@ CREATE TABLE IF NOT EXISTS aws_storage (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ===========================================================================
+-- DOWNLOAD HISTORY
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS download_hdr (
+    id SERIAL PRIMARY KEY,
+    download_ymd VARCHAR(8) NOT NULL,
+    download_hms VARCHAR(6) NOT NULL,
+    aws_cd VARCHAR(3) NOT NULL DEFAULT '',
+    sync_path VARCHAR(255) NOT NULL DEFAULT '',
+    download_count INT NOT NULL DEFAULT 0,
+    is_moved_at_local BOOLEAN DEFAULT FALSE,
+    created_by VARCHAR(100) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS download_dtl (
+    id SERIAL PRIMARY KEY,
+    download_id INT NOT NULL,
+    bug_no VARCHAR(100) NOT NULL,
+    last_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sync_path VARCHAR(255) NOT NULL DEFAULT '',
+    path_copied VARCHAR(255) NOT NULL DEFAULT '',
+    is_moved_at_s3 BOOLEAN DEFAULT FALSE,
+    is_bug_created BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- ===========================================================================
+-- UPLOAD HISTORY
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS upload_hdr (
+    id SERIAL PRIMARY KEY,
+    upload_ymd VARCHAR(8) NOT NULL,
+    upload_hms VARCHAR(6) NOT NULL,
+    aws_cd VARCHAR(3) NOT NULL DEFAULT '',
+    is_moved_at_s3 BOOLEAN DEFAULT FALSE,
+    upload_count INT NOT NULL DEFAULT 0,
+    created_by VARCHAR(100) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_upload_one ON upload_hdr (upload_ymd, upload_hms, aws_cd);
+
+CREATE TABLE IF NOT EXISTS upload_dtl (
+    id SERIAL PRIMARY KEY,
+    upload_id INT NOT NULL,
+    bug_no VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS upload_attach (
+    id SERIAL PRIMARY KEY,
+    upload_id INT NOT NULL,
+    upload_dtl_id INT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 -- ============================================================================
 -- TRIGGERS — auto-update updated_at
 -- ============================================================================

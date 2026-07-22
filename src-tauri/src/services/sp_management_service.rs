@@ -1,57 +1,12 @@
-//! Khởi tạo database khi ứng dụng khởi động.
-//!
-//! Tạo bảng và stored procedure nếu chưa tồn tại.
-//! Được gọi một lần duy nhất trong Tauri setup hook.
+//! Business logic cho quản lý Store Procedure — liệt kê và thực thi CREATE OR REPLACE.
 
-use crate::app::error::AppError;
 use crate::app::result::AppResult;
+use crate::models::app_config::{SpExecutionResult, SpExecutionSummary, SpInfo};
 use crate::utils::pgsql_connect;
-use tokio_postgres::Client;
 
-/// Khởi tạo database: kết nối, tạo bảng, tạo stored procedure, seed dữ liệu.
-///
-/// Tạo bảng trước (fail-fast nếu lỗi), sau đó chạy stored procedures và seed data
-/// độc lập — nếu một số SP fail thì các SP còn lại và seed data vẫn được thực thi.
-pub async fn init() -> AppResult<()> {
-    let client = pgsql_connect::connect().await?;
-
-    client
-        .batch_execute(include_str!("../../../docs/database/schema.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to create tables: {e}")))?;
-
-    let mut errors = Vec::new();
-
-    if let Err(e) = ensure_stored_procedures(&client).await {
-        errors.push(e.to_string());
-    }
-
-    if let Err(e) = seed_data(&client).await {
-        errors.push(e.to_string());
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AppError::new(errors.join("\n")))
-    }
-}
-
-/// Seed dữ liệu mặc định: tạo role admin và user admin nếu chưa tồn tại.
-async fn seed_data(client: &Client) -> AppResult<()> {
-    client
-        .batch_execute(include_str!("../../../docs/database/seed_data.sql"))
-        .await
-        .map_err(|e| AppError::new(format!("Failed to seed data: {e}")))?;
-
-    Ok(())
-}
-
-/// Tạo hoặc cập nhật toàn bộ stored procedure từ các file SQL.
-///
-/// Thực thi tất cả SP và thu thập lỗi thay vì dừng lại ở SP đầu tiên bị lỗi.
-async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
-    let procedures: &[(&str, &str)] = &[
+/// Danh sách toàn bộ stored procedure được embed vào binary (giống startup_store).
+fn all_procedures() -> Vec<(&'static str, &'static str)> {
+    vec![
         // === Project ===
         ("sp_project_insert", include_str!("../../../docs/store-procedure/sp_project_insert.sql")),
         ("sp_project_select_by_id", include_str!("../../../docs/store-procedure/sp_project_select_by_id.sql")),
@@ -137,19 +92,53 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_upload_dtl_insert", include_str!("../../../docs/store-procedure/sp_upload_dtl_insert.sql")),
         ("sp_upload_attach_insert", include_str!("../../../docs/store-procedure/sp_upload_attach_insert.sql")),
         ("sp_upload_history_search", include_str!("../../../docs/store-procedure/sp_upload_history_search.sql")),
-    ];
+    ]
+}
 
-    let mut errors = Vec::new();
+/// Liệt kê toàn bộ stored procedure có sẵn (không kết nối DB).
+pub fn list_procedures() -> Vec<SpInfo> {
+    all_procedures()
+        .iter()
+        .map(|(name, _)| SpInfo {
+            name: name.to_string(),
+            file_name: format!("{name}.sql"),
+        })
+        .collect()
+}
 
-    for (name, sql) in procedures {
-        if let Err(e) = client.batch_execute(sql).await {
-            errors.push(format!("Failed to create {name}: {e}"));
+/// Thực thi CREATE OR REPLACE cho toàn bộ stored procedure.
+pub async fn execute_all_procedures() -> AppResult<SpExecutionSummary> {
+    let client = pgsql_connect::connect().await?;
+    let procedures = all_procedures();
+    let total = procedures.len();
+    let mut results = Vec::with_capacity(total);
+    let mut success_count = 0;
+
+    for (name, sql) in &procedures {
+        match client.batch_execute(sql).await {
+            Ok(_) => {
+                success_count += 1;
+                results.push(SpExecutionResult {
+                    name: name.to_string(),
+                    success: true,
+                    message: "OK".to_string(),
+                });
+            }
+            Err(e) => {
+                let detail = pgsql_connect::pg_error_detail(&e);
+                results.push(SpExecutionResult {
+                    name: name.to_string(),
+                    success: false,
+                    message: detail,
+                });
+            }
         }
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AppError::new(errors.join("\n")))
-    }
+    Ok(SpExecutionSummary {
+        total,
+        success_count,
+        error_count: total - success_count,
+        results,
+    })
 }

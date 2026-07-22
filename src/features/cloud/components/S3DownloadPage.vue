@@ -4,6 +4,8 @@ import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import ProgressSpinner from "primevue/progressspinner";
+import DataTable from "primevue/datatable";
+import Column from "primevue/column";
 import S3DownloadCard from "./S3DownloadCard.vue";
 import S3ConfigError from "./S3ConfigError.vue";
 import { useS3Download } from "../composables/useS3Download";
@@ -34,6 +36,8 @@ const {
   moveObjects,
   deleteObjects,
   checkAvailability,
+  downloadHistory,
+  updateMovedLocal,
 } = useS3Download();
 
 const toast = useToast();
@@ -46,6 +50,8 @@ const showCopyDialog = ref(false);
 const copyEntries = ref<FileEntry[]>([]);
 const copyDestPath = ref("");
 const isCopying = ref(false);
+const copyHistoryId = ref<number | null>(null);
+const copySourcePath = ref("");
 
 function handleDownloaded(path: string) {
   lastDownloadPath.value = path;
@@ -69,9 +75,24 @@ function saveCopyDest() {
 }
 
 async function openCopyDialog() {
+  copyHistoryId.value = null;
+  copySourcePath.value = lastDownloadPath.value;
   loadSavedCopyDest();
   try {
     const result = await explorerReadDir(lastDownloadPath.value);
+    copyEntries.value = result.entries;
+  } catch {
+    copyEntries.value = [];
+  }
+  showCopyDialog.value = true;
+}
+
+async function openCopyDialogForHistory(id: number, syncPath: string) {
+  copyHistoryId.value = id;
+  copySourcePath.value = syncPath;
+  loadSavedCopyDest();
+  try {
+    const result = await explorerReadDir(syncPath);
     copyEntries.value = result.entries;
   } catch {
     copyEntries.value = [];
@@ -88,12 +109,15 @@ async function chooseCopyDest() {
 }
 
 async function handleCopy() {
-  if (!copyDestPath.value) return;
+  if (!copyDestPath.value || !copySourcePath.value) return;
   isCopying.value = true;
   loading.start();
   try {
-    const msg = await explorerCopyBugs(lastDownloadPath.value, copyDestPath.value);
+    const msg = await explorerCopyBugs(copySourcePath.value, copyDestPath.value);
     toast.success(msg);
+    if (copyHistoryId.value !== null) {
+      await updateMovedLocal(copyHistoryId.value, copyDestPath.value);
+    }
     showCopyDialog.value = false;
   } catch (e) {
     toast.error(friendlyError(e));
@@ -105,6 +129,18 @@ async function handleCopy() {
 
 async function handleRefresh() {
   await refresh();
+}
+
+function formatDate(ymd: string): string {
+  if (ymd.length !== 8) return ymd;
+  return `${ymd.slice(0, 4)}/${ymd.slice(4, 6)}/${ymd.slice(6, 8)}`;
+}
+
+function formatTime(hms: string): string {
+  if (hms.length >= 4) {
+    return `${hms.slice(0, 2)}:${hms.slice(2, 4)}`;
+  }
+  return hms;
 }
 </script>
 
@@ -180,6 +216,71 @@ async function handleRefresh() {
         />
       </div>
     </template>
+
+    <!-- Download History -->
+    <div
+      v-if="!isLoading && downloadHistory.length > 0"
+      class="rounded-lg bg-surface-0 shadow dark:bg-surface-900"
+    >
+      <div class="flex items-center gap-2 border-b border-surface-200 px-4 py-3 dark:border-surface-700">
+        <i class="pi pi-history text-lg text-blue-500" />
+        <span class="text-sm font-semibold text-surface-700 dark:text-surface-200">
+          Lịch sử tải về ({{ downloadHistory.length }})
+        </span>
+      </div>
+      <DataTable
+        :value="downloadHistory"
+        scrollable
+        scroll-height="260px"
+        size="small"
+        striped-rows
+        class="text-sm"
+      >
+        <Column header="Ngày" :style="{ width: '100px' }">
+          <template #body="{ data }">
+            {{ formatDate(data.downloadYmd) }}
+          </template>
+        </Column>
+        <Column header="Giờ" :style="{ width: '60px' }">
+          <template #body="{ data }">
+            {{ formatTime(data.downloadHms) }}
+          </template>
+        </Column>
+        <Column header="Nơi lưu trữ">
+          <template #body="{ data }">
+            {{ data.awsNameAlias || data.awsName }}
+          </template>
+        </Column>
+        <Column header="Số lượng" :style="{ width: '80px' }">
+          <template #body="{ data }">
+            <span class="font-semibold text-blue-600 dark:text-blue-400">
+              {{ data.downloadCount }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Đường dẫn" :style="{ minWidth: '200px' }">
+          <template #body="{ data }">
+            <span class="font-mono text-xs break-all">{{ data.syncPath }}</span>
+          </template>
+        </Column>
+        <Column header="" :style="{ width: '80px' }">
+          <template #body="{ data }">
+            <Button
+              v-if="!data.isMovedAtLocal"
+              label="Copy"
+              icon="pi pi-copy"
+              severity="info"
+              size="small"
+              text
+              @click="openCopyDialogForHistory(data.id, data.syncPath)"
+            />
+            <span v-else class="text-xs text-green-600">
+              <i class="pi pi-check mr-1" />Copied
+            </span>
+          </template>
+        </Column>
+      </DataTable>
+    </div>
 
     <!-- Offline Dialog -->
     <Dialog

@@ -12,7 +12,7 @@ const props = defineProps<{
   ensureOnline: () => Promise<boolean>;
   getDownloadList: (code: string) => Promise<string[]>;
   selectFolder: () => Promise<string | null>;
-  downloadFiles: (code: string, bugList: string[], localPath: string) => Promise<void>;
+  downloadFiles: (code: string, bugList: string[], localPath: string) => Promise<string | null>;
   moveObjects: (code: string, items: string[]) => Promise<void>;
   deleteObjects: (code: string, items: string[]) => Promise<void>;
 }>();
@@ -160,9 +160,11 @@ async function handleConfirmDownload() {
     return;
   }
   showDownloadModal.value = false;
-  await props.downloadFiles(props.awsStorage.code, items.value, destinationPath.value);
+  const syncPath = await props.downloadFiles(props.awsStorage.code, items.value, destinationPath.value);
   hasDownloaded.value = true;
-  emit("downloaded", destinationPath.value);
+  if (syncPath) {
+    emit("downloaded", syncPath);
+  }
   await loadItems();
   emit("refreshed");
 }

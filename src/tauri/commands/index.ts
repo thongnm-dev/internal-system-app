@@ -14,3 +14,4 @@ export * from "./s3";
 export * from "./ai-usage";
 export * from "./ai-chat";
 export * from "./sql-editor";
+export * from "./app-config";

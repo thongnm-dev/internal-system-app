@@ -6,11 +6,13 @@ import type { AwsStorage, ScannedFile, S3OperationResult, UploadFileRequest, Del
 import { useCloudGuard } from "./useCloudGuard";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
+import { useAuthStore } from "@/app/stores/auth";
 
 export function useS3Upload() {
   const guard = useCloudGuard();
   const toast = useToast();
   const loading = useGlobalLoading();
+  const authStore = useAuthStore();
 
   const uploadStorages = ref<AwsStorage[]>([]);
   const isLoading = ref(false);
@@ -59,7 +61,8 @@ export function useS3Upload() {
     isUploading.value = true;
     loading.start();
     try {
-      const result = await s3UploadFiles(files, storage.name, storage.subscribe, createFolderSameName);
+      const userId = authStore.user?.username || "";
+      const result = await s3UploadFiles(files, storage.name, storage.subscribe, createFolderSameName, storage.code, userId);
 
       if (result.success) {
         toast.success(`Đã thực hiện tải thành công ${result.processed} tập tin lên S3.`);
