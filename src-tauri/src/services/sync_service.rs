@@ -186,6 +186,67 @@ fn build_init_script(entries_json: &str, date: &str) -> String {
     log.scrollTop = log.scrollHeight;
   }}
 
+  /* ── Dialog xác nhận cập nhật ── */
+  function showUpdateDialog() {{
+    if (document.getElementById('sync-update-dialog')) return;
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'sync-update-dialog';
+    backdrop.style.cssText = `
+      position: fixed; inset: 0; z-index: 999999;
+      background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+    `;
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      background: white; border-radius: 10px; padding: 24px 28px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25); min-width: 340px;
+      font-family: ${{FONT}};
+    `;
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size: 16px; font-weight: 700; color: #1f2937; margin-bottom: 20px;';
+    title.textContent = 'Cập nhật dữ liệu';
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display: flex; justify-content: flex-end; gap: 10px;';
+
+    const btnCancel = document.createElement('button');
+    btnCancel.textContent = 'Cancel';
+    btnCancel.style.cssText = `
+      padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600;
+      border: 1px solid #d1d5db; background: white; color: #374151; cursor: pointer;
+    `;
+    btnCancel.onmouseover = () => {{ btnCancel.style.background = '#f3f4f6'; }};
+    btnCancel.onmouseout = () => {{ btnCancel.style.background = 'white'; }};
+    btnCancel.onclick = () => {{ backdrop.remove(); }};
+
+    const btnOk = document.createElement('button');
+    btnOk.textContent = 'OK';
+    btnOk.style.cssText = `
+      padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600;
+      border: none; background: #059669; color: white; cursor: pointer;
+    `;
+    btnOk.onmouseover = () => {{ btnOk.style.background = '#047857'; }};
+    btnOk.onmouseout = () => {{ btnOk.style.background = '#059669'; }};
+    btnOk.onclick = () => {{
+      backdrop.remove();
+      const doc = getFormDoc();
+      const btn = doc.getElementById('btnSaveDisplay') || document.getElementById('btnSaveDisplay');
+      if (btn) {{
+        btn.style.pointerEvents = '';
+        btn.removeAttribute('tabindex');
+        btn.click();
+      }}
+    }};
+
+    btnRow.append(btnCancel, btnOk);
+    dialog.append(title, btnRow);
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+  }}
+
   /* ── Điền dữ liệu tự động ── */
   function sleep(ms) {{
     return new Promise(r => setTimeout(r, ms));
@@ -399,13 +460,12 @@ fn build_init_script(entries_json: &str, date: &str) -> String {
 
     window.__SYNC_FILLED__ = true;
     setProgress(100, 'Hoàn tất — ' + filled + '/' + total + ' mục đã điền.');
-    addLog('✅', 'Đã điền xong ' + filled + '/' + total + ' mục. Kiểm tra lại rồi tự submit.', '#059669');
-    addLog('🚫', 'Hệ thống KHÔNG tự động submit dữ liệu.', '#dc2626');
+    addLog('✅', 'Đã điền xong ' + filled + '/' + total + ' mục.', '#059669');
 
-    await sleep(2000);
+    await sleep(1500);
+    removeProgressPanel();
     removeOverlay();
-    const panel = document.getElementById('sync-progress');
-    if (panel) panel.style.pointerEvents = 'none';
+    showUpdateDialog();
   }}
 
   /* ── Chờ form xuất hiện rồi mới fill ── */

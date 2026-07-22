@@ -506,7 +506,7 @@ async function executeSyncDailyReport() {
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <Button icon="pi pi-refresh" severity="secondary" outlined size="small" title="Làm mới" @click="ctrl.reload()" />
-          <Button icon="pi pi-sync" label="Đồng bộ" severity="secondary" outlined size="small" title="Đồng bộ hệ thống nội bộ" @click="openSyncDialog" />
+          <Button icon="pi pi-sync" label="Đồng bộ" severity="secondary" outlined size="small" title="Đồng bộ hệ thống nội bộ" :disabled="ctrl.monthValue.value !== ctrl.maxMonthValue.value" @click="openSyncDialog" />
           <Button icon="pi pi-chevron-left" severity="secondary" outlined size="small" title="Previous month" @click="ctrl.previousMonth()" />
           <InputText
             class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"

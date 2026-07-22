@@ -61,6 +61,19 @@ fn save_seen(map: &SeenMap) -> AppResult<()> {
     Ok(())
 }
 
+/// Đánh dấu các item đã được download thủ công vào `seen.json`,
+/// tránh bắn notification trùng ở vòng poll tiếp theo.
+pub fn mark_as_seen(code: &str, items: &[String]) -> AppResult<()> {
+    let mut map = load_seen().unwrap_or_default();
+    let entry = map.entry(code.to_string()).or_default();
+    for item in items {
+        if !entry.contains(item) {
+            entry.push(item.clone());
+        }
+    }
+    save_seen(&map)
+}
+
 /// Đọc chu kỳ poll (phút) từ config.ini — tối thiểu 1 phút.
 fn poll_interval_minutes() -> u64 {
     let minutes = Ini::load_from_file(app_config::config_path())
@@ -132,14 +145,22 @@ pub async fn poll_once(app: &AppHandle) -> AppResult<()> {
         return Ok(());
     }
 
-    // Gộp thành 1 notification.
+    // Gộp thành 1 notification — liệt kê tối đa 3 dòng, còn lại gom tổng.
     let total: usize = fresh_by_storage.iter().map(|(_, v)| v.len()).sum();
-    let detail = fresh_by_storage
-        .iter()
-        .map(|(name, v)| format!("{}: {}", name, v.join(", ")))
-        .collect::<Vec<_>>()
-        .join(" · ");
-    let body = format!("Có {total} tài liệu mới trên S3 — {detail}");
+    let mut lines: Vec<String> = Vec::new();
+    for (name, items) in &fresh_by_storage {
+        for item in items {
+            lines.push(format!("- {name}: {item}"));
+        }
+    }
+    let body = if lines.len() <= 3 {
+        lines.join("\n")
+    } else {
+        let rest = total - 3;
+        let mut body = lines[..3].join("\n");
+        body.push_str(&format!("\n(và {rest} Tài liệu)"));
+        body
+    };
 
     let _ = app
         .notification()

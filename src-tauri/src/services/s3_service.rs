@@ -904,6 +904,10 @@ pub async fn download_by_storage(
         {
             log::error!("Failed to save download history: {e}");
         }
+
+        if let Err(e) = crate::services::s3_watch_service::mark_as_seen(&code, &bug_list) {
+            log::error!("Failed to update seen.json after download: {e}");
+        }
     }
 
     let message = if errors.is_empty() {

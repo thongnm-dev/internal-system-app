@@ -1,7 +1,7 @@
 -- ============================================================================
 -- sp_daily_report_project_select
--- Lấy danh sách project active kèm cờ is_member cho daily report.
--- Trả về tất cả project active, đánh dấu project nào user là thành viên.
+-- Lấy danh sách project active mà user là thành viên cho daily report.
+-- Chỉ trả về project user được assign vào (project_members).
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION sp_daily_report_project_select(
@@ -23,11 +23,9 @@ BEGIN
         p.code,
         p.name,
         p.client,
-        EXISTS (
-            SELECT 1 FROM project_members pm
-            WHERE pm.project_id = p.id AND pm.username = p_username
-        ) AS is_member
+        TRUE AS is_member
     FROM projects p
+    INNER JOIN project_members pm ON pm.project_id = p.id AND pm.username = p_username
     WHERE p.is_active = TRUE
     ORDER BY p.code;
 END;
