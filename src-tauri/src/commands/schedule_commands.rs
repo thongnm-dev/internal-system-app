@@ -9,5 +9,5 @@ pub fn read_schedule_excel(
     user_filter: Option<String>,
 ) -> Result<ScheduleResult, String> {
     schedule_service::read_schedule(&file_path, target_year, target_month, &user_filter.unwrap_or_default())
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

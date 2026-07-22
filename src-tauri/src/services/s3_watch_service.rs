@@ -95,7 +95,7 @@ pub async fn poll_once(app: &AppHandle) -> AppResult<()> {
             Err(e) => {
                 // Lỗi liệt kê một storage → giữ nguyên baseline cũ (nếu có) để
                 // không bắn lại nhầm ở vòng sau, rồi bỏ qua storage này.
-                eprintln!("S3 watch: list '{}' failed: {e}", storage.code);
+                log::error!("S3 watch: list '{}' failed: {e}", storage.code);
                 if let Some(known) = prev.get(&storage.code) {
                     current.insert(storage.code.clone(), known.clone());
                 }
@@ -179,21 +179,21 @@ pub async fn run_poll_loop(app: AppHandle) {
         match is_ready().await {
             Ok(()) => break,
             Err(reason) => {
-                eprintln!("S3 watch: chưa sẵn sàng ({reason}), thử lại sau {RETRY_WAIT_MINUTES} phút");
+                log::error!("S3 watch: chưa sẵn sàng ({reason}), thử lại sau {RETRY_WAIT_MINUTES} phút");
                 tokio::time::sleep(Duration::from_secs(RETRY_WAIT_MINUTES * 60)).await;
             }
         }
     }
 
     if let Err(e) = poll_once(&app).await {
-        eprintln!("S3 watch initial poll error: {e}");
+        log::error!("S3 watch initial poll error: {e}");
     }
 
     loop {
         let minutes = poll_interval_minutes();
         tokio::time::sleep(Duration::from_secs(minutes.saturating_mul(60))).await;
         if let Err(e) = poll_once(&app).await {
-            eprintln!("S3 watch poll error: {e}");
+            log::error!("S3 watch poll error: {e}");
         }
     }
 }

@@ -152,7 +152,7 @@ pub async fn connect() -> AppResult<Client> {
     // Spawn task chạy nền để xử lý I/O cho kết nối
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {e}");
+            log::error!("PostgreSQL connection error: {e}");
         }
     });
 
@@ -169,7 +169,7 @@ pub async fn connect_with(config: &PgConfig) -> AppResult<Client> {
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {e}");
+            log::error!("PostgreSQL connection error: {e}");
         }
     });
 

@@ -23,7 +23,7 @@ pub async fn test_database_config(
 ) -> Result<(), String> {
     db_config_service::test_config(request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lưu cấu hình database. Thử kết nối trước, ghi `config.ini`, rồi khởi tạo bảng.
@@ -33,5 +33,5 @@ pub async fn save_database_config(
 ) -> Result<DatabaseStatus, String> {
     db_config_service::save_config(request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

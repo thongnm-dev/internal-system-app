@@ -3,7 +3,7 @@
 //! Hỗ trợ chuyển đổi tự động từ các lỗi thư viện phổ biến
 //! (`io::Error`, `csv::Error`, `serde_json::Error`) thông qua `From` trait.
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 /// Kiểu lỗi thống nhất cho toàn bộ tầng business logic và data access.
 ///
@@ -52,4 +52,11 @@ impl From<serde_json::Error> for AppError {
     fn from(error: serde_json::Error) -> Self {
         Self::new(error.to_string())
     }
+}
+
+/// Ghi log lỗi rồi chuyển thành `String` — dùng cho `.map_err(log_err)` ở tầng command.
+pub fn log_err(e: impl Debug) -> String {
+    let msg = format!("{e:?}");
+    log::error!("{msg}");
+    msg
 }

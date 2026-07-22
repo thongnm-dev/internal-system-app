@@ -749,7 +749,7 @@ pub async fn run_poll_loop(app: AppHandle) {
             .max(60);
         tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
         if let Err(e) = poll_once(&app).await {
-            eprintln!("AI usage poll error: {e}");
+            log::error!("AI usage poll error: {e}");
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::services::menu_permission_service;
 pub async fn list_role_menu_permissions(role_id: i32) -> Result<Vec<String>, String> {
     menu_permission_service::list_role_menu_permissions(role_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
@@ -19,14 +19,14 @@ pub async fn save_role_menu_permissions(
 ) -> Result<Vec<String>, String> {
     menu_permission_service::save_role_menu_permissions(request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
 pub async fn list_user_menu_permissions(user_id: i32) -> Result<Vec<UserMenuPermission>, String> {
     menu_permission_service::list_user_menu_permissions(user_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
@@ -35,7 +35,7 @@ pub async fn save_user_menu_permissions(
 ) -> Result<Vec<UserMenuPermission>, String> {
     menu_permission_service::save_user_menu_permissions(request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
@@ -44,5 +44,5 @@ pub async fn list_effective_menu_permissions(
 ) -> Result<Vec<EffectiveMenuPermission>, String> {
     menu_permission_service::list_effective_menu_permissions(user_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

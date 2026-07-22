@@ -7,5 +7,5 @@ use crate::services::ai_chat_service;
 pub async fn ai_chat_complete(request: AiChatRequest) -> Result<AiChatResponse, String> {
     ai_chat_service::complete(request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

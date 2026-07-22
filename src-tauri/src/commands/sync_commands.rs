@@ -8,5 +8,5 @@ pub async fn sync_daily_report(
 ) -> Result<SyncResult, String> {
     sync_service::sync_daily_report(app, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

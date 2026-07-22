@@ -583,7 +583,7 @@ pub async fn upload_files(
         )
         .await
         {
-            eprintln!("Failed to save upload history: {e}");
+            log::error!("Failed to save upload history: {e}");
         }
     }
 
@@ -902,7 +902,7 @@ pub async fn download_by_storage(
         )
         .await
         {
-            eprintln!("Failed to save download history: {e}");
+            log::error!("Failed to save download history: {e}");
         }
     }
 
@@ -1004,7 +1004,7 @@ pub async fn move_s3_objects(
 
     if processed > 0 {
         if let Err(e) = crate::database::download_store::update_moved_at_s3(&code, &items).await {
-            eprintln!("Failed to update is_moved_at_s3: {e}");
+            log::error!("Failed to update is_moved_at_s3: {e}");
         }
     }
 

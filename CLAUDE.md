@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Manager System Helps** — a Tauri 2.0 desktop application for internal project management and statistics tracking. The app imports CSV data, generates reports, tracks daily work, and converts Excel specs to Markdown.
+**Management Systems** — a Tauri 2.0 desktop application (v1.0.9) for internal project management, daily reporting, cloud storage, AI usage tracking, and developer tools. Built for a team workflow with PostgreSQL backend, S3 integration, Backlog API integration, and role-based access control.
 
 ## Commands
 
@@ -23,6 +23,9 @@ npm run build
 
 # Type-check Vue files
 npx vue-tsc --noEmit
+
+# Bump app version (package.json + tauri.conf.json)
+npm run version:bump
 ```
 
 There are no test commands — the project has no test suite currently.
@@ -37,81 +40,91 @@ cd src-tauri && cargo build
 
 ### Tech Stack
 
-- **Frontend:** Vue 3 (Composition API with `<script setup lang="ts">`), Vite 8, TypeScript, Tailwind CSS, PrimeVue 4
-- **State:** Pinia for auth store, Vue composables for feature-level state
+- **Frontend:** Vue 3 (Composition API with `<script setup lang="ts">`), Vite 8, TypeScript, Tailwind CSS 3, PrimeVue 4
+- **State:** Pinia stores (auth, menu, members), Vue composables for feature-level state
 - **Routing:** Vue Router with `createWebHashHistory()`
 - **Desktop:** Tauri v2 with Rust backend
+- **Database:** PostgreSQL (accessed exclusively through stored procedures)
+- **Tauri Plugins:** dialog, updater, process, notification
 
 ### Tauri IPC Pattern
 
-All backend calls go through `src/tauri/commands.ts`:
-- `safeInvoke<T>(command, args)` — wraps `tauri invoke`; throws if called outside the Tauri runtime (e.g., browser-only dev)
-- `canUseTauriRuntime()` — guards UI branches that require Tauri
-- `friendlyError(error)` — converts Tauri error strings to user-readable messages
+All backend calls go through modular command files under `src/tauri/commands/`:
+- `_base.ts` — core utilities: `safeInvoke<T>()`, `canUseTauriRuntime()`, `friendlyError()`
+- One file per domain (e.g., `auth.ts`, `project.ts`, `s3.ts`, `ai-usage.ts`)
+- `index.ts` — re-exports all command modules + base utilities
 
-Tauri commands are registered in `src-tauri/src/lib.rs` and implemented across three command modules:
-- `commands/import_commands` — CSV import, batch listing, previewing monthly reports
-- `commands/system_commands` — system info
-- `commands/xlsx_markdown_commands` — Excel → Markdown conversion
+`src/tauri/events.ts` — Tauri event listeners for backend-pushed events (`ai-usage-updated`, `s3-new-documents`).
+
+Tauri commands are registered in `src-tauri/src/lib.rs` and implemented across 24 command modules under `src-tauri/src/commands/`.
 
 ### Frontend Structure
 
-Feature-based folder structure:
 ```
 src/
 ├─ app/
-│  ├─ router/          # Vue Router setup (hash mode) + route definitions
-│  ├─ stores/          # Pinia stores (auth)
-│  └─ plugins/         # PrimeVue + Pinia plugin registration
-├─ features/           # Feature modules (one per domain)
-│  ├─ overview/        # Overview dashboard
-│  ├─ projects/        # Project list + detail
-│  ├─ skills/          # Skill catalog management
-│  ├─ issues/          # Issue backlog + CSV import
-│  ├─ import-csv/      # CSV data import
-│  ├─ import-reports/  # Import report history + detail
-│  ├─ xlsx-markdown/   # Excel → Markdown converter
-│  ├─ daily-notes/     # Daily work notes calendar
-│  ├─ daily-report/    # Daily hour input grid
-│  ├─ settings/        # User settings + theme
-│  └─ auth/            # Login page
+│  ├─ router/              # Vue Router setup (hash mode) + route definitions
+│  ├─ stores/              # Pinia stores (auth, menu, members)
+│  └─ plugins/             # PrimeVue + Pinia plugin registration
+├─ features/               # Feature modules (one folder per domain)
+│  ├─ overview/            # Overview dashboard
+│  ├─ projects/            # Project CRUD, tasks, import, reports
+│  ├─ daily-notes/         # Daily work notes calendar
+│  ├─ daily-report/        # Daily hour input grid
+│  ├─ issues/              # Issue backlog + Backlog API integration
+│  ├─ tools/               # Excel→MD, Copy Tools, SQL Editor, Explore Faster, Check Monthly Report
+│  ├─ cloud/               # S3 browser, upload, download, upload/download history
+│  ├─ ai-agent/            # AI Chat, AI Usage tracking
+│  ├─ governance/          # Menus, Users, Roles, Permissions, Logs, AppConfig, StoreProcedure, Skills
+│  ├─ settings/            # User settings + theme
+│  └─ auth/                # Login, Forgot Password
 ├─ shared/
-│  ├─ components/      # Sidebar, Header, BottomBar, StartupScreen, MessageBanner, etc.
-│  ├─ composables/     # useAppShell (bootstrap, system info polling)
-│  ├─ utils/           # timeMath.ts
-│  ├─ config/          # appConfig.ts
-│  └─ types/           # statistics.ts (all shared TS types)
+│  ├─ components/          # AppSidebar, AppHeader, AppBottomBar, StartupScreen, GlobalLoading,
+│  │                       # AppToast, MessageBanner, SummaryCards, NetworkStatusBanner,
+│  │                       # DatabaseConfigScreen, DatabaseErrorScreen, ConnectionErrorScreen
+│  ├─ composables/         # useAppShell, useAppUpdater, useDatabaseStatus, useNetworkStatus,
+│  │                       # useNavigationHistory, useToast, useGlobalLoading
+│  ├─ utils/               # timeMath.ts
+│  └─ config/              # appConfig.ts, themeTokens.ts
+├─ _/
+│  └─ types/               # All shared TypeScript types (one file per domain)
 ├─ tauri/
-│  ├─ commands.ts      # safeInvoke, canUseTauriRuntime, friendlyError
-│  └─ events.ts        # (placeholder for Tauri events)
-├─ App.vue             # App shell: sidebar + header + router-view + bottom bar
-├─ main.ts             # Vue entry point
-└─ styles.css          # Tailwind + CSS variable theming + PrimeVue overrides
+│  ├─ commands/            # Modular IPC wrappers (_base.ts + per-domain files)
+│  └─ events.ts            # Backend event listeners (AI usage, S3 notifications)
+├─ App.vue                 # App shell: sidebar + header + router-view + bottom bar
+├─ main.ts                 # Vue entry point
+└─ styles.css              # Tailwind + CSS variable theming + PrimeVue overrides
 ```
 
 Each feature folder follows the pattern:
 - `components/` — Vue SFC pages
 - `composables/` — `use<Feature>()` composable owning state, data fetching, and Tauri calls
+- `utils/` — (optional) feature-specific utilities (e.g., `tools/utils/` for SQL highlighting/formatting)
 
-**Routing** — Vue Router with `createWebHashHistory()`. Routes defined in `src/app/router/routes.ts`. Only `/settings` requires authentication. Navigation guard in `src/app/router/index.ts`.
+**Routing** — Vue Router with `createWebHashHistory()`. Routes defined in `src/app/router/routes.ts`. Governance and Settings routes require authentication. Navigation guard in `src/app/router/index.ts`.
 
-**Auth** — Pinia store (`src/app/stores/auth.ts`). Login stores a `{ username }` object in localStorage (`msh.auth.session`). Protected routes redirect to `/login` with a `returnPath`.
+**Auth** — Pinia store (`src/app/stores/auth.ts`). Login via backend auth commands against PostgreSQL. Forgot password flow with email-based reset codes. Protected routes redirect to `/login` with a `returnPath`.
 
 **Layout shell** (`src/App.vue`) — collapsible sidebar (240px expanded / 72px collapsed) + header + `<router-view>` + bottom bar.
 
 ### Rust Backend Structure
 
-Clean layered architecture under `src-tauri/src/`:
+Layered architecture under `src-tauri/src/`:
 ```
 commands/       ← Tauri #[tauri::command] handlers (thin, delegate to services)
-services/       ← Business logic (import_csv, monthly_report, system, project, xlsx_markdown)
-database/       ← Persistence layer (JSON file store, CSV reading)
-infrastructure/ ← Low-level I/O utilities (encoding_rs Shift-JIS, file path resolution)
-utils/          ← Network and time helpers
-app/            ← AppError type and Result alias
+services/       ← Business logic (one service per domain)
+database/       ← PostgreSQL store layer (calls stored procedures)
+utils/          ← api_client, csv_reader, time, app_config, pgsql_connect, network, email
+app/            ← AppError type, Result alias, consts
 ```
 
-Data flow: `commands → services → database → infrastructure`
+Data flow: `commands → services → database → utils`
+
+**Background services** (started in `lib.rs` setup):
+- `ai_usage_service::run_poll_loop` — polls AI usage data and emits `ai-usage-updated` events
+- `s3_watch_service::run_poll_loop` — watches S3 storage and emits `s3-new-documents` notifications
+
+**Database initialization** — `database/startup_store.rs::init()` runs in debug mode to create tables and install stored procedures.
 
 **IMPORTANT — Database access must go through stored procedures:**
 - The `database/` layer (store files) must NEVER write raw SQL (SELECT/INSERT/UPDATE/DELETE) directly. All queries must call PostgreSQL stored procedures (functions).
@@ -121,23 +134,27 @@ Data flow: `commands → services → database → infrastructure`
 
 ### Styling
 
-Tailwind CSS with CSS variable–based theming. Colors like `bg-canvas` and `text-ink` are custom CSS variables set in `src/styles.css` and referenced in `tailwind.config.js`. Use these semantic tokens rather than raw Tailwind palette colors for consistency with the app's theme.
+Tailwind CSS with CSS variable–based theming. Colors like `bg-canvas` and `text-ink` are custom CSS variables set in `src/styles.css`, mapped in `src/shared/config/themeTokens.ts`, and referenced in `tailwind.config.js`. Use these semantic tokens rather than raw Tailwind palette colors for consistency with the app's theme.
 
 PrimeVue 4 with Aura theme preset, dark mode via `[data-theme='dark']` selector.
 
 ### App Window
 
-Default size: 1200×760, minimum: 980×640. Design features to fit within minimum dimensions.
+Default size: 1200×760, minimum: 980×600. Opens maximized. Design features to fit within minimum dimensions.
 
 ## Key Files
 
 | File | Role |
 |------|------|
 | `src/App.vue` | App shell with layout grid and auth routing |
-| `src/app/router/routes.ts` | All route definitions |
-| `src/tauri/commands.ts` | Tauri IPC wrapper — always use `safeInvoke` for backend calls |
-| `src/shared/types/statistics.ts` | Core TypeScript types shared across the app |
+| `src/app/router/routes.ts` | All route definitions + breadcrumb logic |
+| `src/tauri/commands/_base.ts` | Tauri IPC core — `safeInvoke`, `canUseTauriRuntime`, `friendlyError` |
+| `src/tauri/commands/index.ts` | Re-exports all IPC command modules |
+| `src/tauri/events.ts` | Backend event listeners (AI usage, S3) |
+| `src/_/types/` | All shared TypeScript types (one file per domain) |
 | `src/app/stores/auth.ts` | Pinia auth store |
-| `src-tauri/src/lib.rs` | Tauri command registration |
-| `src-tauri/tauri.conf.json` | App config (name, window size, build commands) |
-| `scripts/xlsx_spec_to_markdown.py` | Python helper for Excel → Markdown conversion |
+| `src/app/stores/menu.ts` | Pinia menu config store |
+| `src/app/stores/members.ts` | Pinia members store |
+| `src-tauri/src/lib.rs` | Tauri command registration + plugin setup + background services |
+| `src-tauri/tauri.conf.json` | App config (name, window size, build commands, updater) |
+| `docs/store-procedure/` | All PostgreSQL stored procedure definitions |

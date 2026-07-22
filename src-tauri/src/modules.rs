@@ -238,4 +238,6 @@ mod utils {
     pub mod app_config;
     /// Gửi email qua SMTP (dùng cho reset password, v.v.).
     pub mod email;
+    /// Ghi log lỗi ra file (logs/errors_log.log).
+    pub mod logger;
 }

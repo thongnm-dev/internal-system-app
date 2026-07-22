@@ -22,7 +22,7 @@ pub async fn save_daily_report_entry(
 ) -> Result<DailyReportEntry, String> {
     daily_report_service::save_entry(&username, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Xóa một ô nhập giờ công (khi bấm "Clear" trên dialog).
@@ -36,7 +36,7 @@ pub async fn clear_daily_report_entry(
 ) -> Result<(), String> {
     daily_report_service::clear_entry(&username, &task_id, &entry_date, category_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy toàn bộ ô nhập giờ công của user trong một tháng.
@@ -49,7 +49,7 @@ pub async fn get_daily_report_entries(
 ) -> Result<Vec<DailyReportEntry>, String> {
     daily_report_service::get_entries_by_month(&username, year, month)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 // ============================================================================
@@ -64,7 +64,7 @@ pub async fn create_daily_report_task(
 ) -> Result<DailyReportUserTask, String> {
     daily_report_service::create_task(&username, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy task người dùng tự thêm của user theo tháng đang xem (`year`, `month` 1-12).
@@ -76,7 +76,7 @@ pub async fn get_daily_report_tasks(
 ) -> Result<Vec<DailyReportUserTask>, String> {
     daily_report_service::get_tasks(&username, year, month)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Tổng số giờ tích luỹ (mọi tháng) gộp theo task, cho user.
@@ -86,7 +86,7 @@ pub async fn get_daily_report_task_hours(
 ) -> Result<Vec<DailyReportTaskHours>, String> {
     daily_report_service::get_task_hours_total(&username)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Đánh dấu một task user tự thêm hoàn thành / bỏ hoàn thành.
@@ -98,7 +98,7 @@ pub async fn set_daily_report_task_completed(
 ) -> Result<DailyReportUserTask, String> {
     daily_report_service::set_task_completed(&username, task_id, is_completed)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Đánh dấu một project_task delivery / bỏ delivery (task được giao cho user).
@@ -109,7 +109,7 @@ pub async fn set_project_task_completed(
 ) -> Result<bool, String> {
     daily_report_service::set_project_task_completed(&task_id, is_completed)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Danh sách công đoạn (process/phase) cho dropdown phase khi nhập giờ.
@@ -117,7 +117,7 @@ pub async fn set_project_task_completed(
 pub async fn get_daily_report_phases() -> Result<Vec<DailyReportPhase>, String> {
     daily_report_service::get_phases()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Danh sách category dùng cho project tasks (is_task_category = TRUE).
@@ -125,7 +125,7 @@ pub async fn get_daily_report_phases() -> Result<Vec<DailyReportPhase>, String> 
 pub async fn get_task_categories() -> Result<Vec<DailyReportPhase>, String> {
     daily_report_service::get_task_categories()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 // ============================================================================
@@ -139,7 +139,7 @@ pub async fn get_daily_report_projects(
 ) -> Result<Vec<DailyReportProject>, String> {
     daily_report_service::get_projects(&username)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Xóa một task người dùng tự thêm. Kiểm tra `username` để đảm bảo quyền sở hữu.
@@ -150,5 +150,5 @@ pub async fn delete_daily_report_task(
 ) -> Result<(), String> {
     daily_report_service::delete_task(&username, task_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

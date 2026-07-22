@@ -15,7 +15,7 @@ pub async fn create_daily_note(
 ) -> Result<DailyWorkNote, String> {
     daily_note_service::create_note(&username, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy danh sách ghi chú của user trong một ngày cụ thể.
@@ -27,7 +27,7 @@ pub async fn get_daily_notes_by_date(
 ) -> Result<Vec<DailyWorkNote>, String> {
     daily_note_service::get_notes_by_date(&username, &note_date)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy danh sách ghi chú của user trong một tháng.
@@ -40,7 +40,7 @@ pub async fn get_daily_notes_by_month(
 ) -> Result<Vec<DailyWorkNote>, String> {
     daily_note_service::get_notes_by_month(&username, year, month)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Đếm số ghi chú theo từng ngày trong tháng.
@@ -53,7 +53,7 @@ pub async fn get_daily_note_counts(
 ) -> Result<Vec<DailyNoteDateCount>, String> {
     daily_note_service::get_date_counts(&username, year, month)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
@@ -64,7 +64,7 @@ pub async fn update_daily_note_content(
 ) -> Result<DailyWorkNote, String> {
     daily_note_service::update_note_content(id, &username, &content)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Cập nhật trạng thái ghi chú (completed / incomplete / reserved).
@@ -77,7 +77,7 @@ pub async fn update_daily_note_status(
 ) -> Result<DailyWorkNote, String> {
     daily_note_service::update_note_status(id, &username, &status)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Xóa ghi chú theo `id`. Kiểm tra `username` để đảm bảo quyền sở hữu.
@@ -88,5 +88,5 @@ pub async fn delete_daily_note(
 ) -> Result<(), String> {
     daily_note_service::delete_note(id, &username)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

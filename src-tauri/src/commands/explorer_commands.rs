@@ -10,7 +10,7 @@ pub fn explorer_read_dir(path: String) -> Result<ReadDirResult, String> {
 pub async fn explorer_search(root: String, query: String) -> Result<SearchResult, String> {
     tauri::async_runtime::spawn_blocking(move || explorer_service::search_files(&root, &query))
         .await
-        .map_err(|e| format!("Thread error: {e}"))?
+        .map_err(crate::app::error::log_err)?
 }
 
 #[tauri::command]
@@ -52,7 +52,7 @@ pub async fn explorer_copy_bugs(
         explorer_service::copy_bug_files(&source_dir, &dest_dir)
     })
     .await
-    .map_err(|e| format!("Thread error: {e}"))?
+    .map_err(crate::app::error::log_err)?
 }
 
 #[tauri::command]
@@ -65,5 +65,5 @@ pub async fn explorer_paste(
         explorer_service::paste_entries(&sources, &dest_dir, cut)
     })
     .await
-    .map_err(|e| format!("Thread error: {e}"))?
+    .map_err(crate::app::error::log_err)?
 }

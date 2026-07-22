@@ -15,7 +15,7 @@ use crate::services::project_service;
 pub async fn create_project(request: CreateProjectRequest) -> Result<ProjectDetail, String> {
     project_service::create_project(request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Cập nhật thông tin dự án theo `project_id`.
@@ -26,7 +26,7 @@ pub async fn update_project(
 ) -> Result<ProjectDetail, String> {
     project_service::update_project(project_id, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy thông tin chi tiết dự án theo `project_id`, bao gồm danh sách thành viên.
@@ -34,7 +34,7 @@ pub async fn update_project(
 pub async fn get_project_detail(project_id: i32) -> Result<ProjectDetail, String> {
     project_service::get_project_detail(project_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy danh sách tóm tắt toàn bộ dự án (không bao gồm chi tiết thành viên).
@@ -42,7 +42,7 @@ pub async fn get_project_detail(project_id: i32) -> Result<ProjectDetail, String
 pub async fn list_projects() -> Result<Vec<ProjectSummary>, String> {
     project_service::list_projects()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Xóa dự án theo `project_id`. Thành viên bị xóa theo (ON DELETE CASCADE).
@@ -50,7 +50,7 @@ pub async fn list_projects() -> Result<Vec<ProjectSummary>, String> {
 pub async fn delete_project(project_id: i32) -> Result<(), String> {
     project_service::delete_project(project_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Tạo task mới cho dự án.
@@ -61,7 +61,7 @@ pub async fn create_project_task(
 ) -> Result<ProjectTask, String> {
     project_service::create_project_task(project_id, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Cập nhật task đã có.
@@ -72,7 +72,7 @@ pub async fn update_project_task(
 ) -> Result<ProjectTask, String> {
     project_service::update_project_task(task_id, request)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Lấy danh sách task của dự án.
@@ -80,7 +80,7 @@ pub async fn update_project_task(
 pub async fn list_project_tasks(project_id: i32) -> Result<Vec<ProjectTask>, String> {
     project_service::list_project_tasks(project_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Xóa task theo ID.
@@ -88,5 +88,5 @@ pub async fn list_project_tasks(project_id: i32) -> Result<Vec<ProjectTask>, Str
 pub async fn delete_project_task(task_id: String) -> Result<(), String> {
     project_service::delete_project_task(task_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }

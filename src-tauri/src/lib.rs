@@ -98,6 +98,8 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            utils::logger::init();
+
             if let Some(window) = app.get_webview_window("main") {
                 let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
                     .expect("failed to load app icon");
@@ -108,7 +110,7 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 tauri::async_runtime::spawn(async {
                     if let Err(e) = database::startup_store::init().await {
-                        eprintln!("Failed to initialize database tables: {e}");
+                        log::error!("Failed to initialize database tables: {e}");
                     }
                 });
             }

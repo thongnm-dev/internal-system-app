@@ -15,7 +15,7 @@ pub async fn fetch_csv_from_system(
 ) -> Result<String, String> {
     monthly_report_service::fetch_csv_from_url(&date_from, &date_to, &staff)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(crate::app::error::log_err)
 }
 
 /// Preview nội dung file CSV trước khi import.
