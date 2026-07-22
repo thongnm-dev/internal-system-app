@@ -53,6 +53,10 @@ export function s3ScanUploadFolder(dirPath: string) {
   return safeInvoke<ScannedFile[]>("s3_scan_upload_folder", { dirPath });
 }
 
+export function s3ScanUploadFolders(dirPaths: string[]) {
+  return safeInvoke<ScannedFile[]>("s3_scan_upload_folders", { dirPaths });
+}
+
 export function s3UploadFiles(files: UploadFileRequest[], storageName: string, subscribe: string, createFolderSameName: boolean, awsCd: string, userId: string) {
   return safeInvoke<S3OperationResult>("s3_upload_files", { files, storageName, subscribe, createFolderSameName, awsCd, userId });
 }

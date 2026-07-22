@@ -495,6 +495,83 @@ pub async fn scan_upload_folder(dir_path: String) -> AppResult<Vec<ScannedFile>>
     Ok(files)
 }
 
+pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<ScannedFile>> {
+    use regex::Regex;
+
+    let bug_pattern = Regex::new(
+        r"^F3\.1_バグ管理表_\d{4}(?:（再）（急）|（特急）|（急）|（再）)?$"
+    ).unwrap();
+
+    let paths = &dir_paths;
+    if paths.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let raw_files = if paths.len() == 1 {
+        let files = scan_upload_folder(paths[0].clone()).await?;
+        files.into_iter()
+            .filter(|f| bug_pattern.is_match(&f.parent_name))
+            .collect::<Vec<_>>()
+    } else {
+        let folder_names: Vec<String> = paths.iter().map(|p| {
+            Path::new(p)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default()
+        }).collect();
+
+        let invalid: Vec<&String> = folder_names.iter()
+            .filter(|name| !bug_pattern.is_match(name))
+            .collect();
+        if !invalid.is_empty() {
+            let names = invalid.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+            return Err(AppError::new(
+                format!("Thư mục không đúng định dạng F3.1_バグ管理表_XXXX: {names}")
+            ));
+        }
+
+        let parent_path = Path::new(&paths[0])
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        let files = scan_upload_folder(parent_path).await?;
+        let selected: std::collections::HashSet<&str> = folder_names.iter().map(|s| s.as_str()).collect();
+        files.into_iter()
+            .filter(|f| selected.contains(f.parent_name.as_str()))
+            .collect::<Vec<_>>()
+    };
+
+    let mut grouped: std::collections::HashMap<String, Vec<ScannedFile>> = std::collections::HashMap::new();
+    for f in raw_files {
+        grouped.entry(f.parent_name.clone()).or_default().push(f);
+    }
+
+    let mut result = Vec::new();
+    for (folder_name, folder_files) in &grouped {
+        let same_name: Vec<&ScannedFile> = folder_files.iter()
+            .filter(|f| file_stem(&f.name) == *folder_name)
+            .collect();
+        if !same_name.is_empty() {
+            result.extend(same_name.into_iter().cloned());
+        } else {
+            let pattern_match: Vec<&ScannedFile> = folder_files.iter()
+                .filter(|f| bug_pattern.is_match(&file_stem(&f.name)))
+                .collect();
+            result.extend(pattern_match.into_iter().cloned());
+        }
+    }
+
+    Ok(result)
+}
+
+fn file_stem(file_name: &str) -> String {
+    match file_name.rfind('.') {
+        Some(pos) if pos > 0 => file_name[..pos].to_string(),
+        _ => file_name.to_string(),
+    }
+}
+
 pub async fn get_work_folder(folder_key: &str) -> AppResult<String> {
     crate::database::aws_storage_store::get_work_folder_name(folder_key).await
 }

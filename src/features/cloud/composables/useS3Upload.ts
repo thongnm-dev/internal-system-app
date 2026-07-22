@@ -1,6 +1,6 @@
 import { ref, onMounted } from "vue";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { s3ListUploadStorages, s3ScanUploadFolder, s3UploadFiles, s3ListDeleteOptions, s3DeleteUploadedItems } from "@/tauri/commands/s3";
+import { s3ListUploadStorages, s3ScanUploadFolders, s3UploadFiles, s3ListDeleteOptions, s3DeleteUploadedItems } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AwsStorage, ScannedFile, S3OperationResult, UploadFileRequest, DeleteUploadedItem } from "@/_/types/s3";
 import { useCloudGuard } from "./useCloudGuard";
@@ -40,11 +40,14 @@ export function useS3Upload() {
     if (!canUseTauriRuntime()) return [];
     if (!(await guard.ensureOnline())) return [];
 
-    const dir = await open({ directory: true, title: "Chọn thư mục chứa tập tin" });
-    if (!dir) return [];
+    const result = await open({ directory: true, multiple: true, title: "Chọn thư mục chứa tập tin" });
+    if (!result) return [];
+
+    const paths = Array.isArray(result) ? result : [result];
+    if (paths.length === 0) return [];
 
     try {
-      return await s3ScanUploadFolder(dir as string);
+      return await s3ScanUploadFolders(paths);
     } catch (e) {
       toast.error(friendlyError(e));
       return [];

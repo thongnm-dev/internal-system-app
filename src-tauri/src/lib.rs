@@ -81,7 +81,7 @@ use commands::s3_commands::{
     s3_get_browser_allowed_prefixes, s3_get_config, s3_get_download_history,
     s3_get_download_list, s3_list_delete_options, s3_list_download_storages, s3_list_objects,
     s3_list_upload_storages, s3_move_browser_objects, s3_move_objects, s3_save_config,
-    s3_scan_local_folder, s3_scan_upload_folder, s3_search_download_history,
+    s3_scan_local_folder, s3_scan_upload_folder, s3_scan_upload_folders, s3_search_download_history,
     s3_search_upload_history, s3_test_connection, s3_update_download_moved_local,
     s3_upload_file, s3_upload_files, s3_upload_folder,
 };
@@ -242,6 +242,7 @@ pub fn run() {
             s3_list_upload_storages,
             s3_scan_local_folder,
             s3_scan_upload_folder,
+            s3_scan_upload_folders,
             s3_list_delete_options,
             s3_delete_uploaded_items,
             s3_list_download_storages,

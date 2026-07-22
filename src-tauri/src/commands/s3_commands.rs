@@ -100,6 +100,13 @@ pub async fn s3_scan_upload_folder(dir_path: String) -> Result<Vec<ScannedFile>,
 }
 
 #[tauri::command]
+pub async fn s3_scan_upload_folders(dir_paths: Vec<String>) -> Result<Vec<ScannedFile>, String> {
+    s3_service::scan_upload_folders(dir_paths)
+        .await
+        .map_err(crate::app::error::log_err)
+}
+
+#[tauri::command]
 pub async fn s3_upload_files(
     files: Vec<UploadFileRequest>,
     storage_name: String,
