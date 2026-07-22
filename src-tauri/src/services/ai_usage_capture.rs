@@ -119,7 +119,7 @@ pub fn read_login_at(config_dir: &str) -> Option<CapturedLogin> {
 }
 
 /// Mở rộng `~` đầu đường dẫn thành thư mục home.
-fn expand_tilde(path: &str) -> std::path::PathBuf {
+pub fn expand_tilde(path: &str) -> std::path::PathBuf {
     let trimmed = path.trim();
     let home = || std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
     if trimmed == "~" {

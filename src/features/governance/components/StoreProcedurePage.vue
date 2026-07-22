@@ -10,6 +10,8 @@ import { ref } from "vue";
 import { useStoreProcedure } from "../composables/useStoreProcedure";
 import { useToast } from "@/shared/composables/useToast";
 
+import { highlightSql } from "@/features/tools/utils/highlightSql";
+
 const ctrl = useStoreProcedure();
 const toast = useToast();
 const confirmExecute = ref(false);
@@ -27,6 +29,15 @@ async function handleExecute() {
     toast.error(
       `${ctrl.summary.value?.error_count} of ${ctrl.summary.value?.total} stored procedures failed.`,
     );
+  }
+}
+
+async function handleExecuteSingle(name: string) {
+  const ok = await ctrl.executeSingle(name);
+  if (ok) {
+    toast.success(`${name} executed successfully.`);
+  } else {
+    toast.error(`${name} execution failed.`);
   }
 }
 
@@ -179,8 +190,63 @@ onMounted(() => ctrl.init());
             <span v-else class="text-xs text-muted">—</span>
           </template>
         </Column>
+        <Column header-class="text-center" body-class="text-center" :style="{ width: '120px' }">
+          <template #body="{ data }">
+            <div class="flex items-center justify-center gap-1">
+              <Button
+                icon="pi pi-eye"
+                severity="secondary"
+                text
+                rounded
+                size="small"
+                @click="ctrl.viewScript(data.name)"
+              />
+              <Button
+                icon="pi pi-play"
+                severity="info"
+                text
+                rounded
+                size="small"
+                :loading="ctrl.executingNames.value.has(data.name)"
+                @click="handleExecuteSingle(data.name)"
+              />
+            </div>
+          </template>
+        </Column>
       </DataTable>
     </section>
+
+    <!-- View script dialog -->
+    <Dialog
+      :visible="!!ctrl.viewingName.value"
+      class="w-full max-w-3xl rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="!$event && ctrl.closeViewer()"
+    >
+      <template #header>
+        <h3 class="font-mono text-sm font-bold text-ink">{{ ctrl.viewingName.value }}</h3>
+      </template>
+      <div v-if="ctrl.viewingLoading.value" class="flex items-center justify-center py-8">
+        <i class="pi pi-spin pi-spinner text-xl text-muted" />
+      </div>
+      <pre
+        v-else
+        class="sp-viewer max-h-[60vh] overflow-auto rounded-lg border border-divider bg-canvas p-4 font-mono text-sm leading-relaxed text-ink"
+        v-html="highlightSql(ctrl.viewingContent.value)"
+      />
+      <template #footer>
+        <div class="flex items-center justify-end">
+          <Button
+            icon="pi pi-play"
+            label="Execute"
+            severity="warning"
+            :loading="ctrl.executingNames.value.has(ctrl.viewingName.value)"
+            @click="handleExecuteSingle(ctrl.viewingName.value)"
+          />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- Confirm dialog -->
     <Dialog
@@ -222,3 +288,14 @@ onMounted(() => ctrl.init());
     </Dialog>
   </section>
 </template>
+
+<style scoped>
+.sp-viewer :deep(.sql-kw) { color: #2563eb; font-weight: 600; }
+.sp-viewer :deep(.sql-str) { color: #16a34a; }
+.sp-viewer :deep(.sql-com) { color: #6b7280; font-style: italic; }
+.sp-viewer :deep(.sql-num) { color: #b45309; }
+[data-theme="dark"] .sp-viewer :deep(.sql-kw) { color: #93c5fd; }
+[data-theme="dark"] .sp-viewer :deep(.sql-str) { color: #86efac; }
+[data-theme="dark"] .sp-viewer :deep(.sql-com) { color: #9ca3af; }
+[data-theme="dark"] .sp-viewer :deep(.sql-num) { color: #fcd34d; }
+</style>

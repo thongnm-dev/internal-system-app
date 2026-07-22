@@ -84,6 +84,14 @@ pub async fn ai_usage_report_signal(request: ReportUsageSignalRequest) -> Result
     ai_usage_service::report_signal(request).map_err(crate::app::error::log_err)
 }
 
+/// Probe usage một account theo ID, trả về account sau khi cập nhật.
+#[tauri::command]
+pub async fn ai_usage_refresh_account(id: i64) -> Result<AiAccount, String> {
+    ai_usage_service::poll_account(id)
+        .await
+        .map_err(crate::app::error::log_err)
+}
+
 /// Ép probe usage ngay lập tức (toàn bộ account), trả về danh sách sau khi cập nhật.
 #[tauri::command]
 pub async fn ai_usage_refresh(app: tauri::AppHandle) -> Result<Vec<AiAccount>, String> {
@@ -101,4 +109,18 @@ pub async fn ai_usage_get_settings() -> Result<AiUsageSettings, String> {
 #[tauri::command]
 pub async fn ai_usage_save_settings(settings: AiUsageSettings) -> Result<(), String> {
     ai_usage_service::save_settings(settings).map_err(crate::app::error::log_err)
+}
+
+/// Mở terminal với `CLAUDE_CONFIG_DIR` trong working directory chỉ định.
+#[tauri::command]
+pub async fn ai_usage_open_terminal(config_dir: String, work_dir: String) -> Result<(), String> {
+    ai_usage_service::open_terminal(&config_dir, &work_dir)
+        .map_err(crate::app::error::log_err)
+}
+
+/// Mở terminal mới chạy `claude /login` với `CLAUDE_CONFIG_DIR` tuỳ chỉnh.
+#[tauri::command]
+pub async fn ai_usage_open_login(config_dir: String, work_dir: String) -> Result<(), String> {
+    ai_usage_service::open_login_terminal(&config_dir, &work_dir)
+        .map_err(crate::app::error::log_err)
 }

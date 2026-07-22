@@ -132,6 +132,4 @@ export type ReportUsageSignalRequest = {
 export type AiUsageSettings = {
   switch_threshold_percent: number;
   poll_interval_secs: number;
-  /** Thư mục project (`CLAUDE_CONFIG_WORK_DIR`) nơi user mở terminal làm việc với AI. */
-  work_dir: string;
 };

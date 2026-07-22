@@ -3,6 +3,7 @@ import type {
   AppConfigData,
   SaveAppConfigRequest,
   SpInfo,
+  SpExecutionResult,
   SpExecutionSummary,
 } from "@/_/types/app-config";
 
@@ -16,6 +17,14 @@ export function saveAppConfig(request: SaveAppConfigRequest) {
 
 export function listStoredProcedures() {
   return safeInvoke<SpInfo[]>("list_stored_procedures");
+}
+
+export function getStoredProcedureContent(name: string) {
+  return safeInvoke<string>("get_stored_procedure_content", { name });
+}
+
+export function executeSingleStoredProcedure(name: string) {
+  return safeInvoke<SpExecutionResult>("execute_single_stored_procedure", { name });
 }
 
 export function executeStoredProcedures() {

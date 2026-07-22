@@ -13,7 +13,10 @@ import {
   aiUsageGetToken,
   aiUsageImportDetected,
   aiUsageListAccounts,
+  aiUsageOpenLogin,
+  aiUsageOpenTerminal,
   aiUsageRefresh,
+  aiUsageRefreshAccount,
   aiUsageReportSignal,
   aiUsageSaveSettings,
   aiUsageSetActive,
@@ -37,11 +40,11 @@ export function useAiUsage() {
   const settings = ref<AiUsageSettings>({
     switch_threshold_percent: 10,
     poll_interval_secs: 300,
-    work_dir: "",
   });
   const isLoading = ref(false);
   const isSaving = ref(false);
   const isRefreshing = ref(false);
+  const refreshingId = ref<number | null>(null);
   const isDetecting = ref(false);
   const detected = ref<DetectedLogin[]>([]);
   const capturePreview = ref<CapturedLogin | null>(null);
@@ -218,6 +221,26 @@ export function useAiUsage() {
     }
   }
 
+  async function openTerminal(configDir: string, workDir: string): Promise<boolean> {
+    try {
+      await aiUsageOpenTerminal(configDir.trim(), workDir.trim());
+      return true;
+    } catch (error) {
+      toast.error(friendlyError(error));
+      return false;
+    }
+  }
+
+  async function openLogin(configDir: string, workDir: string): Promise<boolean> {
+    try {
+      await aiUsageOpenLogin(configDir.trim(), workDir.trim());
+      return true;
+    } catch (error) {
+      toast.error(friendlyError(error));
+      return false;
+    }
+  }
+
   async function refresh() {
     isRefreshing.value = true;
     try {
@@ -226,6 +249,19 @@ export function useAiUsage() {
       toast.error(friendlyError(error));
     } finally {
       isRefreshing.value = false;
+    }
+  }
+
+  async function refreshAccount(id: number) {
+    refreshingId.value = id;
+    try {
+      const updated = await aiUsageRefreshAccount(id);
+      const idx = accounts.value.findIndex((a) => a.id === id);
+      if (idx >= 0) accounts.value[idx] = updated;
+    } catch (error) {
+      toast.error(friendlyError(error));
+    } finally {
+      refreshingId.value = null;
     }
   }
 
@@ -260,6 +296,7 @@ export function useAiUsage() {
     isLoading,
     isSaving,
     isRefreshing,
+    refreshingId,
     isDetecting,
     detected,
     capturePreview,
@@ -277,9 +314,12 @@ export function useAiUsage() {
     captureAdd,
     previewConfigDir,
     addConfigDir,
+    openTerminal,
+    openLogin,
     detectLocal,
     importDetected,
     refresh,
+    refreshAccount,
     saveSettings,
   };
 }

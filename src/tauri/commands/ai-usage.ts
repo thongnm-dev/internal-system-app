@@ -65,10 +65,22 @@ export function aiUsageRefresh() {
   return safeInvoke<AiAccount[]>("ai_usage_refresh");
 }
 
+export function aiUsageRefreshAccount(id: number) {
+  return safeInvoke<AiAccount>("ai_usage_refresh_account", { id });
+}
+
 export function aiUsageGetSettings() {
   return safeInvoke<AiUsageSettings>("ai_usage_get_settings");
 }
 
 export function aiUsageSaveSettings(settings: AiUsageSettings) {
   return safeInvoke<void>("ai_usage_save_settings", { settings });
+}
+
+export function aiUsageOpenTerminal(configDir: string, workDir: string) {
+  return safeInvoke<void>("ai_usage_open_terminal", { configDir, workDir });
+}
+
+export function aiUsageOpenLogin(configDir: string, workDir: string) {
+  return safeInvoke<void>("ai_usage_open_login", { configDir, workDir });
 }

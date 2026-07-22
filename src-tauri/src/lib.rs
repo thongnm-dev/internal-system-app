@@ -60,8 +60,10 @@ use commands::ai_usage_commands::{
     ai_usage_add_account, ai_usage_add_config_dir, ai_usage_capture_add, ai_usage_capture_preview,
     ai_usage_config_dir_preview, ai_usage_delete_account, ai_usage_detect_local,
     ai_usage_get_settings, ai_usage_get_token, ai_usage_import_detected, ai_usage_list_accounts,
-    ai_usage_refresh, ai_usage_report_signal, ai_usage_save_settings, ai_usage_set_active,
-    ai_usage_update_account,
+    ai_usage_open_login, ai_usage_open_terminal, ai_usage_refresh, ai_usage_refresh_account,
+    ai_usage_report_signal,
+    ai_usage_save_settings,
+    ai_usage_set_active, ai_usage_update_account,
 };
 use commands::ai_chat_commands::ai_chat_complete;
 use commands::schedule_commands::read_schedule_excel;
@@ -70,7 +72,8 @@ use commands::sql_editor_commands::{
     sql_save_connection, sql_test_connection,
 };
 use commands::app_config_commands::{
-    execute_stored_procedures, get_app_config, list_stored_procedures, save_app_config,
+    execute_single_stored_procedure, execute_stored_procedures, get_app_config,
+    get_stored_procedure_content, list_stored_procedures, save_app_config,
 };
 use commands::s3_commands::{
     s3_check_config, s3_check_download_available, s3_create_folder, s3_delete_by_storage,
@@ -285,8 +288,11 @@ pub fn run() {
             ai_usage_get_token,
             ai_usage_report_signal,
             ai_usage_refresh,
+            ai_usage_refresh_account,
             ai_usage_get_settings,
             ai_usage_save_settings,
+            ai_usage_open_login,
+            ai_usage_open_terminal,
             // === AI Chat commands ===
             ai_chat_complete,
             // === Schedule commands ===
@@ -303,6 +309,8 @@ pub fn run() {
             save_app_config,
             // === Store Procedure management commands ===
             list_stored_procedures,
+            get_stored_procedure_content,
+            execute_single_stored_procedure,
             execute_stored_procedures
         ])
         .run(tauri::generate_context!())

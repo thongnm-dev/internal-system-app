@@ -99,6 +99,14 @@ fn all_procedures() -> Vec<(&'static str, &'static str)> {
     ]
 }
 
+/// Lấy nội dung SQL của một stored procedure theo tên.
+pub fn get_procedure_content(name: &str) -> Option<String> {
+    all_procedures()
+        .into_iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, sql)| sql.to_string())
+}
+
 /// Liệt kê toàn bộ stored procedure có sẵn (không kết nối DB).
 pub fn list_procedures() -> Vec<SpInfo> {
     all_procedures()
@@ -108,6 +116,32 @@ pub fn list_procedures() -> Vec<SpInfo> {
             file_name: format!("{name}.sql"),
         })
         .collect()
+}
+
+/// Thực thi CREATE OR REPLACE cho một stored procedure theo tên.
+pub async fn execute_single_procedure(name: &str) -> AppResult<SpExecutionResult> {
+    let procedures = all_procedures();
+    let (_, sql) = procedures
+        .iter()
+        .find(|(n, _)| *n == name)
+        .ok_or_else(|| crate::app::error::AppError::new(format!("Stored procedure '{}' not found", name)))?;
+
+    let client = pgsql_connect::connect().await?;
+    match client.batch_execute(sql).await {
+        Ok(_) => Ok(SpExecutionResult {
+            name: name.to_string(),
+            success: true,
+            message: "OK".to_string(),
+        }),
+        Err(e) => {
+            let detail = pgsql_connect::pg_error_detail(&e);
+            Ok(SpExecutionResult {
+                name: name.to_string(),
+                success: false,
+                message: detail,
+            })
+        }
+    }
 }
 
 /// Thực thi CREATE OR REPLACE cho toàn bộ stored procedure.

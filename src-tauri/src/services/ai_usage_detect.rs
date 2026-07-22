@@ -226,7 +226,7 @@ fn sha256_hex8(input: &str) -> String {
 }
 
 /// `true` nếu `config_dir` là login mặc định (rỗng hoặc `~/.claude`).
-fn is_default_config_dir(config_dir: &str) -> bool {
+pub fn is_default_config_dir(config_dir: &str) -> bool {
     let dir = config_dir.trim();
     if dir.is_empty() {
         return true;

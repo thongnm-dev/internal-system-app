@@ -48,6 +48,11 @@ fn ensure_loaded(guard: &mut Option<AiAccountData>) {
                 };
             }
         }
+        for account in data.accounts.iter_mut() {
+            if account.priority < 1 {
+                account.priority = 1;
+            }
+        }
         // Migrate chu kỳ poll cũ (60s) → 300s: endpoint usage bị rate-limit nếu gọi dày.
         if data.settings.poll_interval_secs == 60 {
             data.settings.poll_interval_secs = 300;
@@ -273,7 +278,7 @@ pub fn add_account(request: AddAiAccountRequest) -> AppResult<AiAccount> {
                 .map(|a| a.priority)
                 .max()
                 .map(|max| max + 1)
-                .unwrap_or(0)
+                .unwrap_or(1)
         });
 
         let id = data.next_id;
@@ -434,7 +439,7 @@ pub fn capture_add(name: Option<String>) -> AppResult<AiAccount> {
             .map(|a| a.priority)
             .max()
             .map(|max| max + 1)
-            .unwrap_or(0);
+            .unwrap_or(1);
 
         let id = data.next_id;
         data.next_id += 1;
@@ -722,6 +727,17 @@ fn apply_probe_results(outcomes: Vec<ai_usage_probe::ProbeOutcome>) -> AppResult
     })
 }
 
+/// Probe một account theo ID, cập nhật dữ liệu và trả về account mới nhất.
+pub async fn poll_account(id: i64) -> AppResult<AiAccount> {
+    let account = read_data(|data| data.accounts.iter().find(|a| a.id == id).cloned())
+        .ok_or_else(|| AppError::new("Account not found."))?;
+    let outcome = ai_usage_probe::probe(&account).await;
+    apply_probe_results(vec![outcome])?;
+    let updated = read_data(|data| data.accounts.iter().find(|a| a.id == id).cloned())
+        .ok_or_else(|| AppError::new("Account not found after probe."))?;
+    Ok(to_public(&updated))
+}
+
 /// Probe toàn bộ account một lần, cập nhật dữ liệu và bắn event cho frontend.
 pub async fn poll_once(app: &AppHandle) -> AppResult<()> {
     let accounts = snapshot();
@@ -752,4 +768,91 @@ pub async fn run_poll_loop(app: AppHandle) {
             log::error!("AI usage poll error: {e}");
         }
     }
+}
+
+/// Mở terminal với `CLAUDE_CONFIG_DIR` trong working directory chỉ định.
+pub fn open_terminal(config_dir: &str, work_dir: &str) -> AppResult<()> {
+    spawn_terminal(config_dir, work_dir, Some("claude --dangerously-skip-permissions"))
+}
+
+/// Mở terminal chạy `claude /login` với `CLAUDE_CONFIG_DIR` tuỳ chỉnh.
+pub fn open_login_terminal(config_dir: &str, work_dir: &str) -> AppResult<()> {
+    spawn_terminal(config_dir, work_dir, Some("claude /login"))
+}
+
+fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> AppResult<()> {
+    let dir = config_dir.trim();
+    if dir.is_empty() {
+        return Err(AppError::new("Config directory is required."));
+    }
+    let wd = work_dir.trim();
+    if wd.is_empty() {
+        return Err(AppError::new("Working directory is required."));
+    }
+    let expanded_wd = ai_usage_capture::expand_tilde(wd)
+        .to_string_lossy()
+        .to_string();
+
+    let is_default = ai_usage_detect::is_default_config_dir(dir);
+    let expanded_dir = ai_usage_capture::expand_tilde(dir)
+        .to_string_lossy()
+        .to_string();
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut parts = format!("cd /d {expanded_wd}");
+        if !is_default {
+            parts.push_str(&format!("&& set CLAUDE_CONFIG_DIR={expanded_dir}"));
+        }
+        if let Some(cmd) = command {
+            parts.push_str(&format!("&& {cmd}"));
+        }
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "cmd", "/k", &parts])
+            .spawn()
+            .map_err(|e| AppError::new(&format!("Không thể mở terminal: {e}")))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let mut script_body = format!("cd '{expanded_wd}'");
+        if !is_default {
+            script_body.push_str(&format!(" && export CLAUDE_CONFIG_DIR='{expanded_dir}'"));
+        }
+        if let Some(cmd) = command {
+            script_body.push_str(&format!(" && {cmd}"));
+        }
+        let script = format!("tell application \"Terminal\" to do script \"{script_body}\"");
+        std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .spawn()
+            .map_err(|e| AppError::new(&format!("Không thể mở Terminal: {e}")))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let mut bash_body = format!("cd \"{expanded_wd}\"");
+        if !is_default {
+            bash_body.push_str(&format!(" && export CLAUDE_CONFIG_DIR=\"{expanded_dir}\""));
+        }
+        if let Some(cmd) = command {
+            bash_body.push_str(&format!(" && {cmd}"));
+        }
+        bash_body.push_str("; exec bash");
+        let arg = format!("bash -c '{bash_body}'");
+        for term in ["x-terminal-emulator", "gnome-terminal", "xterm"] {
+            if std::process::Command::new(term)
+                .args(["-e", &arg])
+                .spawn()
+                .is_ok()
+            {
+                return Ok(());
+            }
+        }
+        return Err(AppError::new("Không tìm thấy terminal emulator."));
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        return Err(AppError::new("Hệ điều hành không được hỗ trợ."));
+    }
+
+    Ok(())
 }

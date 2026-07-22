@@ -3,6 +3,8 @@ import { canUseTauriRuntime } from "@/tauri/commands/_base";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import {
   listStoredProcedures,
+  getStoredProcedureContent,
+  executeSingleStoredProcedure,
   executeStoredProcedures,
 } from "@/tauri/commands/app-config";
 import type { SpInfo, SpExecutionResult, SpExecutionSummary } from "@/_/types/app-config";
@@ -14,7 +16,11 @@ export function useStoreProcedure() {
   const summary = ref<SpExecutionSummary | null>(null);
   const loading = ref(false);
   const executing = ref(false);
+  const executingNames = ref<Set<string>>(new Set());
   const error = ref("");
+  const viewingName = ref("");
+  const viewingContent = ref("");
+  const viewingLoading = ref(false);
   const filterText = ref("");
   const filterStatus = ref<"all" | "success" | "error">("all");
 
@@ -73,6 +79,68 @@ export function useStoreProcedure() {
     }
   }
 
+  async function executeSingle(name: string): Promise<boolean> {
+    if (!canUseTauriRuntime()) return false;
+    executingNames.value = new Set([...executingNames.value, name]);
+    try {
+      const result = await executeSingleStoredProcedure(name);
+      const idx = results.value.findIndex((r) => r.name === name);
+      if (idx >= 0) {
+        results.value[idx] = result;
+      } else {
+        results.value = [...results.value, result];
+      }
+      if (summary.value) {
+        const oldResult = summary.value.results.find((r) => r.name === name);
+        const wasSuccess = oldResult?.success ?? false;
+        if (wasSuccess && !result.success) {
+          summary.value.success_count--;
+          summary.value.error_count++;
+        } else if (!wasSuccess && result.success) {
+          summary.value.success_count++;
+          summary.value.error_count--;
+        }
+        const sIdx = summary.value.results.findIndex((r) => r.name === name);
+        if (sIdx >= 0) summary.value.results[sIdx] = result;
+        else summary.value.results.push(result);
+      } else {
+        summary.value = {
+          total: 1,
+          success_count: result.success ? 1 : 0,
+          error_count: result.success ? 0 : 1,
+          results: [result],
+        };
+      }
+      return result.success;
+    } catch (e) {
+      error.value = String(e);
+      return false;
+    } finally {
+      const next = new Set(executingNames.value);
+      next.delete(name);
+      executingNames.value = next;
+    }
+  }
+
+  async function viewScript(name: string) {
+    if (!canUseTauriRuntime()) return;
+    viewingName.value = name;
+    viewingContent.value = "";
+    viewingLoading.value = true;
+    try {
+      viewingContent.value = await getStoredProcedureContent(name);
+    } catch (e) {
+      viewingContent.value = String(e);
+    } finally {
+      viewingLoading.value = false;
+    }
+  }
+
+  function closeViewer() {
+    viewingName.value = "";
+    viewingContent.value = "";
+  }
+
   function resetResults() {
     results.value = [];
     summary.value = null;
@@ -94,7 +162,14 @@ export function useStoreProcedure() {
     filterStatus,
     filteredResults,
     hasResults,
+    executingNames,
+    viewingName,
+    viewingContent,
+    viewingLoading,
     executeAll,
+    executeSingle,
+    viewScript,
+    closeViewer,
     resetResults,
     init,
   };

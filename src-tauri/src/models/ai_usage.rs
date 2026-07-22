@@ -132,18 +132,13 @@ pub struct AiUsageSettings {
     pub switch_threshold_percent: f64,
     /// Chu kỳ poll usage nền (giây).
     pub poll_interval_secs: u64,
-    /// Thư mục project (`CLAUDE_CONFIG_WORK_DIR`) nơi user mở terminal làm việc với AI.
-    #[serde(default)]
-    pub work_dir: String,
 }
 
 impl Default for AiUsageSettings {
     fn default() -> Self {
         Self {
             switch_threshold_percent: 10.0,
-            // Endpoint usage của Claude bị rate-limit nếu gọi dày → mặc định 5 phút.
             poll_interval_secs: 300,
-            work_dir: String::new(),
         }
     }
 }

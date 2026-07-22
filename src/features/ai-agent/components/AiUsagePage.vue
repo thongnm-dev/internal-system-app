@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useAiUsage } from "../composables/useAiUsage";
 import type {
   AiAccount,
@@ -28,7 +29,11 @@ const configDir = ref("");
 const showSettings = ref(false);
 const thresholdInput = ref(10);
 const intervalInput = ref(60);
-const workDirInput = ref("");
+
+const showTerminal = ref(false);
+const terminalConfigDir = ref("");
+const terminalWorkDir = ref("");
+const terminalIsLogin = ref(false);
 
 const showDetect = ref(false);
 
@@ -38,10 +43,11 @@ async function openDetect() {
   if (ok) showDetect.value = true;
 }
 
-/** Đổi provider — Codex chưa hỗ trợ subscription nên ép về API key. */
+/** Đổi provider — Claude luôn là subscription, Codex chỉ API key. */
 function selectProvider(next: AiProvider) {
   provider.value = next;
-  if (next === "codex") accountKind.value = "key";
+  accountKind.value = next === "claude" ? "subscription" : "key";
+  if (next === "claude" && subMode.value === "current") void loadPreviewAndPrefill();
 }
 
 /** Nạp login hiện tại + prefill tên (chỉ khi tên còn trống). */
@@ -53,24 +59,35 @@ async function loadPreviewAndPrefill() {
   }
 }
 
-/** Đổi kiểu account; subscription thì nạp login hiện tại để capture. */
-function selectKind(kind: "subscription" | "key") {
-  accountKind.value = kind;
-  if (kind === "subscription" && subMode.value === "current") void loadPreviewAndPrefill();
-}
-
 /** Đổi giữa "capture login hiện tại" và "đăng ký config dir khác". */
 function selectSubMode(mode: "current" | "dir") {
   subMode.value = mode;
   if (mode === "current") void loadPreviewAndPrefill();
 }
 
-/** Preview login tại config dir + prefill tên (khi nhập ô config dir). */
+/** Mở dialog chọn folder → điền vào config dir. */
+async function browseConfigDir() {
+  const selected = await open({ directory: true, title: "Chọn CLAUDE_CONFIG_DIR" });
+  if (typeof selected === "string") {
+    configDir.value = selected;
+    await onConfigDirInput();
+  }
+}
+
+/** Preview login tại config dir + prefill tên. Nếu chưa login thì hỏi mở terminal. */
 async function onConfigDirInput() {
-  await ctrl.previewConfigDir(configDir.value);
+  const dir = configDir.value.trim();
+  if (!dir) return;
+  await ctrl.previewConfigDir(dir);
   const preview = ctrl.configDirPreview.value;
   if (preview && !accountName.value.trim()) {
     accountName.value = preview.display_name || preview.email;
+  }
+  if (!preview) {
+    terminalConfigDir.value = dir;
+    terminalWorkDir.value = "";
+    terminalIsLogin.value = true;
+    showTerminal.value = true;
   }
 }
 
@@ -103,13 +120,13 @@ function openDialog() {
   void loadPreviewAndPrefill();
 }
 
-/** Form hợp lệ: subscription cần đọc được login (hiện tại/config dir); API key cần key. */
+/** Form hợp lệ: subscription cần đọc được login (hiện tại cần token; config dir chỉ cần identity). */
 const canSaveAccount = computed(() => {
   if (!accountName.value.trim()) return false;
   if (accountKind.value !== "subscription") return !!apiKey.value.trim();
   return subMode.value === "current"
     ? !!ctrl.capturePreview.value?.has_token
-    : !!ctrl.configDirPreview.value?.has_token;
+    : !!ctrl.configDirPreview.value;
 });
 
 async function saveAccount() {
@@ -134,7 +151,6 @@ async function saveAccount() {
 function openSettings() {
   thresholdInput.value = ctrl.settings.value.switch_threshold_percent;
   intervalInput.value = ctrl.settings.value.poll_interval_secs;
-  workDirInput.value = ctrl.settings.value.work_dir ?? "";
   showSettings.value = true;
 }
 
@@ -142,14 +158,31 @@ async function saveSettings() {
   const ok = await ctrl.saveSettings({
     switch_threshold_percent: Number(thresholdInput.value) || 0,
     poll_interval_secs: Math.max(60, Number(intervalInput.value) || 300),
-    work_dir: workDirInput.value.trim(),
   });
   if (ok) showSettings.value = false;
 }
 
+function openTerminalDialog(account: AiAccount) {
+  terminalConfigDir.value = account.config_dir || "";
+  terminalWorkDir.value = "";
+  terminalIsLogin.value = false;
+  showTerminal.value = true;
+}
+
+async function browseTerminalWorkDir() {
+  const selected = await open({ directory: true, title: "Chọn working directory (thư mục project)" });
+  if (typeof selected === "string") terminalWorkDir.value = selected;
+}
+
+async function confirmOpenTerminal() {
+  const fn = terminalIsLogin.value ? ctrl.openLogin : ctrl.openTerminal;
+  const ok = await fn(terminalConfigDir.value, terminalWorkDir.value);
+  if (ok) showTerminal.value = false;
+}
+
 function onPriorityChange(account: AiAccount, event: Event) {
-  const value = Number((event.target as HTMLInputElement).value);
-  if (Number.isFinite(value) && value !== account.priority) {
+  const value = Math.max(1, Number((event.target as HTMLInputElement).value) || 1);
+  if (value !== account.priority) {
     void ctrl.updateAccount({ id: account.id, priority: value });
   }
 }
@@ -278,13 +311,6 @@ function resetHint(resetAt: string): string {
         </div>
         <div class="ml-auto flex shrink-0 items-center gap-2">
           <Button
-            icon="pi pi-refresh"
-            label="Refresh"
-            severity="secondary"
-            :loading="ctrl.isRefreshing.value"
-            @click="ctrl.refresh()"
-          />
-          <Button
             icon="pi pi-search"
             label="Detect local"
             severity="secondary"
@@ -321,7 +347,10 @@ function resetHint(resetAt: string): string {
                   <span v-if="account.is_active" class="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">
                     ACTIVE
                   </span>
-                  <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]">
+                  <span
+                    v-if="account.account_type !== 'subscription'"
+                    :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]"
+                  >
                     {{ typeLabel(account.account_type) }}
                   </span>
                   <span
@@ -329,20 +358,6 @@ function resetHint(resetAt: string): string {
                     class="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
                   >
                     {{ account.subscription_type }}
-                  </span>
-                  <span
-                    v-if="account.account_type === 'subscription' && account.source"
-                    class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
-                    :class="account.source === 'detected'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : account.source === 'captured'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-canvas text-muted'"
-                    :title="account.source === 'detected'
-                      ? 'Token trong Keychain — luôn mới'
-                      : 'Token đã capture vào app data dir — có thể hết hạn'"
-                  >
-                    {{ account.source }}
                   </span>
                 </div>
                 <template v-if="account.account_type === 'subscription'">
@@ -446,6 +461,7 @@ function resetHint(resetAt: string): string {
                 <span>Priority</span>
                 <input
                   type="number"
+                  min="1"
                   class="w-14 rounded border border-divider bg-canvas px-1.5 py-0.5 text-right text-ink"
                   :value="account.priority"
                   @change="onPriorityChange(account, $event)"
@@ -455,6 +471,14 @@ function resetHint(resetAt: string): string {
 
             <!-- Actions -->
             <div class="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                icon="pi pi-refresh"
+                label="Refresh"
+                size="small"
+                severity="secondary"
+                :loading="ctrl.refreshingId.value === account.id"
+                @click="ctrl.refreshAccount(account.id)"
+              />
               <Button
                 icon="pi pi-check-circle"
                 label="Set active"
@@ -471,6 +495,15 @@ function resetHint(resetAt: string): string {
                 severity="secondary"
                 outlined
                 @click="ctrl.copyToken(account.id)"
+              />
+              <Button
+                v-if="account.account_type === 'subscription'"
+                icon="pi pi-terminal"
+                label="Open terminal"
+                size="small"
+                severity="secondary"
+                outlined
+                @click="openTerminalDialog(account)"
               />
               <Button
                 icon="pi pi-exclamation-triangle"
@@ -526,27 +559,6 @@ function resetHint(resetAt: string): string {
           </div>
         </label>
 
-        <!-- Kiểu account (chỉ Claude có subscription) -->
-        <label v-if="provider === 'claude'" class="block">
-          <span class="text-xs font-bold text-muted">Kiểu tài khoản</span>
-          <div class="mt-1 flex gap-2">
-            <Button
-              label="Subscription"
-              size="small"
-              :severity="accountKind === 'subscription' ? undefined : 'secondary'"
-              :outlined="accountKind !== 'subscription'"
-              @click="selectKind('subscription')"
-            />
-            <Button
-              label="API key"
-              size="small"
-              :severity="accountKind === 'key' ? undefined : 'secondary'"
-              :outlined="accountKind !== 'key'"
-              @click="selectKind('key')"
-            />
-          </div>
-        </label>
-
         <label class="block">
           <span class="text-xs font-bold text-muted">Account Name <span class="text-red-500">*</span></span>
           <InputText v-model="accountName" class="mt-1 w-full" placeholder="e.g. personal-claude" autofocus />
@@ -575,12 +587,20 @@ function resetHint(resetAt: string): string {
           <!-- Config dir input (đăng ký account thứ 2 đã login ở dir riêng) -->
           <label v-if="subMode === 'dir'" class="block">
             <span class="text-xs font-bold text-muted">CLAUDE_CONFIG_DIR <span class="text-red-500">*</span></span>
-            <InputText
-              v-model="configDir"
-              class="mt-1 w-full font-mono"
-              placeholder="~/.claude-work"
-              @input="onConfigDirInput"
-            />
+            <div class="mt-1 flex gap-1.5">
+              <InputText
+                v-model="configDir"
+                class="min-w-0 flex-1 font-mono"
+                placeholder="~/.claude-work"
+                @input="onConfigDirInput"
+              />
+              <Button
+                icon="pi pi-folder-open"
+                severity="secondary"
+                title="Chọn folder"
+                @click="browseConfigDir"
+              />
+            </div>
             <span class="text-xs text-muted">
               Login trước 1 lần: <code class="rounded bg-canvas px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code>
             </span>
@@ -588,7 +608,7 @@ function resetHint(resetAt: string): string {
 
           <!-- Preview login đọc được (từ login hiện tại hoặc config dir) -->
           <div
-            v-if="subMode === 'current' ? ctrl.capturePreview.value?.has_token : ctrl.configDirPreview.value?.has_token"
+            v-if="subMode === 'current' ? ctrl.capturePreview.value?.has_token : ctrl.configDirPreview.value"
             class="rounded-lg border border-divider bg-canvas/50 p-3 text-xs"
           >
             <div class="flex items-center gap-2">
@@ -615,6 +635,13 @@ function resetHint(resetAt: string): string {
                 ? 'Tool sẽ lưu token này vào profile riêng trong app data dir.'
                 : 'Token đọc từ Keychain của config dir này (luôn mới).' }}
             </p>
+            <p
+              v-if="subMode === 'dir' && ctrl.configDirPreview.value && !ctrl.configDirPreview.value.has_token"
+              class="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-700"
+            >
+              <i class="pi pi-exclamation-triangle mr-1" />Chưa có token — account sẽ được thêm nhưng chưa dùng được.
+              Chạy <code class="rounded bg-amber-100 px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code> để lấy token.
+            </p>
           </div>
           <p
             v-else
@@ -622,7 +649,7 @@ function resetHint(resetAt: string): string {
           >
             {{ subMode === 'current'
               ? 'Chưa có login Claude đang hoạt động. Chạy `claude /login` rồi mở lại dialog.'
-              : 'Chưa đọc được login ở config dir này. Kiểm tra đường dẫn và đảm bảo đã login.' }}
+              : 'Chưa đọc được login ở config dir này. Kiểm tra đường dẫn và đảm bảo đã tạo .claude.json.' }}
           </p>
         </div>
 
@@ -698,16 +725,6 @@ function resetHint(resetAt: string): string {
           <span class="text-xs text-muted">
             Tối thiểu 60 giây (khuyến nghị 300). Endpoint usage của Claude bị rate-limit nếu gọi quá dày.
           </span>
-        </label>
-        <label class="block">
-          <span class="text-xs font-bold text-muted">Work directory (CLAUDE_CONFIG_WORK_DIR)</span>
-          <input
-            v-model="workDirInput"
-            type="text"
-            placeholder="~/Documents/Projects/my-project"
-            class="mt-1 w-full rounded border border-divider bg-canvas px-3 py-2 font-mono text-ink"
-          />
-          <span class="text-xs text-muted">Thư mục project nơi bạn mở terminal làm việc với AI.</span>
         </label>
       </div>
 
@@ -786,6 +803,48 @@ function resetHint(resetAt: string): string {
             :disabled="ctrl.isDetecting.value || !ctrl.detected.value.some((l) => !l.already_added)"
             @click="ctrl.importDetected()"
           />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Open terminal dialog -->
+    <Dialog
+      :visible="showTerminal"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="showTerminal = $event"
+    >
+      <template #header>
+        <h3 class="font-bold text-ink">Open terminal</h3>
+      </template>
+
+      <div class="space-y-4">
+        <label class="block">
+          <span class="text-xs font-bold text-muted">Working directory <span class="text-red-500">*</span></span>
+          <div class="mt-1 flex gap-1.5">
+            <input
+              :value="terminalWorkDir"
+              type="text"
+              readonly
+              placeholder="Chọn thư mục project..."
+              class="min-w-0 flex-1 rounded border border-divider bg-canvas px-3 py-2 font-mono text-sm text-ink"
+            />
+            <Button
+              icon="pi pi-folder-open"
+              severity="secondary"
+              title="Chọn folder"
+              @click="browseTerminalWorkDir"
+            />
+          </div>
+          <span class="text-xs text-muted">Thư mục project nơi terminal sẽ mở.</span>
+        </label>
+      </div>
+
+      <template #footer>
+        <div class="flex items-center justify-end gap-2">
+          <Button label="Cancel" severity="secondary" @click="showTerminal = false" />
+          <Button label="Continue" :disabled="!terminalWorkDir.trim()" @click="confirmOpenTerminal" />
         </div>
       </template>
     </Dialog>
