@@ -6,7 +6,7 @@
 include!("modules.rs");
 
 use tauri::Manager;
-use commands::auth_commands::login;
+use commands::auth_commands::{login, request_password_reset, verify_password_reset};
 use commands::daily_note_commands::{
     create_daily_note, delete_daily_note, get_daily_note_counts, get_daily_notes_by_date,
     get_daily_notes_by_month, update_daily_note_content, update_daily_note_status,
@@ -130,6 +130,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // === Auth commands ===
             login,
+            request_password_reset,
+            verify_password_reset,
             // === System commands ===
             get_system_info,
             check_internet_connection,

@@ -113,6 +113,12 @@ app/            ← AppError type and Result alias
 
 Data flow: `commands → services → database → infrastructure`
 
+**IMPORTANT — Database access must go through stored procedures:**
+- The `database/` layer (store files) must NEVER write raw SQL (SELECT/INSERT/UPDATE/DELETE) directly. All queries must call PostgreSQL stored procedures (functions).
+- Stored procedures are defined as `.sql` files in `docs/store-procedure/`, naming convention: `sp_{domain}_{action}.sql`.
+- Every new SP must be registered in **both** `services/sp_management_service.rs` (`all_procedures()`) and `database/startup_store.rs` (`ensure_stored_procedures()`).
+- The StoreProcedurePage.vue UI reads the list from `sp_management_service` — if a new SP is not registered there, it won't appear in the management screen.
+
 ### Styling
 
 Tailwind CSS with CSS variable–based theming. Colors like `bg-canvas` and `text-ink` are custom CSS variables set in `src/styles.css` and referenced in `tailwind.config.js`. Use these semantic tokens rather than raw Tailwind palette colors for consistency with the app's theme.

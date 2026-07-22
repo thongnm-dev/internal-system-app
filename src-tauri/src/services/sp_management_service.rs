@@ -27,6 +27,10 @@ fn all_procedures() -> Vec<(&'static str, &'static str)> {
         // === Auth ===
         ("sp_auth_find_user_by_username", include_str!("../../../docs/store-procedure/sp_auth_find_user_by_username.sql")),
         ("sp_auth_get_user_roles", include_str!("../../../docs/store-procedure/sp_auth_get_user_roles.sql")),
+        ("sp_auth_reset_code_save", include_str!("../../../docs/store-procedure/sp_auth_reset_code_save.sql")),
+        ("sp_auth_reset_code_verify", include_str!("../../../docs/store-procedure/sp_auth_reset_code_verify.sql")),
+        ("sp_auth_reset_code_has_valid", include_str!("../../../docs/store-procedure/sp_auth_reset_code_has_valid.sql")),
+        ("sp_auth_reset_password", include_str!("../../../docs/store-procedure/sp_auth_reset_password.sql")),
         // === Daily Work Notes ===
         ("sp_daily_note_insert", include_str!("../../../docs/store-procedure/sp_daily_note_insert.sql")),
         ("sp_daily_note_select_by_date", include_str!("../../../docs/store-procedure/sp_daily_note_select_by_date.sql")),

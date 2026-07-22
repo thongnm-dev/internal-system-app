@@ -30,6 +30,8 @@ use crate::utils::app_config;
 const NEW_DOCUMENTS_EVENT: &str = "s3-new-documents";
 /// Chu kỳ poll mặc định (phút) khi không có cấu hình trong config.ini.
 const DEFAULT_POLL_MINUTES: u64 = 10;
+/// Chu kỳ chờ (phút) khi pre-check thất bại (S3/DB chưa sẵn sàng).
+const RETRY_WAIT_MINUTES: u64 = 2;
 
 /// Thư mục con lưu trạng thái theo dõi.
 const WATCH_DIR: &str = "s3_watch";
@@ -158,12 +160,31 @@ pub async fn poll_once(app: &AppHandle) -> AppResult<()> {
     Ok(())
 }
 
+/// Kiểm tra S3 config + DB đã sẵn sàng chưa trước khi bắt đầu poll.
+async fn is_ready() -> Result<(), String> {
+    s3_service::check_config().map_err(|e| format!("S3 config: {e}"))?;
+    crate::utils::pgsql_connect::connect()
+        .await
+        .map_err(|e| format!("Database: {e}"))?;
+    Ok(())
+}
+
 /// Vòng lặp poll nền — chạy suốt vòng đời ứng dụng.
 ///
-/// Chạy một lần ngay khi khởi động để ghi baseline (không bắn notification),
-/// sau đó lặp lại theo chu kỳ cấu hình.
+/// Trước khi bắt đầu, kiểm tra S3 config và DB. Nếu chưa sẵn sàng,
+/// chờ [`RETRY_WAIT_MINUTES`] phút rồi thử lại cho đến khi OK.
+/// Sau đó chạy baseline + poll theo chu kỳ cấu hình.
 pub async fn run_poll_loop(app: AppHandle) {
-    // Seed baseline sớm; nếu DB/S3 chưa sẵn sàng sẽ báo lỗi và thử lại ở vòng sau.
+    loop {
+        match is_ready().await {
+            Ok(()) => break,
+            Err(reason) => {
+                eprintln!("S3 watch: chưa sẵn sàng ({reason}), thử lại sau {RETRY_WAIT_MINUTES} phút");
+                tokio::time::sleep(Duration::from_secs(RETRY_WAIT_MINUTES * 60)).await;
+            }
+        }
+    }
+
     if let Err(e) = poll_once(&app).await {
         eprintln!("S3 watch initial poll error: {e}");
     }

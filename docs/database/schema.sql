@@ -37,6 +37,17 @@ CREATE TABLE IF NOT EXISTS user_roles (
     PRIMARY KEY (user_id, role_id)
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+    id         SERIAL       PRIMARY KEY,
+    user_id    INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code       VARCHAR(6)   NOT NULL,
+    expires_at TIMESTAMPTZ  NOT NULL,
+    used       BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reset_codes_user ON password_reset_codes(user_id, used);
+
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id    INTEGER     PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     theme      VARCHAR(10) NOT NULL DEFAULT 'light'

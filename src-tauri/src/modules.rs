@@ -236,4 +236,6 @@ mod utils {
     pub mod time;
     /// Đường dẫn dữ liệu và cấu hình ứng dụng (AppData + config.ini).
     pub mod app_config;
+    /// Gửi email qua SMTP (dùng cho reset password, v.v.).
+    pub mod email;
 }
