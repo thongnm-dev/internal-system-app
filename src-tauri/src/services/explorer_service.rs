@@ -274,6 +274,22 @@ pub fn create_folder(dir: &str, name: &str) -> Result<String, String> {
     Ok(folder_path.to_string_lossy().to_string())
 }
 
+/// Idempotent `mkdir -p`: ensure `path` (and any missing parents) exists, returning the
+/// canonical path. Does nothing if it already exists; errors only if a non-directory sits
+/// at `path`. Used by AI Translate Cowork to guarantee `<projectDir>/input` and
+/// `<projectDir>/output` are present.
+pub fn ensure_dir(path: &str) -> Result<String, String> {
+    let p = Path::new(path);
+    if p.exists() {
+        if !p.is_dir() {
+            return Err(format!("Path exists but is not a directory: {path}"));
+        }
+    } else {
+        fs::create_dir_all(p).map_err(|e| format!("Create directory failed: {e}"))?;
+    }
+    Ok(p.to_string_lossy().to_string())
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     fs::create_dir_all(dst).map_err(|e| format!("Create dir failed: {e}"))?;
     for entry in fs::read_dir(src).map_err(|e| format!("Read dir failed: {e}"))? {

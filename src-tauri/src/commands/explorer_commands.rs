@@ -49,6 +49,11 @@ pub fn explorer_create_folder(dir: String, name: String) -> Result<String, Strin
 }
 
 #[tauri::command]
+pub fn explorer_ensure_dir(path: String) -> Result<String, String> {
+    explorer_service::ensure_dir(&path)
+}
+
+#[tauri::command]
 pub async fn explorer_copy_bugs(
     source_dir: String,
     dest_dir: String,

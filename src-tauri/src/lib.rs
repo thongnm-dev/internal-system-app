@@ -48,7 +48,7 @@ use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
     explorer_copy_bugs, explorer_create_file, explorer_create_folder, explorer_delete,
-    explorer_get_drives, explorer_open, explorer_paste, explorer_read_dir,
+    explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_paste, explorer_read_dir,
     explorer_read_text_file, explorer_rename, explorer_search,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
@@ -283,6 +283,7 @@ pub fn run() {
             explorer_delete,
             explorer_create_file,
             explorer_create_folder,
+            explorer_ensure_dir,
             explorer_paste,
             explorer_copy_bugs,
             // === AI Usage commands ===

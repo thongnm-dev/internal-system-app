@@ -18,6 +18,7 @@ export type MenuKey =
   | "aiUsage"
   | "aiWorkflow"
   | "aiCowork"
+  | "aiTranslateCowork"
   | "aiTasks"
   | "governanceMenus"
   | "governanceUsers"

@@ -71,6 +71,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('aiUsage',         'AI Usage',          '/ai/usage',          'pi-chart-bar',  'AI Agent',   TRUE, 16),
     ('aiWorkflow',      'AI Workflow',       '/ai/workflow',       'pi-sitemap',    'AI Agent',   TRUE, 17),
     ('aiCowork',        'AI Cowork',         '/ai/cowork',         'pi-objects-column', 'AI Agent', TRUE, 18),
+    ('aiTranslateCowork', 'AI Translate Cowork', '/ai/translate-cowork', 'pi-language', 'AI Agent', TRUE, 29),
     ('aiTasks',         'AI Tasks',          '/ai/tasks',          'pi-check-square', 'AI Agent',  TRUE, 19),
     ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 20),
     ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 21),
