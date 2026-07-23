@@ -3,6 +3,8 @@
 -- Select all steps for a workflow, ordered by step_order asc.
 -- ============================================================================
 
+DROP FUNCTION IF EXISTS sp_ai_workflow_step_select(INTEGER);
+
 CREATE OR REPLACE FUNCTION sp_ai_workflow_step_select(
     p_workflow_id INTEGER
 )
@@ -11,6 +13,7 @@ RETURNS TABLE (
     workflow_id INTEGER,
     name        VARCHAR(200),
     step_type   VARCHAR(20),
+    skill_name  VARCHAR(200),
     description TEXT,
     icon        VARCHAR(50),
     step_order  INTEGER,
@@ -25,6 +28,7 @@ BEGIN
         s.workflow_id,
         s.name,
         s.step_type,
+        s.skill_name,
         s.description,
         s.icon,
         s.step_order,

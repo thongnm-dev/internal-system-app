@@ -167,6 +167,20 @@ pub fn search_files(root: &str, query: &str) -> Result<SearchResult, String> {
     })
 }
 
+const MAX_TEXT_FILE_SIZE: u64 = 2 * 1024 * 1024;
+
+pub fn read_text_file(path: &str) -> Result<String, String> {
+    let p = Path::new(path);
+    if !p.is_file() {
+        return Err(format!("Not a file: {path}"));
+    }
+    let size = fs::metadata(p).map_err(|e| format!("Cannot read file metadata: {e}"))?.len();
+    if size > MAX_TEXT_FILE_SIZE {
+        return Err("File too large to preview (> 2MB).".to_string());
+    }
+    fs::read_to_string(p).map_err(|e| format!("Cannot read file: {e}"))
+}
+
 pub fn open_in_explorer(path: &str) -> Result<(), String> {
     let p = Path::new(path);
     if !p.exists() {

@@ -48,8 +48,8 @@ use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
     explorer_copy_bugs, explorer_create_file, explorer_create_folder, explorer_delete,
-    explorer_get_drives, explorer_open, explorer_paste, explorer_read_dir, explorer_rename,
-    explorer_search,
+    explorer_get_drives, explorer_open, explorer_paste, explorer_read_dir,
+    explorer_read_text_file, explorer_rename, explorer_search,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::menu_permission_commands::{
@@ -71,6 +71,7 @@ use commands::ai_workflow_commands::{
     ai_workflow_step_create, ai_workflow_step_delete, ai_workflow_step_list,
     ai_workflow_step_reorder, ai_workflow_step_update, ai_workflow_update,
 };
+use commands::ai_task_commands::{ai_task_create, ai_task_list};
 use commands::schedule_commands::read_schedule_excel;
 use commands::sql_editor_commands::{
     sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
@@ -131,10 +132,10 @@ pub fn run() {
             });
 
             // Theo dõi nền storage S3 → bắn notification khi có tài liệu mới.
-            let s3_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                services::s3_watch_service::run_poll_loop(s3_handle).await;
-            });
+            // let s3_handle = app.handle().clone();
+            // tauri::async_runtime::spawn(async move {
+            //     services::s3_watch_service::run_poll_loop(s3_handle).await;
+            // });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -272,6 +273,7 @@ pub fn run() {
             explorer_read_dir,
             explorer_search,
             explorer_open,
+            explorer_read_text_file,
             explorer_get_drives,
             explorer_rename,
             explorer_delete,
@@ -312,6 +314,9 @@ pub fn run() {
             ai_workflow_step_delete,
             ai_workflow_step_reorder,
             ai_workflow_save_layout,
+            // === AI Task commands ===
+            ai_task_create,
+            ai_task_list,
             // === Schedule commands ===
             read_schedule_excel,
             // === SQL Editor commands ===

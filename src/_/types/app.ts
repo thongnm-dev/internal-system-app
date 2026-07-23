@@ -17,6 +17,8 @@ export type MenuKey =
   | "aiChat"
   | "aiUsage"
   | "aiWorkflow"
+  | "aiCowork"
+  | "aiTasks"
   | "governanceMenus"
   | "governanceUsers"
   | "governanceRoles"

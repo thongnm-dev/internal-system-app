@@ -65,6 +65,8 @@ mod commands {
     pub mod app_config_commands;
     /// Commands cho module AI Workflow (quản lý workflow và steps).
     pub mod ai_workflow_commands;
+    /// Commands cho module AI Task (tìm kiếm/thêm task cho AI Cowork).
+    pub mod ai_task_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -101,6 +103,8 @@ mod database {
     pub mod sql_connection_store;
     /// Data access cho bảng `ai_workflows` và `ai_workflow_steps` (PostgreSQL).
     pub mod ai_workflow_store;
+    /// Data access cho bảng `ai_tasks` (PostgreSQL).
+    pub mod ai_task_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -157,6 +161,8 @@ mod models {
     pub mod app_config;
     /// Model cho module AI Workflow (workflow và steps).
     pub mod ai_workflow;
+    /// Model cho module AI Task (task code + phân loại).
+    pub mod ai_task;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -227,6 +233,8 @@ mod services {
     pub mod sp_management_service;
     /// Service cho module AI Workflow — quản lý workflow và steps.
     pub mod ai_workflow_service;
+    /// Service cho module AI Task — tìm kiếm/thêm task.
+    pub mod ai_task_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

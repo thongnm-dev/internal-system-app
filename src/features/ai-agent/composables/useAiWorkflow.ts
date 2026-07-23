@@ -36,6 +36,7 @@ export type WorkflowStep = {
   workflowId: number;
   name: string;
   type: WorkflowStepType;
+  skillName: string;
   description: string;
   icon: string;
   stepOrder: number;
@@ -67,6 +68,7 @@ function toStep(r: AiWorkflowStepResult): WorkflowStep {
     workflowId: r.workflow_id,
     name: r.name,
     type: r.step_type as WorkflowStepType,
+    skillName: r.skill_name,
     description: r.description,
     icon: r.icon,
     stepOrder: r.step_order,
@@ -208,6 +210,7 @@ export function useAiWorkflow() {
         await aiWorkflowStepCreate(wf.id, {
           name: step.name,
           step_type: step.type,
+          skill_name: step.skillName,
           description: step.description,
           icon: step.icon,
           step_order: step.stepOrder,
@@ -245,6 +248,7 @@ export function useAiWorkflow() {
       const result = await aiWorkflowStepCreate(wf.id, {
         name: step?.name ?? "New Step",
         step_type: type,
+        skill_name: step?.skillName ?? "",
         description: step?.description ?? "",
         icon: step?.icon ?? meta.icon,
         step_order: stepOrder,
@@ -277,6 +281,7 @@ export function useAiWorkflow() {
       const result = await aiWorkflowStepUpdate(stepId, {
         name: patch.name ?? step.name,
         step_type: patch.type ?? step.type,
+        skill_name: patch.skillName ?? step.skillName,
         description: patch.description ?? step.description,
         icon: patch.icon ?? step.icon,
         step_order: patch.stepOrder ?? step.stepOrder,

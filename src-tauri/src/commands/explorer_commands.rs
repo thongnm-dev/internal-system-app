@@ -19,6 +19,11 @@ pub fn explorer_open(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn explorer_read_text_file(path: String) -> Result<String, String> {
+    explorer_service::read_text_file(&path)
+}
+
+#[tauri::command]
 pub fn explorer_get_drives() -> Vec<String> {
     explorer_service::get_drives()
 }

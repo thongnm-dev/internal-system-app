@@ -70,15 +70,16 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('aiChat',          'AI Chat',           '/ai/chat',           'pi-comments',   'AI Agent',   TRUE, 15),
     ('aiUsage',         'AI Usage',          '/ai/usage',          'pi-chart-bar',  'AI Agent',   TRUE, 16),
     ('aiWorkflow',      'AI Workflow',       '/ai/workflow',       'pi-sitemap',    'AI Agent',   TRUE, 17),
-    ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 18),
-    ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 19),
-    ('governanceUsers', 'Users',             '/governance/users',  'pi-users',      'Governance', TRUE, 20),
-    ('governanceRoles', 'Roles',             '/governance/roles',  'pi-shield',     'Governance', TRUE, 21),
-    ('governancePermissions', 'Permissions',  '/governance/permissions', 'pi-lock', 'Governance', TRUE, 22),
-    ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 23),
-    ('governanceAppConfig', 'App Config',    '/governance/app-config', 'pi-sliders-h', 'Governance', TRUE, 24),
-    ('governanceStoreProcedure', 'Store Procedure', '/governance/store-procedure', 'pi-database', 'Governance', TRUE, 25),
-    ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 26)
+    ('aiCowork',        'AI Cowork',         '/ai/cowork',         'pi-objects-column', 'AI Agent', TRUE, 18),
+    ('projectSkills',   'Skills',            '/project-skills',    'pi-book',       'Governance', TRUE, 19),
+    ('governanceMenus', 'Menus',             '/governance/menus',  'pi-bars',       'Governance', TRUE, 20),
+    ('governanceUsers', 'Users',             '/governance/users',  'pi-users',      'Governance', TRUE, 21),
+    ('governanceRoles', 'Roles',             '/governance/roles',  'pi-shield',     'Governance', TRUE, 22),
+    ('governancePermissions', 'Permissions',  '/governance/permissions', 'pi-lock', 'Governance', TRUE, 23),
+    ('governanceLogs',  'Logs',              '/governance/logs',   'pi-history',    'Governance', TRUE, 24),
+    ('governanceAppConfig', 'App Config',    '/governance/app-config', 'pi-sliders-h', 'Governance', TRUE, 25),
+    ('governanceStoreProcedure', 'Store Procedure', '/governance/store-procedure', 'pi-database', 'Governance', TRUE, 26),
+    ('settings',        'Settings',          '/settings',          'pi-cog',        '—',          TRUE, 27)
 ON CONFLICT (key) DO NOTHING;
 
 -- Cấp toàn bộ menu cho role admin. Bắt buộc: sidebar/route giờ lấy hoàn toàn

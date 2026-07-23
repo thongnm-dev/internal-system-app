@@ -82,6 +82,7 @@ const editingStepId = ref<number | null>(null);
 const afterStepId = ref<number | null>(null);
 const stepName = ref("");
 const stepType = ref<WorkflowStepType>("custom");
+const stepSkillName = ref("");
 const stepDescription = ref("");
 const stepIcon = ref("pi pi-cog");
 
@@ -96,6 +97,7 @@ function openAddStepDialog(after: number | null) {
   afterStepId.value = after;
   stepName.value = "";
   stepType.value = "custom";
+  stepSkillName.value = "";
   stepDescription.value = "";
   stepIcon.value = STEP_TYPE_META.custom.icon;
   showStepDialog.value = true;
@@ -108,6 +110,7 @@ function openEditStepDialog(stepId: number) {
   afterStepId.value = null;
   stepName.value = step.name;
   stepType.value = step.type;
+  stepSkillName.value = step.skillName;
   stepDescription.value = step.description;
   stepIcon.value = step.icon;
   showStepDialog.value = true;
@@ -121,7 +124,13 @@ function onStepTypeChange() {
 async function saveStep() {
   const name = stepName.value.trim();
   if (!name) return;
-  const data = { name, type: stepType.value, description: stepDescription.value.trim(), icon: stepIcon.value };
+  const data = {
+    name,
+    type: stepType.value,
+    skillName: stepSkillName.value.trim(),
+    description: stepDescription.value.trim(),
+    icon: stepIcon.value,
+  };
   if (editingStepId.value) {
     await ctrl.updateStep(editingStepId.value, data);
   } else {
@@ -650,6 +659,13 @@ const selectPt = {
             :pt="selectPt"
             @change="onStepTypeChange"
           />
+        </label>
+        <label v-if="stepType === 'skill'" class="block">
+          <span class="text-xs font-bold text-muted">Skill Name</span>
+          <InputText v-model="stepSkillName" class="mt-1 w-full" placeholder="e.g. code-review" />
+          <span class="text-xs text-muted">
+            Tên folder skill tương ứng trong <code class="rounded bg-canvas px-1">.claude/skills/&lt;skill-name&gt;</code> của project.
+          </span>
         </label>
         <label class="block">
           <span class="text-xs font-bold text-muted">Description</span>

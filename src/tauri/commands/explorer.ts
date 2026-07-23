@@ -33,6 +33,10 @@ export function explorerOpen(path: string) {
   return safeInvoke<void>("explorer_open", { path });
 }
 
+export function explorerReadTextFile(path: string) {
+  return safeInvoke<string>("explorer_read_text_file", { path });
+}
+
 export function explorerGetDrives() {
   return safeInvoke<string[]>("explorer_get_drives");
 }

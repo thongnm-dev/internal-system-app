@@ -152,6 +152,9 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_ai_workflow_step_delete", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_delete.sql")),
         ("sp_ai_workflow_step_reorder", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_reorder.sql")),
         ("sp_ai_workflow_update_layout", include_str!("../../../docs/store-procedure/sp_ai_workflow_update_layout.sql")),
+        // === AI Task ===
+        ("sp_ai_task_insert", include_str!("../../../docs/store-procedure/sp_ai_task_insert.sql")),
+        ("sp_ai_task_select_list", include_str!("../../../docs/store-procedure/sp_ai_task_select_list.sql")),
     ];
 
     let mut errors = Vec::new();

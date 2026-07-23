@@ -96,6 +96,7 @@ pub async fn insert_step(
     workflow_id: i32,
     name: &str,
     step_type: &str,
+    skill_name: &str,
     description: &str,
     icon: &str,
     step_order: i32,
@@ -104,8 +105,8 @@ pub async fn insert_step(
 
     let row = client
         .query_one(
-            "SELECT * FROM sp_ai_workflow_step_insert($1, $2, $3, $4, $5, $6)",
-            &[&workflow_id, &name, &step_type, &description, &icon, &step_order],
+            "SELECT * FROM sp_ai_workflow_step_insert($1, $2, $3, $4, $5, $6, $7)",
+            &[&workflow_id, &name, &step_type, &skill_name, &description, &icon, &step_order],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to insert step: {e}")))?;
@@ -131,6 +132,7 @@ pub async fn update_step(
     id: i32,
     name: &str,
     step_type: &str,
+    skill_name: &str,
     description: &str,
     icon: &str,
     step_order: i32,
@@ -139,8 +141,8 @@ pub async fn update_step(
 
     let row = client
         .query_opt(
-            "SELECT * FROM sp_ai_workflow_step_update($1, $2, $3, $4, $5, $6)",
-            &[&id, &name, &step_type, &description, &icon, &step_order],
+            "SELECT * FROM sp_ai_workflow_step_update($1, $2, $3, $4, $5, $6, $7)",
+            &[&id, &name, &step_type, &skill_name, &description, &icon, &step_order],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to update step: {e}")))?;
@@ -215,6 +217,7 @@ fn row_to_step(row: &tokio_postgres::Row) -> AiWorkflowStep {
         workflow_id: row.get("workflow_id"),
         name: row.get("name"),
         step_type: row.get("step_type"),
+        skill_name: row.get("skill_name"),
         description: row.get("description"),
         icon: row.get("icon"),
         step_order: row.get("step_order"),

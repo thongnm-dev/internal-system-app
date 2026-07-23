@@ -18,6 +18,7 @@ pub struct AiWorkflowStep {
     pub workflow_id: i32,
     pub name: String,
     pub step_type: String,
+    pub skill_name: String,
     pub description: String,
     pub icon: String,
     pub step_order: i32,
@@ -40,6 +41,7 @@ pub struct UpdateWorkflowRequest {
 pub struct CreateStepRequest {
     pub name: String,
     pub step_type: String,
+    pub skill_name: String,
     pub description: String,
     pub icon: String,
     pub step_order: i32,
@@ -49,6 +51,7 @@ pub struct CreateStepRequest {
 pub struct UpdateStepRequest {
     pub name: String,
     pub step_type: String,
+    pub skill_name: String,
     pub description: String,
     pub icon: String,
     pub step_order: i32,

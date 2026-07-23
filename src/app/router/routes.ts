@@ -126,6 +126,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Manage step-by-step AI workflows for Claude-based feature development.",
   },
   {
+    key: "aiCowork",
+    path: "/ai/cowork",
+    title: "AI Cowork",
+    subtitle: "Pick a project directory, apply an AI workflow, and choose an AI account to work with.",
+  },
+  {
     key: "governanceMenus",
     path: "/governance/menus",
     requiresAuth: true,
@@ -349,6 +355,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/ai/workflow",
     component: () => import("@/features/ai-agent/components/AiWorkflowPage.vue"),
     meta: { key: "aiWorkflow" as MenuKey },
+  },
+  {
+    path: "/ai/cowork",
+    component: () => import("@/features/ai-agent/components/AiCoworkPage.vue"),
+    meta: { key: "aiCowork" as MenuKey },
   },
   {
     path: "/governance/menus",

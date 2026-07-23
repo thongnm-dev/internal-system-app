@@ -16,6 +16,7 @@ export type AiWorkflowStepResult = {
   workflow_id: number;
   name: string;
   step_type: string;
+  skill_name: string;
   description: string;
   icon: string;
   step_order: number;
@@ -35,6 +36,7 @@ export type UpdateWorkflowRequest = {
 export type CreateStepRequest = {
   name: string;
   step_type: string;
+  skill_name: string;
   description: string;
   icon: string;
   step_order: number;
@@ -43,6 +45,7 @@ export type CreateStepRequest = {
 export type UpdateStepRequest = {
   name: string;
   step_type: string;
+  skill_name: string;
   description: string;
   icon: string;
   step_order: number;

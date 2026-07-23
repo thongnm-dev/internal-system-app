@@ -138,6 +138,8 @@ Tailwind CSS with CSS variable–based theming. Colors like `bg-canvas` and `tex
 
 PrimeVue 4 with Aura theme preset, dark mode via `[data-theme='dark']` selector.
 
+**Use PrimeVue components for form controls — never raw HTML form elements.** Checkboxes must be `<Checkbox binary>` (`primevue/checkbox`), not `<input type="checkbox">`; text fields must be `InputText`, not a bare `<input type="text">`; dropdowns must be `Select`, not `<select>`. For list/table row checkboxes bound to a computed check (e.g. membership in a `Set`/array) instead of a plain `ref`, follow the pattern already used in `S3BrowserPage.vue` and `ExploreFasterPage.vue`: `<Checkbox :model-value="isSelected(item)" binary @change="toggleSelect(item)" />`. The one intentional exception is a **read-only, non-interactive path/text display** (e.g. the picked folder path in `AiUsagePage.vue` / `AiCoworkPage.vue`), which uses a plain `<input readonly>` since there's no PrimeVue "static display" input — do not extend that exception to any editable or checkable control.
+
 ### App Window
 
 Default size: 1200×760, minimum: 980×600. Opens maximized. Design features to fit within minimum dimensions.

@@ -371,6 +371,7 @@ CREATE TABLE IF NOT EXISTS ai_workflow_steps (
     name          VARCHAR(200) NOT NULL,
     step_type     VARCHAR(20)  NOT NULL DEFAULT 'custom'
         CHECK (step_type IN ('skill', 'implement', 'review', 'release', 'custom')),
+    skill_name    VARCHAR(200) NOT NULL DEFAULT '',
     description   TEXT         NOT NULL DEFAULT '',
     icon          VARCHAR(50)  NOT NULL DEFAULT 'pi pi-cog',
     step_order    INTEGER      NOT NULL DEFAULT 0,
@@ -378,6 +379,18 @@ CREATE TABLE IF NOT EXISTS ai_workflow_steps (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_workflow_steps_workflow ON ai_workflow_steps(workflow_id);
+
+CREATE TABLE IF NOT EXISTS ai_tasks (
+    id          SERIAL       PRIMARY KEY,
+    task_code   VARCHAR(100) NOT NULL,
+    category    VARCHAR(30)  NOT NULL DEFAULT 'other'
+        CHECK (category IN ('screen', 'batch', 'part', 'other')),
+    description TEXT         NOT NULL DEFAULT '',
+    created_by  VARCHAR(100) NOT NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_tasks_task_code ON ai_tasks(task_code);
 
 -- ============================================================================
 -- TRIGGERS — auto-update updated_at
