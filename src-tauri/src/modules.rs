@@ -63,6 +63,8 @@ mod commands {
     pub mod issue_csv_commands;
     /// Commands cho cấu hình ứng dụng (config.ini) và quản lý Store Procedure.
     pub mod app_config_commands;
+    /// Commands cho module AI Workflow (quản lý workflow và steps).
+    pub mod ai_workflow_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -97,6 +99,8 @@ mod database {
     pub mod ai_profile_store;
     /// Lưu trữ cục bộ (JSON file) danh sách kết nối của SQL Editor.
     pub mod sql_connection_store;
+    /// Data access cho bảng `ai_workflows` và `ai_workflow_steps` (PostgreSQL).
+    pub mod ai_workflow_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -151,6 +155,8 @@ mod models {
     pub mod issue_csv;
     /// Model cho cấu hình ứng dụng (config.ini) và quản lý Store Procedure.
     pub mod app_config;
+    /// Model cho module AI Workflow (workflow và steps).
+    pub mod ai_workflow;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -219,6 +225,8 @@ mod services {
     pub mod app_config_service;
     /// Service quản lý Store Procedure — liệt kê và thực thi CREATE OR REPLACE.
     pub mod sp_management_service;
+    /// Service cho module AI Workflow — quản lý workflow và steps.
+    pub mod ai_workflow_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

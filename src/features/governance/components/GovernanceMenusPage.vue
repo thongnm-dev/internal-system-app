@@ -4,11 +4,14 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
+import IconPickerDialog from "@/shared/components/IconPickerDialog.vue";
 import { useGovernanceMenus } from "../composables/useGovernanceMenus";
 
 const ctrl = useGovernanceMenus();
 const isEditing = ref(false);
 const isCreating = ref(false);
+const showIconPicker = ref(false);
+const iconPickerTarget = ref<"edit" | "create">("edit");
 
 const createKeyInvalid = computed(() => {
   const key = ctrl.draft.value?.key.trim() ?? "";
@@ -181,13 +184,22 @@ async function createAndClose() {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
             <span class="text-xs font-bold text-muted">Icon</span>
-            <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-              <i :class="`pi ${ctrl.draft.value.icon} text-muted`" />
-              <InputText
-                class="embedded-input min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
-                :model-value="ctrl.draft.value.icon"
-                placeholder="pi-home"
-                @update:model-value="ctrl.updateDraft('icon', $event as string)"
+            <div class="mt-1 flex items-center gap-2">
+              <div class="flex h-10 flex-1 items-center gap-2 rounded-md border border-divider bg-panel px-3">
+                <i :class="`pi ${ctrl.draft.value.icon} text-muted`" />
+                <InputText
+                  class="embedded-input min-w-0 flex-1 border-0 !bg-transparent !p-0 !text-sm"
+                  :model-value="ctrl.draft.value.icon"
+                  placeholder="pi-home"
+                  @update:model-value="ctrl.updateDraft('icon', $event as string)"
+                />
+              </div>
+              <Button
+                icon="pi pi-th-large"
+                severity="secondary"
+                outlined
+                title="Browse icons"
+                @click="iconPickerTarget = 'edit'; showIconPicker = true"
               />
             </div>
           </label>
@@ -294,13 +306,22 @@ async function createAndClose() {
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
             <span class="text-xs font-bold text-muted">Icon</span>
-            <div class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
-              <i :class="`pi ${ctrl.draft.value.icon} text-muted`" />
-              <InputText
-                class="embedded-input min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
-                :model-value="ctrl.draft.value.icon"
-                placeholder="pi-home"
-                @update:model-value="ctrl.updateDraft('icon', ($event as string) ?? '')"
+            <div class="mt-1 flex items-center gap-2">
+              <div class="flex h-10 flex-1 items-center gap-2 rounded-md border border-divider bg-panel px-3">
+                <i :class="`pi ${ctrl.draft.value.icon} text-muted`" />
+                <InputText
+                  class="embedded-input min-w-0 flex-1 border-0 !bg-transparent !p-0 !text-sm"
+                  :model-value="ctrl.draft.value.icon"
+                  placeholder="pi-home"
+                  @update:model-value="ctrl.updateDraft('icon', ($event as string) ?? '')"
+                />
+              </div>
+              <Button
+                icon="pi pi-th-large"
+                severity="secondary"
+                outlined
+                title="Browse icons"
+                @click="iconPickerTarget = 'create'; showIconPicker = true"
               />
             </div>
           </label>
@@ -350,5 +371,12 @@ async function createAndClose() {
         </div>
       </template>
     </Dialog>
+    <!-- Icon Picker Dialog -->
+    <IconPickerDialog
+      :visible="showIconPicker"
+      :selected="ctrl.draft.value?.icon"
+      @update:visible="showIconPicker = $event"
+      @select="(icon: string) => ctrl.updateDraft('icon', icon)"
+    />
   </section>
 </template>

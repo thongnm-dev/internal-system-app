@@ -66,6 +66,11 @@ use commands::ai_usage_commands::{
     ai_usage_set_active, ai_usage_update_account,
 };
 use commands::ai_chat_commands::ai_chat_complete;
+use commands::ai_workflow_commands::{
+    ai_workflow_create, ai_workflow_delete, ai_workflow_list, ai_workflow_save_layout,
+    ai_workflow_step_create, ai_workflow_step_delete, ai_workflow_step_list,
+    ai_workflow_step_reorder, ai_workflow_step_update, ai_workflow_update,
+};
 use commands::schedule_commands::read_schedule_excel;
 use commands::sql_editor_commands::{
     sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
@@ -296,6 +301,17 @@ pub fn run() {
             ai_usage_open_terminal,
             // === AI Chat commands ===
             ai_chat_complete,
+            // === AI Workflow commands ===
+            ai_workflow_create,
+            ai_workflow_list,
+            ai_workflow_update,
+            ai_workflow_delete,
+            ai_workflow_step_list,
+            ai_workflow_step_create,
+            ai_workflow_step_update,
+            ai_workflow_step_delete,
+            ai_workflow_step_reorder,
+            ai_workflow_save_layout,
             // === Schedule commands ===
             read_schedule_excel,
             // === SQL Editor commands ===

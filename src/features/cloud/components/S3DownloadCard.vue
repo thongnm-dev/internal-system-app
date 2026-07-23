@@ -12,14 +12,14 @@ const props = defineProps<{
   ensureOnline: () => Promise<boolean>;
   getDownloadList: (code: string) => Promise<string[]>;
   selectFolder: () => Promise<string | null>;
-  downloadFiles: (code: string, bugList: string[], localPath: string) => Promise<string | null>;
+  downloadFiles: (code: string, bugList: string[], localPath: string) => Promise<{ syncPath: string; historyId: number | null } | null>;
   moveObjects: (code: string, items: string[]) => Promise<void>;
   deleteObjects: (code: string, items: string[]) => Promise<void>;
 }>();
 
 const emit = defineEmits<{
   refreshed: [];
-  downloaded: [path: string];
+  downloaded: [path: string, historyId: number | null];
 }>();
 
 const STORAGE_KEY = "download_state";
@@ -160,10 +160,10 @@ async function handleConfirmDownload() {
     return;
   }
   showDownloadModal.value = false;
-  const syncPath = await props.downloadFiles(props.awsStorage.code, items.value, destinationPath.value);
+  const result = await props.downloadFiles(props.awsStorage.code, items.value, destinationPath.value);
   hasDownloaded.value = true;
-  if (syncPath) {
-    emit("downloaded", syncPath);
+  if (result) {
+    emit("downloaded", result.syncPath, result.historyId);
   }
   await loadItems();
   emit("refreshed");

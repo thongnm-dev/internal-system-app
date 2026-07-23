@@ -103,7 +103,7 @@ export function useS3Download() {
     code: string,
     bugList: string[],
     localPath: string,
-  ): Promise<string | null> {
+  ): Promise<{ syncPath: string; historyId: number | null } | null> {
     if (bugList.length === 0) return null;
     if (!(await guard.ensureOnline())) return null;
     loading.start();
@@ -113,7 +113,10 @@ export function useS3Download() {
       if (result.success) {
         toast.success(result.message);
         await loadHistory();
-        return result.syncPath;
+        const matched = downloadHistory.value.find(
+          (h) => h.syncPath === result.syncPath && !h.isMovedAtLocal,
+        );
+        return { syncPath: result.syncPath, historyId: matched?.id ?? null };
       } else {
         toast.error(result.message);
         return null;

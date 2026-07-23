@@ -46,6 +46,7 @@ const loading = useGlobalLoading();
 const COPY_DEST_KEY = "copy_dest_state";
 
 const lastDownloadPath = ref("");
+const lastDownloadHistoryId = ref<number | null>(null);
 const showCopyDialog = ref(false);
 const copyEntries = ref<FileEntry[]>([]);
 const copyDestPath = ref("");
@@ -53,8 +54,9 @@ const isCopying = ref(false);
 const copyHistoryId = ref<number | null>(null);
 const copySourcePath = ref("");
 
-function handleDownloaded(path: string) {
+function handleDownloaded(path: string, historyId: number | null) {
   lastDownloadPath.value = path;
+  lastDownloadHistoryId.value = historyId;
 }
 
 function loadSavedCopyDest() {
@@ -75,7 +77,7 @@ function saveCopyDest() {
 }
 
 async function openCopyDialog() {
-  copyHistoryId.value = null;
+  copyHistoryId.value = lastDownloadHistoryId.value;
   copySourcePath.value = lastDownloadPath.value;
   loadSavedCopyDest();
   try {
@@ -172,7 +174,7 @@ function formatTime(hms: string): string {
           :move-objects="moveObjects"
           :delete-objects="deleteObjects"
           @refreshed="checkAvailability"
-          @downloaded="handleDownloaded"
+          @downloaded="(path, historyId) => handleDownloaded(path, historyId)"
         />
       </div>
 

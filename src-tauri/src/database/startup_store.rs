@@ -141,6 +141,17 @@ async fn ensure_stored_procedures(client: &Client) -> AppResult<()> {
         ("sp_upload_dtl_insert", include_str!("../../../docs/store-procedure/sp_upload_dtl_insert.sql")),
         ("sp_upload_attach_insert", include_str!("../../../docs/store-procedure/sp_upload_attach_insert.sql")),
         ("sp_upload_history_search", include_str!("../../../docs/store-procedure/sp_upload_history_search.sql")),
+        // === AI Workflow ===
+        ("sp_ai_workflow_insert", include_str!("../../../docs/store-procedure/sp_ai_workflow_insert.sql")),
+        ("sp_ai_workflow_select_list", include_str!("../../../docs/store-procedure/sp_ai_workflow_select_list.sql")),
+        ("sp_ai_workflow_update", include_str!("../../../docs/store-procedure/sp_ai_workflow_update.sql")),
+        ("sp_ai_workflow_delete", include_str!("../../../docs/store-procedure/sp_ai_workflow_delete.sql")),
+        ("sp_ai_workflow_step_insert", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_insert.sql")),
+        ("sp_ai_workflow_step_select", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_select.sql")),
+        ("sp_ai_workflow_step_update", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_update.sql")),
+        ("sp_ai_workflow_step_delete", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_delete.sql")),
+        ("sp_ai_workflow_step_reorder", include_str!("../../../docs/store-procedure/sp_ai_workflow_step_reorder.sql")),
+        ("sp_ai_workflow_update_layout", include_str!("../../../docs/store-procedure/sp_ai_workflow_update_layout.sql")),
     ];
 
     let mut errors = Vec::new();

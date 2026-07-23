@@ -120,6 +120,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Track AI usage, token consumption, and cost statistics across the team.",
   },
   {
+    key: "aiWorkflow",
+    path: "/ai/workflow",
+    title: "AI Workflow",
+    subtitle: "Manage step-by-step AI workflows for Claude-based feature development.",
+  },
+  {
     key: "governanceMenus",
     path: "/governance/menus",
     requiresAuth: true,
@@ -338,6 +344,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/ai/usage",
     component: () => import("@/features/ai-agent/components/AiUsagePage.vue"),
     meta: { key: "aiUsage" as MenuKey },
+  },
+  {
+    path: "/ai/workflow",
+    component: () => import("@/features/ai-agent/components/AiWorkflowPage.vue"),
+    meta: { key: "aiWorkflow" as MenuKey },
   },
   {
     path: "/governance/menus",

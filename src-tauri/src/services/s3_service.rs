@@ -505,10 +505,26 @@ pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<Scanne
     }
 
     let raw_files = if paths.len() == 1 {
-        let files = scan_upload_folder(paths[0].clone()).await?;
-        files.into_iter()
-            .filter(|f| bug_pattern.is_match(&f.parent_name))
-            .collect::<Vec<_>>()
+        let single_folder_name = Path::new(&paths[0])
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        if bug_pattern.is_match(&single_folder_name) {
+            let parent_path = Path::new(&paths[0])
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let files = scan_upload_folder(parent_path).await?;
+            files.into_iter()
+                .filter(|f| f.parent_name == single_folder_name)
+                .collect::<Vec<_>>()
+        } else {
+            let files = scan_upload_folder(paths[0].clone()).await?;
+            files.into_iter()
+                .filter(|f| bug_pattern.is_match(&f.parent_name))
+                .collect::<Vec<_>>()
+        }
     } else {
         let folder_names: Vec<String> = paths.iter().map(|p| {
             Path::new(p)

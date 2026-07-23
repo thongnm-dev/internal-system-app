@@ -16,6 +16,7 @@ export type MenuKey =
   | "cloudS3UploadHistory"
   | "aiChat"
   | "aiUsage"
+  | "aiWorkflow"
   | "governanceMenus"
   | "governanceUsers"
   | "governanceRoles"

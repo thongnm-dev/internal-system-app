@@ -350,6 +350,36 @@ CREATE TABLE IF NOT EXISTS upload_attach (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 -- ============================================================================
+-- AI WORKFLOW
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ai_workflows (
+    id          SERIAL       PRIMARY KEY,
+    name        VARCHAR(200) NOT NULL,
+    description TEXT         NOT NULL DEFAULT '',
+    layout      JSONB        NOT NULL DEFAULT '{}',
+    created_by  VARCHAR(100) NOT NULL,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_workflows_created_by ON ai_workflows(created_by);
+
+CREATE TABLE IF NOT EXISTS ai_workflow_steps (
+    id            SERIAL       PRIMARY KEY,
+    workflow_id   INTEGER      NOT NULL REFERENCES ai_workflows(id) ON DELETE CASCADE,
+    name          VARCHAR(200) NOT NULL,
+    step_type     VARCHAR(20)  NOT NULL DEFAULT 'custom'
+        CHECK (step_type IN ('skill', 'implement', 'review', 'release', 'custom')),
+    description   TEXT         NOT NULL DEFAULT '',
+    icon          VARCHAR(50)  NOT NULL DEFAULT 'pi pi-cog',
+    step_order    INTEGER      NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_workflow_steps_workflow ON ai_workflow_steps(workflow_id);
+
+-- ============================================================================
 -- TRIGGERS — auto-update updated_at
 -- ============================================================================
 
@@ -378,3 +408,6 @@ CREATE OR REPLACE TRIGGER trg_menu_configs_updated_at
 
 CREATE OR REPLACE TRIGGER trg_daily_report_entries_updated_at
     BEFORE UPDATE ON daily_report_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_ai_workflows_updated_at
+    BEFORE UPDATE ON ai_workflows FOR EACH ROW EXECUTE FUNCTION update_updated_at();
