@@ -110,6 +110,15 @@ fn all_procedures() -> Vec<(&'static str, &'static str)> {
         // === AI Task ===
         ("sp_ai_task_insert", include_str!("../../../docs/store-procedure/sp_ai_task_insert.sql")),
         ("sp_ai_task_select_list", include_str!("../../../docs/store-procedure/sp_ai_task_select_list.sql")),
+        ("sp_ai_task_update", include_str!("../../../docs/store-procedure/sp_ai_task_update.sql")),
+        // === AI Task WF Proc ===
+        ("sp_ai_task_wf_proc_insert", include_str!("../../../docs/store-procedure/sp_ai_task_wf_proc_insert.sql")),
+        ("sp_ai_task_wf_proc_select_by_task", include_str!("../../../docs/store-procedure/sp_ai_task_wf_proc_select_by_task.sql")),
+        ("sp_ai_task_wf_proc_update", include_str!("../../../docs/store-procedure/sp_ai_task_wf_proc_update.sql")),
+        // === AI Task WF Proc Step ===
+        ("sp_ai_task_wf_proc_step_insert", include_str!("../../../docs/store-procedure/sp_ai_task_wf_proc_step_insert.sql")),
+        ("sp_ai_task_wf_proc_step_select_by_proc", include_str!("../../../docs/store-procedure/sp_ai_task_wf_proc_step_select_by_proc.sql")),
+        ("sp_ai_task_wf_proc_step_update", include_str!("../../../docs/store-procedure/sp_ai_task_wf_proc_step_update.sql")),
     ]
 }
 

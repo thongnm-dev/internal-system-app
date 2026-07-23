@@ -71,7 +71,11 @@ use commands::ai_workflow_commands::{
     ai_workflow_step_create, ai_workflow_step_delete, ai_workflow_step_list,
     ai_workflow_step_reorder, ai_workflow_step_update, ai_workflow_update,
 };
-use commands::ai_task_commands::{ai_task_create, ai_task_list};
+use commands::ai_task_commands::{
+    ai_task_create, ai_task_list, ai_task_update,
+    ai_task_wf_proc_create, ai_task_wf_proc_list, ai_task_wf_proc_update,
+    ai_task_wf_proc_step_create, ai_task_wf_proc_step_list, ai_task_wf_proc_step_update,
+};
 use commands::schedule_commands::read_schedule_excel;
 use commands::sql_editor_commands::{
     sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
@@ -132,10 +136,10 @@ pub fn run() {
             });
 
             // Theo dõi nền storage S3 → bắn notification khi có tài liệu mới.
-            // let s3_handle = app.handle().clone();
-            // tauri::async_runtime::spawn(async move {
-            //     services::s3_watch_service::run_poll_loop(s3_handle).await;
-            // });
+            let s3_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                services::s3_watch_service::run_poll_loop(s3_handle).await;
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -317,6 +321,15 @@ pub fn run() {
             // === AI Task commands ===
             ai_task_create,
             ai_task_list,
+            ai_task_update,
+            // === AI Task WF Proc commands ===
+            ai_task_wf_proc_create,
+            ai_task_wf_proc_list,
+            ai_task_wf_proc_update,
+            // === AI Task WF Proc Step commands ===
+            ai_task_wf_proc_step_create,
+            ai_task_wf_proc_step_list,
+            ai_task_wf_proc_step_update,
             // === Schedule commands ===
             read_schedule_excel,
             // === SQL Editor commands ===

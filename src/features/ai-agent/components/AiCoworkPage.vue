@@ -4,26 +4,51 @@ import DOMPurify from "dompurify";
 import { marked } from "marked";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
+import Column from "primevue/column";
+import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useAiCowork } from "../composables/useAiCowork";
+import AiTaskDialog from "./AiTaskDialog.vue";
+import type { TaskDialogPayload } from "./AiTaskDialog.vue";
 import { STEP_TYPE_META } from "@/_/types/ai-workflow";
-import { TASK_CATEGORY_META, TASK_CATEGORY_OPTIONS } from "@/_/types/ai-task";
+import { TASK_CATEGORY_META } from "@/_/types/ai-task";
 import type { AiTaskCategory } from "@/tauri/commands/ai-task";
 import type { AiAccount, AiAccountStatus, AiProvider } from "@/_/types/ai-usage";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
-function categoryLabel(category: string): string {
-  return TASK_CATEGORY_META[category as AiTaskCategory]?.label ?? category;
+function categoryLabel(cat: string): string {
+  return TASK_CATEGORY_META[cat as AiTaskCategory]?.label ?? cat;
 }
 
-function categoryBadgeClass(category: string): string {
-  return TASK_CATEGORY_META[category as AiTaskCategory]?.badgeClass ?? "bg-canvas text-muted";
+function categoryBadgeClass(cat: string): string {
+  return TASK_CATEGORY_META[cat as AiTaskCategory]?.badgeClass ?? "bg-canvas text-muted";
+}
+
+function formatPickerDate(value: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 const ctrl = useAiCowork();
+
+const showCreateTaskDialog = ref(false);
+const isCreatingTaskViaDialog = ref(false);
+
+async function handleCreateTaskFromDialog(payload: TaskDialogPayload) {
+  isCreatingTaskViaDialog.value = true;
+  try {
+    await ctrl.createInlineTask(payload);
+    showCreateTaskDialog.value = false;
+  } finally {
+    isCreatingTaskViaDialog.value = false;
+  }
+}
 
 onMounted(() => {
   void ctrl.init();
@@ -299,18 +324,17 @@ function isMarkdown(entry: FileEntry): boolean {
                 :model-value="ctrl.isTaskConfirmed(task.id)"
                 binary
                 class="mt-1 shrink-0"
-                title="Xác nhận lại task này"
                 @change="ctrl.toggleTaskConfirmed(task.id)"
               />
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="truncate font-semibold text-ink">{{ task.task_code }}</span>
+                  <span class="truncate font-semibold text-ink">{{ task.task_cd }}</span>
                   <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', categoryBadgeClass(task.category)]">
                     {{ categoryLabel(task.category) }}
                   </span>
                 </div>
-                <p v-if="task.description" class="mt-0.5 truncate text-xs text-muted" :title="task.description">
-                  {{ task.description }}
+                <p v-if="task.task_name" class="mt-0.5 truncate text-xs text-muted" :title="task.task_name">
+                  {{ task.task_name }}
                 </p>
               </div>
               <Button
@@ -609,101 +633,94 @@ function isMarkdown(entry: FileEntry): boolean {
       </template>
     </Dialog>
 
-    <!-- Task picker: search hoặc thêm task, cho phép chọn nhiều -->
+    <!-- Task picker: Fieldset search + DataTable, chỉ hiển thị task chưa hoàn thành -->
     <Dialog
       :visible="ctrl.showTaskPicker.value"
       class="w-full rounded-lg bg-panel shadow-xl"
-      :style="{ width: '640px' }"
-      :content-style="{ display: 'flex', flexDirection: 'column' }"
+      :style="{ width: '900px' }"
+      :content-style="{ display: 'flex', flexDirection: 'column', minHeight: '460px' }"
       :closable="true"
       modal
       @update:visible="ctrl.showTaskPicker.value = $event"
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink">
-          <i class="pi pi-list-check" />Select Tasks
-        </h3>
+        <div class="flex flex-1 items-center justify-between gap-3">
+          <h3 class="flex items-center gap-2 font-bold text-ink">
+            <i class="pi pi-list-check" />Select Tasks
+          </h3>
+          <Button label="New Task" icon="pi pi-plus" size="small" outlined @click="showCreateTaskDialog = true" />
+        </div>
       </template>
 
-      <div class="space-y-4">
-        <span class="flex items-center gap-2 rounded-md border border-divider bg-canvas px-2">
-          <i class="pi pi-search text-xs text-muted" />
-          <InputText
-            v-model="ctrl.taskSearchQuery.value"
-            class="embedded-input w-full border-0 !bg-transparent !py-1.5 !text-sm"
-            placeholder="Search by task code, category, description..."
-            @input="ctrl.triggerTaskSearch"
-          />
-        </span>
-
-        <div class="rounded-lg border border-dashed border-divider p-3">
-          <p class="mb-2 text-xs font-bold text-muted">Add new task</p>
-          <div class="flex flex-wrap items-end gap-2">
-            <label class="block min-w-0 flex-1">
-              <span class="text-xs font-bold text-muted">Task Code</span>
-              <InputText v-model="ctrl.newTaskCode.value" class="mt-1 w-full" placeholder="e.g. SCR-001" />
-            </label>
-            <label class="block w-36">
-              <span class="text-xs font-bold text-muted">Category</span>
-              <Select
-                v-model="ctrl.newTaskCategory.value"
-                :options="TASK_CATEGORY_OPTIONS"
-                option-label="label"
-                option-value="value"
+      <div class="flex min-h-0 flex-1 flex-col gap-3">
+        <!-- Search fieldset -->
+        <Fieldset class="fieldset-nested shrink-0 rounded-lg border border-divider p-3" legend="Search" toggleable>
+          <div class="grid gap-3">
+            <label>
+              <span class="text-xs font-bold text-muted">Keyword Search</span>
+              <InputText
+                v-model="ctrl.taskSearchQuery.value"
                 class="mt-1 w-full"
+                placeholder="Task code, task name"
+                @keydown.enter="ctrl.triggerTaskSearch"
               />
             </label>
-            <Button
-              label="Create"
-              icon="pi pi-plus"
-              :disabled="!ctrl.newTaskCode.value.trim()"
-              :loading="ctrl.isCreatingTask.value"
-              @click="ctrl.createInlineTask"
-            />
+            <div class="flex items-center justify-end gap-2">
+              <Button icon="pi pi-refresh" label="Reset" size="small" severity="secondary" outlined @click="ctrl.taskSearchQuery.value = ''; ctrl.triggerTaskSearch()" />
+              <Button icon="pi pi-search" label="Search" size="small" @click="ctrl.triggerTaskSearch" />
+            </div>
           </div>
-          <label class="mt-2 block">
-            <span class="text-xs font-bold text-muted">Description</span>
-            <InputText v-model="ctrl.newTaskDescription.value" class="mt-1 w-full" placeholder="Optional" />
-          </label>
-        </div>
+        </Fieldset>
 
-        <div class="max-h-[40vh] space-y-1.5 overflow-auto">
-          <p v-if="ctrl.isSearchingTasks.value" class="p-4 text-center text-xs text-muted">Loading...</p>
-          <template v-else-if="ctrl.taskSearchResults.value.length">
-            <label
-              v-for="task in ctrl.taskSearchResults.value"
-              :key="task.id"
-              class="flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5"
-              :class="ctrl.isTaskPicked(task) ? 'border-brand ring-1 ring-brand/40' : 'border-divider'"
-            >
-              <Checkbox
-                :model-value="ctrl.isTaskPicked(task)"
-                binary
-                class="shrink-0"
-                @change="ctrl.toggleTaskPicked(task)"
-              />
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="truncate font-semibold text-ink">{{ task.task_code }}</span>
-                  <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', categoryBadgeClass(task.category)]">
-                    {{ categoryLabel(task.category) }}
-                  </span>
-                </div>
-                <p v-if="task.description" class="mt-0.5 truncate text-xs text-muted" :title="task.description">
-                  {{ task.description }}
-                </p>
-              </div>
-            </label>
-          </template>
-          <p v-else class="rounded-lg border border-dashed border-divider p-6 text-center text-xs text-muted">
-            Không tìm thấy task nào.
-          </p>
+        <!-- Results DataTable -->
+        <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider">
+          <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-2">
+            <span class="text-xs font-bold text-muted">Incomplete tasks</span>
+            <span class="text-xs text-muted">{{ ctrl.taskSearchResults.value.length.toLocaleString("en-US") }} tasks</span>
+          </div>
+          <DataTable
+            class="app-data-table min-h-0"
+            :empty-message="ctrl.isSearchingTasks.value ? 'Loading...' : 'No incomplete tasks found.'"
+            scrollable
+            scroll-height="flex"
+            :table-style="{ minWidth: '600px' }"
+            :value="ctrl.taskSearchResults.value"
+            paginator
+            :rows="10"
+            :rows-per-page-options="[10, 20, 50]"
+            paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+          >
+            <Column header-class="w-12 text-center" body-class="w-12 text-center">
+              <template #body="{ data }">
+                <Checkbox
+                  :model-value="ctrl.isTaskPicked(data)"
+                  binary
+                  @change="ctrl.toggleTaskPicked(data)"
+                />
+              </template>
+            </Column>
+            <Column field="task_cd" header="Task Code" body-class="font-bold text-ink" />
+            <Column field="task_name" header="Task Name">
+              <template #body="{ data }">{{ data.task_name || '—' }}</template>
+            </Column>
+            <Column header="Category">
+              <template #body="{ data }">
+                <span :class="['inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold', categoryBadgeClass(data.category)]">
+                  {{ categoryLabel(data.category) }}
+                </span>
+              </template>
+            </Column>
+            <Column field="created_by" header="Created By" />
+            <Column header="Created" header-class="num" body-class="num">
+              <template #body="{ data }">{{ formatPickerDate(data.created_at) }}</template>
+            </Column>
+          </DataTable>
         </div>
       </div>
 
       <template #footer>
         <div class="flex w-full items-center justify-between gap-2">
-          <span class="text-xs text-muted">{{ ctrl.pickerSelectedCount.value }} task đã chọn</span>
+          <span class="text-xs text-muted">{{ ctrl.pickerSelectedCount.value }} task selected</span>
           <div class="flex items-center gap-2">
             <Button label="Cancel" severity="secondary" @click="ctrl.showTaskPicker.value = false" />
             <Button
@@ -715,6 +732,13 @@ function isMarkdown(entry: FileEntry): boolean {
         </div>
       </template>
     </Dialog>
+
+    <!-- Shared Task Dialog (create from picker) -->
+    <AiTaskDialog
+      v-model:visible="showCreateTaskDialog"
+      :loading="isCreatingTaskViaDialog"
+      @save="handleCreateTaskFromDialog"
+    />
   </div>
 </template>
 

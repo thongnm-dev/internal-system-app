@@ -12,7 +12,8 @@ import { explorerOpen, explorerReadDir, explorerReadTextFile } from "@/tauri/com
 import type { FileEntry } from "@/tauri/commands/explorer";
 import type { WorkflowStepType } from "@/_/types/ai-workflow";
 import { aiTaskCreate, aiTaskList } from "@/tauri/commands/ai-task";
-import type { AiTaskCategory, AiTaskResult } from "@/tauri/commands/ai-task";
+import type { AiTaskResult } from "@/tauri/commands/ai-task";
+import type { TaskDialogPayload } from "../components/AiTaskDialog.vue";
 
 export type CoworkWorkflow = {
   id: number;
@@ -96,10 +97,6 @@ export function useAiCowork() {
   const isSearchingTasks = ref(false);
   const pickerSelected = ref<Map<number, AiTaskResult>>(new Map());
   const pickerSelectedCount = computed(() => pickerSelected.value.size);
-  const newTaskCode = ref("");
-  const newTaskCategory = ref<AiTaskCategory>("other");
-  const newTaskDescription = ref("");
-  const isCreatingTask = ref(false);
 
   const selectedWorkflow = computed(
     () => workflows.value.find((w) => w.id === selectedWorkflowId.value) ?? null,
@@ -283,7 +280,7 @@ export function useAiCowork() {
   async function doTaskSearch(query: string) {
     isSearchingTasks.value = true;
     try {
-      taskSearchResults.value = await aiTaskList(query.trim() || undefined);
+      taskSearchResults.value = await aiTaskList(query.trim() || undefined, false);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
@@ -299,9 +296,6 @@ export function useAiCowork() {
   function openTaskPicker() {
     taskSearchQuery.value = "";
     pickerSelected.value = new Map();
-    newTaskCode.value = "";
-    newTaskCategory.value = "other";
-    newTaskDescription.value = "";
     showTaskPicker.value = true;
     void doTaskSearch("");
   }
@@ -317,28 +311,18 @@ export function useAiCowork() {
     pickerSelected.value = map;
   }
 
-  async function createInlineTask() {
-    const code = newTaskCode.value.trim();
-    if (!code || !username.value) return;
-    isCreatingTask.value = true;
-    try {
-      const created = await aiTaskCreate(username.value, {
-        task_code: code,
-        category: newTaskCategory.value,
-        description: newTaskDescription.value.trim(),
-      });
-      taskSearchResults.value = [created, ...taskSearchResults.value];
-      const map = new Map(pickerSelected.value);
-      map.set(created.id, created);
-      pickerSelected.value = map;
-      newTaskCode.value = "";
-      newTaskDescription.value = "";
-      toast.success("Task created.");
-    } catch (e) {
-      toast.error(friendlyError(e));
-    } finally {
-      isCreatingTask.value = false;
-    }
+  async function createInlineTask(payload: TaskDialogPayload) {
+    if (!payload.task_cd || !username.value) return;
+    const created = await aiTaskCreate(username.value, {
+      task_cd: payload.task_cd,
+      task_name: payload.task_name,
+      category: payload.category,
+    });
+    taskSearchResults.value = [created, ...taskSearchResults.value];
+    const map = new Map(pickerSelected.value);
+    map.set(created.id, created);
+    pickerSelected.value = map;
+    toast.success("Task created.");
   }
 
   function confirmTaskPicker() {
@@ -406,10 +390,6 @@ export function useAiCowork() {
     taskSearchResults,
     isSearchingTasks,
     pickerSelectedCount,
-    newTaskCode,
-    newTaskCategory,
-    newTaskDescription,
-    isCreatingTask,
     openTaskPicker,
     triggerTaskSearch,
     isTaskPicked,

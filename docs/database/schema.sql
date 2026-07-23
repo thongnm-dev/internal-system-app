@@ -381,16 +381,47 @@ CREATE TABLE IF NOT EXISTS ai_workflow_steps (
 CREATE INDEX IF NOT EXISTS idx_ai_workflow_steps_workflow ON ai_workflow_steps(workflow_id);
 
 CREATE TABLE IF NOT EXISTS ai_tasks (
-    id          SERIAL       PRIMARY KEY,
-    task_code   VARCHAR(100) NOT NULL,
-    category    VARCHAR(30)  NOT NULL DEFAULT 'other'
+    id           SERIAL       PRIMARY KEY,
+    task_cd      VARCHAR(100) NOT NULL,
+    task_name    VARCHAR(300) NOT NULL DEFAULT '',
+    category     VARCHAR(30)  NOT NULL DEFAULT 'other'
         CHECK (category IN ('screen', 'batch', 'part', 'other')),
-    description TEXT         NOT NULL DEFAULT '',
-    created_by  VARCHAR(100) NOT NULL,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    is_complete  BOOLEAN      NOT NULL DEFAULT FALSE,
+    completed_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    created_by   VARCHAR(100) NOT NULL,
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_by   VARCHAR(100) NOT NULL DEFAULT ''
 );
 
-CREATE INDEX IF NOT EXISTS idx_ai_tasks_task_code ON ai_tasks(task_code);
+CREATE INDEX IF NOT EXISTS idx_ai_tasks_task_cd ON ai_tasks(task_cd);
+
+CREATE TABLE IF NOT EXISTS ai_task_wf_proc (
+    id             SERIAL       PRIMARY KEY,
+    task_id        INTEGER      NOT NULL REFERENCES ai_tasks(id) ON DELETE CASCADE,
+    wf_id          INTEGER      NOT NULL REFERENCES ai_workflows(id) ON DELETE CASCADE,
+    latest_step_id INTEGER      REFERENCES ai_workflow_steps(id) ON DELETE SET NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    created_by     VARCHAR(100) NOT NULL,
+    updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_by     VARCHAR(100) NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_task_wf_proc_task ON ai_task_wf_proc(task_id);
+
+CREATE TABLE IF NOT EXISTS ai_task_wf_proc_step (
+    id              SERIAL       PRIMARY KEY,
+    wf_proc_id      INTEGER      NOT NULL REFERENCES ai_task_wf_proc(id) ON DELETE CASCADE,
+    wf_step_id      INTEGER      NOT NULL REFERENCES ai_workflow_steps(id) ON DELETE CASCADE,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped')),
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    created_by      VARCHAR(100) NOT NULL,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_by      VARCHAR(100) NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_task_wf_proc_step_proc ON ai_task_wf_proc_step(wf_proc_id);
 
 -- ============================================================================
 -- TRIGGERS — auto-update updated_at
@@ -424,3 +455,12 @@ CREATE OR REPLACE TRIGGER trg_daily_report_entries_updated_at
 
 CREATE OR REPLACE TRIGGER trg_ai_workflows_updated_at
     BEFORE UPDATE ON ai_workflows FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_ai_tasks_updated_at
+    BEFORE UPDATE ON ai_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_ai_task_wf_proc_updated_at
+    BEFORE UPDATE ON ai_task_wf_proc FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_ai_task_wf_proc_step_updated_at
+    BEFORE UPDATE ON ai_task_wf_proc_step FOR EACH ROW EXECUTE FUNCTION update_updated_at();
