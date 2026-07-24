@@ -69,6 +69,8 @@ mod commands {
     pub mod ai_task_commands;
     /// Commands cho state màn hình AI Translate Cowork (lịch sử làm việc gần nhất).
     pub mod ai_translate_cowork_commands;
+    /// Commands cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
+    pub mod ai_cowork_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -109,6 +111,8 @@ mod database {
     pub mod ai_task_store;
     /// Lưu trữ cục bộ (JSON file) state màn hình AI Translate Cowork.
     pub mod ai_translate_cowork_store;
+    /// Lưu trữ cục bộ (JSON file) state màn hình AI Cowork.
+    pub mod ai_cowork_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -241,6 +245,8 @@ mod services {
     pub mod ai_task_service;
     /// Service cho state màn hình AI Translate Cowork (lịch sử làm việc gần nhất).
     pub mod ai_translate_cowork_service;
+    /// Service cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
+    pub mod ai_cowork_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

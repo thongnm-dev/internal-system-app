@@ -4,6 +4,7 @@ import { useAuthStore } from "@/app/stores/auth";
 import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { aiCoworkGetState, aiCoworkSaveState } from "@/tauri/commands/ai-cowork";
 import { aiWorkflowList, aiWorkflowStepList } from "@/tauri/commands/ai-workflow";
 import type { AiWorkflowResult, AiWorkflowStepResult } from "@/tauri/commands/ai-workflow";
 import { aiUsageListAccounts, aiUsageOpenTerminal, aiUsageSetActive } from "@/tauri/commands/ai-usage";
@@ -102,6 +103,11 @@ export function useAiCowork() {
     () => workflows.value.find((w) => w.id === selectedWorkflowId.value) ?? null,
   );
 
+  /** Lưu lại project directory hiện tại để lần mở màn hình sau tự động load lại. */
+  function persistState() {
+    void aiCoworkSaveState(projectDir.value).catch(() => undefined);
+  }
+
   async function pickProjectDir() {
     if (!canUseTauriRuntime()) {
       toast.error(tauriRuntimeMessage);
@@ -112,6 +118,7 @@ export function useAiCowork() {
       if (typeof selected === "string") {
         projectDir.value = selected;
         await loadDirectory();
+        persistState();
       }
     } catch (e) {
       toast.error(friendlyError(e));
@@ -121,6 +128,7 @@ export function useAiCowork() {
   function clearProjectDir() {
     projectDir.value = "";
     dirEntries.value = [];
+    persistState();
   }
 
   async function loadDirectory() {
@@ -354,6 +362,16 @@ export function useAiCowork() {
 
   async function init() {
     await Promise.all([loadWorkflows(), loadAccounts()]);
+    if (!canUseTauriRuntime()) return;
+    try {
+      const state = await aiCoworkGetState();
+      if (state.project_dir) {
+        projectDir.value = state.project_dir;
+        await loadDirectory();
+      }
+    } catch {
+      // Không có lịch sử hoặc lỗi đọc file — bỏ qua, giữ màn hình ở trạng thái mặc định.
+    }
   }
 
   return {

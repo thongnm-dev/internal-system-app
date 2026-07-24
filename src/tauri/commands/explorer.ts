@@ -33,6 +33,11 @@ export function explorerOpen(path: string) {
   return safeInvoke<void>("explorer_open", { path });
 }
 
+/** Mở file bằng ứng dụng mặc định của hệ điều hành (khác `explorerOpen`, vốn chỉ chọn file trong Explorer). */
+export function explorerOpenFile(path: string) {
+  return safeInvoke<void>("explorer_open_file", { path });
+}
+
 export function explorerReadTextFile(path: string) {
   return safeInvoke<string>("explorer_read_text_file", { path });
 }

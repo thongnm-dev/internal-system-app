@@ -224,6 +224,37 @@ pub fn open_in_explorer(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Mở một file bằng ứng dụng mặc định của hệ điều hành (khác `open_in_explorer`,
+/// vốn chỉ chọn/hiển thị file trong Explorer/Finder mà không chạy nó).
+pub fn open_file(path: &str) -> Result<(), String> {
+    let p = Path::new(path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    if p.is_dir() {
+        return Err(format!("Expected a file path, got a directory: {path}"));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let windows_path = path.replace('/', "\\");
+        std::process::Command::new("explorer")
+            .arg(&windows_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {e}"))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {e}"))?;
+    }
+
+    Ok(())
+}
+
 pub fn rename_entry(path: &str, new_name: &str) -> Result<(), String> {
     let p = Path::new(path);
     if !p.exists() {

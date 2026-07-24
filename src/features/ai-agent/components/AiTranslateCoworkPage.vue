@@ -44,6 +44,78 @@ function openMarkdownPreview(entry: FileEntry) {
   void ctrl.openMarkdownPreview(entry);
 }
 
+// --- Folder quick-view (Input panel, folders only) ---
+const showFolderPeek = ref(false);
+const folderPeekName = ref("");
+const folderPeekFiles = ref<FileEntry[]>([]);
+const isLoadingFolderPeek = ref(false);
+const folderPeekSelected = ref<Set<string>>(new Set());
+
+async function openFolderPeek(entry: FileEntry) {
+  folderPeekName.value = entry.name;
+  folderPeekFiles.value = [];
+  folderPeekSelected.value = new Set();
+  showFolderPeek.value = true;
+  isLoadingFolderPeek.value = true;
+  try {
+    folderPeekFiles.value = await ctrl.readFolderEntries(entry.path);
+  } finally {
+    isLoadingFolderPeek.value = false;
+  }
+}
+
+function openFolderPeekEntry(entry: FileEntry) {
+  if (entry.is_dir) {
+    void openFolderPeek(entry);
+    return;
+  }
+  void ctrl.input.openEntry(entry);
+}
+
+function isFolderPeekSelected(entry: FileEntry): boolean {
+  return folderPeekSelected.value.has(entry.path);
+}
+
+function toggleFolderPeekSelected(entry: FileEntry) {
+  const next = new Set(folderPeekSelected.value);
+  if (next.has(entry.path)) next.delete(entry.path);
+  else next.add(entry.path);
+  folderPeekSelected.value = next;
+}
+
+const showFolderPeekDeleteConfirm = ref(false);
+const folderPeekDeleteCount = computed(() => folderPeekSelected.value.size);
+
+function openFolderPeekDeleteConfirm() {
+  if (!folderPeekSelected.value.size) return;
+  showFolderPeekDeleteConfirm.value = true;
+}
+
+async function confirmFolderPeekDelete() {
+  const paths = Array.from(folderPeekSelected.value);
+  await ctrl.deletePaths(paths);
+  folderPeekFiles.value = folderPeekFiles.value.filter((f) => !folderPeekSelected.value.has(f.path));
+  folderPeekSelected.value = new Set();
+  showFolderPeekDeleteConfirm.value = false;
+}
+
+// --- Import file/folder từ ngoài app vào Input (hỏi loại trước khi mở native picker) ---
+const showImportTypeDialog = ref(false);
+
+function openImportDialog() {
+  showImportTypeDialog.value = true;
+}
+
+function chooseImportFiles() {
+  showImportTypeDialog.value = false;
+  void ctrl.pickAndImportToInput(false, focusedEntry.value?.path);
+}
+
+function chooseImportFolders() {
+  showImportTypeDialog.value = false;
+  void ctrl.pickAndImportToInput(true, focusedEntry.value?.path);
+}
+
 // --- Inline new folder ---
 const inlineNewFolder = ref(false);
 const inlineNewFolderName = ref("");
@@ -156,16 +228,30 @@ function confirmSkillFileDialogSelected() {
   void ctrl.openSkillTerminal(skillFileDialogSkillName.value, names);
 }
 
+// --- Focused folder (Input panel) ---
+// Folder đang được focus (click chọn, hoặc right-click) — dùng làm đích cho Paste (context menu)
+// và Import (toolbar), thay vì folder gốc/đang duyệt.
+const focusedEntry = ref<FileEntry | null>(null);
+
+function setFocusedEntry(entry: FileEntry) {
+  focusedEntry.value = entry.is_dir ? entry : null;
+}
+
+function clearFocusedEntry() {
+  focusedEntry.value = null;
+}
+
 // --- Context menu (Input panel) ---
 const ctxMenu = ref(false);
 const ctxX = ref(0);
 const ctxY = ref(0);
 const ctxMenuEl = ref<HTMLElement | null>(null);
 
-function openCtxMenu(ev: MouseEvent) {
+function openCtxMenu(ev: MouseEvent, entry?: FileEntry) {
   ev.preventDefault();
   ctxX.value = ev.clientX;
   ctxY.value = ev.clientY;
+  if (entry) setFocusedEntry(entry);
   ctxMenu.value = true;
   void nextTick(() => clampCtxMenu());
 }
@@ -188,7 +274,8 @@ function ctxCopy() {
 }
 
 function ctxPaste() {
-  ctrl.input.paste();
+  if (focusedEntry.value) void ctrl.input.pasteInto(focusedEntry.value.path);
+  else void ctrl.input.paste();
   closeCtxMenu();
 }
 
@@ -365,8 +452,7 @@ function isTextResult(entry: FileEntry): boolean {
       <div class="flex flex-wrap items-center gap-3">
         <i class="pi pi-language text-2xl text-muted" />
         <div class="min-w-0">
-          <h2 class="text-lg font-semibold text-ink">AI Translate Cowork</h2>
-          <p class="text-sm text-muted">Chọn thư mục project, quản lý account AI, chuẩn bị input và chạy skill dịch thuật.</p>
+          <p class="text-[12px] text-muted">Chọn thư mục project, quản lý account AI, chuẩn bị input và chạy skill dịch thuật.</p>
         </div>
       </div>
 
@@ -478,12 +564,13 @@ function isTextResult(entry: FileEntry): boolean {
           <div class="mb-2 flex flex-wrap items-center gap-1.5">
             <Button icon="pi pi-folder-plus" severity="secondary" outlined size="small" title="New folder" @click="openNewFolder('input')" />
             <Button icon="pi pi-copy" severity="secondary" outlined size="small" :disabled="!ctrl.input.selected.value.size" title="Copy" @click="ctrl.input.copySelected" />
-            <Button icon="pi pi-clipboard" severity="secondary" outlined size="small" title="Paste (từ app hoặc từ File Explorer)" @click="ctrl.input.paste" />
+            <Button icon="pi pi-clipboard" severity="secondary" outlined size="small" title="Paste" @click="ctrl.input.paste" />
+            <Button icon="pi pi-upload" severity="secondary" outlined size="small" title="Import file/folder" @click="openImportDialog" />
             <Button icon="pi pi-trash" severity="danger" outlined size="small" :disabled="!ctrl.input.selected.value.size" title="Delete" @click="openDeleteConfirm('input')" />
             <Button icon="pi pi-refresh" severity="secondary" text size="small" class="ml-auto" :loading="ctrl.input.isLoading.value" title="Reload" @click="ctrl.input.load" />
           </div>
           <!-- Input entries list -->
-          <div class="min-h-0 flex-1 overflow-auto" @contextmenu="openCtxMenu">
+          <div class="min-h-0 flex-1 overflow-auto" @contextmenu="openCtxMenu" @click.self="clearFocusedEntry">
             <!-- Inline new folder row -->
             <div v-if="inlineNewFolder" class="flex items-center gap-2 rounded bg-brand/5 px-2 py-1.5 text-sm">
               <i class="pi pi-folder text-amber-500" />
@@ -499,12 +586,25 @@ function isTextResult(entry: FileEntry): boolean {
             </div>
             <p v-if="ctrl.input.isLoading.value" class="p-6 text-center text-xs text-muted">Loading...</p>
             <template v-else-if="ctrl.input.entries.value.length">
-              <div v-for="entry in ctrl.input.entries.value" :key="entry.path" class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70" :class="[ctrl.input.isSelected(entry) ? 'bg-brand/5' : '', ctrl.clipboard.value?.cut && ctrl.clipboard.value.paths.includes(entry.path) ? 'opacity-50' : '']" :title="entry.path">
+              <div
+                v-for="entry in ctrl.input.entries.value"
+                :key="entry.path"
+                class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70"
+                :class="[
+                  ctrl.input.isSelected(entry) ? 'bg-brand/5' : '',
+                  focusedEntry?.path === entry.path ? 'ring-1 ring-inset ring-brand' : '',
+                  ctrl.clipboard.value?.cut && ctrl.clipboard.value.paths.includes(entry.path) ? 'opacity-50' : '',
+                ]"
+                :title="entry.path"
+                @click="setFocusedEntry(entry)"
+                @contextmenu.stop="openCtxMenu($event, entry)"
+              >
                 <Checkbox :model-value="ctrl.input.isSelected(entry)" binary @change="ctrl.input.toggleSelected(entry)" />
                 <i :class="entryIcon(entry)" />
                 <span class="min-w-0 flex-1 truncate" :class="entry.is_dir ? 'cursor-pointer font-semibold text-brand' : 'text-ink'" @dblclick="ctrl.input.openEntry(entry)">{{ entry.name }}</span>
                 <span class="shrink-0 text-[11px] text-muted">{{ formatSize(entry) }}</span>
                 <Button v-if="isTextResult(entry)" icon="pi pi-eye" text rounded size="small" title="Xem nội dung" @click="openMarkdownPreview(entry)" />
+                <Button v-if="entry.is_dir" icon="pi pi-eye" text rounded size="small" title="View - xem nhanh" @click="openFolderPeek(entry)" />
                 <Button v-if="entry.is_dir" icon="pi pi-external-link" text rounded size="small" title="Show in folder" @click="ctrl.showInFolder(entry.path)" />
               </div>
             </template>
@@ -735,6 +835,96 @@ function isTextResult(entry: FileEntry): boolean {
 
       <template #footer>
         <Button label="Đóng" severity="secondary" @click="ctrl.mdPreviewOpen.value = false" />
+      </template>
+    </Dialog>
+
+    <!-- Folder quick-view (Input panel, folders only) -->
+    <Dialog
+      v-model:visible="showFolderPeek"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-folder text-amber-500" />{{ folderPeekName }}</h3>
+      </template>
+      <p v-if="isLoadingFolderPeek" class="p-6 text-center text-xs text-muted">Loading...</p>
+      <div v-else-if="folderPeekFiles.length" class="max-h-[50vh] space-y-1 overflow-auto">
+        <div
+          v-for="entry in folderPeekFiles"
+          :key="entry.path"
+          class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70"
+          :title="entry.path"
+        >
+          <Checkbox :model-value="isFolderPeekSelected(entry)" binary @change="toggleFolderPeekSelected(entry)" />
+          <i :class="entryIcon(entry)" />
+          <span class="min-w-0 flex-1 truncate text-ink">{{ entry.name }}</span>
+          <span class="shrink-0 text-[11px] text-muted">{{ formatSize(entry) }}</span>
+          <Button
+            icon="pi pi-eye"
+            text
+            rounded
+            size="small"
+            :title="entry.is_dir ? 'Xem nhanh folder này' : 'Mở file'"
+            @click="openFolderPeekEntry(entry)"
+          />
+        </div>
+      </div>
+      <p v-else class="flex items-center justify-center rounded-lg border border-dashed border-divider p-6 text-center text-xs text-muted">
+        Thư mục trống.
+      </p>
+      <template #footer>
+        <Button
+          icon="pi pi-trash"
+          label="Xoá"
+          severity="danger"
+          outlined
+          size="small"
+          :disabled="!folderPeekSelected.size"
+          @click="openFolderPeekDeleteConfirm"
+        />
+        <Button label="Đóng" severity="secondary" @click="showFolderPeek = false" />
+      </template>
+    </Dialog>
+
+    <!-- Xoá file/folder đã chọn trong dialog xem nhanh (View) -->
+    <Dialog
+      v-model:visible="showFolderPeekDeleteConfirm"
+      class="w-full max-w-sm rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-exclamation-triangle text-red-500" />Confirm Delete</h3>
+      </template>
+      <p class="text-sm text-muted">
+        Xoá <strong class="text-ink">{{ folderPeekDeleteCount }}</strong> mục đã chọn trong "{{ folderPeekName }}"? Hành động này không thể hoàn tác.
+      </p>
+      <template #footer>
+        <Button label="Cancel" severity="secondary" @click="showFolderPeekDeleteConfirm = false" />
+        <Button label="Delete" severity="danger" @click="confirmFolderPeekDelete" />
+      </template>
+    </Dialog>
+
+    <!-- Import file/folder từ ngoài app vào Input: hỏi loại trước khi mở native picker -->
+    <Dialog
+      v-model:visible="showImportTypeDialog"
+      class="w-full max-w-sm rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-upload" />Import vào Input</h3>
+      </template>
+      <p class="text-sm text-muted">
+        Bạn muốn chọn file hay folder? Nội dung sẽ được copy vào
+        <strong v-if="focusedEntry" class="text-ink">folder "{{ focusedEntry.name }}"</strong>
+        <span v-else>folder đang mở trong Input (folder gốc nếu chưa duyệt vào folder con nào)</span>.
+      </p>
+      <template #footer>
+        <Button label="Cancel" severity="secondary" @click="showImportTypeDialog = false" />
+        <Button label="Chọn folder" severity="secondary" outlined @click="chooseImportFolders" />
+        <Button label="Chọn file" @click="chooseImportFiles" />
       </template>
     </Dialog>
 

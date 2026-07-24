@@ -817,7 +817,11 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
         // Ghi ra file .bat tạm thay vì nhồi cả câu lệnh (có thể chứa dấu ngoặc kép của prompt)
         // vào một argument của `cmd /k`: cmd.exe không tự bóc tách quote lồng nhau theo kiểu
         // CommandLineToArgvW mà Rust dùng để escape arguments, nên quote bị lệch/dư khi nhồi trực tiếp.
-        let mut script = format!("@echo off\r\ncd /d \"{expanded_wd}\"\r\n");
+        // `chcp 65001` bắt buộc phải đứng trước mọi dòng chứa ký tự non-ASCII (vd. tên file tiếng
+        // Nhật trong prompt): file .bat được ghi bằng UTF-8, nhưng cmd.exe mặc định đọc theo code
+        // page ANSI/OEM của hệ thống — nếu không chuyển sang UTF-8 trước, các byte UTF-8 đó bị
+        // hiểu sai thành ký tự khác (mojibake) trước khi được truyền tiếp cho `claude`.
+        let mut script = format!("@echo off\r\nchcp 65001 > nul\r\ncd /d \"{expanded_wd}\"\r\n");
         if !is_default {
             script.push_str(&format!("set CLAUDE_CONFIG_DIR={expanded_dir}\r\n"));
         }

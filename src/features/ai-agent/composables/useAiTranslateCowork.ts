@@ -11,6 +11,7 @@ import {
   explorerDelete,
   explorerEnsureDir,
   explorerOpen,
+  explorerOpenFile,
   explorerPaste,
   explorerPasteFromOsClipboard,
   explorerReadDir,
@@ -115,6 +116,12 @@ export function useAiTranslateCowork() {
       if (entry.is_dir) {
         dir.value = entry.path;
         await load();
+        return;
+      }
+      try {
+        await explorerOpenFile(entry.path);
+      } catch (e) {
+        toast.error(friendlyError(e));
       }
     }
 
@@ -158,12 +165,11 @@ export function useAiTranslateCowork() {
     }
 
     /**
-     * Dán vào panel. Ưu tiên clipboard nội bộ của app (Copy/Cut trong Input/Output panel);
+     * Dán vào `target`. Ưu tiên clipboard nội bộ của app (Copy/Cut trong Input/Output panel);
      * nếu chưa có gì được Copy trong app, thử dán trực tiếp từ OS clipboard
      * (vd. file/folder vừa Ctrl+C trong Windows File Explorer).
      */
-    async function paste() {
-      const target = dir.value.trim();
+    async function pasteToTarget(target: string) {
       if (!target) return;
       try {
         if (clipboard.value) {
@@ -176,6 +182,33 @@ export function useAiTranslateCowork() {
           await load();
           toast.success(`Đã dán ${count} mục từ clipboard.`);
         }
+      } catch (e) {
+        toast.error(friendlyError(e));
+      }
+    }
+
+    /** Dán vào folder đang mở (`dir`) trong panel. */
+    async function paste() {
+      await pasteToTarget(dir.value.trim());
+    }
+
+    /** Dán vào thẳng một folder cụ thể (vd. folder đang right-click), không cần mở/duyệt vào nó. */
+    async function pasteInto(targetDir: string) {
+      await pasteToTarget(targetDir.trim());
+    }
+
+    /**
+     * Copy các file/folder chọn từ ngoài hệ điều hành (qua dialog Browse) vào panel này —
+     * vào `targetDir` nếu truyền vào (vd. folder đang focus), ngược lại vào folder đang mở (`dir`),
+     * tức folder gốc nếu chưa duyệt sâu vào folder con nào.
+     */
+    async function importPaths(paths: string[], targetDir?: string) {
+      const target = (targetDir ?? dir.value).trim();
+      if (!target || !paths.length) return;
+      try {
+        await explorerPaste(paths, target, false);
+        await load();
+        toast.success(`${paths.length} mục đã được import.`);
       } catch (e) {
         toast.error(friendlyError(e));
       }
@@ -210,12 +243,38 @@ export function useAiTranslateCowork() {
       createFolder,
       copySelected,
       paste,
+      pasteInto,
+      importPaths,
       deleteSelected,
     };
   }
 
   const input = makeFolderPanel("input");
   const output = makeFolderPanel("output");
+
+  /**
+   * Mở dialog Browse của OS để chọn file (hoặc folder, tuỳ `directory`) từ ngoài app,
+   * rồi copy vào `targetDir` nếu truyền vào (vd. folder đang được focus trong Input),
+   * ngược lại vào folder Input đang mở (folder gốc nếu chưa duyệt vào folder con nào).
+   */
+  async function pickAndImportToInput(directory: boolean, targetDir?: string) {
+    if (!canUseTauriRuntime()) {
+      toast.error(tauriRuntimeMessage);
+      return;
+    }
+    try {
+      const selected = await open({
+        directory,
+        multiple: true,
+        title: directory ? "Chọn folder để import vào Input" : "Chọn file để import vào Input",
+      });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      await input.importPaths(paths, targetDir);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
 
   // --- Row 1: project directory ---
 
@@ -333,6 +392,17 @@ export function useAiTranslateCowork() {
     }
   }
 
+  /** Xoá các đường dẫn chỉ định (vd. từ dialog xem nhanh nội dung folder) — không gắn với panel nào. */
+  async function deletePaths(paths: string[]) {
+    if (!paths.length) return;
+    try {
+      await explorerDelete(paths);
+      toast.success(`${paths.length} mục đã được xoá.`);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    }
+  }
+
   /**
    * Mở terminal tại project directory với account AI đang active để chạy skill,
    * đưa sẵn prompt dạng `/<skill-name> <input-entry-name>` (yêu cầu đã chọn đúng 1 mục trong Input).
@@ -414,6 +484,7 @@ export function useAiTranslateCowork() {
     clipboard,
     input,
     output,
+    pickAndImportToInput,
     // col 2
     skillFolders,
     isLoadingSkills,
@@ -421,6 +492,7 @@ export function useAiTranslateCowork() {
     loadSkillFolders,
     openSkillTerminal,
     readFolderEntries,
+    deletePaths,
     // col 3
     mdPreviewOpen,
     mdPreviewName,

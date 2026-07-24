@@ -48,7 +48,7 @@ use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
     explorer_copy_bugs, explorer_create_file, explorer_create_folder, explorer_delete,
-    explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_paste,
+    explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_open_file, explorer_paste,
     explorer_paste_from_os_clipboard, explorer_read_dir, explorer_read_text_file, explorer_rename,
     explorer_search,
 };
@@ -80,6 +80,7 @@ use commands::ai_task_commands::{
 use commands::ai_translate_cowork_commands::{
     ai_translate_cowork_get_state, ai_translate_cowork_save_state,
 };
+use commands::ai_cowork_commands::{ai_cowork_get_state, ai_cowork_save_state};
 use commands::schedule_commands::read_schedule_excel;
 use commands::sql_editor_commands::{
     sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
@@ -287,6 +288,7 @@ pub fn run() {
             explorer_read_dir,
             explorer_search,
             explorer_open,
+            explorer_open_file,
             explorer_read_text_file,
             explorer_get_drives,
             explorer_rename,
@@ -345,6 +347,9 @@ pub fn run() {
             // === AI Translate Cowork commands ===
             ai_translate_cowork_get_state,
             ai_translate_cowork_save_state,
+            // === AI Cowork commands ===
+            ai_cowork_get_state,
+            ai_cowork_save_state,
             // === Schedule commands ===
             read_schedule_excel,
             // === SQL Editor commands ===
