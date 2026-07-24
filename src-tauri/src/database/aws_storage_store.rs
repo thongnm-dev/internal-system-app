@@ -8,6 +8,17 @@ use crate::app::result::AppResult;
 use crate::models::s3::AwsStorage;
 use crate::utils::pgsql_connect;
 
+pub async fn list_all() -> AppResult<Vec<AwsStorage>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query("SELECT * FROM sp_aws_storage_select_all()", &[])
+        .await
+        .map_err(|e| AppError::new(format!("Failed to list all storages: {e}")))?;
+
+    Ok(rows.iter().map(row_to_storage).collect())
+}
+
 pub async fn list_by_upload() -> AppResult<Vec<AwsStorage>> {
     let client = pgsql_connect::connect().await?;
 

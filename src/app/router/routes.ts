@@ -96,6 +96,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Download files from S3 storage to local directories.",
   },
   {
+    key: "cloudS3BugFolders",
+    path: "/cloud/s3-bug-folders",
+    title: "S3 Bug Folders",
+    subtitle: "Danh sách tất cả thư mục bug trên S3 theo từng nơi lưu trữ.",
+  },
+  {
     key: "cloudS3DownloadHistory",
     path: "/cloud/s3-download-history",
     title: "S3 Download History",
@@ -342,6 +348,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/cloud/s3-download",
     component: () => import("@/features/cloud/components/S3DownloadPage.vue"),
     meta: { key: "cloudS3Download" as MenuKey },
+  },
+  {
+    path: "/cloud/s3-bug-folders",
+    component: () => import("@/features/cloud/components/S3BugFoldersPage.vue"),
+    meta: { key: "cloudS3BugFolders" as MenuKey },
   },
   {
     path: "/cloud/s3-download-history",

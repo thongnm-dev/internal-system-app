@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref, nextTick, watch } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
@@ -9,6 +9,7 @@ import Select from "primevue/select";
 import ProgressSpinner from "primevue/progressspinner";
 import S3UploadCard from "./S3UploadCard.vue";
 import S3ConfigError from "./S3ConfigError.vue";
+import S3BugFoldersDialog from "./S3BugFoldersDialog.vue";
 import { useS3Upload } from "../composables/useS3Upload";
 import { useS3ConfigGuard } from "../composables/useS3ConfigGuard";
 import type { AwsStorage, ScannedFile, UploadFileRequest } from "@/_/types/s3";
@@ -35,6 +36,9 @@ const {
 } = useS3Upload();
 
 const uploadedId = ref("");
+const showS3ConfirmDialog = ref(false);
+const showBugFoldersDialog = ref(false);
+const pendingS3Confirm = ref(false);
 
 const openModal = ref(false);
 const modalTitle = ref("");
@@ -86,10 +90,20 @@ async function handleConfirm() {
   }
 
   if (deleteItems.value.length > 0) {
+    pendingS3Confirm.value = !!result?.success;
     await nextTick();
     showDeleteDialog.value = true;
+  } else if (result?.success) {
+    showS3ConfirmDialog.value = true;
   }
 }
+
+watch(showDeleteDialog, (val) => {
+  if (!val && pendingS3Confirm.value) {
+    pendingS3Confirm.value = false;
+    showS3ConfirmDialog.value = true;
+  }
+});
 
 function handleCloseModal() {
   openModal.value = false;
@@ -219,6 +233,29 @@ function handleCloseModal() {
       />
     </template>
   </Dialog>
+
+  <!-- S3 Status Confirm Dialog -->
+  <Dialog
+    v-model:visible="showS3ConfirmDialog"
+    header="Xác nhận"
+    :modal="true"
+    :closable="true"
+    :style="{ width: '28rem' }"
+  >
+    <div class="flex items-center gap-3">
+      <i class="pi pi-question-circle text-3xl text-blue-500" />
+      <span class="text-sm text-surface-600 dark:text-surface-400">
+        Bạn có muốn mở màn hình để xem trạng thái trên S3 không?
+      </span>
+    </div>
+    <template #footer>
+      <Button label="Cancel" icon="pi pi-times" severity="secondary" @click="showS3ConfirmDialog = false" />
+      <Button label="OK" icon="pi pi-check" @click="showS3ConfirmDialog = false; showBugFoldersDialog = true" />
+    </template>
+  </Dialog>
+
+  <!-- S3 Bug Folders Dialog -->
+  <S3BugFoldersDialog v-if="showBugFoldersDialog" @close="showBugFoldersDialog = false" />
 
   <!-- Delete after upload dialog -->
   <Dialog

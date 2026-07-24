@@ -403,14 +403,10 @@ pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String
                 fs::create_dir_all(&range_dir)
                     .map_err(|e| format!("Create range dir failed: {e}"))?;
                 let range_target = range_dir.join(&folder_name);
-                if !range_target.exists() {
-                    copy_dir_recursive(&folder_path, &range_target)?;
-                }
+                copy_dir_recursive(&folder_path, &range_target)?;
 
                 let history_target = history_dir.join(&folder_name);
-                if !history_target.exists() {
-                    copy_dir_recursive(&folder_path, &history_target)?;
-                }
+                copy_dir_recursive(&folder_path, &history_target)?;
 
                 copied += 1;
             }

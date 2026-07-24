@@ -205,7 +205,9 @@ function isTextResult(entry: FileEntry): boolean {
 <template>
   <div class="flex flex-1 flex-col gap-4 overflow-hidden">
     <!-- Row 1: project directory -->
-    <div class="shrink-0 rounded-lg border border-divider bg-panel p-5 shadow-sm">
+    <Fieldset class="shrink-0 rounded-lg border border-divider bg-panel p-5 shadow-sm fieldset-nested"
+      legend="Project Directory"
+      toggleable>
       <div class="flex flex-wrap items-center gap-3">
         <i class="pi pi-language text-2xl text-muted" />
         <div class="min-w-0">
@@ -214,7 +216,7 @@ function isTextResult(entry: FileEntry): boolean {
         </div>
       </div>
 
-      <label class="mt-4 block">
+      <label class="block">
         <span class="text-xs font-bold text-muted">Project Directory</span>
         <div class="mt-1 flex gap-1.5">
           <input
@@ -244,7 +246,7 @@ function isTextResult(entry: FileEntry): boolean {
           />
         </div>
       </label>
-    </div>
+    </Fieldset>
 
     <!-- Row 2: Account AI -->
     <Fieldset

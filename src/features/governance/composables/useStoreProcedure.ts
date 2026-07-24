@@ -9,6 +9,33 @@ import {
 } from "@/tauri/commands/app-config";
 import type { SpInfo, SpExecutionResult, SpExecutionSummary } from "@/_/types/app-config";
 
+const GROUP_PREFIXES: [string, string][] = [
+  ["sp_ai_task_wf_proc_step_", "AI Task WF Proc Step"],
+  ["sp_ai_task_wf_proc_", "AI Task WF Proc"],
+  ["sp_ai_task_", "AI Task"],
+  ["sp_ai_workflow_", "AI Workflow"],
+  ["sp_project_task_", "Project Task"],
+  ["sp_project_", "Project"],
+  ["sp_auth_", "Auth"],
+  ["sp_daily_note_", "Daily Work Notes"],
+  ["sp_daily_report_", "Daily Report"],
+  ["sp_category_", "Category"],
+  ["sp_user_", "User Management"],
+  ["sp_role_", "User Management"],
+  ["sp_menu_config_", "Menu Config"],
+  ["sp_menu_permission_", "Menu Permission"],
+  ["sp_aws_", "AWS Storage"],
+  ["sp_download_", "Download History"],
+  ["sp_upload_", "Upload History"],
+];
+
+function resolveGroup(name: string): string {
+  for (const [prefix, group] of GROUP_PREFIXES) {
+    if (name.startsWith(prefix)) return group;
+  }
+  return "Other";
+}
+
 export function useStoreProcedure() {
   const globalLoading = useGlobalLoading();
   const procedures = ref<SpInfo[]>([]);
@@ -23,6 +50,13 @@ export function useStoreProcedure() {
   const viewingLoading = ref(false);
   const filterText = ref("");
   const filterStatus = ref<"all" | "success" | "error">("all");
+  const filterGroup = ref("");
+
+  const groupOptions = computed(() => {
+    const groups = new Set<string>();
+    for (const p of procedures.value) groups.add(resolveGroup(p.name));
+    return [...groups].sort();
+  });
 
   const filteredResults = computed(() => {
     let list = results.value.length > 0 ? results.value : procedures.value.map((p) => ({
@@ -34,6 +68,10 @@ export function useStoreProcedure() {
     if (filterText.value) {
       const q = filterText.value.toLowerCase();
       list = list.filter((r) => r.name.toLowerCase().includes(q));
+    }
+
+    if (filterGroup.value) {
+      list = list.filter((r) => resolveGroup(r.name) === filterGroup.value);
     }
 
     if (filterStatus.value === "success" && results.value.length > 0) {
@@ -141,6 +179,12 @@ export function useStoreProcedure() {
     viewingContent.value = "";
   }
 
+  function resetFilters() {
+    filterText.value = "";
+    filterGroup.value = "";
+    filterStatus.value = "all";
+  }
+
   function resetResults() {
     results.value = [];
     summary.value = null;
@@ -159,7 +203,9 @@ export function useStoreProcedure() {
     executing,
     error,
     filterText,
+    filterGroup,
     filterStatus,
+    groupOptions,
     filteredResults,
     hasResults,
     executingNames,
@@ -170,6 +216,7 @@ export function useStoreProcedure() {
     executeSingle,
     viewScript,
     closeViewer,
+    resetFilters,
     resetResults,
     init,
   };

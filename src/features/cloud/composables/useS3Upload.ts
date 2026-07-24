@@ -46,11 +46,14 @@ export function useS3Upload() {
     const paths = Array.isArray(result) ? result : [result];
     if (paths.length === 0) return [];
 
+    loading.start();
     try {
       return await s3ScanUploadFolders(paths);
     } catch (e) {
       toast.error(friendlyError(e));
       return [];
+    } finally {
+      loading.stop();
     }
   }
 

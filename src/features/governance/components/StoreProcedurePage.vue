@@ -2,9 +2,11 @@
 import { onMounted } from "vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
+import Fieldset from "primevue/fieldset";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dialog from "primevue/dialog";
+import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
 import { ref } from "vue";
 import { useStoreProcedure } from "../composables/useStoreProcedure";
@@ -52,35 +54,8 @@ onMounted(() => ctrl.init());
 
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <!-- Error banner -->
-    <p
-      v-if="ctrl.error.value"
-      class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
-    >
-      {{ ctrl.error.value }}
-    </p>
-
     <!-- Action bar -->
-    <section class="flex items-center justify-between rounded-lg border border-divider bg-panel p-4 shadow-sm">
-      <div class="flex items-center gap-3">
-        <span class="text-sm text-muted">
-          {{ ctrl.procedures.value.length }} stored procedures
-        </span>
-        <template v-if="ctrl.hasResults.value && ctrl.summary.value">
-          <span class="text-xs text-muted">|</span>
-          <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 dark:bg-green-950 dark:text-green-400">
-            <i class="pi pi-check text-[10px]" />
-            {{ ctrl.summary.value.success_count }}
-          </span>
-          <span
-            v-if="ctrl.summary.value.error_count > 0"
-            class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-400"
-          >
-            <i class="pi pi-times text-[10px]" />
-            {{ ctrl.summary.value.error_count }}
-          </span>
-        </template>
-      </div>
+    <section class="flex items-center justify-end rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="flex items-center gap-2">
         <Button
           v-if="ctrl.hasResults.value"
@@ -100,27 +75,61 @@ onMounted(() => ctrl.init());
       </div>
     </section>
 
-    <!-- Filter bar -->
-    <section class="flex items-center gap-3 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm">
-      <InputText
-        class="h-9 w-64"
-        placeholder="Filter by name..."
-        :model-value="ctrl.filterText.value"
-        @update:model-value="ctrl.filterText.value = $event as string"
-      />
-      <SelectButton
-        v-if="ctrl.hasResults.value"
-        :model-value="ctrl.filterStatus.value"
-        :options="statusOptions"
-        option-label="label"
-        option-value="value"
-        :allow-empty="false"
-        @update:model-value="ctrl.filterStatus.value = $event"
-      />
-    </section>
+    <!-- Search fieldset -->
+    <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Search" toggleable>
+      <div class="grid gap-3">
+        <div class="grid gap-3 lg:grid-cols-3">
+          <label>
+            <span class="text-xs font-bold text-muted">Procedure Name</span>
+            <InputText class="mt-1 w-full" placeholder="Name" :model-value="ctrl.filterText.value" @update:model-value="ctrl.filterText.value = $event as string" />
+          </label>
+          <label>
+            <span class="text-xs font-bold text-muted">Group</span>
+            <Select class="mt-1 w-full" placeholder="All groups" :options="ctrl.groupOptions.value" :model-value="ctrl.filterGroup.value" show-clear @update:model-value="ctrl.filterGroup.value = $event ?? ''" />
+          </label>
+          <label v-if="ctrl.hasResults.value">
+            <span class="text-xs font-bold text-muted">Status</span>
+            <div class="mt-1">
+              <SelectButton
+                :model-value="ctrl.filterStatus.value"
+                :options="statusOptions"
+                option-label="label"
+                option-value="value"
+                :allow-empty="false"
+                @update:model-value="ctrl.filterStatus.value = $event"
+              />
+            </div>
+          </label>
+        </div>
+        <div class="flex items-center justify-end gap-2">
+          <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined @click="ctrl.resetFilters()" />
+          <Button icon="pi pi-search" label="Search" />
+        </div>
+      </div>
+    </Fieldset>
 
     <!-- SP table -->
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+      <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
+        <h3 class="font-bold">Stored Procedure list</h3>
+        <div class="flex items-center gap-3">
+          <template v-if="ctrl.hasResults.value && ctrl.summary.value">
+            <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 dark:bg-green-950 dark:text-green-400">
+              <i class="pi pi-check text-[10px]" />
+              {{ ctrl.summary.value.success_count }}
+            </span>
+            <span
+              v-if="ctrl.summary.value.error_count > 0"
+              class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-400"
+            >
+              <i class="pi pi-times text-[10px]" />
+              {{ ctrl.summary.value.error_count }}
+            </span>
+          </template>
+          <span class="text-xs text-muted">{{ ctrl.filteredResults.value.length.toLocaleString("en-US") }} procedures</span>
+        </div>
+      </div>
+      <p v-if="ctrl.error.value" class="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{{ ctrl.error.value }}</p>
       <DataTable
         class="app-data-table min-h-0"
         :empty-message="ctrl.loading.value ? 'Loading...' : 'No stored procedures found.'"

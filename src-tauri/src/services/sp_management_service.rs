@@ -78,6 +78,7 @@ fn all_procedures() -> Vec<(&'static str, &'static str)> {
         ("sp_menu_permission_user_sync", include_str!("../../../docs/store-procedure/sp_menu_permission_user_sync.sql")),
         ("sp_menu_permission_effective_select", include_str!("../../../docs/store-procedure/sp_menu_permission_effective_select.sql")),
         // === AWS Storage ===
+        ("sp_aws_storage_select_all", include_str!("../../../docs/store-procedure/sp_aws_storage_select_all.sql")),
         ("sp_aws_storage_select_by_upload", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_upload.sql")),
         ("sp_aws_storage_select_by_download", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_download.sql")),
         ("sp_aws_storage_select_by_codes", include_str!("../../../docs/store-procedure/sp_aws_storage_select_by_codes.sql")),

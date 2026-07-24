@@ -1,6 +1,6 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
+use crate::models::s3::{AwsStorage, BugFolderItem, BugFolderTab, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3Object, S3OperationResult, ScannedFile, StorageBugFolders, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
 use crate::utils::app_config;
 
 use aws_config::Region;
@@ -90,6 +90,17 @@ pub fn save_config(config: &S3Config) -> AppResult<()> {
         AppError::new(format!("Failed to write config.ini at {}: {e}", path.display()))
     })?;
     Ok(())
+}
+
+pub fn get_local_sync_workdir() -> AppResult<String> {
+    let path = app_config::config_path();
+    let ini = Ini::load_from_file(&path).map_err(|e| {
+        AppError::new(format!("Failed to load config.ini at {}: {e}", path.display()))
+    })?;
+    let section = ini.section(Some("S3 bucket")).ok_or_else(|| {
+        AppError::new("Section [S3 bucket] not found in config.ini.")
+    })?;
+    Ok(section.get("S3_LOCAL_SYNC_WORKDIR").unwrap_or("").to_string())
 }
 
 pub fn check_config() -> AppResult<()> {
@@ -320,6 +331,74 @@ async fn list_all_objects_recursive(
     }
 
     Ok(keys)
+}
+
+async fn list_subfolders_with_dates(
+    client: &Client,
+    bucket: &str,
+    prefix: &str,
+) -> HashMap<String, String> {
+    let mut folder_dates: HashMap<String, String> = HashMap::new();
+    let mut continuation_token: Option<String> = None;
+
+    loop {
+        let mut request = client
+            .list_objects_v2()
+            .bucket(bucket)
+            .prefix(prefix);
+
+        if let Some(ref token) = continuation_token {
+            request = request.continuation_token(token);
+        }
+
+        let output = match request.send().await {
+            Ok(o) => o,
+            Err(_) => break,
+        };
+
+        for obj in output.contents() {
+            let key = match obj.key() {
+                Some(k) => k,
+                None => continue,
+            };
+            let rest = match key.strip_prefix(prefix) {
+                Some(r) => r,
+                None => continue,
+            };
+            let folder_name = match rest.find('/') {
+                Some(pos) => &rest[..pos],
+                None => continue,
+            };
+            if folder_name.is_empty() {
+                continue;
+            }
+
+            let last_modified = obj
+                .last_modified()
+                .map(|dt| {
+                    dt.fmt(aws_sdk_s3::primitives::DateTimeFormat::DateTime)
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+
+            folder_dates
+                .entry(folder_name.to_string())
+                .and_modify(|existing| {
+                    if last_modified > *existing {
+                        *existing = last_modified.clone();
+                    }
+                })
+                .or_insert(last_modified);
+        }
+
+        if output.is_truncated() == Some(true) {
+            continuation_token = output.next_continuation_token().map(String::from);
+        } else {
+            break;
+        }
+    }
+
+    folder_dates
 }
 
 pub async fn upload_file(
@@ -910,14 +989,11 @@ pub async fn download_by_storage(
     let time_hm = now.format("%H%M").to_string();
     let time_hms = now.format("%H%M%S").to_string();
 
-    let sync_path = format!(
-        "{}/{}/{}/{}",
-        local_path.trim_end_matches(['/', '\\']),
-        storage.name,
-        date_ymd,
-        time_hm
-    );
-    let dest = Path::new(&sync_path);
+    let dest = Path::new(&local_path)
+        .join(&storage.name)
+        .join(&date_ymd)
+        .join(&time_hm);
+    let sync_path = dest.to_string_lossy().to_string();
 
     let mut processed: u32 = 0;
     let mut failed: u32 = 0;
@@ -1282,6 +1358,146 @@ pub async fn move_browser_objects(
         processed,
         failed,
     })
+}
+
+pub async fn list_all_bug_folders() -> AppResult<Vec<StorageBugFolders>> {
+    let storages = crate::database::aws_storage_store::list_by_download().await?;
+    if storages.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+
+    let mut results = Vec::new();
+    for storage in storages {
+        let prefix = if storage.subscribe.is_empty() {
+            format!("{}/{}/", work_folder, storage.name)
+        } else {
+            format!("{}/{}/{}/", work_folder, storage.name, storage.subscribe)
+        };
+
+        let bugs = match client
+            .list_objects_v2()
+            .bucket(&bucket)
+            .prefix(&prefix)
+            .delimiter("/")
+            .send()
+            .await
+        {
+            Ok(output) => output
+                .common_prefixes()
+                .iter()
+                .filter_map(|p| p.prefix())
+                .filter_map(|p| {
+                    p.strip_prefix(&prefix)
+                        .map(|s| s.trim_end_matches('/').to_string())
+                })
+                .filter(|s| !s.is_empty())
+                .collect(),
+            Err(_) => Vec::new(),
+        };
+
+        results.push(StorageBugFolders { storage, bugs });
+    }
+
+    Ok(results)
+}
+
+pub async fn list_bug_folder_tabs() -> AppResult<Vec<BugFolderTab>> {
+    let storages = crate::database::aws_storage_store::list_all().await?;
+    if storages.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let work_folder = get_work_folder("CORRECT_BUG_TEST").await?;
+    let config = load_config_from_ini()?;
+    let (client, bucket) = build_client(&config)?;
+
+    struct GroupEntry {
+        name: String,
+        name_alias: String,
+        subscribes: Vec<String>,
+        excludes: std::collections::HashSet<String>,
+    }
+
+    let mut groups: Vec<GroupEntry> = Vec::new();
+    for s in &storages {
+        let entry = groups.iter_mut().find(|g| g.name == s.name);
+        if let Some(entry) = entry {
+            if !s.subscribe.is_empty() {
+                entry.subscribes.push(s.subscribe.clone());
+            }
+            for ex in &s.exclude_subscribe {
+                entry.excludes.insert(ex.clone());
+            }
+        } else {
+            let mut excludes = std::collections::HashSet::new();
+            for ex in &s.exclude_subscribe {
+                excludes.insert(ex.clone());
+            }
+            let subscribes = if s.subscribe.is_empty() {
+                Vec::new()
+            } else {
+                vec![s.subscribe.clone()]
+            };
+            groups.push(GroupEntry {
+                name: s.name.clone(),
+                name_alias: s.name_alias.clone(),
+                subscribes,
+                excludes,
+            });
+        }
+    }
+
+    let mut tabs = Vec::new();
+    for GroupEntry { name, name_alias, subscribes, excludes } in &groups {
+        let mut items: Vec<BugFolderItem> = Vec::new();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        let skip_set: std::collections::HashSet<&str> = subscribes
+            .iter()
+            .map(|s| s.as_str())
+            .chain(excludes.iter().map(|s| s.as_str()))
+            .collect();
+
+        let parent_prefix = format!("{}/{}/", work_folder, name);
+        let parent_dates = list_subfolders_with_dates(&client, &bucket, &parent_prefix).await;
+        for (folder, date) in &parent_dates {
+            if !skip_set.contains(folder.as_str()) && seen.insert(folder.clone()) {
+                items.push(BugFolderItem {
+                    bug_no: folder.clone(),
+                    in_subscribe: false,
+                    last_modified: date.clone(),
+                });
+            }
+        }
+
+        for sub in subscribes {
+            let sub_prefix = format!("{}/{}/{}/", work_folder, name, sub);
+            let sub_dates = list_subfolders_with_dates(&client, &bucket, &sub_prefix).await;
+            for (folder, date) in &sub_dates {
+                if seen.insert(folder.clone()) {
+                    items.push(BugFolderItem {
+                        bug_no: folder.clone(),
+                        in_subscribe: true,
+                        last_modified: date.clone(),
+                    });
+                }
+            }
+        }
+
+        items.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+
+        tabs.push(BugFolderTab {
+            name: name.clone(),
+            name_alias: if name_alias.is_empty() { name.clone() } else { name_alias.clone() },
+            items,
+        });
+    }
+
+    Ok(tabs)
 }
 
 pub async fn list_delete_options(destination_code: String) -> AppResult<Vec<AwsStorage>> {

@@ -12,6 +12,7 @@ export type MenuKey =
   | "cloudS3"
   | "cloudS3Upload"
   | "cloudS3Download"
+  | "cloudS3BugFolders"
   | "cloudS3DownloadHistory"
   | "cloudS3UploadHistory"
   | "aiChat"

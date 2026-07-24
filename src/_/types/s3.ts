@@ -40,6 +40,23 @@ export interface AwsStorage {
   excludeSubscribe: string[];
 }
 
+export interface StorageBugFolders {
+  storage: AwsStorage;
+  bugs: string[];
+}
+
+export interface BugFolderItem {
+  bugNo: string;
+  inSubscribe: boolean;
+  lastModified: string;
+}
+
+export interface BugFolderTab {
+  name: string;
+  nameAlias: string;
+  items: BugFolderItem[];
+}
+
 export interface UploadFileRequest {
   parentName: string;
   name: string;

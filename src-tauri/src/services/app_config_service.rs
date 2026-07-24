@@ -6,7 +6,7 @@ use crate::models::app_config::{
     AppConfigData, ConfigEntry, ConfigSection, SaveAppConfigRequest,
 };
 use crate::utils::app_config::config_path;
-use ini::Ini;
+use ini::{EscapePolicy, Ini, WriteOption};
 
 /// Đọc toàn bộ config.ini, trả về danh sách sections kèm đường dẫn file.
 pub fn get_app_config() -> AppResult<AppConfigData> {
@@ -20,7 +20,7 @@ pub fn get_app_config() -> AppResult<AppConfigData> {
         });
     }
 
-    let ini = Ini::load_from_file(&path).map_err(|e| {
+    let ini = Ini::load_from_file_noescape(&path).map_err(|e| {
         AppError::new(format!("Failed to load config.ini: {e}"))
     })?;
 
@@ -71,7 +71,11 @@ pub fn save_app_config(request: SaveAppConfigRequest) -> AppResult<AppConfigData
         }
     }
 
-    ini.write_to_file(&path).map_err(|e| {
+    let write_opt = WriteOption {
+        escape_policy: EscapePolicy::Nothing,
+        ..Default::default()
+    };
+    ini.write_to_file_opt(&path, write_opt).map_err(|e| {
         AppError::new(format!("Failed to write config.ini: {e}"))
     })?;
 

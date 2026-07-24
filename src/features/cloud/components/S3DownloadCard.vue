@@ -6,6 +6,7 @@ import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import type { AwsStorage } from "@/_/types/s3";
+import { s3GetLocalSyncWorkdir } from "@/tauri/commands/s3";
 
 const props = defineProps<{
   awsStorage: AwsStorage;
@@ -20,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   refreshed: [];
   downloaded: [path: string, historyId: number | null];
+  moved: [];
 }>();
 
 const STORAGE_KEY = "download_state";
@@ -57,17 +59,28 @@ function toggle() {
   expanded.value = !expanded.value;
 }
 
-function loadSavedPath() {
+async function loadSavedPath() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const state = JSON.parse(saved);
       if (state[props.awsStorage.code]?.localPathSync) {
         destinationPath.value = state[props.awsStorage.code].localPathSync;
+        return;
       }
     }
   } catch {
     // ignore
+  }
+  if (!destinationPath.value) {
+    try {
+      const workdir = await s3GetLocalSyncWorkdir();
+      if (workdir) {
+        destinationPath.value = workdir;
+      }
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -106,8 +119,8 @@ async function handleDownload() {
   openDownloadModal();
 }
 
-function openDownloadModal() {
-  loadSavedPath();
+async function openDownloadModal() {
+  await loadSavedPath();
   errorCheck.value = "";
   showDownloadModal.value = true;
 }
@@ -178,6 +191,7 @@ async function handleConfirmMove() {
   }
   await loadItems();
   emit("refreshed");
+  emit("moved");
 }
 
 watch(showMoveWarning, (visible) => {

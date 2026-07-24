@@ -87,9 +87,11 @@ use commands::app_config_commands::{
 };
 use commands::s3_commands::{
     s3_check_config, s3_check_download_available, s3_create_folder, s3_delete_by_storage,
+    s3_get_local_sync_workdir, s3_list_bug_folder_tabs,
     s3_delete_objects, s3_delete_uploaded_items, s3_download_by_storage, s3_download_objects,
     s3_get_browser_allowed_prefixes, s3_get_config, s3_get_download_history,
-    s3_get_download_list, s3_list_delete_options, s3_list_download_storages, s3_list_objects,
+    s3_get_download_list, s3_list_all_bug_folders, s3_list_all_bug_folders_by_code,
+    s3_list_delete_options, s3_list_download_storages, s3_list_objects,
     s3_list_upload_storages, s3_move_browser_objects, s3_move_objects, s3_save_config,
     s3_scan_local_folder, s3_scan_upload_folder, s3_scan_upload_folders, s3_search_download_history,
     s3_search_upload_history, s3_test_connection, s3_update_download_moved_local,
@@ -240,6 +242,7 @@ pub fn run() {
             // === S3 commands ===
             s3_check_config,
             s3_get_config,
+            s3_get_local_sync_workdir,
             s3_save_config,
             s3_test_connection,
             s3_list_objects,
@@ -253,6 +256,9 @@ pub fn run() {
             s3_scan_local_folder,
             s3_scan_upload_folder,
             s3_scan_upload_folders,
+            s3_list_all_bug_folders,
+            s3_list_all_bug_folders_by_code,
+            s3_list_bug_folder_tabs,
             s3_list_delete_options,
             s3_delete_uploaded_items,
             s3_list_download_storages,

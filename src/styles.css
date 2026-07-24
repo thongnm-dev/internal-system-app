@@ -287,3 +287,74 @@
 .app-data-table.p-datatable .p-datatable-tbody > tr > td {
   border-color: rgb(var(--color-border));
 }
+
+/* PrimeVue DataTable — align with app theme tokens */
+.p-datatable {
+  background: rgb(var(--color-panel)) !important;
+  color: rgb(var(--color-ink)) !important;
+}
+
+.p-datatable .p-datatable-table-container {
+  background: rgb(var(--color-panel)) !important;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  background: rgb(var(--color-canvas)) !important;
+  color: rgb(var(--color-ink)) !important;
+  border-color: rgb(var(--color-border)) !important;
+}
+
+.p-datatable .p-datatable-tbody > tr {
+  background: rgb(var(--color-panel)) !important;
+  color: rgb(var(--color-text-secondary)) !important;
+}
+
+.p-datatable .p-datatable-tbody > tr:nth-child(even) {
+  background: rgb(var(--color-canvas)) !important;
+}
+
+.p-datatable .p-datatable-tbody > tr > td {
+  border-color: rgb(var(--color-border)) !important;
+}
+
+.p-datatable .p-datatable-tbody > tr:hover {
+  background: rgb(var(--color-sidebar-hover-bg)) !important;
+}
+
+.p-datatable .p-datatable-tfoot > tr > td,
+.p-datatable .p-datatable-footer {
+  background: rgb(var(--color-panel)) !important;
+  color: rgb(var(--color-text-muted)) !important;
+  border-color: rgb(var(--color-border)) !important;
+}
+
+/* PrimeVue Tabs — align with app theme tokens */
+.p-tabs {
+  background: rgb(var(--color-panel)) !important;
+}
+
+.p-tablist {
+  background: rgb(var(--color-panel)) !important;
+}
+
+.p-tab {
+  background: rgb(var(--color-panel)) !important;
+  color: rgb(var(--color-text-secondary)) !important;
+}
+
+.p-tab:hover {
+  color: rgb(var(--color-ink)) !important;
+}
+
+.p-tab[data-p-active="true"] {
+  color: rgb(var(--color-ink)) !important;
+}
+
+.p-tabpanels {
+  background: rgb(var(--color-panel)) !important;
+  color: rgb(var(--color-ink)) !important;
+}
+
+.p-tabpanel {
+  background: rgb(var(--color-panel)) !important;
+}

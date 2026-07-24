@@ -1,6 +1,11 @@
-use crate::models::s3::{AwsStorage, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
+use crate::models::s3::{AwsStorage, BugFolderTab, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3OperationResult, ScannedFile, StorageBugFolders, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
 use std::collections::HashMap;
 use crate::services::s3_service;
+
+#[tauri::command]
+pub fn s3_get_local_sync_workdir() -> Result<String, String> {
+    s3_service::get_local_sync_workdir().map_err(crate::app::error::log_err)
+}
 
 #[tauri::command]
 pub fn s3_check_config() -> Result<(), String> {
@@ -125,6 +130,27 @@ pub async fn s3_search_upload_history(
     params: UploadHistorySearchParams,
 ) -> Result<Vec<UploadHistorySearchItem>, String> {
     s3_service::search_upload_history(params)
+        .await
+        .map_err(crate::app::error::log_err)
+}
+
+#[tauri::command]
+pub async fn s3_list_all_bug_folders() -> Result<Vec<StorageBugFolders>, String> {
+    s3_service::list_all_bug_folders()
+        .await
+        .map_err(crate::app::error::log_err)
+}
+
+#[tauri::command]
+pub async fn s3_list_bug_folder_tabs() -> Result<Vec<BugFolderTab>, String> {
+    s3_service::list_bug_folder_tabs()
+        .await
+        .map_err(crate::app::error::log_err)
+}
+
+#[tauri::command]
+pub async fn s3_list_all_bug_folders_by_code(code: String) -> Result<Vec<String>, String> {
+    s3_service::get_download_list(code)
         .await
         .map_err(crate::app::error::log_err)
 }

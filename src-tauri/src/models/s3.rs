@@ -149,6 +149,29 @@ pub struct UploadHistorySearchParams {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StorageBugFolders {
+    pub storage: AwsStorage,
+    pub bugs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BugFolderItem {
+    pub bug_no: String,
+    pub in_subscribe: bool,
+    pub last_modified: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BugFolderTab {
+    pub name: String,
+    pub name_alias: String,
+    pub items: Vec<BugFolderItem>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UploadHistorySearchItem {
     pub upload_ymd: String,
     pub aws_name: String,

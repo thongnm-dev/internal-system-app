@@ -1,5 +1,5 @@
 import { safeInvoke } from "./_base";
-import type { AwsStorage, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams } from "@/_/types/s3";
+import type { AwsStorage, BugFolderTab, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3ListResult, S3OperationResult, ScannedFile, StorageBugFolders, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams } from "@/_/types/s3";
 
 export type S3Config = {
   accessKeyId: string;
@@ -11,6 +11,10 @@ export type S3Config = {
 
 export function s3CheckConfig() {
   return safeInvoke<void>("s3_check_config");
+}
+
+export function s3GetLocalSyncWorkdir() {
+  return safeInvoke<string>("s3_get_local_sync_workdir");
 }
 
 export function s3GetConfig() {
@@ -63,6 +67,18 @@ export function s3UploadFiles(files: UploadFileRequest[], storageName: string, s
 
 export function s3SearchUploadHistory(params: UploadHistorySearchParams) {
   return safeInvoke<UploadHistorySearchItem[]>("s3_search_upload_history", { params });
+}
+
+export function s3ListAllBugFolders() {
+  return safeInvoke<StorageBugFolders[]>("s3_list_all_bug_folders");
+}
+
+export function s3ListBugFolderTabs() {
+  return safeInvoke<BugFolderTab[]>("s3_list_bug_folder_tabs");
+}
+
+export function s3ListAllBugFoldersByCode(code: string) {
+  return safeInvoke<string[]>("s3_list_all_bug_folders_by_code", { code });
 }
 
 export function s3ListDeleteOptions(destinationCode: string) {

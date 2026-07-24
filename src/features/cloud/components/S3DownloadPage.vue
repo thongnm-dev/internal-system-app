@@ -8,9 +8,10 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import S3DownloadCard from "./S3DownloadCard.vue";
 import S3ConfigError from "./S3ConfigError.vue";
+import S3BugFoldersDialog from "./S3BugFoldersDialog.vue";
 import { useS3Download } from "../composables/useS3Download";
 import { useS3ConfigGuard } from "../composables/useS3ConfigGuard";
-import { explorerReadDir, explorerCopyBugs } from "@/tauri/commands/explorer";
+import { explorerReadDir, explorerCopyBugs, explorerOpen } from "@/tauri/commands/explorer";
 import type { FileEntry } from "@/tauri/commands/explorer";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useToast } from "@/shared/composables/useToast";
@@ -47,6 +48,8 @@ const COPY_DEST_KEY = "copy_dest_state";
 
 const lastDownloadPath = ref("");
 const lastDownloadHistoryId = ref<number | null>(null);
+const showS3ConfirmDialog = ref(false);
+const showBugFoldersDialog = ref(false);
 const showCopyDialog = ref(false);
 const copyEntries = ref<FileEntry[]>([]);
 const copyDestPath = ref("");
@@ -57,6 +60,10 @@ const copySourcePath = ref("");
 function handleDownloaded(path: string, historyId: number | null) {
   lastDownloadPath.value = path;
   lastDownloadHistoryId.value = historyId;
+}
+
+function handleMoved() {
+  showS3ConfirmDialog.value = true;
 }
 
 function loadSavedCopyDest() {
@@ -175,6 +182,7 @@ function formatTime(hms: string): string {
           :delete-objects="deleteObjects"
           @refreshed="checkAvailability"
           @downloaded="(path, historyId) => handleDownloaded(path, historyId)"
+          @moved="handleMoved"
         />
       </div>
 
@@ -195,6 +203,14 @@ function formatTime(hms: string): string {
           severity="info"
           size="small"
           @click="openCopyDialog"
+        />
+        <Button
+          v-tooltip.top="'Show in folder'"
+          icon="pi pi-external-link"
+          severity="secondary"
+          size="small"
+          text
+          @click="explorerOpen(lastDownloadPath)"
         />
       </div>
     </template>
@@ -265,20 +281,30 @@ function formatTime(hms: string): string {
             <span class="font-mono text-xs break-all">{{ data.syncPath }}</span>
           </template>
         </Column>
-        <Column header="" :style="{ width: '80px' }">
+        <Column header="" :style="{ width: '110px' }">
           <template #body="{ data }">
-            <Button
-              v-if="!data.isMovedAtLocal"
-              label="Copy"
-              icon="pi pi-copy"
-              severity="info"
-              size="small"
-              text
-              @click="openCopyDialogForHistory(data.id, data.syncPath)"
-            />
-            <span v-else class="text-xs text-green-600">
-              <i class="pi pi-check mr-1" />Copied
-            </span>
+            <div class="flex items-center gap-1">
+              <Button
+                v-if="!data.isMovedAtLocal"
+                label="Copy"
+                icon="pi pi-copy"
+                severity="info"
+                size="small"
+                text
+                @click="openCopyDialogForHistory(data.id, data.syncPath)"
+              />
+              <span v-else class="text-xs text-green-600">
+                <i class="pi pi-check mr-1" />Copied
+              </span>
+              <Button
+                v-tooltip.top="'Show in folder'"
+                icon="pi pi-external-link"
+                severity="secondary"
+                size="small"
+                text
+                @click="explorerOpen(data.syncPath)"
+              />
+            </div>
           </template>
         </Column>
       </DataTable>
@@ -300,6 +326,29 @@ function formatTime(hms: string): string {
         <Button label="Đóng" @click="dismissOfflineDialog()" />
       </template>
     </Dialog>
+
+    <!-- S3 Status Confirm Dialog -->
+    <Dialog
+      v-model:visible="showS3ConfirmDialog"
+      header="Xác nhận"
+      :modal="true"
+      :closable="true"
+      :style="{ width: '28rem' }"
+    >
+      <div class="flex items-center gap-3">
+        <i class="pi pi-question-circle text-3xl text-blue-500" />
+        <span class="text-sm text-surface-600 dark:text-surface-400">
+          Bạn có muốn mở màn hình để xem trạng thái trên S3 không?
+        </span>
+      </div>
+      <template #footer>
+        <Button label="Cancel" icon="pi pi-times" severity="secondary" @click="showS3ConfirmDialog = false" />
+        <Button label="OK" icon="pi pi-check" @click="showS3ConfirmDialog = false; showBugFoldersDialog = true" />
+      </template>
+    </Dialog>
+
+    <!-- S3 Bug Folders Dialog -->
+    <S3BugFoldersDialog v-if="showBugFoldersDialog" @close="showBugFoldersDialog = false" />
 
     <!-- Copy Dialog -->
     <Dialog
