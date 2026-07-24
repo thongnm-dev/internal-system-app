@@ -771,8 +771,22 @@ pub async fn run_poll_loop(app: AppHandle) {
 }
 
 /// Mở terminal với `CLAUDE_CONFIG_DIR` trong working directory chỉ định.
-pub fn open_terminal(config_dir: &str, work_dir: &str) -> AppResult<()> {
-    spawn_terminal(config_dir, work_dir, Some("claude --dangerously-skip-permissions"))
+/// `prompt`, nếu có, được truyền sẵn cho `claude` như một câu lệnh skill (vd. `/translator-qa QA20260724`).
+pub fn open_terminal(config_dir: &str, work_dir: &str, prompt: Option<&str>) -> AppResult<()> {
+    let command = build_claude_command(prompt);
+    spawn_terminal(config_dir, work_dir, Some(&command))
+}
+
+/// Ghép câu lệnh `claude` với prompt đã sanitize (loại bỏ dấu ngoặc kép để tránh phá vỡ quoting theo OS).
+fn build_claude_command(prompt: Option<&str>) -> String {
+    let mut command = String::from("claude --dangerously-skip-permissions");
+    if let Some(p) = prompt {
+        let sanitized = p.trim().replace('"', "");
+        if !sanitized.is_empty() {
+            command.push_str(&format!(" \"{sanitized}\""));
+        }
+    }
+    command
 }
 
 /// Mở terminal chạy `claude /login` với `CLAUDE_CONFIG_DIR` tuỳ chỉnh.
@@ -800,15 +814,25 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
 
     #[cfg(target_os = "windows")]
     {
-        let mut parts = format!("cd /d {expanded_wd}");
+        // Ghi ra file .bat tạm thay vì nhồi cả câu lệnh (có thể chứa dấu ngoặc kép của prompt)
+        // vào một argument của `cmd /k`: cmd.exe không tự bóc tách quote lồng nhau theo kiểu
+        // CommandLineToArgvW mà Rust dùng để escape arguments, nên quote bị lệch/dư khi nhồi trực tiếp.
+        let mut script = format!("@echo off\r\ncd /d \"{expanded_wd}\"\r\n");
         if !is_default {
-            parts.push_str(&format!("&& set CLAUDE_CONFIG_DIR={expanded_dir}"));
+            script.push_str(&format!("set CLAUDE_CONFIG_DIR={expanded_dir}\r\n"));
         }
         if let Some(cmd) = command {
-            parts.push_str(&format!("&& {cmd}"));
+            script.push_str(&format!("{cmd}\r\n"));
         }
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let script_path = std::env::temp_dir()
+            .join(format!("ai_usage_terminal_{}_{seq}.bat", std::process::id()));
+        std::fs::write(&script_path, script)
+            .map_err(|e| AppError::new(&format!("Không thể tạo script terminal: {e}")))?;
         std::process::Command::new("cmd")
-            .args(["/c", "start", "cmd", "/k", &parts])
+            .args(["/c", "start", "cmd", "/k"])
+            .arg(&script_path)
             .spawn()
             .map_err(|e| AppError::new(&format!("Không thể mở terminal: {e}")))?;
     }

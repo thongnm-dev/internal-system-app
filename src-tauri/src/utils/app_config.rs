@@ -68,3 +68,19 @@ pub fn config_path() -> PathBuf {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest.join("config").join("config.ini")
 }
+
+/// Thư mục `data` cùng cấp với thư mục `config` (kế bên .exe ở production, hoặc
+/// `src-tauri/data` ở development khi không lấy được exe path).
+///
+/// Khác với [`data_dir`] (AppData `%LOCALAPPDATA%`), thư mục này dùng cho các file
+/// lịch sử làm việc gắn với từng bản cài đặt (ví dụ: state của màn AI Translate Cowork).
+///
+/// Tự tạo thư mục nếu chưa tồn tại.
+pub fn local_data_dir() -> PathBuf {
+    let dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("data")))
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data"));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}

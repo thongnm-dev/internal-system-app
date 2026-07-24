@@ -24,9 +24,9 @@ function toggleTheme() {
 <template>
   <header class="flex items-start justify-between gap-4">
     <div>
-      <h2 class="text-2xl font-bold leading-tight">{{ route.title }}</h2>
-      <p class="mt-2 text-sm text-secondary">{{ route.subtitle }}</p>
-      <nav class="mt-3 flex items-center gap-2 text-xs font-semibold text-muted" aria-label="Breadcrumb">
+      <h2 class="text-xl font-bold leading-tight">{{ route.title }}</h2>
+      <p class="mt-[2px] text-[11px] text-secondary">{{ route.subtitle }}</p>
+      <nav class="mt-2 flex items-center gap-2 text-xs font-semibold text-muted" aria-label="Breadcrumb">
         <span>Home</span>
         <template v-if="route.breadcrumbs?.length">
           <template v-for="(crumb, i) in route.breadcrumbs" :key="i">

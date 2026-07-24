@@ -7,7 +7,6 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
-import SelectButton from "primevue/selectbutton";
 import { ref } from "vue";
 import { useStoreProcedure } from "../composables/useStoreProcedure";
 import { useToast } from "@/shared/composables/useToast";
@@ -24,7 +23,7 @@ function openConfirm() {
 
 async function handleExecute() {
   confirmExecute.value = false;
-  const allOk = await ctrl.executeAll();
+  const allOk = await ctrl.executeFiltered();
   if (allOk) {
     toast.success(`All ${ctrl.summary.value?.total} stored procedures executed successfully.`);
   } else {
@@ -42,12 +41,6 @@ async function handleExecuteSingle(name: string) {
     toast.error(`${name} execution failed.`);
   }
 }
-
-const statusOptions = [
-  { label: "All", value: "all" },
-  { label: "Success", value: "success" },
-  { label: "Error", value: "error" },
-];
 
 onMounted(() => ctrl.init());
 </script>
@@ -78,7 +71,7 @@ onMounted(() => ctrl.init());
     <!-- Search fieldset -->
     <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Search" toggleable>
       <div class="grid gap-3">
-        <div class="grid gap-3 lg:grid-cols-3">
+        <div class="grid gap-3 lg:grid-cols-2">
           <label>
             <span class="text-xs font-bold text-muted">Procedure Name</span>
             <InputText class="mt-1 w-full" placeholder="Name" :model-value="ctrl.filterText.value" @update:model-value="ctrl.filterText.value = $event as string" />
@@ -86,19 +79,6 @@ onMounted(() => ctrl.init());
           <label>
             <span class="text-xs font-bold text-muted">Group</span>
             <Select class="mt-1 w-full" placeholder="All groups" :options="ctrl.groupOptions.value" :model-value="ctrl.filterGroup.value" show-clear @update:model-value="ctrl.filterGroup.value = $event ?? ''" />
-          </label>
-          <label v-if="ctrl.hasResults.value">
-            <span class="text-xs font-bold text-muted">Status</span>
-            <div class="mt-1">
-              <SelectButton
-                :model-value="ctrl.filterStatus.value"
-                :options="statusOptions"
-                option-label="label"
-                option-value="value"
-                :allow-empty="false"
-                @update:model-value="ctrl.filterStatus.value = $event"
-              />
-            </div>
           </label>
         </div>
         <div class="flex items-center justify-end gap-2">
@@ -156,47 +136,6 @@ onMounted(() => ctrl.init());
               </span>
               <span class="font-mono text-sm font-semibold text-ink">{{ data.name }}</span>
             </div>
-          </template>
-        </Column>
-        <Column header="Status" header-class="text-center" body-class="text-center" :style="{ width: '120px' }">
-          <template #body="{ data }">
-            <template v-if="ctrl.hasResults.value">
-              <span
-                v-if="data.success"
-                class="inline-flex items-center gap-1 rounded-md bg-green-50 px-2.5 py-1 text-xs font-bold text-green-700 dark:bg-green-950 dark:text-green-400"
-              >
-                <i class="pi pi-check-circle text-[11px]" />
-                OK
-              </span>
-              <span
-                v-else
-                class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700 dark:bg-red-950 dark:text-red-400"
-              >
-                <i class="pi pi-times-circle text-[11px]" />
-                Error
-              </span>
-            </template>
-            <span
-              v-else
-              class="inline-flex items-center gap-1 rounded-md bg-canvas px-2.5 py-1 text-xs text-muted"
-            >
-              <i class="pi pi-minus text-[11px]" />
-              Pending
-            </span>
-          </template>
-        </Column>
-        <Column header="Message" :style="{ minWidth: '200px' }">
-          <template #body="{ data }">
-            <span
-              v-if="ctrl.hasResults.value && data.message && data.message !== 'OK'"
-              :class="[
-                'text-xs',
-                data.success ? 'text-muted' : 'text-red-600 dark:text-red-400',
-              ]"
-            >
-              {{ data.message }}
-            </span>
-            <span v-else class="text-xs text-muted">—</span>
           </template>
         </Column>
         <Column header-class="text-center" body-class="text-center" :style="{ width: '120px' }">
@@ -270,8 +209,8 @@ onMounted(() => ctrl.init());
       </template>
       <div class="space-y-3">
         <p class="text-sm text-secondary">
-          This will run <strong>CREATE OR REPLACE</strong> for all
-          <strong>{{ ctrl.procedures.value.length }}</strong> stored procedures
+          This will run <strong>CREATE OR REPLACE</strong> for
+          <strong>{{ ctrl.filteredResults.value.length }}</strong> stored procedures
           against the connected database.
         </p>
         <p class="text-xs text-muted">

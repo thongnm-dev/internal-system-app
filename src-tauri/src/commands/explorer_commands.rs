@@ -77,3 +77,14 @@ pub async fn explorer_paste(
     .await
     .map_err(crate::app::error::log_err)?
 }
+
+/// Dán file/folder đang có trên OS clipboard (vd. Ctrl+C trong File Explorer) vào `dest_dir`.
+/// Trả về số lượng mục đã dán.
+#[tauri::command]
+pub async fn explorer_paste_from_os_clipboard(dest_dir: String) -> Result<usize, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        explorer_service::paste_from_os_clipboard(&dest_dir)
+    })
+    .await
+    .map_err(crate::app::error::log_err)?
+}

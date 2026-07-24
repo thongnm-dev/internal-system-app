@@ -5,7 +5,6 @@ import {
   listStoredProcedures,
   getStoredProcedureContent,
   executeSingleStoredProcedure,
-  executeStoredProcedures,
 } from "@/tauri/commands/app-config";
 import type { SpInfo, SpExecutionResult, SpExecutionSummary } from "@/_/types/app-config";
 
@@ -49,7 +48,6 @@ export function useStoreProcedure() {
   const viewingContent = ref("");
   const viewingLoading = ref(false);
   const filterText = ref("");
-  const filterStatus = ref<"all" | "success" | "error">("all");
   const filterGroup = ref("");
 
   const groupOptions = computed(() => {
@@ -59,7 +57,7 @@ export function useStoreProcedure() {
   });
 
   const filteredResults = computed(() => {
-    let list = results.value.length > 0 ? results.value : procedures.value.map((p) => ({
+    let list = procedures.value.map((p) => ({
       name: p.name,
       success: true,
       message: "",
@@ -72,12 +70,6 @@ export function useStoreProcedure() {
 
     if (filterGroup.value) {
       list = list.filter((r) => resolveGroup(r.name) === filterGroup.value);
-    }
-
-    if (filterStatus.value === "success" && results.value.length > 0) {
-      list = list.filter((r) => r.success);
-    } else if (filterStatus.value === "error" && results.value.length > 0) {
-      list = list.filter((r) => !r.success);
     }
 
     return list;
@@ -98,16 +90,29 @@ export function useStoreProcedure() {
     }
   }
 
-  async function executeAll(): Promise<boolean> {
+  async function executeFiltered(): Promise<boolean> {
     if (!canUseTauriRuntime()) return false;
+    const names = filteredResults.value.map((r) => r.name);
+    if (names.length === 0) return true;
     executing.value = true;
     error.value = "";
     globalLoading.start();
     try {
-      const data = await executeStoredProcedures();
-      summary.value = data;
-      results.value = data.results;
-      return data.error_count === 0;
+      const execResults: SpExecutionResult[] = [];
+      let successCount = 0;
+      for (const name of names) {
+        const result = await executeSingleStoredProcedure(name);
+        execResults.push(result);
+        if (result.success) successCount++;
+      }
+      summary.value = {
+        total: names.length,
+        success_count: successCount,
+        error_count: names.length - successCount,
+        results: execResults,
+      };
+      results.value = execResults;
+      return names.length === successCount;
     } catch (e) {
       error.value = String(e);
       return false;
@@ -182,13 +187,11 @@ export function useStoreProcedure() {
   function resetFilters() {
     filterText.value = "";
     filterGroup.value = "";
-    filterStatus.value = "all";
   }
 
   function resetResults() {
     results.value = [];
     summary.value = null;
-    filterStatus.value = "all";
   }
 
   function init() {
@@ -204,7 +207,6 @@ export function useStoreProcedure() {
     error,
     filterText,
     filterGroup,
-    filterStatus,
     groupOptions,
     filteredResults,
     hasResults,
@@ -212,7 +214,7 @@ export function useStoreProcedure() {
     viewingName,
     viewingContent,
     viewingLoading,
-    executeAll,
+    executeFiltered,
     executeSingle,
     viewScript,
     closeViewer,

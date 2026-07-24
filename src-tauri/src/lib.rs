@@ -48,8 +48,9 @@ use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
     explorer_copy_bugs, explorer_create_file, explorer_create_folder, explorer_delete,
-    explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_paste, explorer_read_dir,
-    explorer_read_text_file, explorer_rename, explorer_search,
+    explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_paste,
+    explorer_paste_from_os_clipboard, explorer_read_dir, explorer_read_text_file, explorer_rename,
+    explorer_search,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::menu_permission_commands::{
@@ -75,6 +76,9 @@ use commands::ai_task_commands::{
     ai_task_create, ai_task_list, ai_task_update,
     ai_task_wf_proc_create, ai_task_wf_proc_list, ai_task_wf_proc_update,
     ai_task_wf_proc_step_create, ai_task_wf_proc_step_list, ai_task_wf_proc_step_update,
+};
+use commands::ai_translate_cowork_commands::{
+    ai_translate_cowork_get_state, ai_translate_cowork_save_state,
 };
 use commands::schedule_commands::read_schedule_excel;
 use commands::sql_editor_commands::{
@@ -291,6 +295,7 @@ pub fn run() {
             explorer_create_folder,
             explorer_ensure_dir,
             explorer_paste,
+            explorer_paste_from_os_clipboard,
             explorer_copy_bugs,
             // === AI Usage commands ===
             ai_usage_add_account,
@@ -337,6 +342,9 @@ pub fn run() {
             ai_task_wf_proc_step_create,
             ai_task_wf_proc_step_list,
             ai_task_wf_proc_step_update,
+            // === AI Translate Cowork commands ===
+            ai_translate_cowork_get_state,
+            ai_translate_cowork_save_state,
             // === Schedule commands ===
             read_schedule_excel,
             // === SQL Editor commands ===

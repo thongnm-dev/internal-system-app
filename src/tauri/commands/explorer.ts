@@ -65,6 +65,11 @@ export function explorerPaste(sources: string[], destDir: string, cut: boolean) 
   return safeInvoke<void>("explorer_paste", { sources, destDir, cut });
 }
 
+/** Dán file/folder đang có trên OS clipboard (vd. Ctrl+C trong File Explorer) vào `destDir`. Trả về số lượng mục đã dán. */
+export function explorerPasteFromOsClipboard(destDir: string) {
+  return safeInvoke<number>("explorer_paste_from_os_clipboard", { destDir });
+}
+
 export function explorerCopyBugs(sourceDir: string, destDir: string) {
   return safeInvoke<string>("explorer_copy_bugs", { sourceDir, destDir });
 }

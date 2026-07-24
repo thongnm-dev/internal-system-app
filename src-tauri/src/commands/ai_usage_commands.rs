@@ -113,8 +113,12 @@ pub async fn ai_usage_save_settings(settings: AiUsageSettings) -> Result<(), Str
 
 /// Mở terminal với `CLAUDE_CONFIG_DIR` trong working directory chỉ định.
 #[tauri::command]
-pub async fn ai_usage_open_terminal(config_dir: String, work_dir: String) -> Result<(), String> {
-    ai_usage_service::open_terminal(&config_dir, &work_dir)
+pub async fn ai_usage_open_terminal(
+    config_dir: String,
+    work_dir: String,
+    prompt: Option<String>,
+) -> Result<(), String> {
+    ai_usage_service::open_terminal(&config_dir, &work_dir, prompt.as_deref())
         .map_err(crate::app::error::log_err)
 }
 

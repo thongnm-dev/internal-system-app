@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import Button from "primevue/button";
@@ -14,12 +14,7 @@ import type { FileEntry } from "@/tauri/commands/explorer";
 
 const ctrl = useAiTranslateCowork();
 
-// The two symmetric folder panels of column 1 (both rooted in the project directory).
 type PanelKey = "input" | "output";
-const panels = [
-  { key: "input" as PanelKey, title: "Input", icon: "pi pi-inbox", panel: ctrl.input },
-  { key: "output" as PanelKey, title: "Output (Skill Result)", icon: "pi pi-sparkles", panel: ctrl.output },
-];
 
 function panelByKey(key: PanelKey) {
   return key === "input" ? ctrl.input : ctrl.output;
@@ -49,20 +44,33 @@ function openMarkdownPreview(entry: FileEntry) {
   void ctrl.openMarkdownPreview(entry);
 }
 
-// --- New folder dialog (per panel) ---
-const showNewFolderDialog = ref(false);
-const newFolderName = ref("");
-const newFolderTarget = ref<PanelKey>("input");
+// --- Inline new folder ---
+const inlineNewFolder = ref(false);
+const inlineNewFolderName = ref("");
+const inlineNewFolderInput = ref<HTMLInputElement | null>(null);
 
-function openNewFolder(key: PanelKey) {
-  newFolderTarget.value = key;
-  newFolderName.value = "New Folder";
-  showNewFolderDialog.value = true;
+function openNewFolder(_key?: PanelKey) {
+  inlineNewFolderName.value = "New Folder";
+  inlineNewFolder.value = true;
+  void nextTick(() => {
+    const el = inlineNewFolderInput.value;
+    if (el) { el.focus(); el.select(); }
+  });
 }
 
+let newFolderPending = false;
 async function confirmNewFolder() {
-  await panelByKey(newFolderTarget.value).createFolder(newFolderName.value);
-  showNewFolderDialog.value = false;
+  if (newFolderPending) return;
+  const name = inlineNewFolderName.value.trim();
+  inlineNewFolder.value = false;
+  if (!name) return;
+  newFolderPending = true;
+  try { await ctrl.input.createFolder(name); }
+  finally { newFolderPending = false; }
+}
+
+function cancelNewFolder() {
+  inlineNewFolder.value = false;
 }
 
 // --- Delete confirmation (per panel) ---
@@ -80,6 +88,114 @@ async function confirmDelete() {
 }
 
 const deleteCount = computed(() => panelByKey(deleteTarget.value).selected.value.size);
+
+// --- Skill terminal: require exactly one Input item selected ---
+const showInputSelectionWarning = ref(false);
+const inputSelectionWarningMessage = computed(() => {
+  const count = ctrl.input.selected.value.size;
+  return count === 0
+    ? "Vui lòng chọn 1 mục trong Input trước khi mở terminal cho skill này."
+    : "Vui lòng chỉ chọn 1 mục trong Input trước khi mở terminal cho skill này.";
+});
+
+// --- Skill terminal: choose "all" vs. specific files when the selected Input folder has multiple entries ---
+const showSkillFileDialog = ref(false);
+const skillFileDialogSkillName = ref("");
+const skillFileDialogFolderName = ref("");
+const skillFileDialogFiles = ref<FileEntry[]>([]);
+const skillFileDialogSelected = ref<Set<string>>(new Set());
+const checkingSkillName = ref<string | null>(null);
+
+function isSkillFileSelected(entry: FileEntry): boolean {
+  return skillFileDialogSelected.value.has(entry.path);
+}
+
+function toggleSkillFileSelected(entry: FileEntry) {
+  const next = new Set(skillFileDialogSelected.value);
+  if (next.has(entry.path)) next.delete(entry.path);
+  else next.add(entry.path);
+  skillFileDialogSelected.value = next;
+}
+
+async function openSkillTerminal(name: string) {
+  if (ctrl.input.selected.value.size !== 1) {
+    showInputSelectionWarning.value = true;
+    return;
+  }
+  const selectedPath = Array.from(ctrl.input.selected.value)[0];
+  const selectedEntry = ctrl.input.entries.value.find((e) => e.path === selectedPath);
+  if (!selectedEntry) return;
+
+  if (selectedEntry.is_dir) {
+    checkingSkillName.value = name;
+    const children = await ctrl.readFolderEntries(selectedEntry.path);
+    checkingSkillName.value = null;
+    if (children.length > 1) {
+      skillFileDialogSkillName.value = name;
+      skillFileDialogFolderName.value = selectedEntry.name;
+      skillFileDialogFiles.value = children;
+      skillFileDialogSelected.value = new Set();
+      showSkillFileDialog.value = true;
+      return;
+    }
+  }
+  void ctrl.openSkillTerminal(name);
+}
+
+function confirmSkillFileDialogAll() {
+  showSkillFileDialog.value = false;
+  void ctrl.openSkillTerminal(skillFileDialogSkillName.value);
+}
+
+function confirmSkillFileDialogSelected() {
+  const names = skillFileDialogFiles.value
+    .filter((f) => skillFileDialogSelected.value.has(f.path))
+    .map((f) => f.name);
+  if (!names.length) return;
+  showSkillFileDialog.value = false;
+  void ctrl.openSkillTerminal(skillFileDialogSkillName.value, names);
+}
+
+// --- Context menu (Input panel) ---
+const ctxMenu = ref(false);
+const ctxX = ref(0);
+const ctxY = ref(0);
+const ctxMenuEl = ref<HTMLElement | null>(null);
+
+function openCtxMenu(ev: MouseEvent) {
+  ev.preventDefault();
+  ctxX.value = ev.clientX;
+  ctxY.value = ev.clientY;
+  ctxMenu.value = true;
+  void nextTick(() => clampCtxMenu());
+}
+
+function clampCtxMenu() {
+  const el = ctxMenuEl.value;
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (r.right > window.innerWidth) ctxX.value -= r.right - window.innerWidth + 4;
+  if (r.bottom > window.innerHeight) ctxY.value -= r.bottom - window.innerHeight + 4;
+}
+
+function closeCtxMenu() {
+  ctxMenu.value = false;
+}
+
+function ctxCopy() {
+  ctrl.input.copySelected();
+  closeCtxMenu();
+}
+
+function ctxPaste() {
+  ctrl.input.paste();
+  closeCtxMenu();
+}
+
+function ctxDelete() {
+  closeCtxMenu();
+  openDeleteConfirm("input");
+}
 
 // --- Column resize (Input/Output ↔ Skills ↔ Project Directory) ---
 const COL_MIN = 240;
@@ -108,7 +224,45 @@ function startColDrag(event: MouseEvent, col: "col1" | "col2") {
   cleanupDrag = onUp;
 }
 
-onBeforeUnmount(() => cleanupDrag?.());
+// --- Row resize within Column 1 (Input ↔ Output) ---
+const ROW_HANDLE_H = 10;
+const ROW_MIN_H = 100;
+const col1TopH = ref<number | null>(null);
+let cleanupRowDrag: (() => void) | null = null;
+const col1Container = ref<HTMLElement | null>(null);
+
+function resolvedTopH(): number {
+  const container = col1Container.value;
+  if (!container) return 200;
+  if (col1TopH.value != null) return col1TopH.value;
+  return (container.getBoundingClientRect().height - ROW_HANDLE_H) / 2;
+}
+
+function startRowDrag(event: MouseEvent) {
+  const container = col1Container.value;
+  if (!container) return;
+  const startY = event.clientY;
+  const startH = resolvedTopH();
+  const maxH = container.getBoundingClientRect().height - ROW_HANDLE_H - ROW_MIN_H;
+  function onMove(ev: MouseEvent) {
+    const next = startH + (ev.clientY - startY);
+    col1TopH.value = Math.min(maxH, Math.max(ROW_MIN_H, next));
+  }
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.body.style.userSelect = "";
+    document.body.style.cursor = "";
+    cleanupRowDrag = null;
+  }
+  document.body.style.userSelect = "none";
+  document.body.style.cursor = "row-resize";
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+  cleanupRowDrag = onUp;
+}
+
+onBeforeUnmount(() => { cleanupDrag?.(); cleanupRowDrag?.(); });
 
 // --- Account helpers (copied from AI Cowork) ---
 function providerLabel(p: AiProvider): string {
@@ -310,127 +464,89 @@ function isTextResult(entry: FileEntry): boolean {
 
     <!-- Row 3: 3 columns (chỉ hiển thị khi đã chọn Project Directory) -->
     <div v-if="ctrl.projectDir.value" class="flex min-h-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden">
-      <!-- Column 1: input folder (top) + output / skill result folder (bottom) -->
-      <div class="flex min-h-0 shrink-0 flex-col gap-2" :style="{ width: col1Width + 'px' }">
+      <!-- Column 1: input folder (top) + drag handle + output folder (bottom) -->
+      <div ref="col1Container" class="flex min-h-0 shrink-0 flex-col" :style="{ width: col1Width + 'px' }">
+
+        <!-- Input panel (top) -->
         <div
-          v-for="p in panels"
-          :key="p.key"
-          class="flex min-h-0 flex-1 flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm"
+          class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel p-4 shadow-sm"
+          :style="col1TopH != null ? { height: col1TopH + 'px', flexShrink: 0 } : { flex: '1 1 50%', minHeight: '100px' }"
         >
           <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
-            <i :class="p.icon" />{{ p.title }}
+            <i class="pi pi-inbox" />Input
           </h3>
-
-          <!-- Toolbar -->
           <div class="mb-2 flex flex-wrap items-center gap-1.5">
-            <Button
-              icon="pi pi-arrow-up"
-              severity="secondary"
-              outlined
-              size="small"
-              :disabled="p.panel.isAtRoot.value"
-              title="Up one folder"
-              @click="p.panel.goUp"
-            />
-            <Button
-              v-if="p.key === 'input'"
-              icon="pi pi-folder-plus"
-              label="New"
-              severity="secondary"
-              outlined
-              size="small"
-              title="New folder"
-              @click="openNewFolder(p.key)"
-            />
-            <Button
-              icon="pi pi-copy"
-              label="Copy"
-              severity="secondary"
-              outlined
-              size="small"
-              :disabled="!p.panel.selected.value.size"
-              title="Copy selected"
-              @click="p.panel.copySelected"
-            />
-            <Button
-              v-if="p.key === 'input'"
-              icon="pi pi-clipboard"
-              label="Paste"
-              severity="secondary"
-              outlined
-              size="small"
-              :disabled="!ctrl.clipboard.value"
-              title="Paste"
-              @click="p.panel.paste"
-            />
-            <Button
-              icon="pi pi-trash"
-              severity="danger"
-              outlined
-              size="small"
-              :disabled="!p.panel.selected.value.size"
-              title="Delete selected"
-              @click="openDeleteConfirm(p.key)"
-            />
-            <Button
-              icon="pi pi-refresh"
-              severity="secondary"
-              text
-              size="small"
-              class="ml-auto"
-              :loading="p.panel.isLoading.value"
-              title="Reload"
-              @click="p.panel.load"
-            />
+            <Button icon="pi pi-folder-plus" severity="secondary" outlined size="small" title="New folder" @click="openNewFolder('input')" />
+            <Button icon="pi pi-copy" severity="secondary" outlined size="small" :disabled="!ctrl.input.selected.value.size" title="Copy" @click="ctrl.input.copySelected" />
+            <Button icon="pi pi-clipboard" severity="secondary" outlined size="small" title="Paste (từ app hoặc từ File Explorer)" @click="ctrl.input.paste" />
+            <Button icon="pi pi-trash" severity="danger" outlined size="small" :disabled="!ctrl.input.selected.value.size" title="Delete" @click="openDeleteConfirm('input')" />
+            <Button icon="pi pi-refresh" severity="secondary" text size="small" class="ml-auto" :loading="ctrl.input.isLoading.value" title="Reload" @click="ctrl.input.load" />
           </div>
-
-          <!-- File list -->
-          <div class="min-h-0 flex-1 overflow-auto">
-            <p v-if="p.panel.isLoading.value" class="p-6 text-center text-xs text-muted">Loading...</p>
-            <template v-else-if="p.panel.entries.value.length">
-              <div
-                v-for="entry in p.panel.entries.value"
-                :key="entry.path"
-                class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70"
-                :class="[
-                  p.panel.isSelected(entry) ? 'bg-brand/5' : '',
-                  ctrl.clipboard.value?.cut && ctrl.clipboard.value.paths.includes(entry.path) ? 'opacity-50' : '',
-                ]"
-                :title="entry.path"
-              >
-                <Checkbox :model-value="p.panel.isSelected(entry)" binary @change="p.panel.toggleSelected(entry)" />
+          <!-- Input entries list -->
+          <div class="min-h-0 flex-1 overflow-auto" @contextmenu="openCtxMenu">
+            <!-- Inline new folder row -->
+            <div v-if="inlineNewFolder" class="flex items-center gap-2 rounded bg-brand/5 px-2 py-1.5 text-sm">
+              <i class="pi pi-folder text-amber-500" />
+              <input
+                ref="inlineNewFolderInput"
+                v-model="inlineNewFolderName"
+                type="text"
+                class="min-w-0 flex-1 rounded border border-brand bg-canvas px-2 py-0.5 text-sm text-ink outline-none focus:ring-1 focus:ring-brand"
+                @keydown.enter="confirmNewFolder"
+                @keydown.escape="cancelNewFolder"
+                @blur="confirmNewFolder"
+              />
+            </div>
+            <p v-if="ctrl.input.isLoading.value" class="p-6 text-center text-xs text-muted">Loading...</p>
+            <template v-else-if="ctrl.input.entries.value.length">
+              <div v-for="entry in ctrl.input.entries.value" :key="entry.path" class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70" :class="[ctrl.input.isSelected(entry) ? 'bg-brand/5' : '', ctrl.clipboard.value?.cut && ctrl.clipboard.value.paths.includes(entry.path) ? 'opacity-50' : '']" :title="entry.path">
+                <Checkbox :model-value="ctrl.input.isSelected(entry)" binary @change="ctrl.input.toggleSelected(entry)" />
                 <i :class="entryIcon(entry)" />
-                <span
-                  class="min-w-0 flex-1 truncate"
-                  :class="entry.is_dir ? 'cursor-pointer font-semibold text-brand' : 'text-ink'"
-                  @dblclick="p.panel.openEntry(entry)"
-                >
-                  {{ entry.name }}
-                </span>
+                <span class="min-w-0 flex-1 truncate" :class="entry.is_dir ? 'cursor-pointer font-semibold text-brand' : 'text-ink'" @dblclick="ctrl.input.openEntry(entry)">{{ entry.name }}</span>
                 <span class="shrink-0 text-[11px] text-muted">{{ formatSize(entry) }}</span>
-                <Button
-                  v-if="isTextResult(entry)"
-                  icon="pi pi-eye"
-                  text
-                  rounded
-                  size="small"
-                  title="Xem nội dung"
-                  @click="openMarkdownPreview(entry)"
-                />
-                <Button
-                  v-if="entry.is_dir"
-                  icon="pi pi-external-link"
-                  text
-                  rounded
-                  size="small"
-                  title="Show in folder"
-                  @click="ctrl.showInFolder(entry.path)"
-                />
+                <Button v-if="isTextResult(entry)" icon="pi pi-eye" text rounded size="small" title="Xem nội dung" @click="openMarkdownPreview(entry)" />
+                <Button v-if="entry.is_dir" icon="pi pi-external-link" text rounded size="small" title="Show in folder" @click="ctrl.showInFolder(entry.path)" />
               </div>
             </template>
-            <p v-else class="flex h-full items-center justify-center rounded-lg border border-dashed border-divider p-6 text-center text-xs text-muted">
-              Thư mục trống.
-            </p>
+            <p v-else class="flex h-full items-center justify-center rounded-lg border border-dashed border-divider p-6 text-center text-xs text-muted">Thư mục trống.</p>
+          </div>
+        </div>
+
+        <!-- Drag handle: Input ↔ Output -->
+        <div
+          class="group flex h-2.5 shrink-0 cursor-row-resize items-center justify-center"
+          title="Drag to resize"
+          @mousedown.prevent="startRowDrag($event)"
+        >
+          <div class="h-1 w-12 rounded-full bg-divider transition-colors group-hover:bg-brand group-active:bg-brand" />
+        </div>
+
+        <!-- Output panel (bottom) -->
+        <div
+          class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel p-4 shadow-sm"
+          style="min-height: 100px"
+        >
+          <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+            <i class="pi pi-sparkles" />Output (Skill Result)
+          </h3>
+          <div class="mb-2 flex flex-wrap items-center gap-1.5">
+            <Button icon="pi pi-copy" severity="secondary" outlined size="small" :disabled="!ctrl.output.selected.value.size" title="Copy selected" @click="ctrl.output.copySelected" />
+            <Button icon="pi pi-trash" severity="danger" outlined size="small" :disabled="!ctrl.output.selected.value.size" title="Delete selected" @click="openDeleteConfirm('output')" />
+            <Button icon="pi pi-refresh" severity="secondary" text size="small" class="ml-auto" :loading="ctrl.output.isLoading.value" title="Reload" @click="ctrl.output.load" />
+          </div>
+          <div class="min-h-0 flex-1 overflow-auto">
+            <p v-if="ctrl.output.isLoading.value" class="p-6 text-center text-xs text-muted">Loading...</p>
+            <template v-else-if="ctrl.output.entries.value.length">
+              <div v-for="entry in ctrl.output.entries.value" :key="entry.path" class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70" :class="[ctrl.output.isSelected(entry) ? 'bg-brand/5' : '', ctrl.clipboard.value?.cut && ctrl.clipboard.value.paths.includes(entry.path) ? 'opacity-50' : '']" :title="entry.path">
+                <Checkbox :model-value="ctrl.output.isSelected(entry)" binary @change="ctrl.output.toggleSelected(entry)" />
+                <i :class="entryIcon(entry)" />
+                <span class="min-w-0 flex-1 truncate" :class="entry.is_dir ? 'cursor-pointer font-semibold text-brand' : 'text-ink'" @dblclick="ctrl.output.openEntry(entry)">{{ entry.name }}</span>
+                <span class="shrink-0 text-[11px] text-muted">{{ formatSize(entry) }}</span>
+                <Button v-if="isTextResult(entry)" icon="pi pi-eye" text rounded size="small" title="Xem nội dung" @click="openMarkdownPreview(entry)" />
+                <Button v-if="entry.is_dir" icon="pi pi-external-link" text rounded size="small" title="Show in folder" @click="ctrl.showInFolder(entry.path)" />
+              </div>
+            </template>
+            <p v-else class="flex h-full items-center justify-center rounded-lg border border-dashed border-divider p-6 text-center text-xs text-muted">Thư mục trống.</p>
           </div>
         </div>
       </div>
@@ -479,9 +595,9 @@ function isTextResult(entry: FileEntry): boolean {
                 rounded
                 size="small"
                 :disabled="!ctrl.activeAccount.value"
-                :loading="ctrl.openingSkillTerminal.value === name"
+                :loading="ctrl.openingSkillTerminal.value === name || checkingSkillName === name"
                 :title="ctrl.activeAccount.value ? 'Mở terminal cho skill này' : 'Chưa có account AI active có CLAUDE_CONFIG_DIR'"
-                @click="ctrl.openSkillTerminal(name)"
+                @click="openSkillTerminal(name)"
               />
             </div>
           </template>
@@ -622,26 +738,6 @@ function isTextResult(entry: FileEntry): boolean {
       </template>
     </Dialog>
 
-    <!-- New folder dialog -->
-    <Dialog
-      v-model:visible="showNewFolderDialog"
-      class="w-full max-w-sm rounded-lg bg-panel shadow-xl"
-      :closable="true"
-      modal
-    >
-      <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-folder-plus" />New Folder</h3>
-      </template>
-      <label class="block">
-        <span class="text-xs font-bold text-muted">Folder name</span>
-        <InputText v-model="newFolderName" class="mt-1 w-full" autofocus @keydown.enter="confirmNewFolder" />
-      </label>
-      <template #footer>
-        <Button label="Cancel" severity="secondary" @click="showNewFolderDialog = false" />
-        <Button label="Create" :disabled="!newFolderName.trim()" @click="confirmNewFolder" />
-      </template>
-    </Dialog>
-
     <!-- Delete confirmation -->
     <Dialog
       v-model:visible="showDeleteConfirm"
@@ -660,6 +756,91 @@ function isTextResult(entry: FileEntry): boolean {
         <Button label="Delete" severity="danger" @click="confirmDelete" />
       </template>
     </Dialog>
+
+    <!-- Input selection warning (skill terminal) -->
+    <Dialog
+      v-model:visible="showInputSelectionWarning"
+      class="w-full max-w-sm rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-exclamation-triangle text-yellow-500" />Chưa chọn Input</h3>
+      </template>
+      <p class="text-sm text-muted">{{ inputSelectionWarningMessage }}</p>
+      <template #footer>
+        <Button label="Đóng" severity="secondary" @click="showInputSelectionWarning = false" />
+      </template>
+    </Dialog>
+
+    <!-- Skill terminal: choose all vs. specific files inside the selected Input folder -->
+    <Dialog
+      v-model:visible="showSkillFileDialog"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-folder-open" />Chọn file trong "{{ skillFileDialogFolderName }}"</h3>
+      </template>
+      <p class="mb-2 text-sm text-muted">Folder này có nhiều file. Chạy skill trên toàn bộ folder hay chỉ những file đã chọn?</p>
+      <div class="max-h-[50vh] space-y-1 overflow-auto rounded-lg border border-divider p-2">
+        <div
+          v-for="entry in skillFileDialogFiles"
+          :key="entry.path"
+          class="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-canvas/70"
+        >
+          <Checkbox :model-value="isSkillFileSelected(entry)" binary @change="toggleSkillFileSelected(entry)" />
+          <i :class="entryIcon(entry)" />
+          <span class="min-w-0 flex-1 truncate text-ink" :title="entry.name">{{ entry.name }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancel" severity="secondary" @click="showSkillFileDialog = false" />
+        <Button label="Toàn bộ" severity="secondary" outlined @click="confirmSkillFileDialogAll" />
+        <Button label="Chỉ file chọn" :disabled="!skillFileDialogSelected.size" @click="confirmSkillFileDialogSelected" />
+      </template>
+    </Dialog>
+
+    <!-- Context menu (Input panel) -->
+    <Teleport to="body">
+      <div v-if="ctxMenu" class="fixed inset-0 z-[9998]" @click="closeCtxMenu" @contextmenu.prevent="closeCtxMenu" />
+      <div
+        v-if="ctxMenu"
+        ref="ctxMenuEl"
+        class="fixed z-[9999] min-w-[140px] rounded-lg border border-divider bg-panel py-1 shadow-xl"
+        :style="{ left: ctxX + 'px', top: ctxY + 'px' }"
+      >
+        <button
+          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink hover:bg-canvas/80"
+          @click="closeCtxMenu(); openNewFolder('input')"
+        >
+          <i class="pi pi-folder-plus text-xs text-muted" />New Folder
+        </button>
+        <div class="my-1 border-t border-divider" />
+        <button
+          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink hover:bg-canvas/80 disabled:opacity-40 disabled:hover:bg-transparent"
+          :disabled="!ctrl.input.selected.value.size"
+          @click="ctxCopy"
+        >
+          <i class="pi pi-copy text-xs text-muted" />Copy
+        </button>
+        <button
+          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink hover:bg-canvas/80 disabled:opacity-40 disabled:hover:bg-transparent"
+          @click="ctxPaste"
+        >
+          <i class="pi pi-clipboard text-xs text-muted" />Paste
+        </button>
+        <div class="my-1 border-t border-divider" />
+        <button
+          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-canvas/80 disabled:opacity-40 disabled:hover:bg-transparent"
+          :disabled="!ctrl.input.selected.value.size"
+          @click="ctxDelete"
+        >
+          <i class="pi pi-trash text-xs" />Delete
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 

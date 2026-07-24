@@ -4,6 +4,7 @@ import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { aiUsageListAccounts, aiUsageOpenTerminal, aiUsageSetActive } from "@/tauri/commands/ai-usage";
+import { aiTranslateCoworkGetState, aiTranslateCoworkSaveState } from "@/tauri/commands/ai-translate-cowork";
 import type { AiAccount } from "@/_/types/ai-usage";
 import {
   explorerCreateFolder,
@@ -11,6 +12,7 @@ import {
   explorerEnsureDir,
   explorerOpen,
   explorerPaste,
+  explorerPasteFromOsClipboard,
   explorerReadDir,
   explorerReadTextFile,
 } from "@/tauri/commands/explorer";
@@ -155,15 +157,25 @@ export function useAiTranslateCowork() {
       toast.success(`${paths.length} item(s) copied.`);
     }
 
+    /**
+     * Dán vào panel. Ưu tiên clipboard nội bộ của app (Copy/Cut trong Input/Output panel);
+     * nếu chưa có gì được Copy trong app, thử dán trực tiếp từ OS clipboard
+     * (vd. file/folder vừa Ctrl+C trong Windows File Explorer).
+     */
     async function paste() {
-      if (!clipboard.value) return;
       const target = dir.value.trim();
       if (!target) return;
       try {
-        await explorerPaste(clipboard.value.paths, target, clipboard.value.cut);
-        if (clipboard.value.cut) clipboard.value = null;
-        await load();
-        toast.success("Pasted.");
+        if (clipboard.value) {
+          await explorerPaste(clipboard.value.paths, target, clipboard.value.cut);
+          if (clipboard.value.cut) clipboard.value = null;
+          await load();
+          toast.success("Pasted.");
+        } else {
+          const count = await explorerPasteFromOsClipboard(target);
+          await load();
+          toast.success(`Đã dán ${count} mục từ clipboard.`);
+        }
       } catch (e) {
         toast.error(friendlyError(e));
       }
@@ -206,6 +218,12 @@ export function useAiTranslateCowork() {
   const output = makeFolderPanel("output");
 
   // --- Row 1: project directory ---
+
+  /** Lưu lại project directory hiện tại để lần mở màn hình sau tự động load lại. */
+  function persistState() {
+    void aiTranslateCoworkSaveState(projectDir.value).catch(() => undefined);
+  }
+
   async function pickProjectDir() {
     if (!canUseTauriRuntime()) {
       toast.error(tauriRuntimeMessage);
@@ -216,6 +234,7 @@ export function useAiTranslateCowork() {
       if (typeof selected === "string") {
         projectDir.value = selected;
         await loadDirectory();
+        persistState();
       }
     } catch (e) {
       toast.error(friendlyError(e));
@@ -229,6 +248,7 @@ export function useAiTranslateCowork() {
     clipboard.value = null;
     input.reset();
     output.reset();
+    persistState();
   }
 
   async function loadDirectory() {
@@ -302,8 +322,24 @@ export function useAiTranslateCowork() {
     }
   }
 
-  /** Mở terminal tại project directory với account AI đang active để chạy skill. */
-  async function openSkillTerminal(name: string) {
+  /** Đọc danh sách entry (chỉ 1 cấp) bên trong một folder — dùng để hỏi chọn file trước khi chạy skill. */
+  async function readFolderEntries(path: string): Promise<FileEntry[]> {
+    try {
+      const result = await explorerReadDir(path);
+      return result.entries;
+    } catch (e) {
+      toast.error(friendlyError(e));
+      return [];
+    }
+  }
+
+  /**
+   * Mở terminal tại project directory với account AI đang active để chạy skill,
+   * đưa sẵn prompt dạng `/<skill-name> <input-entry-name>` (yêu cầu đã chọn đúng 1 mục trong Input).
+   * Nếu `fileNames` được truyền (chỉ chạy skill trên một số file cụ thể bên trong folder đã chọn),
+   * prompt sẽ là `/<skill-name> <input-entry-name> [file1, file2]`.
+   */
+  async function openSkillTerminal(name: string, fileNames?: string[]) {
     const dir = projectDir.value.trim();
     if (!dir) return;
     const active = activeAccount.value;
@@ -311,9 +347,16 @@ export function useAiTranslateCowork() {
       toast.error("Không tìm thấy account AI đang active có CLAUDE_CONFIG_DIR.");
       return;
     }
+    const selectedPath = Array.from(input.selected.value)[0];
+    const selectedEntry = input.entries.value.find((e) => e.path === selectedPath);
+    if (!selectedEntry) return;
+    let prompt = `/${name} ${selectedEntry.name}`;
+    if (fileNames?.length) {
+      prompt += ` [${fileNames.join(", ")}]`;
+    }
     openingSkillTerminal.value = name;
     try {
-      await aiUsageOpenTerminal(active.config_dir, dir);
+      await aiUsageOpenTerminal(active.config_dir, dir, prompt);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
@@ -339,6 +382,16 @@ export function useAiTranslateCowork() {
 
   async function init() {
     await loadAccounts();
+    if (!canUseTauriRuntime()) return;
+    try {
+      const state = await aiTranslateCoworkGetState();
+      if (state.project_dir) {
+        projectDir.value = state.project_dir;
+        await loadDirectory();
+      }
+    } catch {
+      // Không có lịch sử hoặc lỗi đọc file — bỏ qua, giữ màn hình ở trạng thái mặc định.
+    }
   }
 
   return {
@@ -367,6 +420,7 @@ export function useAiTranslateCowork() {
     openingSkillTerminal,
     loadSkillFolders,
     openSkillTerminal,
+    readFolderEntries,
     // col 3
     mdPreviewOpen,
     mdPreviewName,

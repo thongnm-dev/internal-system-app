@@ -189,14 +189,18 @@ pub fn open_in_explorer(path: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        // explorer.exe does not reliably resolve paths with forward slashes (it can
+        // misparse them as switches), so normalize to backslashes before invoking it —
+        // callers may build paths with `/` (e.g. `${projectPath}/input`).
+        let windows_path = path.replace('/', "\\");
         if p.is_dir() {
             std::process::Command::new("explorer")
-                .arg(path)
+                .arg(&windows_path)
                 .spawn()
                 .map_err(|e| format!("Failed to open explorer: {e}"))?;
         } else {
             std::process::Command::new("explorer")
-                .args(["/select,", path])
+                .args(["/select,", &windows_path])
                 .spawn()
                 .map_err(|e| format!("Failed to open explorer: {e}"))?;
         }
@@ -338,6 +342,34 @@ pub fn paste_entries(sources: &[String], dest_dir: &str, cut: bool) -> Result<()
         }
     }
     Ok(())
+}
+
+/// Đọc danh sách đường dẫn file/folder đang có trên OS clipboard (vd. Ctrl+C trong Windows
+/// File Explorer). Dùng để hỗ trợ dán trực tiếp file ngoài app vào Input/Output panel.
+#[cfg(target_os = "windows")]
+pub fn os_clipboard_file_paths() -> Result<Vec<String>, String> {
+    use clipboard_win::{formats, get_clipboard};
+    get_clipboard::<Vec<String>, _>(formats::FileList)
+        .map_err(|e| format!("Không đọc được clipboard: {e}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn os_clipboard_file_paths() -> Result<Vec<String>, String> {
+    Err("Chức năng dán từ OS clipboard chỉ hỗ trợ Windows.".to_string())
+}
+
+/// Dán các file/folder đang có trên OS clipboard vào `dest_dir` (luôn copy, không cut).
+/// Trả về số lượng mục đã dán.
+pub fn paste_from_os_clipboard(dest_dir: &str) -> Result<usize, String> {
+    let sources = os_clipboard_file_paths()?;
+    if sources.is_empty() {
+        return Err(
+            "Clipboard không chứa file/folder nào. Hãy Copy (Ctrl+C) trong File Explorer trước."
+                .to_string(),
+        );
+    }
+    paste_entries(&sources, dest_dir, false)?;
+    Ok(sources.len())
 }
 
 pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String> {
