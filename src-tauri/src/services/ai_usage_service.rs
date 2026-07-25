@@ -861,7 +861,11 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
         if let Some(cmd) = command {
             script_body.push_str(&format!(" && {cmd}"));
         }
-        let script = format!("tell application \"Terminal\" to do script \"{script_body}\"");
+        // `script_body` là câu lệnh shell, có thể chứa dấu `"` (bọc quanh prompt) và `\`.
+        // Phải escape cho chuỗi literal của AppleScript (`\` → `\\`, `"` → `\"`), nếu không
+        // dấu `"` trong prompt sẽ cắt sớm chuỗi `do script "..."` → lỗi cú pháp AppleScript (-2740).
+        let escaped = script_body.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!("tell application \"Terminal\" to do script \"{escaped}\"");
         std::process::Command::new("osascript")
             .args(["-e", &script])
             .spawn()
