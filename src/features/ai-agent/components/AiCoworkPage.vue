@@ -599,6 +599,50 @@ function isMarkdown(entry: FileEntry): boolean {
       </template>
     </Dialog>
 
+    <!-- Lỗi: các task đang chọn không cùng 1 workflow_proc_step -->
+    <Dialog
+      :visible="ctrl.showTaskStepConflict.value"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="ctrl.showTaskStepConflict.value = $event"
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink">
+          <i class="pi pi-exclamation-triangle text-red-500" />Task không cùng bước workflow
+        </h3>
+      </template>
+
+      <p class="text-sm text-muted">
+        Các task đang chọn không cùng một bước workflow
+        (<code class="rounded bg-canvas px-1">workflow_proc_step</code>). Hãy đưa các task về cùng một bước
+        trước khi mở terminal cho skill này.
+      </p>
+
+      <div class="mt-3 space-y-2">
+        <div
+          v-for="group in ctrl.taskStepConflictGroups.value"
+          :key="group.stepLabel"
+          class="rounded-lg border border-divider bg-canvas/50 p-3"
+        >
+          <p class="mb-1 text-xs font-bold text-ink">{{ group.stepLabel }}</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span
+              v-for="cd in group.taskCds"
+              :key="cd"
+              class="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
+            >
+              {{ cd }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Đã hiểu" @click="ctrl.showTaskStepConflict.value = false" />
+      </template>
+    </Dialog>
+
     <!-- Danh sách skill available trong .claude/skills của project directory -->
     <Dialog
       :visible="ctrl.showSkillListDialog.value"

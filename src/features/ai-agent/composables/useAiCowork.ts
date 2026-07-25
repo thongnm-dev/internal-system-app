@@ -12,7 +12,7 @@ import type { AiAccount } from "@/_/types/ai-usage";
 import { explorerOpen, explorerReadDir, explorerReadTextFile } from "@/tauri/commands/explorer";
 import type { FileEntry } from "@/tauri/commands/explorer";
 import type { WorkflowStepType } from "@/_/types/ai-workflow";
-import { aiTaskCreate, aiTaskList } from "@/tauri/commands/ai-task";
+import { aiTaskCreate, aiTaskList, aiTaskWfProcList } from "@/tauri/commands/ai-task";
 import type { AiTaskResult } from "@/tauri/commands/ai-task";
 import type { TaskDialogPayload } from "../components/AiTaskDialog.vue";
 
@@ -80,6 +80,10 @@ export function useAiCowork() {
   const openingTerminalStepId = ref<number | null>(null);
   const showSkillListDialog = ref(false);
   const isLoadingSkillList = ref(false);
+
+  // Dialog báo lỗi khi các task đang chọn không cùng 1 workflow_proc_step.
+  const showTaskStepConflict = ref(false);
+  const taskStepConflictGroups = ref<{ stepLabel: string; taskCds: string[] }[]>([]);
 
   // Column 2 — AI accounts.
   const accounts = ref<AiAccount[]>([]);
@@ -237,6 +241,49 @@ export function useAiCowork() {
     }
   }
 
+  /** Nhãn hiển thị cho 1 workflow step id (dựa trên step của workflow đang áp dụng). */
+  function stepLabelForId(stepId: number | null): string {
+    if (stepId === null) return "Chưa có bước nào";
+    return steps.value.find((s) => s.id === stepId)?.name ?? `Bước #${stepId}`;
+  }
+
+  /**
+   * Kiểm tra các task đang chọn có cùng 1 workflow_proc_step (theo workflow đang áp dụng) hay không.
+   * Trả về `true` nếu hợp lệ (được phép mở terminal); nếu không, bật dialog lỗi và trả về `false`.
+   */
+  async function ensureSelectedTasksSameStep(): Promise<boolean> {
+    const tasks = selectedTasks.value;
+    // Dưới 2 task thì không thể xảy ra xung đột.
+    if (tasks.length < 2) return true;
+
+    const wfId = appliedWorkflowId.value;
+    const stepIds = await Promise.all(
+      tasks.map(async (t) => {
+        const procs = await aiTaskWfProcList(t.id);
+        const proc = wfId !== null ? procs.find((p) => p.wf_id === wfId) : procs[0];
+        return proc?.latest_step_id ?? null;
+      }),
+    );
+
+    const distinct = new Set(stepIds.map((s) => (s === null ? "none" : String(s))));
+    if (distinct.size <= 1) return true;
+
+    // Gom nhóm task theo step hiện tại để hiển thị chi tiết xung đột trong dialog lỗi.
+    const groups = new Map<number | null, string[]>();
+    tasks.forEach((t, i) => {
+      const key = stepIds[i];
+      const list = groups.get(key) ?? [];
+      list.push(t.task_cd);
+      groups.set(key, list);
+    });
+    taskStepConflictGroups.value = Array.from(groups.entries()).map(([stepId, taskCds]) => ({
+      stepLabel: stepLabelForId(stepId),
+      taskCds,
+    }));
+    showTaskStepConflict.value = true;
+    return false;
+  }
+
   /** Mở terminal tại project directory với account AI đang active để chạy step skill. */
   async function openStepTerminal(step: CoworkStep) {
     if (!hasMatchingSkill(step)) return;
@@ -251,6 +298,8 @@ export function useAiCowork() {
 
     openingTerminalStepId.value = step.id;
     try {
+      // Các task đang chọn phải cùng 1 workflow_proc_step trước khi mở terminal.
+      if (!(await ensureSelectedTasksSameStep())) return;
       await aiUsageOpenTerminal(active.config_dir, dir);
     } catch (e) {
       toast.error(friendlyError(e));
@@ -399,6 +448,8 @@ export function useAiCowork() {
     showSkillListDialog,
     isLoadingSkillList,
     openSkillListDialog,
+    showTaskStepConflict,
+    taskStepConflictGroups,
     accounts,
     isLoadingAccounts,
     settingActiveId,
