@@ -772,14 +772,26 @@ pub async fn run_poll_loop(app: AppHandle) {
 
 /// Mở terminal với `CLAUDE_CONFIG_DIR` trong working directory chỉ định.
 /// `prompt`, nếu có, được truyền sẵn cho `claude` như một câu lệnh skill (vd. `/translator-qa QA20260724`).
-pub fn open_terminal(config_dir: &str, work_dir: &str, prompt: Option<&str>) -> AppResult<()> {
-    let command = build_claude_command(prompt);
+pub fn open_terminal(
+    config_dir: &str,
+    work_dir: &str,
+    prompt: Option<&str>,
+    model: Option<&str>,
+) -> AppResult<()> {
+    let command = build_claude_command(prompt, model);
     spawn_terminal(config_dir, work_dir, Some(&command))
 }
 
-/// Ghép câu lệnh `claude` với prompt đã sanitize (loại bỏ dấu ngoặc kép để tránh phá vỡ quoting theo OS).
-fn build_claude_command(prompt: Option<&str>) -> String {
+/// Ghép câu lệnh `claude` với model (`--model <model>`) và prompt đã sanitize
+/// (loại bỏ dấu ngoặc kép để tránh phá vỡ quoting theo OS).
+fn build_claude_command(prompt: Option<&str>, model: Option<&str>) -> String {
     let mut command = String::from("claude --dangerously-skip-permissions");
+    if let Some(m) = model {
+        let sanitized = m.trim().replace('"', "");
+        if !sanitized.is_empty() {
+            command.push_str(&format!(" --model {sanitized}"));
+        }
+    }
     if let Some(p) = prompt {
         let sanitized = p.trim().replace('"', "");
         if !sanitized.is_empty() {
@@ -787,28 +799,6 @@ fn build_claude_command(prompt: Option<&str>) -> String {
         }
     }
     command
-}
-
-/// Mở 1 terminal chạy toàn bộ workflow cho 1 task: nối các prompt skill bằng `&&`,
-/// mỗi bước dùng `claude -p` (headless) nên chạy tuần tự — xong bước này mới sang bước kế.
-pub fn open_workflow_terminal(config_dir: &str, work_dir: &str, prompts: &[String]) -> AppResult<()> {
-    if prompts.is_empty() {
-        return Err(AppError::new("Không có step nào để chạy."));
-    }
-    let command = build_claude_workflow_command(prompts);
-    spawn_terminal(config_dir, work_dir, Some(&command))
-}
-
-/// Ghép chuỗi lệnh tuần tự: `claude ... -p "p1" && claude ... -p "p2" && ...`.
-fn build_claude_workflow_command(prompts: &[String]) -> String {
-    prompts
-        .iter()
-        .map(|p| {
-            let sanitized = p.trim().replace('"', "");
-            format!("claude --dangerously-skip-permissions -p \"{sanitized}\"")
-        })
-        .collect::<Vec<_>>()
-        .join(" && ")
 }
 
 /// Mở terminal chạy `claude /login` với `CLAUDE_CONFIG_DIR` tuỳ chỉnh.

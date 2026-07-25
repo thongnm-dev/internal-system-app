@@ -77,12 +77,18 @@ export function aiUsageSaveSettings(settings: AiUsageSettings) {
   return safeInvoke<void>("ai_usage_save_settings", { settings });
 }
 
-export function aiUsageOpenTerminal(configDir: string, workDir: string, prompt?: string) {
-  return safeInvoke<void>("ai_usage_open_terminal", { configDir, workDir, prompt: prompt ?? null });
-}
-
-export function aiUsageOpenWorkflowTerminal(configDir: string, workDir: string, prompts: string[]) {
-  return safeInvoke<void>("ai_usage_open_workflow_terminal", { configDir, workDir, prompts });
+export function aiUsageOpenTerminal(
+  configDir: string,
+  workDir: string,
+  prompt?: string,
+  model?: string,
+) {
+  return safeInvoke<void>("ai_usage_open_terminal", {
+    configDir,
+    workDir,
+    prompt: prompt ?? null,
+    model: model ?? null,
+  });
 }
 
 export function aiUsageOpenLogin(configDir: string, workDir: string) {

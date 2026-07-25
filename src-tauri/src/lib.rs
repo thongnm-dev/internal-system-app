@@ -61,7 +61,7 @@ use commands::ai_usage_commands::{
     ai_usage_add_account, ai_usage_add_config_dir, ai_usage_capture_add, ai_usage_capture_preview,
     ai_usage_config_dir_preview, ai_usage_delete_account, ai_usage_detect_local,
     ai_usage_get_settings, ai_usage_get_token, ai_usage_import_detected, ai_usage_list_accounts,
-    ai_usage_open_login, ai_usage_open_terminal, ai_usage_open_workflow_terminal,
+    ai_usage_open_login, ai_usage_open_terminal,
     ai_usage_refresh, ai_usage_refresh_account,
     ai_usage_report_signal,
     ai_usage_save_settings,
@@ -320,7 +320,6 @@ pub fn run() {
             ai_usage_save_settings,
             ai_usage_open_login,
             ai_usage_open_terminal,
-            ai_usage_open_workflow_terminal,
             // === AI Chat commands ===
             ai_chat_complete,
             // === AI Workflow commands ===
