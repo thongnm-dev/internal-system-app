@@ -248,12 +248,13 @@ export function useAiCowork() {
   }
 
   /**
-   * Kiểm tra các task đang chọn có cùng 1 workflow_proc_step (theo workflow đang áp dụng) hay không.
+   * Kiểm tra các task đã tick checkbox xác nhận có cùng 1 workflow_proc_step
+   * (theo workflow đang áp dụng) hay không.
    * Trả về `true` nếu hợp lệ (được phép mở terminal); nếu không, bật dialog lỗi và trả về `false`.
    */
   async function ensureSelectedTasksSameStep(): Promise<boolean> {
-    const tasks = selectedTasks.value;
-    // Dưới 2 task thì không thể xảy ra xung đột.
+    const tasks = selectedTasks.value.filter((t) => confirmedTaskIds.value.has(t.id));
+    // Dưới 2 task đã xác nhận thì không thể xảy ra xung đột.
     if (tasks.length < 2) return true;
 
     const wfId = appliedWorkflowId.value;
