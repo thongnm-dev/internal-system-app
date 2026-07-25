@@ -60,6 +60,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Fast file browser — navigate folders and search documents quickly.",
   },
   {
+    key: "terminal",
+    path: "/terminal",
+    title: "Terminal",
+    subtitle: "Run interactive shell sessions inside the app to drive workflows.",
+  },
+  {
     key: "dailyWorkNotes",
     path: "/daily-work-notes",
     title: "Daily Work Notes",
@@ -318,6 +324,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/explore-faster",
     component: () => import("@/features/tools/components/ExploreFasterPage.vue"),
     meta: { key: "exploreFaster" as MenuKey },
+  },
+  {
+    path: "/terminal",
+    component: () => import("@/features/tools/components/TerminalPage.vue"),
+    meta: { key: "terminal" as MenuKey },
   },
   {
     path: "/daily-work-notes",

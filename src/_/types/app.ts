@@ -6,6 +6,7 @@ export type MenuKey =
   | "excel2md"
   | "sqlEditor"
   | "exploreFaster"
+  | "terminal"
   | "dailyWorkNotes"
   | "dailyReport"
   | "checkMonthlyReport"

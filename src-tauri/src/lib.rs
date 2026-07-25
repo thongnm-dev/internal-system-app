@@ -81,6 +81,9 @@ use commands::ai_translate_cowork_commands::{
     ai_translate_cowork_get_state, ai_translate_cowork_save_state,
 };
 use commands::ai_cowork_commands::{ai_cowork_get_state, ai_cowork_save_state};
+use commands::terminal_commands::{
+    terminal_kill, terminal_resize, terminal_spawn, terminal_write,
+};
 use commands::schedule_commands::read_schedule_excel;
 use commands::sql_editor_commands::{
     sql_delete_connection, sql_get_schema, sql_list_connections, sql_run_query,
@@ -350,6 +353,11 @@ pub fn run() {
             // === AI Cowork commands ===
             ai_cowork_get_state,
             ai_cowork_save_state,
+            // === Terminal (PTY) commands ===
+            terminal_spawn,
+            terminal_write,
+            terminal_resize,
+            terminal_kill,
             // === Schedule commands ===
             read_schedule_excel,
             // === SQL Editor commands ===

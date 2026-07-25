@@ -71,6 +71,8 @@ mod commands {
     pub mod ai_translate_cowork_commands;
     /// Commands cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_commands;
+    /// Commands cho module Terminal nhúng (PTY): spawn/write/resize/kill.
+    pub mod terminal_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -171,6 +173,8 @@ mod models {
     pub mod ai_workflow;
     /// Model cho module AI Task (task code + phân loại).
     pub mod ai_task;
+    /// Model cho module Terminal nhúng (payload event output/exit).
+    pub mod terminal;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -247,6 +251,8 @@ mod services {
     pub mod ai_translate_cowork_service;
     /// Service cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_service;
+    /// Service quản lý phiên terminal nhúng (PTY): spawn/write/resize/kill.
+    pub mod terminal_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).
