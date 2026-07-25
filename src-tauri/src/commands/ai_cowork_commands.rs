@@ -9,8 +9,8 @@ pub fn ai_cowork_get_state() -> Result<AiCoworkState, String> {
     ai_cowork_service::get_state().map_err(crate::app::error::log_err)
 }
 
-/// Lưu lại project directory đang làm việc.
+/// Lưu lại toàn bộ state làm việc (project directory, task đang hiển thị, workflow áp dụng).
 #[tauri::command]
-pub fn ai_cowork_save_state(project_dir: String) -> Result<(), String> {
-    ai_cowork_service::save_state(project_dir).map_err(crate::app::error::log_err)
+pub fn ai_cowork_save_state(state: AiCoworkState) -> Result<(), String> {
+    ai_cowork_service::save_state(state).map_err(crate::app::error::log_err)
 }

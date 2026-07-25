@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::app::result::AppResult;
 use crate::utils::app_config;
@@ -16,10 +17,23 @@ use crate::utils::app_config;
 const DATA_FILE: &str = "ai_cowork.json";
 
 /// State làm việc gần nhất của màn AI Cowork.
+///
+/// Ngoài project directory, còn lưu lại danh sách task đang hiển thị (kèm trạng
+/// thái tick chọn) và workflow đang chọn / đang áp dụng — để khi mở lại màn hình
+/// khôi phục nguyên vẹn tiến trình đang làm dở. Danh sách task lưu dạng JSON
+/// nguyên bản (opaque) để không phụ thuộc cấu trúc task của tầng frontend.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct AiCoworkState {
     #[serde(default)]
     pub project_dir: String,
+    #[serde(default)]
+    pub selected_tasks: Vec<Value>,
+    #[serde(default)]
+    pub confirmed_task_ids: Vec<i64>,
+    #[serde(default)]
+    pub selected_workflow_id: Option<i64>,
+    #[serde(default)]
+    pub applied_workflow_id: Option<i64>,
 }
 
 fn data_path() -> PathBuf {

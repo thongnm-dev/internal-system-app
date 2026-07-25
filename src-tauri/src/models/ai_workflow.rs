@@ -22,7 +22,18 @@ pub struct AiWorkflowStep {
     pub description: String,
     pub icon: String,
     pub step_order: i32,
+    pub is_latest_step: bool,
+    pub model_id: Option<i32>,
     pub created_at: String,
+}
+
+/// Danh mục model AI (bảng `ai_models`) để chọn cho từng workflow step.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AiModel {
+    pub id: i32,
+    pub provider: String,
+    pub model: String,
+    pub version: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +56,10 @@ pub struct CreateStepRequest {
     pub description: String,
     pub icon: String,
     pub step_order: i32,
+    #[serde(default)]
+    pub is_latest_step: bool,
+    #[serde(default)]
+    pub model_id: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,4 +70,8 @@ pub struct UpdateStepRequest {
     pub description: String,
     pub icon: String,
     pub step_order: i32,
+    #[serde(default)]
+    pub is_latest_step: bool,
+    #[serde(default)]
+    pub model_id: Option<i32>,
 }

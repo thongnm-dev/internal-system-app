@@ -365,6 +365,15 @@ CREATE TABLE IF NOT EXISTS ai_workflows (
 
 CREATE INDEX IF NOT EXISTS idx_ai_workflows_created_by ON ai_workflows(created_by);
 
+-- Danh mục model AI để chọn cho từng workflow step. Hiện chỉ đối ứng provider 'claude'.
+CREATE TABLE IF NOT EXISTS ai_models (
+    id       SERIAL       PRIMARY KEY,
+    provider VARCHAR(50)  NOT NULL DEFAULT 'claude',
+    model    VARCHAR(100) NOT NULL,
+    version  VARCHAR(50)  NOT NULL DEFAULT '',
+    UNIQUE (provider, model, version)
+);
+
 CREATE TABLE IF NOT EXISTS ai_workflow_steps (
     id            SERIAL       PRIMARY KEY,
     workflow_id   INTEGER      NOT NULL REFERENCES ai_workflows(id) ON DELETE CASCADE,
@@ -375,8 +384,14 @@ CREATE TABLE IF NOT EXISTS ai_workflow_steps (
     description   TEXT         NOT NULL DEFAULT '',
     icon          VARCHAR(50)  NOT NULL DEFAULT 'pi pi-cog',
     step_order    INTEGER      NOT NULL DEFAULT 0,
+    is_latest_step BOOLEAN     NOT NULL DEFAULT FALSE,
+    model_id      INTEGER      REFERENCES ai_models(id) ON DELETE SET NULL,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- Cột thêm cho DB đã tồn tại trước đó.
+ALTER TABLE ai_workflow_steps ADD COLUMN IF NOT EXISTS is_latest_step BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE ai_workflow_steps ADD COLUMN IF NOT EXISTS model_id INTEGER REFERENCES ai_models(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_ai_workflow_steps_workflow ON ai_workflow_steps(workflow_id);
 

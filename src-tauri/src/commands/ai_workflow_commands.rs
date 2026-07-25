@@ -1,8 +1,15 @@
 use crate::models::ai_workflow::{
-    AiWorkflow, AiWorkflowStep, CreateStepRequest, CreateWorkflowRequest, UpdateStepRequest,
-    UpdateWorkflowRequest,
+    AiModel, AiWorkflow, AiWorkflowStep, CreateStepRequest, CreateWorkflowRequest,
+    UpdateStepRequest, UpdateWorkflowRequest,
 };
 use crate::services::ai_workflow_service;
+
+#[tauri::command]
+pub async fn ai_model_list() -> Result<Vec<AiModel>, String> {
+    ai_workflow_service::list_models()
+        .await
+        .map_err(crate::app::error::log_err)
+}
 
 #[tauri::command]
 pub async fn ai_workflow_create(

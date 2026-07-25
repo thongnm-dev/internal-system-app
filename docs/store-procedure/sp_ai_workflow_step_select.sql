@@ -9,15 +9,17 @@ CREATE OR REPLACE FUNCTION sp_ai_workflow_step_select(
     p_workflow_id INTEGER
 )
 RETURNS TABLE (
-    id          INTEGER,
-    workflow_id INTEGER,
-    name        VARCHAR(200),
-    step_type   VARCHAR(20),
-    skill_name  VARCHAR(200),
-    description TEXT,
-    icon        VARCHAR(50),
-    step_order  INTEGER,
-    created_at  TEXT
+    id             INTEGER,
+    workflow_id    INTEGER,
+    name           VARCHAR(200),
+    step_type      VARCHAR(20),
+    skill_name     VARCHAR(200),
+    description    TEXT,
+    icon           VARCHAR(50),
+    step_order     INTEGER,
+    is_latest_step BOOLEAN,
+    model_id       INTEGER,
+    created_at     TEXT
 )
 LANGUAGE plpgsql
 AS $$
@@ -32,6 +34,8 @@ BEGIN
         s.description,
         s.icon,
         s.step_order,
+        s.is_latest_step,
+        s.model_id,
         s.created_at::text
     FROM ai_workflow_steps s
     WHERE s.workflow_id = p_workflow_id

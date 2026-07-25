@@ -117,8 +117,9 @@ pub async fn ai_usage_open_terminal(
     config_dir: String,
     work_dir: String,
     prompt: Option<String>,
+    model: Option<String>,
 ) -> Result<(), String> {
-    ai_usage_service::open_terminal(&config_dir, &work_dir, prompt.as_deref())
+    ai_usage_service::open_terminal(&config_dir, &work_dir, prompt.as_deref(), model.as_deref())
         .map_err(crate::app::error::log_err)
 }
 
