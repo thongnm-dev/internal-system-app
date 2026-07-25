@@ -3,7 +3,7 @@
 -- Update a workflow step. Returns updated record.
 -- ============================================================================
 
-DROP FUNCTION IF EXISTS sp_ai_workflow_step_update(INTEGER, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, INTEGER);
+DROP FUNCTION IF EXISTS sp_ai_workflow_step_update(INTEGER, VARCHAR, VARCHAR, VARCHAR, TEXT, VARCHAR, INTEGER, BOOLEAN);
 
 CREATE OR REPLACE FUNCTION sp_ai_workflow_step_update(
     p_id             INTEGER,
@@ -13,7 +13,8 @@ CREATE OR REPLACE FUNCTION sp_ai_workflow_step_update(
     p_description    TEXT,
     p_icon           VARCHAR(50),
     p_step_order     INTEGER,
-    p_is_latest_step BOOLEAN
+    p_is_latest_step BOOLEAN,
+    p_model_id       INTEGER
 )
 RETURNS TABLE (
     id             INTEGER,
@@ -25,6 +26,7 @@ RETURNS TABLE (
     icon           VARCHAR(50),
     step_order     INTEGER,
     is_latest_step BOOLEAN,
+    model_id       INTEGER,
     created_at     TEXT
 )
 LANGUAGE plpgsql
@@ -38,7 +40,8 @@ BEGIN
         description = p_description,
         icon = p_icon,
         step_order = p_step_order,
-        is_latest_step = p_is_latest_step
+        is_latest_step = p_is_latest_step,
+        model_id = p_model_id
     WHERE s.id = p_id
     RETURNING
         s.id,
@@ -50,6 +53,7 @@ BEGIN
         s.icon,
         s.step_order,
         s.is_latest_step,
+        s.model_id,
         s.created_at::text;
 END;
 $$;

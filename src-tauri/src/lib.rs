@@ -69,9 +69,9 @@ use commands::ai_usage_commands::{
 };
 use commands::ai_chat_commands::ai_chat_complete;
 use commands::ai_workflow_commands::{
-    ai_workflow_create, ai_workflow_delete, ai_workflow_list, ai_workflow_save_layout,
-    ai_workflow_step_create, ai_workflow_step_delete, ai_workflow_step_list,
-    ai_workflow_step_reorder, ai_workflow_step_update, ai_workflow_update,
+    ai_model_list, ai_workflow_create, ai_workflow_delete, ai_workflow_list,
+    ai_workflow_save_layout, ai_workflow_step_create, ai_workflow_step_delete,
+    ai_workflow_step_list, ai_workflow_step_reorder, ai_workflow_step_update, ai_workflow_update,
 };
 use commands::ai_task_commands::{
     ai_task_create, ai_task_list, ai_task_update,
@@ -334,6 +334,7 @@ pub fn run() {
             ai_workflow_step_delete,
             ai_workflow_step_reorder,
             ai_workflow_save_layout,
+            ai_model_list,
             // === AI Task commands ===
             ai_task_create,
             ai_task_list,

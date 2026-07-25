@@ -3,6 +3,7 @@ import { useToast } from "@/shared/composables/useToast";
 import { useAuthStore } from "@/app/stores/auth";
 import { friendlyError } from "@/tauri/commands/_base";
 import {
+  aiModelList,
   aiWorkflowCreate,
   aiWorkflowDelete,
   aiWorkflowList,
@@ -15,6 +16,7 @@ import {
   aiWorkflowStepUpdate,
 } from "@/tauri/commands/ai-workflow";
 import type {
+  AiModelResult,
   AiWorkflowResult,
   AiWorkflowStepResult,
 } from "@/tauri/commands/ai-workflow";
@@ -41,6 +43,7 @@ export type WorkflowStep = {
   icon: string;
   stepOrder: number;
   isLatestStep: boolean;
+  modelId: number | null;
 };
 
 function parseLayout(raw: string): Record<string, { x: number; y: number }> {
@@ -74,6 +77,7 @@ function toStep(r: AiWorkflowStepResult): WorkflowStep {
     icon: r.icon,
     stepOrder: r.step_order,
     isLatestStep: r.is_latest_step,
+    modelId: r.model_id,
   };
 }
 
@@ -83,6 +87,7 @@ export function useAiWorkflow() {
   const username = computed(() => auth.user?.username ?? "");
 
   const workflows = ref<Workflow[]>([]);
+  const models = ref<AiModelResult[]>([]);
   const activeId = ref<number | null>(null);
   const activeSteps = ref<WorkflowStep[]>([]);
   const selectedStepId = ref<number | null>(null);
@@ -128,7 +133,17 @@ export function useAiWorkflow() {
     }
   }
 
+  /** Nạp danh mục model AI (dùng cho select model ở từng step). */
+  async function loadModels() {
+    try {
+      models.value = await aiModelList();
+    } catch (e) {
+      error.value = friendlyError(e);
+    }
+  }
+
   loadWorkflows();
+  loadModels();
 
   async function selectWorkflow(id: number) {
     activeId.value = id;
@@ -217,6 +232,7 @@ export function useAiWorkflow() {
           icon: step.icon,
           step_order: step.stepOrder,
           is_latest_step: step.isLatestStep,
+          model_id: step.modelId,
         });
       }
 
@@ -256,6 +272,7 @@ export function useAiWorkflow() {
         icon: step?.icon ?? meta.icon,
         step_order: stepOrder,
         is_latest_step: step?.isLatestStep ?? false,
+        model_id: step?.modelId ?? null,
       });
       const newStep = toStep(result);
 
@@ -290,6 +307,7 @@ export function useAiWorkflow() {
         icon: patch.icon ?? step.icon,
         step_order: patch.stepOrder ?? step.stepOrder,
         is_latest_step: patch.isLatestStep ?? step.isLatestStep,
+        model_id: patch.modelId !== undefined ? patch.modelId : step.modelId,
       });
       const updated = toStep(result);
       const idx = activeSteps.value.findIndex((s) => s.id === stepId);
@@ -357,6 +375,7 @@ export function useAiWorkflow() {
 
   return {
     workflows,
+    models,
     activeId,
     selectedStepId,
     searchQuery,
