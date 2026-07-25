@@ -414,15 +414,11 @@ export function useAiCowork() {
   }
 
   /**
-   * Ghép prompt truyền cho `claude`: `/<skill-name> [CATEGORY] <task_cd> ...`
-   * (mỗi task đã xác nhận là một cụm `[CATEGORY] task_cd`).
+   * Ghép prompt truyền cho `claude` cho MỘT task: `/<skill-name> [CATEGORY] <task_cd>`.
    * VD: `/create-plan [SCREEN] SZTN_G_SC01`.
    */
-  function buildSkillPrompt(step: CoworkStep): string {
-    const tasksPart = confirmedTasks.value
-      .map((t) => `[${t.category.toUpperCase()}] ${t.task_cd}`)
-      .join(" ");
-    return `/${step.skillName} ${tasksPart}`.trim();
+  function buildTaskSkillPrompt(step: CoworkStep, task: AiTaskResult): string {
+    return `/${step.skillName} [${task.category.toUpperCase()}] ${task.task_cd}`;
   }
 
   /** Mở terminal tại project directory với account AI đang active để chạy step skill. */
@@ -468,14 +464,18 @@ export function useAiCowork() {
       // Đăng ký dữ liệu wf_proc / wf_proc_step rồi mở terminal kèm prompt skill.
       // `claude --dangerously-skip-permissions` (trong build_claude_command) đã tự bỏ qua
       // hộp thoại "trust folder" nên prompt được chạy thẳng.
-      const hasTasks = confirmedTasks.value.length > 0;
-      const prompt = hasTasks ? buildSkillPrompt(step) : undefined;
-      if (hasTasks) {
+      const tasks = confirmedTasks.value;
+      if (tasks.length > 0) {
         await registerTaskWorkflowProgress(step);
         // Đồng bộ lại trạng thái bước hiện tại theo dữ liệu vừa ghi.
         await resolveConfirmedTaskSteps();
+        // Mỗi task mở 1 terminal riêng (không gom chung) để tránh xung đột khi cùng xử lý 1 file.
+        for (const task of tasks) {
+          await aiUsageOpenTerminal(active.config_dir, dir, buildTaskSkillPrompt(step, task));
+        }
+      } else {
+        await aiUsageOpenTerminal(active.config_dir, dir);
       }
-      await aiUsageOpenTerminal(active.config_dir, dir, prompt);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
