@@ -454,10 +454,16 @@ export function useAiCowork() {
     return `/${step.skillName} [${task.category.toUpperCase()}] ${task.task_cd}`;
   }
 
-  /** Giá trị `--model` tương ứng model đã chọn cho step (undefined nếu chưa chọn / không tìm thấy). */
+  /**
+   * Giá trị `--model` tương ứng model đã chọn cho step (undefined nếu chưa chọn / không tìm thấy).
+   * Có version → pin cụ thể `model-version`; không có version → chạy model latest (chỉ alias `model`).
+   */
   function resolveStepModel(step: CoworkStep): string | undefined {
     if (step.modelId === null) return undefined;
-    return models.value.find((m) => m.id === step.modelId)?.model;
+    const m = models.value.find((x) => x.id === step.modelId);
+    if (!m) return undefined;
+    const version = m.version.trim();
+    return version ? `${m.model}-${version}` : m.model;
   }
 
   /** Mở terminal tại project directory với account AI đang active để chạy step skill. */

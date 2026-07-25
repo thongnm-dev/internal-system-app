@@ -121,8 +121,12 @@ ON CONFLICT (id) DO NOTHING;
 -- Project member mặc định
 INSERT INTO public.project_members (id, project_id, username, "name") VALUES(1, 1, 'Thongnm', 'Thongnm')
 ON CONFLICT (id) DO NOTHING;
--- Model AI mặc định (hiện chỉ đối ứng provider 'claude'; provider khác bổ sung sau)
+-- Model AI mặc định (hiện chỉ đối ứng provider 'claude'; provider khác bổ sung sau).
+-- Version rỗng = chạy model latest (alias); có version = pin cụ thể (model-version).
 INSERT INTO ai_models (provider, model, version) VALUES
+    ('claude', 'opus', ''),
+    ('claude', 'sonnet', ''),
+    ('claude', 'haiku', ''),
     ('claude', 'opus', '5'),
     ('claude', 'sonnet', '5'),
     ('claude', 'haiku', '4.5')
