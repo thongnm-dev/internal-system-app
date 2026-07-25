@@ -60,6 +60,9 @@ function toStep(r: AiWorkflowStepResult): CoworkStep {
   };
 }
 
+/** Số task tối đa được chạy cùng lúc khi thực thi skill (mỗi task mở 1 terminal riêng). */
+const MAX_TASKS_PER_RUN = 3;
+
 export function useAiCowork() {
   const toast = useToast();
   const auth = useAuthStore();
@@ -349,6 +352,7 @@ export function useAiCowork() {
    */
   function canOpenStepTerminal(step: CoworkStep): boolean {
     if (!hasMatchingSkill(step)) return false;
+    if (confirmedTasks.value.length > MAX_TASKS_PER_RUN) return false;
     if (confirmedTasks.value.length === 0) return true;
     if (confirmedStepConflict.value) return true;
     if (confirmedStepIsLatest.value) return false;
@@ -358,6 +362,8 @@ export function useAiCowork() {
   /** Tooltip cho nút mở terminal — giải thích lý do enable/disable. */
   function stepTerminalTitle(step: CoworkStep): string {
     if (!hasMatchingSkill(step)) return "Không tìm thấy skill khớp trong .claude/skills";
+    if (confirmedTasks.value.length > MAX_TASKS_PER_RUN)
+      return `Chỉ chạy tối đa ${MAX_TASKS_PER_RUN} task cùng lúc — hãy bỏ bớt task đã chọn`;
     if (confirmedTasks.value.length === 0 || confirmedStepConflict.value) return "Mở terminal cho skill này";
     if (confirmedStepIsLatest.value) return "Task đã ở bước cuối cùng của workflow — không thể mở terminal";
     if (confirmedStepId.value === null) return "Task chưa có bước hiện tại trong workflow";
@@ -439,6 +445,11 @@ export function useAiCowork() {
       await resolveConfirmedTaskSteps();
 
       if (confirmedTasks.value.length > 0) {
+        // Giới hạn số task chạy cùng lúc (mỗi task 1 terminal).
+        if (confirmedTasks.value.length > MAX_TASKS_PER_RUN) {
+          toast.error(`Chỉ chạy tối đa ${MAX_TASKS_PER_RUN} task cùng lúc. Hãy bỏ bớt task đã chọn.`);
+          return;
+        }
         // Các task đã xác nhận phải cùng 1 workflow_proc_step.
         if (confirmedStepConflict.value) {
           showConfirmedStepConflictDialog();
