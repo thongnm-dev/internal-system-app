@@ -218,10 +218,33 @@ export function useAiCowork() {
     { deep: true },
   );
 
-  /** Lưu lại project directory hiện tại để lần mở màn hình sau tự động load lại. */
+  // Chỉ bắt đầu ghi state sau khi đã khôi phục xong (tránh ghi đè state cũ bằng
+  // state rỗng trong lúc `init()` đang nạp lại dữ liệu).
+  let hydrated = false;
+
+  /**
+   * Lưu lại toàn bộ trạng thái làm việc để lần mở màn hình sau khôi phục y hệt:
+   * project directory, danh sách task đang hiển thị (kèm trạng thái tick chọn),
+   * và workflow đang chọn / đang áp dụng.
+   */
   function persistState() {
-    void aiCoworkSaveState(projectDir.value).catch(() => undefined);
+    void aiCoworkSaveState({
+      project_dir: projectDir.value,
+      selected_tasks: selectedTasks.value,
+      confirmed_task_ids: Array.from(confirmedTaskIds.value),
+      selected_workflow_id: selectedWorkflowId.value,
+      applied_workflow_id: appliedWorkflowId.value,
+    }).catch(() => undefined);
   }
+
+  // Tự động lưu lại khi task / workflow thay đổi (chỉ sau khi đã khôi phục xong).
+  watch(
+    [selectedTasks, confirmedTaskIds, selectedWorkflowId, appliedWorkflowId],
+    () => {
+      if (hydrated) persistState();
+    },
+    { deep: true },
+  );
 
   async function pickProjectDir() {
     if (!canUseTauriRuntime()) {
@@ -784,15 +807,39 @@ export function useAiCowork() {
 
   async function init() {
     await Promise.all([loadWorkflows(), loadAccounts(), loadModels()]);
-    if (!canUseTauriRuntime()) return;
+    if (!canUseTauriRuntime()) {
+      hydrated = true;
+      return;
+    }
     try {
       const state = await aiCoworkGetState();
       if (state.project_dir) {
         projectDir.value = state.project_dir;
         await loadDirectory();
       }
+
+      // Khôi phục danh sách task đang hiển thị + trạng thái tick chọn.
+      if (Array.isArray(state.selected_tasks) && state.selected_tasks.length) {
+        selectedTasks.value = state.selected_tasks;
+        const taskIds = new Set(state.selected_tasks.map((t) => t.id));
+        const confirmed = Array.isArray(state.confirmed_task_ids) ? state.confirmed_task_ids : [];
+        // Chỉ giữ lại id còn nằm trong danh sách task đã khôi phục.
+        confirmedTaskIds.value = new Set(confirmed.filter((id) => taskIds.has(id)));
+      }
+
+      // Khôi phục workflow đang áp dụng (nạp lại danh sách step) và giữ lựa chọn dropdown.
+      const savedSelected = state.selected_workflow_id ?? null;
+      if (state.applied_workflow_id !== null && state.applied_workflow_id !== undefined) {
+        selectedWorkflowId.value = state.applied_workflow_id;
+        await applyWorkflow();
+        selectedWorkflowId.value = savedSelected ?? state.applied_workflow_id;
+      } else {
+        selectedWorkflowId.value = savedSelected;
+      }
     } catch {
       // Không có lịch sử hoặc lỗi đọc file — bỏ qua, giữ màn hình ở trạng thái mặc định.
+    } finally {
+      hydrated = true;
     }
   }
 
