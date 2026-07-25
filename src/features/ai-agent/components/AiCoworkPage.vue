@@ -609,7 +609,7 @@ function isMarkdown(entry: FileEntry): boolean {
     >
       <template #header>
         <h3 class="flex items-center gap-2 font-bold text-ink">
-          <i class="pi pi-exclamation-triangle text-red-500" />Task không cùng bước workflow
+          <i class="pi pi-exclamation-triangle text-amber-500" />Task không cùng bước workflow
         </h3>
       </template>
 
