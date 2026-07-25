@@ -122,6 +122,17 @@ pub async fn ai_usage_open_terminal(
         .map_err(crate::app::error::log_err)
 }
 
+/// Mở 1 terminal chạy toàn bộ workflow cho 1 task (các prompt skill chạy tuần tự).
+#[tauri::command]
+pub async fn ai_usage_open_workflow_terminal(
+    config_dir: String,
+    work_dir: String,
+    prompts: Vec<String>,
+) -> Result<(), String> {
+    ai_usage_service::open_workflow_terminal(&config_dir, &work_dir, &prompts)
+        .map_err(crate::app::error::log_err)
+}
+
 /// Mở terminal mới chạy `claude /login` với `CLAUDE_CONFIG_DIR` tuỳ chỉnh.
 #[tauri::command]
 pub async fn ai_usage_open_login(config_dir: String, work_dir: String) -> Result<(), String> {

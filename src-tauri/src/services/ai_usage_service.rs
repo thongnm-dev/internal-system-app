@@ -789,6 +789,28 @@ fn build_claude_command(prompt: Option<&str>) -> String {
     command
 }
 
+/// Mở 1 terminal chạy toàn bộ workflow cho 1 task: nối các prompt skill bằng `&&`,
+/// mỗi bước dùng `claude -p` (headless) nên chạy tuần tự — xong bước này mới sang bước kế.
+pub fn open_workflow_terminal(config_dir: &str, work_dir: &str, prompts: &[String]) -> AppResult<()> {
+    if prompts.is_empty() {
+        return Err(AppError::new("Không có step nào để chạy."));
+    }
+    let command = build_claude_workflow_command(prompts);
+    spawn_terminal(config_dir, work_dir, Some(&command))
+}
+
+/// Ghép chuỗi lệnh tuần tự: `claude ... -p "p1" && claude ... -p "p2" && ...`.
+fn build_claude_workflow_command(prompts: &[String]) -> String {
+    prompts
+        .iter()
+        .map(|p| {
+            let sanitized = p.trim().replace('"', "");
+            format!("claude --dangerously-skip-permissions -p \"{sanitized}\"")
+        })
+        .collect::<Vec<_>>()
+        .join(" && ")
+}
+
 /// Mở terminal chạy `claude /login` với `CLAUDE_CONFIG_DIR` tuỳ chỉnh.
 pub fn open_login_terminal(config_dir: &str, work_dir: &str) -> AppResult<()> {
     spawn_terminal(config_dir, work_dir, Some("claude /login"))

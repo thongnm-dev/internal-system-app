@@ -7,7 +7,12 @@ import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { aiCoworkGetState, aiCoworkSaveState } from "@/tauri/commands/ai-cowork";
 import { aiWorkflowList, aiWorkflowStepList } from "@/tauri/commands/ai-workflow";
 import type { AiWorkflowResult, AiWorkflowStepResult } from "@/tauri/commands/ai-workflow";
-import { aiUsageListAccounts, aiUsageOpenTerminal, aiUsageSetActive } from "@/tauri/commands/ai-usage";
+import {
+  aiUsageListAccounts,
+  aiUsageOpenTerminal,
+  aiUsageOpenWorkflowTerminal,
+  aiUsageSetActive,
+} from "@/tauri/commands/ai-usage";
 import type { AiAccount } from "@/_/types/ai-usage";
 import { explorerOpen, explorerReadDir, explorerReadTextFile } from "@/tauri/commands/explorer";
 import type { FileEntry } from "@/tauri/commands/explorer";
@@ -94,6 +99,7 @@ export function useAiCowork() {
   const openingTerminalStepId = ref<number | null>(null);
   const showSkillListDialog = ref(false);
   const isLoadingSkillList = ref(false);
+  const isRunningWorkflow = ref(false);
 
   // Dialog báo lỗi khi các task đang chọn không cùng 1 workflow_proc_step.
   const showTaskStepConflict = ref(false);
@@ -494,6 +500,84 @@ export function useAiCowork() {
     }
   }
 
+  /** Các skill step khả dụng (loại "skill" + có folder khớp trong `.claude/skills`), theo thứ tự. */
+  const runnableSkillSteps = computed(() =>
+    steps.value.filter((s) => s.type === "skill" && hasMatchingSkill(s)),
+  );
+
+  /** Nút "Run workflow" chỉ enable khi tick đúng 1 task và workflow có skill step khả dụng. */
+  function canRunWorkflow(): boolean {
+    return confirmedTasks.value.length === 1 && runnableSkillSteps.value.length > 0;
+  }
+
+  /** Tooltip cho nút "Run workflow". */
+  function runWorkflowTitle(): string {
+    if (confirmedTasks.value.length === 0) return "Tick chọn đúng 1 task để chạy workflow";
+    if (confirmedTasks.value.length > 1) return "Chỉ chạy workflow cho đúng 1 task";
+    if (runnableSkillSteps.value.length === 0)
+      return "Workflow không có skill step khả dụng trong .claude/skills";
+    return "Chạy toàn bộ workflow cho task đã chọn (tuần tự từng step)";
+  }
+
+  /** Đăng ký `ai_task_wf_proc` + `ai_task_wf_proc_step` cho tất cả skill step khi chạy cả workflow. */
+  async function registerFullWorkflowProgress(task: AiTaskResult, skillSteps: CoworkStep[]) {
+    const wfId = appliedWorkflowId.value;
+    if (wfId === null) return;
+    const user = username.value;
+    const procs = await aiTaskWfProcList(task.id);
+    let proc = procs.find((p) => p.wf_id === wfId);
+    if (!proc) {
+      proc = await aiTaskWfProcCreate(user, { task_id: task.id, wf_id: wfId });
+    }
+    const procSteps = await aiTaskWfProcStepList(proc.id);
+    for (const step of skillSteps) {
+      const existing = procSteps.find((s) => s.wf_step_id === step.id);
+      if (!existing) {
+        await aiTaskWfProcStepCreate(user, {
+          wf_proc_id: proc.id,
+          wf_step_id: step.id,
+          status: "in_progress",
+        });
+      } else if (existing.status !== "in_progress") {
+        await aiTaskWfProcStepUpdate(existing.id, "in_progress", user);
+      }
+    }
+    // latest_step_id = step cuối cùng trong chuỗi chạy.
+    const lastStep = skillSteps[skillSteps.length - 1];
+    if (proc.latest_step_id !== lastStep.id) {
+      await aiTaskWfProcUpdate(proc.id, lastStep.id, user);
+    }
+  }
+
+  /**
+   * Chạy toàn bộ workflow cho đúng 1 task: đăng ký tiến trình rồi mở 1 terminal chạy
+   * tuần tự tất cả skill step (mỗi bước 1 lệnh `claude -p`, nối bằng `&&`).
+   */
+  async function runWorkflow() {
+    if (!canRunWorkflow()) return;
+    const dir = projectDir.value.trim();
+    if (!dir) return;
+    const active = accounts.value.find((a) => a.is_active && a.config_dir.trim());
+    if (!active) {
+      toast.error("Không tìm thấy account AI subscription đang active có CLAUDE_CONFIG_DIR.");
+      return;
+    }
+    const task = confirmedTasks.value[0];
+    const skillSteps = runnableSkillSteps.value;
+
+    isRunningWorkflow.value = true;
+    try {
+      await registerFullWorkflowProgress(task, skillSteps);
+      await resolveConfirmedTaskSteps();
+      const prompts = skillSteps.map((s) => buildTaskSkillPrompt(s, task));
+      await aiUsageOpenWorkflowTerminal(active.config_dir, dir, prompts);
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      isRunningWorkflow.value = false;
+    }
+  }
+
   async function loadAccounts() {
     isLoadingAccounts.value = true;
     try {
@@ -636,6 +720,10 @@ export function useAiCowork() {
     confirmedStepIsLatest,
     confirmedStepIsNonSkill,
     openStepTerminal,
+    isRunningWorkflow,
+    canRunWorkflow,
+    runWorkflowTitle,
+    runWorkflow,
     skillFolders,
     showSkillListDialog,
     isLoadingSkillList,

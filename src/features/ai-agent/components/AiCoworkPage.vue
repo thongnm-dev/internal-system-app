@@ -449,6 +449,18 @@ function isMarkdown(entry: FileEntry): boolean {
             {{ ctrl.workflows.value.length ? "Chọn workflow rồi bấm Apply để nạp danh sách step." : "Chưa có workflow nào." }}
           </p>
         </div>
+
+        <!-- Run toàn bộ workflow cho đúng 1 task (chạy tuần tự từng step) -->
+        <Button
+          v-if="ctrl.appliedWorkflowId.value !== null && ctrl.steps.value.length"
+          label="Run workflow"
+          icon="pi pi-play"
+          class="mt-3 w-full shrink-0"
+          :disabled="!ctrl.canRunWorkflow()"
+          :loading="ctrl.isRunningWorkflow.value"
+          :title="ctrl.runWorkflowTitle()"
+          @click="ctrl.runWorkflow"
+        />
       </div>
 
       <!-- Drag handle: Workflow ↔ Project Directory -->

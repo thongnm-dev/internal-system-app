@@ -81,6 +81,10 @@ export function aiUsageOpenTerminal(configDir: string, workDir: string, prompt?:
   return safeInvoke<void>("ai_usage_open_terminal", { configDir, workDir, prompt: prompt ?? null });
 }
 
+export function aiUsageOpenWorkflowTerminal(configDir: string, workDir: string, prompts: string[]) {
+  return safeInvoke<void>("ai_usage_open_workflow_terminal", { configDir, workDir, prompts });
+}
+
 export function aiUsageOpenLogin(configDir: string, workDir: string) {
   return safeInvoke<void>("ai_usage_open_login", { configDir, workDir });
 }
