@@ -375,8 +375,12 @@ CREATE TABLE IF NOT EXISTS ai_workflow_steps (
     description   TEXT         NOT NULL DEFAULT '',
     icon          VARCHAR(50)  NOT NULL DEFAULT 'pi pi-cog',
     step_order    INTEGER      NOT NULL DEFAULT 0,
+    is_latest_step BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- Cột đánh dấu step cuối cùng của workflow (thêm cho DB đã tồn tại trước đó).
+ALTER TABLE ai_workflow_steps ADD COLUMN IF NOT EXISTS is_latest_step BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_ai_workflow_steps_workflow ON ai_workflow_steps(workflow_id);
 

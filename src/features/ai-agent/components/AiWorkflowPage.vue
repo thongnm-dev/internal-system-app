@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
@@ -85,6 +86,7 @@ const stepType = ref<WorkflowStepType>("custom");
 const stepSkillName = ref("");
 const stepDescription = ref("");
 const stepIcon = ref("pi pi-cog");
+const stepIsLatest = ref(false);
 
 const stepTypeOptions = Object.entries(STEP_TYPE_META).map(([value, meta]) => ({
   label: meta.label,
@@ -100,6 +102,7 @@ function openAddStepDialog(after: number | null) {
   stepSkillName.value = "";
   stepDescription.value = "";
   stepIcon.value = STEP_TYPE_META.custom.icon;
+  stepIsLatest.value = false;
   showStepDialog.value = true;
 }
 
@@ -113,6 +116,7 @@ function openEditStepDialog(stepId: number) {
   stepSkillName.value = step.skillName;
   stepDescription.value = step.description;
   stepIcon.value = step.icon;
+  stepIsLatest.value = step.isLatestStep;
   showStepDialog.value = true;
 }
 
@@ -130,6 +134,7 @@ async function saveStep() {
     skillName: stepSkillName.value.trim(),
     description: stepDescription.value.trim(),
     icon: stepIcon.value,
+    isLatestStep: stepIsLatest.value,
   };
   if (editingStepId.value) {
     await ctrl.updateStep(editingStepId.value, data);
@@ -540,9 +545,18 @@ const selectPt = {
                     <i class="pi pi-times text-[10px]" />
                   </button>
                 </div>
-                <span :class="['mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold', stepTypeBadgeClass(step.type)]">
-                  {{ stepTypeLabel(step.type) }}
-                </span>
+                <div class="mt-1 flex flex-wrap items-center gap-1">
+                  <span :class="['inline-block rounded-full px-2 py-0.5 text-[11px] font-bold', stepTypeBadgeClass(step.type)]">
+                    {{ stepTypeLabel(step.type) }}
+                  </span>
+                  <span
+                    v-if="step.isLatestStep"
+                    class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700"
+                    title="Bước cuối cùng của workflow"
+                  >
+                    <i class="pi pi-flag-fill text-[9px]" />Latest
+                  </span>
+                </div>
                 <p class="mt-2 line-clamp-2 text-xs text-muted">{{ step.description }}</p>
               </div>
             </template>
@@ -670,6 +684,15 @@ const selectPt = {
         <label class="block">
           <span class="text-xs font-bold text-muted">Description</span>
           <InputText v-model="stepDescription" class="mt-1 w-full" placeholder="What this step does" />
+        </label>
+        <label class="flex items-start gap-2">
+          <Checkbox v-model="stepIsLatest" binary input-id="step-is-latest" class="mt-0.5" />
+          <span class="min-w-0">
+            <span class="text-xs font-bold text-ink">Latest step</span>
+            <span class="block text-xs text-muted">
+              Đánh dấu đây là bước cuối cùng của workflow. Khi task đã ở bước này sẽ không cho phép mở terminal.
+            </span>
+          </span>
         </label>
       </div>
 

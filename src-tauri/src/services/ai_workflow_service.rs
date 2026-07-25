@@ -70,6 +70,7 @@ pub async fn create_step(
         request.description.trim(),
         request.icon.trim(),
         request.step_order,
+        request.is_latest_step,
     )
     .await
 }
@@ -96,6 +97,7 @@ pub async fn update_step(
         request.description.trim(),
         request.icon.trim(),
         request.step_order,
+        request.is_latest_step,
     )
     .await?
     .ok_or_else(|| AppError::new(format!("Step '{id}' not found.")))

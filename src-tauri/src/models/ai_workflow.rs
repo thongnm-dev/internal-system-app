@@ -22,6 +22,7 @@ pub struct AiWorkflowStep {
     pub description: String,
     pub icon: String,
     pub step_order: i32,
+    pub is_latest_step: bool,
     pub created_at: String,
 }
 
@@ -45,6 +46,8 @@ pub struct CreateStepRequest {
     pub description: String,
     pub icon: String,
     pub step_order: i32,
+    #[serde(default)]
+    pub is_latest_step: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,4 +58,6 @@ pub struct UpdateStepRequest {
     pub description: String,
     pub icon: String,
     pub step_order: i32,
+    #[serde(default)]
+    pub is_latest_step: bool,
 }

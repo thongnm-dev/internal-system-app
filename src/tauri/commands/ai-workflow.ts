@@ -20,6 +20,7 @@ export type AiWorkflowStepResult = {
   description: string;
   icon: string;
   step_order: number;
+  is_latest_step: boolean;
   created_at: string;
 };
 
@@ -40,6 +41,7 @@ export type CreateStepRequest = {
   description: string;
   icon: string;
   step_order: number;
+  is_latest_step: boolean;
 };
 
 export type UpdateStepRequest = {
@@ -49,6 +51,7 @@ export type UpdateStepRequest = {
   description: string;
   icon: string;
   step_order: number;
+  is_latest_step: boolean;
 };
 
 export function aiWorkflowCreate(username: string, request: CreateWorkflowRequest) {

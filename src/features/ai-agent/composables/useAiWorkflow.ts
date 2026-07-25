@@ -40,6 +40,7 @@ export type WorkflowStep = {
   description: string;
   icon: string;
   stepOrder: number;
+  isLatestStep: boolean;
 };
 
 function parseLayout(raw: string): Record<string, { x: number; y: number }> {
@@ -72,6 +73,7 @@ function toStep(r: AiWorkflowStepResult): WorkflowStep {
     description: r.description,
     icon: r.icon,
     stepOrder: r.step_order,
+    isLatestStep: r.is_latest_step,
   };
 }
 
@@ -214,6 +216,7 @@ export function useAiWorkflow() {
           description: step.description,
           icon: step.icon,
           step_order: step.stepOrder,
+          is_latest_step: step.isLatestStep,
         });
       }
 
@@ -252,6 +255,7 @@ export function useAiWorkflow() {
         description: step?.description ?? "",
         icon: step?.icon ?? meta.icon,
         step_order: stepOrder,
+        is_latest_step: step?.isLatestStep ?? false,
       });
       const newStep = toStep(result);
 
@@ -285,6 +289,7 @@ export function useAiWorkflow() {
         description: patch.description ?? step.description,
         icon: patch.icon ?? step.icon,
         step_order: patch.stepOrder ?? step.stepOrder,
+        is_latest_step: patch.isLatestStep ?? step.isLatestStep,
       });
       const updated = toStep(result);
       const idx = activeSteps.value.findIndex((s) => s.id === stepId);

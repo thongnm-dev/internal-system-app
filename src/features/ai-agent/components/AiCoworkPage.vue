@@ -427,9 +427,9 @@ function isMarkdown(entry: FileEntry): boolean {
                 outlined
                 rounded
                 size="small"
-                :disabled="!ctrl.hasMatchingSkill(step)"
+                :disabled="!ctrl.canOpenStepTerminal(step)"
                 :loading="ctrl.openingTerminalStepId.value === step.id"
-                :title="ctrl.hasMatchingSkill(step) ? 'Mở terminal cho skill này' : 'Không tìm thấy skill khớp trong .claude/skills'"
+                :title="ctrl.stepTerminalTitle(step)"
                 @click="ctrl.openStepTerminal(step)"
               />
             </div>

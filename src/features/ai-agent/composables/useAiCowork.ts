@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAuthStore } from "@/app/stores/auth";
 import { useToast } from "@/shared/composables/useToast";
@@ -31,6 +31,7 @@ export type CoworkStep = {
   description: string;
   icon: string;
   stepOrder: number;
+  isLatestStep: boolean;
 };
 
 function toWorkflow(r: AiWorkflowResult): CoworkWorkflow {
@@ -46,6 +47,7 @@ function toStep(r: AiWorkflowStepResult): CoworkStep {
     description: r.description,
     icon: r.icon,
     stepOrder: r.step_order,
+    isLatestStep: r.is_latest_step,
   };
 }
 
@@ -95,6 +97,13 @@ export function useAiCowork() {
   // Task đã tick checkbox xác nhận lại (con trong danh sách selectedTasks).
   const confirmedTaskIds = ref<Set<number>>(new Set());
 
+  // Bước workflow_proc_step hiện tại (chung) của các task đã xác nhận — nạp lại mỗi khi
+  // danh sách task xác nhận / workflow áp dụng thay đổi, dùng để enable/disable nút mở terminal.
+  const confirmedStepId = ref<number | null>(null);
+  const confirmedStepConflict = ref(false);
+  const confirmedStepPairs = ref<{ taskCd: string; stepId: number | null }[]>([]);
+  let resolveStepToken = 0;
+
   // Task picker dialog (search + tạo mới, multi-select).
   const showTaskPicker = ref(false);
   const taskSearchQuery = ref("");
@@ -105,6 +114,67 @@ export function useAiCowork() {
 
   const selectedWorkflow = computed(
     () => workflows.value.find((w) => w.id === selectedWorkflowId.value) ?? null,
+  );
+
+  /** Các task đã tick checkbox xác nhận. */
+  const confirmedTasks = computed(() =>
+    selectedTasks.value.filter((t) => confirmedTaskIds.value.has(t.id)),
+  );
+
+  /** CoworkStep tương ứng bước hiện tại chung của các task đã xác nhận (null nếu chưa/không xác định). */
+  const confirmedStep = computed(() =>
+    confirmedStepId.value === null
+      ? null
+      : steps.value.find((s) => s.id === confirmedStepId.value) ?? null,
+  );
+  /** Các task đã xác nhận đang ở bước cuối cùng của workflow. */
+  const confirmedStepIsLatest = computed(() => confirmedStep.value?.isLatestStep === true);
+  /** Các task đã xác nhận đang ở một bước xác định nhưng KHÔNG phải loại "skill". */
+  const confirmedStepIsNonSkill = computed(
+    () => confirmedStep.value !== null && confirmedStep.value.type !== "skill",
+  );
+
+  /**
+   * Nạp lại bước workflow_proc_step hiện tại của các task đã xác nhận (theo workflow đang áp dụng).
+   * Dùng token để tránh race khi có nhiều lần gọi chồng nhau.
+   */
+  async function resolveConfirmedTaskSteps() {
+    const token = ++resolveStepToken;
+    const tasks = confirmedTasks.value;
+    if (tasks.length === 0) {
+      confirmedStepPairs.value = [];
+      confirmedStepConflict.value = false;
+      confirmedStepId.value = null;
+      return;
+    }
+    const wfId = appliedWorkflowId.value;
+    try {
+      const pairs = await Promise.all(
+        tasks.map(async (t) => {
+          const procs = await aiTaskWfProcList(t.id);
+          const proc = wfId !== null ? procs.find((p) => p.wf_id === wfId) : procs[0];
+          return { taskCd: t.task_cd, stepId: proc?.latest_step_id ?? null };
+        }),
+      );
+      if (token !== resolveStepToken) return; // đã có lần resolve mới hơn
+      confirmedStepPairs.value = pairs;
+      const distinct = new Set(pairs.map((p) => (p.stepId === null ? "none" : String(p.stepId))));
+      confirmedStepConflict.value = distinct.size > 1;
+      confirmedStepId.value = confirmedStepConflict.value ? null : pairs[0].stepId;
+    } catch {
+      if (token !== resolveStepToken) return;
+      confirmedStepPairs.value = [];
+      confirmedStepConflict.value = false;
+      confirmedStepId.value = null;
+    }
+  }
+
+  watch(
+    [confirmedTaskIds, selectedTasks, appliedWorkflowId],
+    () => {
+      void resolveConfirmedTaskSteps();
+    },
+    { deep: true },
   );
 
   /** Lưu lại project directory hiện tại để lần mở màn hình sau tự động load lại. */
@@ -248,41 +318,42 @@ export function useAiCowork() {
   }
 
   /**
-   * Kiểm tra các task đã tick checkbox xác nhận có cùng 1 workflow_proc_step
-   * (theo workflow đang áp dụng) hay không.
-   * Trả về `true` nếu hợp lệ (được phép mở terminal); nếu không, bật dialog lỗi và trả về `false`.
+   * Nút mở terminal của 1 step skill có được enable hay không, dựa trên trạng thái bước hiện tại
+   * của các task đã xác nhận:
+   *  - Phải có skill folder khớp trong `.claude/skills` (điều kiện sẵn có).
+   *  - Nếu task đã ở bước cuối cùng (latest step) → không cho chạy terminal.
+   *  - Nếu task đang ở một bước không phải loại "skill" → không enable terminal skill.
+   *  - Khi các task xác nhận lệch bước, vẫn để enable để lần bấm hiển thị dialog xung đột.
    */
-  async function ensureSelectedTasksSameStep(): Promise<boolean> {
-    const tasks = selectedTasks.value.filter((t) => confirmedTaskIds.value.has(t.id));
-    // Dưới 2 task đã xác nhận thì không thể xảy ra xung đột.
-    if (tasks.length < 2) return true;
+  function canOpenStepTerminal(step: CoworkStep): boolean {
+    if (!hasMatchingSkill(step)) return false;
+    if (confirmedStepConflict.value) return true;
+    if (confirmedStepIsLatest.value) return false;
+    if (confirmedStepIsNonSkill.value) return false;
+    return true;
+  }
 
-    const wfId = appliedWorkflowId.value;
-    const stepIds = await Promise.all(
-      tasks.map(async (t) => {
-        const procs = await aiTaskWfProcList(t.id);
-        const proc = wfId !== null ? procs.find((p) => p.wf_id === wfId) : procs[0];
-        return proc?.latest_step_id ?? null;
-      }),
-    );
+  /** Tooltip cho nút mở terminal — giải thích lý do bị disable (nếu có). */
+  function stepTerminalTitle(step: CoworkStep): string {
+    if (!hasMatchingSkill(step)) return "Không tìm thấy skill khớp trong .claude/skills";
+    if (confirmedStepIsLatest.value) return "Task đã ở bước cuối cùng của workflow — không thể mở terminal";
+    if (confirmedStepIsNonSkill.value) return "Task đang ở bước không phải Skill — không thể mở terminal skill";
+    return "Mở terminal cho skill này";
+  }
 
-    const distinct = new Set(stepIds.map((s) => (s === null ? "none" : String(s))));
-    if (distinct.size <= 1) return true;
-
-    // Gom nhóm task theo step hiện tại để hiển thị chi tiết xung đột trong dialog lỗi.
+  /** Bật dialog lỗi liệt kê các task đã xác nhận đang lệch bước workflow_proc_step. */
+  function showConfirmedStepConflictDialog() {
     const groups = new Map<number | null, string[]>();
-    tasks.forEach((t, i) => {
-      const key = stepIds[i];
-      const list = groups.get(key) ?? [];
-      list.push(t.task_cd);
-      groups.set(key, list);
+    confirmedStepPairs.value.forEach((p) => {
+      const list = groups.get(p.stepId) ?? [];
+      list.push(p.taskCd);
+      groups.set(p.stepId, list);
     });
     taskStepConflictGroups.value = Array.from(groups.entries()).map(([stepId, taskCds]) => ({
       stepLabel: stepLabelForId(stepId),
       taskCds,
     }));
     showTaskStepConflict.value = true;
-    return false;
   }
 
   /** Mở terminal tại project directory với account AI đang active để chạy step skill. */
@@ -299,8 +370,25 @@ export function useAiCowork() {
 
     openingTerminalStepId.value = step.id;
     try {
-      // Các task đang chọn phải cùng 1 workflow_proc_step trước khi mở terminal.
-      if (!(await ensureSelectedTasksSameStep())) return;
+      // Nạp lại trạng thái bước hiện tại của các task đã xác nhận rồi mới quyết định.
+      await resolveConfirmedTaskSteps();
+
+      // Các task đã xác nhận phải cùng 1 workflow_proc_step.
+      if (confirmedStepConflict.value) {
+        showConfirmedStepConflictDialog();
+        return;
+      }
+      // Task đã ở bước cuối cùng → không cho chạy terminal.
+      if (confirmedStepIsLatest.value) {
+        toast.error("Task đã ở bước cuối cùng của workflow — không thể mở terminal.");
+        return;
+      }
+      // Task đang ở bước không phải skill → không thực thi terminal skill.
+      if (confirmedStepIsNonSkill.value) {
+        toast.error("Task đang ở bước không phải Skill — không thể mở terminal skill.");
+        return;
+      }
+
       await aiUsageOpenTerminal(active.config_dir, dir);
     } catch (e) {
       toast.error(friendlyError(e));
@@ -444,6 +532,11 @@ export function useAiCowork() {
     showSkillWarning,
     openingTerminalStepId,
     hasMatchingSkill,
+    canOpenStepTerminal,
+    stepTerminalTitle,
+    confirmedStepConflict,
+    confirmedStepIsLatest,
+    confirmedStepIsNonSkill,
     openStepTerminal,
     skillFolders,
     showSkillListDialog,
