@@ -317,28 +317,41 @@ export function useAiCowork() {
     return steps.value.find((s) => s.id === stepId)?.name ?? `Bước #${stepId}`;
   }
 
+  /** Step này có phải bước hiện tại chung của các task đã xác nhận hay không. */
+  function isCurrentTaskStep(step: CoworkStep): boolean {
+    return (
+      confirmedTasks.value.length > 0 &&
+      !confirmedStepConflict.value &&
+      confirmedStepId.value !== null &&
+      step.id === confirmedStepId.value
+    );
+  }
+
   /**
-   * Nút mở terminal của 1 step skill có được enable hay không, dựa trên trạng thái bước hiện tại
+   * Nút mở terminal của 1 step skill có được enable hay không, dựa trên bước hiện tại
    * của các task đã xác nhận:
    *  - Phải có skill folder khớp trong `.claude/skills` (điều kiện sẵn có).
-   *  - Nếu task đã ở bước cuối cùng (latest step) → không cho chạy terminal.
-   *  - Nếu task đang ở một bước không phải loại "skill" → không enable terminal skill.
+   *  - Không có task xác nhận → cho mở tự do (giữ hành vi cũ).
    *  - Khi các task xác nhận lệch bước, vẫn để enable để lần bấm hiển thị dialog xung đột.
+   *  - Nếu task đã ở bước cuối cùng (latest step) → không cho chạy terminal.
+   *  - Chỉ enable đúng skill của bước hiện tại của task (skill-name tương ứng bước hiện tại).
    */
   function canOpenStepTerminal(step: CoworkStep): boolean {
     if (!hasMatchingSkill(step)) return false;
+    if (confirmedTasks.value.length === 0) return true;
     if (confirmedStepConflict.value) return true;
     if (confirmedStepIsLatest.value) return false;
-    if (confirmedStepIsNonSkill.value) return false;
-    return true;
+    return confirmedStepId.value !== null && step.id === confirmedStepId.value;
   }
 
-  /** Tooltip cho nút mở terminal — giải thích lý do bị disable (nếu có). */
+  /** Tooltip cho nút mở terminal — giải thích lý do enable/disable. */
   function stepTerminalTitle(step: CoworkStep): string {
     if (!hasMatchingSkill(step)) return "Không tìm thấy skill khớp trong .claude/skills";
+    if (confirmedTasks.value.length === 0 || confirmedStepConflict.value) return "Mở terminal cho skill này";
     if (confirmedStepIsLatest.value) return "Task đã ở bước cuối cùng của workflow — không thể mở terminal";
-    if (confirmedStepIsNonSkill.value) return "Task đang ở bước không phải Skill — không thể mở terminal skill";
-    return "Mở terminal cho skill này";
+    if (confirmedStepId.value === null) return "Task chưa có bước hiện tại trong workflow";
+    if (step.id !== confirmedStepId.value) return "Chỉ mở terminal được ở skill của bước hiện tại của task";
+    return "Mở terminal cho skill của bước hiện tại";
   }
 
   /** Bật dialog lỗi liệt kê các task đã xác nhận đang lệch bước workflow_proc_step. */
@@ -373,20 +386,27 @@ export function useAiCowork() {
       // Nạp lại trạng thái bước hiện tại của các task đã xác nhận rồi mới quyết định.
       await resolveConfirmedTaskSteps();
 
-      // Các task đã xác nhận phải cùng 1 workflow_proc_step.
-      if (confirmedStepConflict.value) {
-        showConfirmedStepConflictDialog();
-        return;
-      }
-      // Task đã ở bước cuối cùng → không cho chạy terminal.
-      if (confirmedStepIsLatest.value) {
-        toast.error("Task đã ở bước cuối cùng của workflow — không thể mở terminal.");
-        return;
-      }
-      // Task đang ở bước không phải skill → không thực thi terminal skill.
-      if (confirmedStepIsNonSkill.value) {
-        toast.error("Task đang ở bước không phải Skill — không thể mở terminal skill.");
-        return;
+      if (confirmedTasks.value.length > 0) {
+        // Các task đã xác nhận phải cùng 1 workflow_proc_step.
+        if (confirmedStepConflict.value) {
+          showConfirmedStepConflictDialog();
+          return;
+        }
+        // Task đã ở bước cuối cùng → không cho chạy terminal.
+        if (confirmedStepIsLatest.value) {
+          toast.error("Task đã ở bước cuối cùng của workflow — không thể mở terminal.");
+          return;
+        }
+        // Task chưa có bước hiện tại (chưa bắt đầu workflow).
+        if (confirmedStepId.value === null) {
+          toast.error("Task chưa có bước hiện tại trong workflow — không thể mở terminal.");
+          return;
+        }
+        // Chỉ mở được terminal ở skill của đúng bước hiện tại của task.
+        if (step.id !== confirmedStepId.value) {
+          toast.error("Chỉ mở terminal được ở skill của bước hiện tại của task.");
+          return;
+        }
       }
 
       await aiUsageOpenTerminal(active.config_dir, dir);
@@ -534,6 +554,7 @@ export function useAiCowork() {
     hasMatchingSkill,
     canOpenStepTerminal,
     stepTerminalTitle,
+    isCurrentTaskStep,
     confirmedStepConflict,
     confirmedStepIsLatest,
     confirmedStepIsNonSkill,

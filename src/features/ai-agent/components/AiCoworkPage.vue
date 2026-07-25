@@ -403,7 +403,8 @@ function isMarkdown(entry: FileEntry): boolean {
             <div
               v-for="(step, index) in ctrl.steps.value"
               :key="step.id"
-              class="flex items-start gap-2.5 rounded-lg border border-divider bg-canvas/50 p-3"
+              class="flex items-start gap-2.5 rounded-lg border p-3"
+              :class="ctrl.isCurrentTaskStep(step) ? 'border-brand ring-1 ring-brand/40 bg-brand/5' : 'border-divider bg-canvas/50'"
             >
               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">
                 {{ index + 1 }}
@@ -414,6 +415,13 @@ function isMarkdown(entry: FileEntry): boolean {
                   <span class="truncate font-semibold text-ink">{{ step.name }}</span>
                   <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', STEP_TYPE_META[step.type].badgeClass]">
                     {{ STEP_TYPE_META[step.type].label }}
+                  </span>
+                  <span
+                    v-if="ctrl.isCurrentTaskStep(step)"
+                    class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand"
+                    title="Bước hiện tại của task đã chọn"
+                  >
+                    <i class="pi pi-map-marker text-[9px]" />Bước hiện tại
                   </span>
                 </div>
                 <p v-if="step.description" class="mt-0.5 truncate text-xs text-muted" :title="step.description">
