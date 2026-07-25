@@ -854,20 +854,34 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
     }
     #[cfg(target_os = "macos")]
     {
-        let mut script_body = format!("cd '{expanded_wd}'");
+        use std::os::unix::fs::PermissionsExt;
+        // Ghi câu lệnh ra 1 file `.command` tạm rồi mở bằng Terminal, thay vì nhồi cả câu lệnh
+        // (có dấu `"` bọc quanh prompt) vào chuỗi AppleScript `do script "..."` — dấu `"` đó cắt
+        // sớm chuỗi literal của AppleScript và gây lỗi cú pháp (-2740). Trong file script, dấu `"`
+        // chỉ là quoting shell bình thường.
+        let mut script = format!("#!/bin/bash\ncd '{expanded_wd}'\n");
         if !is_default {
-            script_body.push_str(&format!(" && export CLAUDE_CONFIG_DIR='{expanded_dir}'"));
+            script.push_str(&format!("export CLAUDE_CONFIG_DIR='{expanded_dir}'\n"));
         }
         if let Some(cmd) = command {
-            script_body.push_str(&format!(" && {cmd}"));
+            script.push_str(&format!("{cmd}\n"));
         }
-        // `script_body` là câu lệnh shell, có thể chứa dấu `"` (bọc quanh prompt) và `\`.
-        // Phải escape cho chuỗi literal của AppleScript (`\` → `\\`, `"` → `\"`), nếu không
-        // dấu `"` trong prompt sẽ cắt sớm chuỗi `do script "..."` → lỗi cú pháp AppleScript (-2740).
-        let escaped = script_body.replace('\\', "\\\\").replace('"', "\\\"");
-        let script = format!("tell application \"Terminal\" to do script \"{escaped}\"");
-        std::process::Command::new("osascript")
-            .args(["-e", &script])
+        script.push_str("exec bash\n");
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let script_path = std::env::temp_dir()
+            .join(format!("ai_usage_terminal_{}_{seq}.command", std::process::id()));
+        std::fs::write(&script_path, script)
+            .map_err(|e| AppError::new(&format!("Không thể tạo script terminal: {e}")))?;
+        let mut perms = std::fs::metadata(&script_path)
+            .map_err(|e| AppError::new(&format!("Không thể đọc quyền file terminal: {e}")))?
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms)
+            .map_err(|e| AppError::new(&format!("Không thể set quyền file terminal: {e}")))?;
+        std::process::Command::new("open")
+            .args(["-a", "Terminal"])
+            .arg(&script_path)
             .spawn()
             .map_err(|e| AppError::new(&format!("Không thể mở Terminal: {e}")))?;
     }
