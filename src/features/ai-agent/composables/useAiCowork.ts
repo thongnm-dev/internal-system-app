@@ -12,7 +12,16 @@ import type { AiAccount } from "@/_/types/ai-usage";
 import { explorerOpen, explorerReadDir, explorerReadTextFile } from "@/tauri/commands/explorer";
 import type { FileEntry } from "@/tauri/commands/explorer";
 import type { WorkflowStepType } from "@/_/types/ai-workflow";
-import { aiTaskCreate, aiTaskList, aiTaskWfProcList } from "@/tauri/commands/ai-task";
+import {
+  aiTaskCreate,
+  aiTaskList,
+  aiTaskWfProcCreate,
+  aiTaskWfProcList,
+  aiTaskWfProcUpdate,
+  aiTaskWfProcStepCreate,
+  aiTaskWfProcStepList,
+  aiTaskWfProcStepUpdate,
+} from "@/tauri/commands/ai-task";
 import type { AiTaskResult } from "@/tauri/commands/ai-task";
 import type { TaskDialogPayload } from "../components/AiTaskDialog.vue";
 
@@ -148,12 +157,14 @@ export function useAiCowork() {
       return;
     }
     const wfId = appliedWorkflowId.value;
+    // Task chưa có tiến trình workflow → coi như đang ở bước đầu tiên của workflow (để có thể bắt đầu).
+    const firstStepId = steps.value[0]?.id ?? null;
     try {
       const pairs = await Promise.all(
         tasks.map(async (t) => {
           const procs = await aiTaskWfProcList(t.id);
           const proc = wfId !== null ? procs.find((p) => p.wf_id === wfId) : procs[0];
-          return { taskCd: t.task_cd, stepId: proc?.latest_step_id ?? null };
+          return { taskCd: t.task_cd, stepId: proc?.latest_step_id ?? firstStepId };
         }),
       );
       if (token !== resolveStepToken) return; // đã có lần resolve mới hơn
@@ -369,6 +380,51 @@ export function useAiCowork() {
     showTaskStepConflict.value = true;
   }
 
+  /**
+   * Đăng ký dữ liệu tiến trình workflow cho các task đã xác nhận khi bắt đầu chạy 1 step:
+   *  - Tạo `ai_task_wf_proc` cho (task, workflow đang áp dụng) nếu chưa có.
+   *  - Cập nhật `latest_step_id` = step đang chạy.
+   *  - Tạo `ai_task_wf_proc_step` cho (proc, step) với status `in_progress` (hoặc cập nhật nếu đã có).
+   */
+  async function registerTaskWorkflowProgress(step: CoworkStep) {
+    const wfId = appliedWorkflowId.value;
+    if (wfId === null) return;
+    const user = username.value;
+    for (const task of confirmedTasks.value) {
+      const procs = await aiTaskWfProcList(task.id);
+      let proc = procs.find((p) => p.wf_id === wfId);
+      if (!proc) {
+        proc = await aiTaskWfProcCreate(user, { task_id: task.id, wf_id: wfId });
+      }
+      if (proc.latest_step_id !== step.id) {
+        await aiTaskWfProcUpdate(proc.id, step.id, user);
+      }
+      const procSteps = await aiTaskWfProcStepList(proc.id);
+      const existing = procSteps.find((s) => s.wf_step_id === step.id);
+      if (!existing) {
+        await aiTaskWfProcStepCreate(user, {
+          wf_proc_id: proc.id,
+          wf_step_id: step.id,
+          status: "in_progress",
+        });
+      } else if (existing.status !== "in_progress") {
+        await aiTaskWfProcStepUpdate(existing.id, "in_progress", user);
+      }
+    }
+  }
+
+  /**
+   * Ghép prompt truyền cho `claude`: `/<skill-name> [CATEGORY] <task_cd> ...`
+   * (mỗi task đã xác nhận là một cụm `[CATEGORY] task_cd`).
+   * VD: `/create-plan [SCREEN] SZTN_G_SC01`.
+   */
+  function buildSkillPrompt(step: CoworkStep): string {
+    const tasksPart = confirmedTasks.value
+      .map((t) => `[${t.category.toUpperCase()}] ${t.task_cd}`)
+      .join(" ");
+    return `/${step.skillName} ${tasksPart}`.trim();
+  }
+
   /** Mở terminal tại project directory với account AI đang active để chạy step skill. */
   async function openStepTerminal(step: CoworkStep) {
     if (!hasMatchingSkill(step)) return;
@@ -409,7 +465,17 @@ export function useAiCowork() {
         }
       }
 
-      await aiUsageOpenTerminal(active.config_dir, dir);
+      // Đăng ký dữ liệu wf_proc / wf_proc_step rồi mở terminal kèm prompt skill.
+      // `claude --dangerously-skip-permissions` (trong build_claude_command) đã tự bỏ qua
+      // hộp thoại "trust folder" nên prompt được chạy thẳng.
+      const hasTasks = confirmedTasks.value.length > 0;
+      const prompt = hasTasks ? buildSkillPrompt(step) : undefined;
+      if (hasTasks) {
+        await registerTaskWorkflowProgress(step);
+        // Đồng bộ lại trạng thái bước hiện tại theo dữ liệu vừa ghi.
+        await resolveConfirmedTaskSteps();
+      }
+      await aiUsageOpenTerminal(active.config_dir, dir, prompt);
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
