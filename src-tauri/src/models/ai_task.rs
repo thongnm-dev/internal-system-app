@@ -12,6 +12,13 @@ pub struct AiTask {
     pub created_by: String,
     pub updated_at: String,
     pub updated_by: String,
+    /// Process (workflow + step) đang được thực hiện — chỉ có ở list; rỗng nếu không có.
+    #[serde(default)]
+    pub current_wf_name: String,
+    #[serde(default)]
+    pub current_step_name: String,
+    #[serde(default)]
+    pub current_step_status: String,
 }
 
 #[derive(Debug, Deserialize)]

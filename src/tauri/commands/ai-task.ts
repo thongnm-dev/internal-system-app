@@ -15,6 +15,10 @@ export type AiTaskResult = {
   created_by: string;
   updated_at: string;
   updated_by: string;
+  // Process (workflow + step) đang được thực hiện (chỉ có ở list; rỗng nếu không có).
+  current_wf_name: string;
+  current_step_name: string;
+  current_step_status: string;
 };
 
 export type CreateTaskRequest = {
