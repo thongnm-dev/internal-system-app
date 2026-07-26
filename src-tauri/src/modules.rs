@@ -71,6 +71,8 @@ mod commands {
     pub mod ai_translate_cowork_commands;
     /// Commands cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_commands;
+    /// Commands cho màn hình Git Desktop (thao tác git + quản lý danh sách repo).
+    pub mod git_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -113,6 +115,8 @@ mod database {
     pub mod ai_translate_cowork_store;
     /// Lưu trữ cục bộ (JSON file) state màn hình AI Cowork.
     pub mod ai_cowork_store;
+    /// Lưu trữ cục bộ (JSON file) danh sách repository của màn hình Git Desktop.
+    pub mod git_repo_store;
 }
 
 /// Các kiểu dữ liệu (model/DTO) chia theo domain.
@@ -171,6 +175,8 @@ mod models {
     pub mod ai_workflow;
     /// Model cho module AI Task (task code + phân loại).
     pub mod ai_task;
+    /// Model cho màn hình Git Desktop (repo, status, diff, commit, branch, stash).
+    pub mod git;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.
@@ -247,6 +253,8 @@ mod services {
     pub mod ai_translate_cowork_service;
     /// Service cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_service;
+    /// Service cho màn hình Git Desktop — gọi `git` CLI cho mọi thao tác.
+    pub mod git_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

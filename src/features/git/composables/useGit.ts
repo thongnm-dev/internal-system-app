@@ -1,0 +1,563 @@
+import { computed, ref } from "vue";
+import { open } from "@tauri-apps/plugin-dialog";
+
+import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import {
+  gitAddRepo,
+  gitBranches,
+  gitCheckoutBranch,
+  gitClone,
+  gitCommit,
+  gitCommitDetail,
+  gitCommitFileDiff,
+  gitCreateBranch,
+  gitDeleteBranch,
+  gitDiscard,
+  gitFetch,
+  gitFileDiff,
+  gitListRepos,
+  gitLog,
+  gitPull,
+  gitPush,
+  gitRemoveRepo,
+  gitRepoInfo,
+  gitStage,
+  gitStashApply,
+  gitStashDrop,
+  gitStashList,
+  gitStashSave,
+  gitStatus,
+  gitTouchRepo,
+  gitUnstage,
+} from "@/tauri/commands/git";
+import type {
+  GitBranch,
+  GitCommit,
+  GitCommitDetail,
+  GitDiff,
+  GitFileChange,
+  GitRepo,
+  GitRepoInfo,
+  GitStash,
+} from "@/_/types/git";
+import { useToast } from "@/shared/composables/useToast";
+
+const HISTORY_LIMIT = 80;
+const ACTIVE_REPO_KEY = "git.activeRepoId";
+
+/** File đang được chọn để xem diff. */
+type SelectedFile = {
+  path: string;
+  staged: boolean;
+  untracked: boolean;
+};
+
+export type GitTab = "changes" | "history";
+
+export function useGit() {
+  const toast = useToast();
+
+  const repos = ref<GitRepo[]>([]);
+  const activeRepo = ref<GitRepo | null>(null);
+  const info = ref<GitRepoInfo | null>(null);
+
+  const staged = ref<GitFileChange[]>([]);
+  const unstaged = ref<GitFileChange[]>([]);
+  const branches = ref<GitBranch[]>([]);
+  const stashes = ref<GitStash[]>([]);
+  const commits = ref<GitCommit[]>([]);
+
+  const selectedFile = ref<SelectedFile | null>(null);
+  const diff = ref<GitDiff | null>(null);
+  const diffLoading = ref(false);
+
+  const selectedCommit = ref<GitCommit | null>(null);
+  const commitDetail = ref<GitCommitDetail | null>(null);
+  const commitFileDiff = ref<GitDiff | null>(null);
+
+  const commitMessage = ref("");
+  const tab = ref<GitTab>("changes");
+
+  // Cờ trạng thái — dùng cho spinner cục bộ, không blank cả màn hình.
+  const loadingRepo = ref(false);
+  const refreshing = ref(false);
+  const committing = ref(false);
+  const syncing = ref(false);
+  const busyMessage = ref("");
+
+  const runtimeAvailable = computed(() => canUseTauriRuntime());
+  const hasChanges = computed(() => staged.value.length + unstaged.value.length > 0);
+  const canCommit = computed(
+    () => staged.value.length > 0 && commitMessage.value.trim().length > 0 && !committing.value,
+  );
+
+  const localBranches = computed(() => branches.value.filter((b) => !b.is_remote));
+  const remoteBranches = computed(() => branches.value.filter((b) => b.is_remote));
+
+  function reportError(prefix: string, e: unknown) {
+    toast.error(`${prefix}: ${friendlyError(e)}`);
+  }
+
+  // === Danh sách repo ===
+
+  async function loadRepos() {
+    if (!runtimeAvailable.value) return;
+    try {
+      repos.value = await gitListRepos();
+      const savedId = Number(localStorage.getItem(ACTIVE_REPO_KEY) ?? "");
+      const target =
+        repos.value.find((r) => r.id === savedId) ?? repos.value[0] ?? null;
+      if (target) await openRepo(target);
+    } catch (e) {
+      reportError("Không tải được danh sách repo", e);
+    }
+  }
+
+  async function addRepoFromDialog() {
+    if (!runtimeAvailable.value) return;
+    try {
+      const picked = await open({ directory: true, title: "Chọn thư mục Git repository" });
+      if (!picked || typeof picked !== "string") return;
+      const repo = await gitAddRepo(picked);
+      if (!repos.value.some((r) => r.id === repo.id)) {
+        repos.value = [repo, ...repos.value];
+      }
+      await openRepo(repo);
+      toast.success(`Đã thêm repo "${repo.name}".`);
+    } catch (e) {
+      reportError("Không thêm được repo", e);
+    }
+  }
+
+  async function removeRepo(repo: GitRepo) {
+    try {
+      await gitRemoveRepo(repo.id);
+      repos.value = repos.value.filter((r) => r.id !== repo.id);
+      if (activeRepo.value?.id === repo.id) {
+        activeRepo.value = null;
+        resetRepoState();
+        const next = repos.value[0];
+        if (next) await openRepo(next);
+      }
+      toast.success(`Đã gỡ repo "${repo.name}" khỏi danh sách.`);
+    } catch (e) {
+      reportError("Không gỡ được repo", e);
+    }
+  }
+
+  function resetRepoState() {
+    info.value = null;
+    staged.value = [];
+    unstaged.value = [];
+    branches.value = [];
+    stashes.value = [];
+    commits.value = [];
+    selectedFile.value = null;
+    diff.value = null;
+    selectedCommit.value = null;
+    commitDetail.value = null;
+    commitFileDiff.value = null;
+  }
+
+  async function openRepo(repo: GitRepo) {
+    activeRepo.value = repo;
+    localStorage.setItem(ACTIVE_REPO_KEY, String(repo.id));
+    loadingRepo.value = true;
+    resetRepoState();
+    try {
+      await Promise.all([refreshStatusAndInfo(), refreshBranches(), refreshStashes()]);
+      gitTouchRepo(repo.id).catch(() => {});
+    } catch (e) {
+      reportError("Không mở được repo", e);
+    } finally {
+      loadingRepo.value = false;
+    }
+  }
+
+  const repoPath = () => activeRepo.value?.path ?? "";
+
+  // === Refresh (giữ dữ liệu cũ trong lúc tải để tránh nháy màn hình) ===
+
+  async function refreshStatusAndInfo() {
+    const path = repoPath();
+    if (!path) return;
+    refreshing.value = true;
+    try {
+      const [st, nfo] = await Promise.all([gitStatus(path), gitRepoInfo(path)]);
+      staged.value = st.staged;
+      unstaged.value = st.unstaged;
+      info.value = nfo;
+      reconcileSelectedFile();
+    } catch (e) {
+      reportError("Không lấy được trạng thái", e);
+    } finally {
+      refreshing.value = false;
+    }
+  }
+
+  async function refreshBranches() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      branches.value = await gitBranches(path);
+    } catch (e) {
+      reportError("Không lấy được branch", e);
+    }
+  }
+
+  async function refreshStashes() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      stashes.value = await gitStashList(path);
+    } catch (e) {
+      reportError("Không lấy được stash", e);
+    }
+  }
+
+  /** Nếu file đang chọn không còn trong danh sách → bỏ chọn; ngược lại nạp lại diff. */
+  function reconcileSelectedFile() {
+    const sel = selectedFile.value;
+    if (!sel) return;
+    const list = sel.staged ? staged.value : unstaged.value;
+    const found = list.find((f) => f.path === sel.path);
+    if (!found) {
+      selectedFile.value = null;
+      diff.value = null;
+    } else {
+      void loadDiff(found, sel.staged);
+    }
+  }
+
+  // === Diff (Changes tab) ===
+
+  async function selectFile(file: GitFileChange, isStaged: boolean) {
+    selectedFile.value = { path: file.path, staged: isStaged, untracked: file.untracked };
+    await loadDiff(file, isStaged);
+  }
+
+  async function loadDiff(file: GitFileChange, isStaged: boolean) {
+    const path = repoPath();
+    if (!path) return;
+    diffLoading.value = true;
+    try {
+      diff.value = await gitFileDiff(path, file.path, isStaged, file.untracked && !isStaged);
+    } catch (e) {
+      reportError("Không đọc được diff", e);
+      diff.value = null;
+    } finally {
+      diffLoading.value = false;
+    }
+  }
+
+  // === Staging ===
+
+  async function stageFiles(files: string[]) {
+    await mutate(() => gitStage(repoPath(), files), "Không stage được file");
+  }
+  async function unstageFiles(files: string[]) {
+    await mutate(() => gitUnstage(repoPath(), files), "Không unstage được file");
+  }
+  async function stageAll() {
+    await mutate(() => gitStage(repoPath(), []), "Không stage được");
+  }
+  async function unstageAll() {
+    await mutate(() => gitUnstage(repoPath(), []), "Không unstage được");
+  }
+  async function discardFiles(files: string[]) {
+    await mutate(() => gitDiscard(repoPath(), files), "Không bỏ được thay đổi");
+  }
+
+  /** Chạy một mutation rồi refresh status — giữ UI mượt (không blank). */
+  async function mutate(fn: () => Promise<unknown>, errPrefix: string) {
+    if (!repoPath()) return;
+    try {
+      await fn();
+      await refreshStatusAndInfo();
+    } catch (e) {
+      reportError(errPrefix, e);
+    }
+  }
+
+  // === Commit ===
+
+  async function commit() {
+    const path = repoPath();
+    if (!path || !canCommit.value) return;
+    committing.value = true;
+    try {
+      await gitCommit(path, commitMessage.value.trim());
+      commitMessage.value = "";
+      selectedFile.value = null;
+      diff.value = null;
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success("Đã commit.");
+    } catch (e) {
+      reportError("Commit thất bại", e);
+    } finally {
+      committing.value = false;
+    }
+  }
+
+  // === Sync: fetch / pull / push ===
+
+  async function fetch() {
+    await runSync(() => gitFetch(repoPath()), "Đang fetch…", "Fetch xong.", "Fetch thất bại");
+  }
+  async function pull() {
+    await runSync(() => gitPull(repoPath()), "Đang pull…", "Pull xong.", "Pull thất bại");
+  }
+  async function push() {
+    await runSync(() => gitPush(repoPath()), "Đang push…", "Push xong.", "Push thất bại");
+  }
+
+  async function runSync(
+    fn: () => Promise<string>,
+    busy: string,
+    ok: string,
+    errPrefix: string,
+  ) {
+    const path = repoPath();
+    if (!path || syncing.value) return;
+    syncing.value = true;
+    busyMessage.value = busy;
+    try {
+      await fn();
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success(ok);
+    } catch (e) {
+      reportError(errPrefix, e);
+    } finally {
+      syncing.value = false;
+      busyMessage.value = "";
+    }
+  }
+
+  // === History tab ===
+
+  async function loadHistory() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      commits.value = await gitLog(path, HISTORY_LIMIT);
+      if (commits.value.length && !selectedCommit.value) {
+        await selectCommit(commits.value[0]);
+      }
+    } catch (e) {
+      reportError("Không tải được lịch sử", e);
+    }
+  }
+
+  async function selectCommit(c: GitCommit) {
+    const path = repoPath();
+    if (!path) return;
+    selectedCommit.value = c;
+    commitFileDiff.value = null;
+    try {
+      commitDetail.value = await gitCommitDetail(path, c.hash);
+    } catch (e) {
+      reportError("Không đọc được commit", e);
+    }
+  }
+
+  async function selectCommitFile(file: GitFileChange) {
+    const path = repoPath();
+    const c = selectedCommit.value;
+    if (!path || !c) return;
+    diffLoading.value = true;
+    try {
+      commitFileDiff.value = await gitCommitFileDiff(path, c.hash, file.path);
+    } catch (e) {
+      reportError("Không đọc được diff", e);
+    } finally {
+      diffLoading.value = false;
+    }
+  }
+
+  function switchTab(next: GitTab) {
+    tab.value = next;
+    if (next === "history" && commits.value.length === 0) void loadHistory();
+  }
+
+  // === Branch ===
+
+  async function checkoutBranch(name: string) {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = `Đang chuyển sang ${name}…`;
+    try {
+      await gitCheckoutBranch(path, name);
+      selectedFile.value = null;
+      diff.value = null;
+      selectedCommit.value = null;
+      commits.value = [];
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success(`Đã chuyển sang branch "${name}".`);
+    } catch (e) {
+      reportError("Không đổi được branch", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function createBranch(name: string) {
+    const path = repoPath();
+    if (!path || !name.trim()) return;
+    try {
+      await gitCreateBranch(path, name.trim());
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      toast.success(`Đã tạo và chuyển sang branch "${name.trim()}".`);
+    } catch (e) {
+      reportError("Không tạo được branch", e);
+    }
+  }
+
+  async function deleteBranch(name: string, force: boolean) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitDeleteBranch(path, name, force);
+      await refreshBranches();
+      toast.success(`Đã xóa branch "${name}".`);
+    } catch (e) {
+      reportError("Không xóa được branch", e);
+    }
+  }
+
+  // === Stash ===
+
+  async function stashSave(message: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitStashSave(path, message);
+      await Promise.all([refreshStatusAndInfo(), refreshStashes()]);
+      toast.success("Đã cất thay đổi vào stash.");
+    } catch (e) {
+      reportError("Không stash được", e);
+    }
+  }
+
+  async function stashApply(reference: string, pop: boolean) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitStashApply(path, reference, pop);
+      await Promise.all([refreshStatusAndInfo(), refreshStashes()]);
+      toast.success(pop ? "Đã áp dụng và xóa stash." : "Đã áp dụng stash.");
+    } catch (e) {
+      reportError("Không áp dụng được stash", e);
+    }
+  }
+
+  async function stashDrop(reference: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitStashDrop(path, reference);
+      await refreshStashes();
+      toast.success("Đã xóa stash.");
+    } catch (e) {
+      reportError("Không xóa được stash", e);
+    }
+  }
+
+  // === Clone ===
+
+  async function cloneRepo(url: string): Promise<boolean> {
+    if (!runtimeAvailable.value || !url.trim()) return false;
+    const parent = await open({ directory: true, title: "Chọn thư mục để clone vào" });
+    if (!parent || typeof parent !== "string") return false;
+
+    const name = repoNameFromUrl(url);
+    const sep = parent.includes("\\") ? "\\" : "/";
+    const dest = `${parent}${sep}${name}`;
+
+    syncing.value = true;
+    busyMessage.value = `Đang clone ${name}…`;
+    try {
+      await gitClone(url.trim(), dest);
+      const repo = await gitAddRepo(dest);
+      if (!repos.value.some((r) => r.id === repo.id)) {
+        repos.value = [repo, ...repos.value];
+      }
+      await openRepo(repo);
+      toast.success(`Đã clone "${name}".`);
+      return true;
+    } catch (e) {
+      reportError("Clone thất bại", e);
+      return false;
+    } finally {
+      syncing.value = false;
+      busyMessage.value = "";
+    }
+  }
+
+  function repoNameFromUrl(url: string): string {
+    const trimmed = url.trim().replace(/\/+$/, "");
+    const last = trimmed.split(/[/:]/).pop() ?? "repo";
+    return last.replace(/\.git$/i, "") || "repo";
+  }
+
+  return {
+    // state
+    repos,
+    activeRepo,
+    info,
+    staged,
+    unstaged,
+    branches,
+    localBranches,
+    remoteBranches,
+    stashes,
+    commits,
+    selectedFile,
+    diff,
+    diffLoading,
+    selectedCommit,
+    commitDetail,
+    commitFileDiff,
+    commitMessage,
+    tab,
+    loadingRepo,
+    refreshing,
+    committing,
+    syncing,
+    busyMessage,
+    // computed
+    runtimeAvailable,
+    hasChanges,
+    canCommit,
+    // actions
+    loadRepos,
+    addRepoFromDialog,
+    removeRepo,
+    openRepo,
+    refreshStatusAndInfo,
+    refreshBranches,
+    selectFile,
+    stageFiles,
+    unstageFiles,
+    stageAll,
+    unstageAll,
+    discardFiles,
+    commit,
+    fetch,
+    pull,
+    push,
+    loadHistory,
+    selectCommit,
+    selectCommitFile,
+    switchTab,
+    checkoutBranch,
+    createBranch,
+    deleteBranch,
+    stashSave,
+    stashApply,
+    stashDrop,
+    cloneRepo,
+  };
+}

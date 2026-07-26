@@ -1,0 +1,86 @@
+/** Types cho module Git Desktop — khớp với DTO ở `src-tauri/src/models/git.rs`. */
+
+/** Một repository trong danh sách quản lý (lưu cục bộ). */
+export interface GitRepo {
+  id: number;
+  name: string;
+  path: string;
+  last_opened: string;
+}
+
+/** Trạng thái tổng quan của repo. */
+export interface GitRepoInfo {
+  path: string;
+  current_branch: string;
+  detached: boolean;
+  upstream: string;
+  ahead: number;
+  behind: number;
+  remote_url: string;
+}
+
+/** Một file trong danh sách thay đổi. */
+export interface GitFileChange {
+  path: string;
+  orig_path: string;
+  /** M/A/D/R/C/U/? */
+  status: string;
+  untracked: boolean;
+}
+
+/** Kết quả `git status`. */
+export interface GitStatus {
+  staged: GitFileChange[];
+  unstaged: GitFileChange[];
+}
+
+/** Một dòng trong diff. */
+export interface GitDiffLine {
+  /** "add" | "del" | "context" | "hunk" | "meta" */
+  kind: string;
+  content: string;
+  old_line: number;
+  new_line: number;
+}
+
+/** Kết quả diff của một file. */
+export interface GitDiff {
+  path: string;
+  lines: GitDiffLine[];
+  is_binary: boolean;
+  truncated: boolean;
+}
+
+/** Một commit trong lịch sử. */
+export interface GitCommit {
+  hash: string;
+  short_hash: string;
+  subject: string;
+  author_name: string;
+  author_email: string;
+  date: string;
+  relative_date: string;
+}
+
+/** Chi tiết một commit. */
+export interface GitCommitDetail {
+  commit: GitCommit;
+  body: string;
+  files: GitFileChange[];
+}
+
+/** Một branch (local hoặc remote). */
+export interface GitBranch {
+  name: string;
+  is_current: boolean;
+  is_remote: boolean;
+  upstream: string;
+  last_commit_subject: string;
+}
+
+/** Một mục stash. */
+export interface GitStash {
+  index: number;
+  reference: string;
+  message: string;
+}

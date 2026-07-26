@@ -1,0 +1,711 @@
+//! Service cho module Git Desktop.
+//!
+//! Toàn bộ thao tác Git được thực hiện bằng cách gọi `git` CLI của hệ điều hành
+//! (giống cách GitHub Desktop hoạt động). Cách này:
+//! - Tận dụng credential helper / cấu hình git sẵn có của người dùng nên
+//!   fetch/pull/push "chạy được ngay" mà không cần quản lý SSH key/token.
+//! - Không cần thêm dependency native nặng (libgit2).
+//!
+//! Các thao tác chạm mạng (fetch/pull/push/clone) và thao tác ghi nặng được gọi
+//! qua `spawn_blocking` ở tầng command để không chặn UI.
+
+use std::path::Path;
+use std::process::Command;
+
+use crate::app::error::AppError;
+use crate::app::result::AppResult;
+use crate::models::git::{
+    GitBranch, GitCommit, GitCommitDetail, GitDiff, GitDiffLine, GitFileChange, GitRepoInfo,
+    GitStash, GitStatus,
+};
+
+/// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
+const MAX_DIFF_LINES: usize = 6000;
+/// Giới hạn kích thước file untracked khi dựng diff tổng hợp (2MB).
+const MAX_UNTRACKED_DIFF_SIZE: u64 = 2 * 1024 * 1024;
+
+/// Ký tự phân tách field/record khi format output của git (ít khả năng xuất hiện trong nội dung).
+const FS: char = '\u{1f}'; // field separator
+const RS: char = '\u{1e}'; // record separator
+
+/// Tạo `Command` git đã cấu hình sẵn: chạy trong `repo_path`, tắt prompt tương tác
+/// (tránh treo khi thiếu credential), và ẩn cửa sổ console trên Windows.
+fn git_in(repo_path: &str) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.arg("-C").arg(repo_path);
+    configure(&mut cmd);
+    cmd
+}
+
+/// Cấu hình chung cho mọi lệnh git.
+fn configure(cmd: &mut Command) {
+    // Không bao giờ bật prompt tương tác — nếu thiếu credential thì fail luôn
+    // thay vì treo app chờ nhập.
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+}
+
+/// Chạy một lệnh git trong `repo_path` và trả về stdout (đã trim CR/LF cuối).
+/// Lỗi (exit code != 0) trả về `AppError` chứa stderr.
+fn run(repo_path: &str, args: &[&str]) -> AppResult<String> {
+    let output = git_in(repo_path)
+        .args(args)
+        .output()
+        .map_err(|e| AppError::new(format!("Không chạy được git: {e}. Hãy chắc chắn đã cài Git.")))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let msg = if !stderr.is_empty() { stderr } else { stdout };
+        Err(AppError::new(if msg.is_empty() {
+            "Lệnh git thất bại.".to_string()
+        } else {
+            msg
+        }))
+    }
+}
+
+/// Kiểm tra một đường dẫn có phải thư mục làm việc của git repo không.
+pub fn is_git_repo(path: &str) -> bool {
+    if !Path::new(path).is_dir() {
+        return false;
+    }
+    git_in(path)
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Chạy một lệnh, coi lỗi là "không có" và trả về chuỗi rỗng (dùng cho các query
+/// tùy chọn như upstream/remote có thể chưa tồn tại).
+fn run_opt(repo_path: &str, args: &[&str]) -> String {
+    run(repo_path, args).unwrap_or_default().trim().to_string()
+}
+
+/// Lấy trạng thái tổng quan của repo.
+pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
+    if !is_git_repo(repo_path) {
+        return Err(AppError::new(format!(
+            "Không phải Git repository: {repo_path}"
+        )));
+    }
+
+    let top_level = run_opt(repo_path, &["rev-parse", "--show-toplevel"]);
+    let path = if top_level.is_empty() {
+        repo_path.to_string()
+    } else {
+        top_level
+    };
+
+    let branch_ref = run(repo_path, &["symbolic-ref", "--short", "-q", "HEAD"]).ok();
+    let (current_branch, detached) = match branch_ref {
+        Some(b) if !b.trim().is_empty() => (b.trim().to_string(), false),
+        _ => {
+            let short = run_opt(repo_path, &["rev-parse", "--short", "HEAD"]);
+            (short, true)
+        }
+    };
+
+    let upstream = run_opt(
+        repo_path,
+        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    );
+
+    let (mut ahead, mut behind) = (0u32, 0u32);
+    if !upstream.is_empty() {
+        // Output: "<behind>\t<ahead>" (left = @{u}, right = HEAD).
+        let counts = run_opt(
+            repo_path,
+            &["rev-list", "--left-right", "--count", "@{u}...HEAD"],
+        );
+        let mut parts = counts.split_whitespace();
+        behind = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        ahead = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+    }
+
+    let remote_url = run_opt(repo_path, &["remote", "get-url", "origin"]);
+
+    Ok(GitRepoInfo {
+        path,
+        current_branch,
+        detached,
+        upstream,
+        ahead,
+        behind,
+        remote_url,
+    })
+}
+
+/// Lấy danh sách thay đổi (staged + unstaged), parse từ `git status --porcelain -z`.
+pub fn status(repo_path: &str) -> AppResult<GitStatus> {
+    let raw = run(
+        repo_path,
+        &[
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "-z",
+        ],
+    )?;
+
+    let tokens: Vec<&str> = raw.split('\0').collect();
+    let mut staged: Vec<GitFileChange> = Vec::new();
+    let mut unstaged: Vec<GitFileChange> = Vec::new();
+
+    let mut i = 0;
+    while i < tokens.len() {
+        let entry = tokens[i];
+        if entry.len() < 3 {
+            i += 1;
+            continue;
+        }
+        let bytes = entry.as_bytes();
+        let x = bytes[0] as char;
+        let y = bytes[1] as char;
+        let path = entry[3..].to_string();
+
+        // Rename/copy: token kế tiếp là đường dẫn gốc.
+        let mut orig = String::new();
+        if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
+            i += 1;
+            if i < tokens.len() {
+                orig = tokens[i].to_string();
+            }
+        }
+
+        if x == '?' && y == '?' {
+            unstaged.push(GitFileChange {
+                path,
+                orig_path: String::new(),
+                status: "?".to_string(),
+                untracked: true,
+            });
+        } else {
+            if x != ' ' && x != '?' {
+                staged.push(GitFileChange {
+                    path: path.clone(),
+                    orig_path: orig.clone(),
+                    status: x.to_string(),
+                    untracked: false,
+                });
+            }
+            if y != ' ' && y != '?' {
+                unstaged.push(GitFileChange {
+                    path,
+                    orig_path: orig,
+                    status: y.to_string(),
+                    untracked: false,
+                });
+            }
+        }
+        i += 1;
+    }
+
+    Ok(GitStatus { staged, unstaged })
+}
+
+/// Parse output unified diff thành danh sách dòng có phân loại.
+fn parse_diff(path: &str, raw: &str) -> GitDiff {
+    let mut lines: Vec<GitDiffLine> = Vec::new();
+    let mut is_binary = false;
+    let mut truncated = false;
+    let (mut old_ln, mut new_ln) = (0u32, 0u32);
+
+    for line in raw.lines() {
+        if lines.len() >= MAX_DIFF_LINES {
+            truncated = true;
+            break;
+        }
+
+        if line.starts_with("Binary files") || line.starts_with("GIT binary patch") {
+            is_binary = true;
+            continue;
+        }
+        if line.starts_with("diff --git")
+            || line.starts_with("index ")
+            || line.starts_with("--- ")
+            || line.starts_with("+++ ")
+            || line.starts_with("new file")
+            || line.starts_with("deleted file")
+            || line.starts_with("old mode")
+            || line.starts_with("new mode")
+            || line.starts_with("similarity")
+            || line.starts_with("rename ")
+            || line.starts_with("copy ")
+            || line.starts_with("\\ No newline")
+        {
+            continue;
+        }
+
+        if line.starts_with("@@") {
+            // @@ -oldStart,oldCount +newStart,newCount @@ context
+            if let Some((os, ns)) = parse_hunk_header(line) {
+                old_ln = os;
+                new_ln = ns;
+            }
+            lines.push(GitDiffLine {
+                kind: "hunk".to_string(),
+                content: line.to_string(),
+                old_line: 0,
+                new_line: 0,
+            });
+            continue;
+        }
+
+        let first = line.chars().next().unwrap_or(' ');
+        match first {
+            '+' => {
+                lines.push(GitDiffLine {
+                    kind: "add".to_string(),
+                    content: line[1..].to_string(),
+                    old_line: 0,
+                    new_line: new_ln,
+                });
+                new_ln += 1;
+            }
+            '-' => {
+                lines.push(GitDiffLine {
+                    kind: "del".to_string(),
+                    content: line[1..].to_string(),
+                    old_line: old_ln,
+                    new_line: 0,
+                });
+                old_ln += 1;
+            }
+            _ => {
+                let content = if line.is_empty() { "" } else { &line[1..] };
+                lines.push(GitDiffLine {
+                    kind: "context".to_string(),
+                    content: content.to_string(),
+                    old_line: old_ln,
+                    new_line: new_ln,
+                });
+                old_ln += 1;
+                new_ln += 1;
+            }
+        }
+    }
+
+    GitDiff {
+        path: path.to_string(),
+        lines,
+        is_binary,
+        truncated,
+    }
+}
+
+/// Parse dòng hunk header `@@ -a,b +c,d @@` → (a, c).
+fn parse_hunk_header(line: &str) -> Option<(u32, u32)> {
+    let inner = line.strip_prefix("@@ ")?;
+    let end = inner.find(" @@")?;
+    let ranges = &inner[..end];
+    let mut parts = ranges.split(' ');
+    let old_part = parts.next()?.trim_start_matches('-');
+    let new_part = parts.next()?.trim_start_matches('+');
+    let old_start = old_part.split(',').next()?.parse().ok()?;
+    let new_start = new_part.split(',').next()?.parse().ok()?;
+    Some((old_start, new_start))
+}
+
+/// Diff của một file trong working tree (unstaged) hoặc index (staged).
+pub fn file_diff(repo_path: &str, file: &str, staged: bool, untracked: bool) -> AppResult<GitDiff> {
+    if untracked {
+        return untracked_diff(repo_path, file);
+    }
+    let mut args = vec!["diff", "--no-color"];
+    if staged {
+        args.push("--cached");
+    }
+    args.push("--");
+    args.push(file);
+    let raw = run(repo_path, &args)?;
+    Ok(parse_diff(file, &raw))
+}
+
+/// Dựng diff "tất cả là thêm mới" cho file untracked (git diff không hiển thị file mới).
+fn untracked_diff(repo_path: &str, file: &str) -> AppResult<GitDiff> {
+    let abs = Path::new(repo_path).join(file);
+    let meta = std::fs::metadata(&abs)
+        .map_err(|e| AppError::new(format!("Không đọc được file: {e}")))?;
+    if meta.len() > MAX_UNTRACKED_DIFF_SIZE {
+        return Ok(GitDiff {
+            path: file.to_string(),
+            lines: vec![],
+            is_binary: false,
+            truncated: true,
+        });
+    }
+    let bytes = std::fs::read(&abs).map_err(|e| AppError::new(format!("Không đọc được file: {e}")))?;
+    if bytes.contains(&0) {
+        return Ok(GitDiff {
+            path: file.to_string(),
+            lines: vec![],
+            is_binary: true,
+            truncated: false,
+        });
+    }
+    let text = String::from_utf8_lossy(&bytes);
+    let mut lines: Vec<GitDiffLine> = Vec::new();
+    let mut new_ln = 1u32;
+    let mut truncated = false;
+    for line in text.lines() {
+        if lines.len() >= MAX_DIFF_LINES {
+            truncated = true;
+            break;
+        }
+        lines.push(GitDiffLine {
+            kind: "add".to_string(),
+            content: line.to_string(),
+            old_line: 0,
+            new_line: new_ln,
+        });
+        new_ln += 1;
+    }
+    Ok(GitDiff {
+        path: file.to_string(),
+        lines,
+        is_binary: false,
+        truncated,
+    })
+}
+
+/// Diff của một file trong một commit cụ thể.
+pub fn commit_file_diff(repo_path: &str, hash: &str, file: &str) -> AppResult<GitDiff> {
+    let raw = run(
+        repo_path,
+        &["show", "--no-color", "--format=", hash, "--", file],
+    )?;
+    Ok(parse_diff(file, &raw))
+}
+
+// === Staging ===
+
+/// Đưa các file vào staged (`git add`). Nếu `files` rỗng → thêm tất cả (`git add -A`).
+pub fn stage(repo_path: &str, files: &[String]) -> AppResult<()> {
+    if files.is_empty() {
+        run(repo_path, &["add", "-A"])?;
+        return Ok(());
+    }
+    let mut args: Vec<&str> = vec!["add", "--"];
+    for f in files {
+        args.push(f);
+    }
+    run(repo_path, &args)?;
+    Ok(())
+}
+
+/// Bỏ các file khỏi staged (`git restore --staged`). Rỗng → bỏ tất cả.
+pub fn unstage(repo_path: &str, files: &[String]) -> AppResult<()> {
+    let mut args: Vec<&str> = vec!["restore", "--staged", "--"];
+    if files.is_empty() {
+        args = vec!["reset", "-q", "HEAD", "--"];
+    } else {
+        for f in files {
+            args.push(f);
+        }
+    }
+    run(repo_path, &args)?;
+    Ok(())
+}
+
+/// Bỏ thay đổi (discard) của các file. File tracked → `git checkout --`,
+/// file untracked → xóa hẳn file khỏi đĩa. `files` không được rỗng.
+pub fn discard(repo_path: &str, files: &[String]) -> AppResult<()> {
+    for f in files {
+        // Bỏ staged trước (nếu có) rồi khôi phục working tree.
+        let _ = run(repo_path, &["reset", "-q", "HEAD", "--", f]);
+        let restored = run(repo_path, &["checkout", "--", f]);
+        if restored.is_err() {
+            // File untracked (không có trong HEAD) → xóa khỏi đĩa.
+            let abs = Path::new(repo_path).join(f);
+            if abs.is_dir() {
+                let _ = std::fs::remove_dir_all(&abs);
+            } else if abs.exists() {
+                let _ = std::fs::remove_file(&abs);
+            }
+        }
+    }
+    Ok(())
+}
+
+// === Commit ===
+
+/// Tạo commit với message cho trước. Yêu cầu có file staged.
+pub fn commit(repo_path: &str, message: &str) -> AppResult<String> {
+    if message.trim().is_empty() {
+        return Err(AppError::new("Commit message không được để trống."));
+    }
+    run(repo_path, &["commit", "-m", message])
+}
+
+// === Log / History ===
+
+/// Lấy lịch sử commit của branch hiện tại (giới hạn `limit`).
+pub fn log(repo_path: &str, limit: u32) -> AppResult<Vec<GitCommit>> {
+    let format = format!(
+        "--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ae{FS}%aI{FS}%ar{RS}"
+    );
+    let limit_arg = format!("-{limit}");
+    let raw = run(repo_path, &["log", &limit_arg, &format])?;
+    Ok(parse_commits(&raw))
+}
+
+fn parse_commits(raw: &str) -> Vec<GitCommit> {
+    raw.split(RS)
+        .map(|r| r.trim_matches(['\n', '\r']))
+        .filter(|r| !r.is_empty())
+        .filter_map(|record| {
+            let f: Vec<&str> = record.split(FS).collect();
+            if f.len() < 7 {
+                return None;
+            }
+            Some(GitCommit {
+                hash: f[0].to_string(),
+                short_hash: f[1].to_string(),
+                subject: f[2].to_string(),
+                author_name: f[3].to_string(),
+                author_email: f[4].to_string(),
+                date: f[5].to_string(),
+                relative_date: f[6].to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Chi tiết một commit: meta + body + danh sách file đã đổi.
+pub fn commit_detail(repo_path: &str, hash: &str) -> AppResult<GitCommitDetail> {
+    let format = format!("--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ae{FS}%aI{FS}%ar{FS}%b");
+    let raw = run(repo_path, &["show", "-s", &format, hash])?;
+    let f: Vec<&str> = raw.split(FS).collect();
+    if f.len() < 7 {
+        return Err(AppError::new("Không đọc được thông tin commit."));
+    }
+    let commit = GitCommit {
+        hash: f[0].to_string(),
+        short_hash: f[1].to_string(),
+        subject: f[2].to_string(),
+        author_name: f[3].to_string(),
+        author_email: f[4].to_string(),
+        date: f[5].to_string(),
+        relative_date: f[6].to_string(),
+    };
+    let body = f.get(7).map(|s| s.trim().to_string()).unwrap_or_default();
+
+    // Danh sách file đã đổi trong commit.
+    let names = run(
+        repo_path,
+        &[
+            "diff-tree",
+            "--no-commit-id",
+            "--name-status",
+            "-M",
+            "-r",
+            "-z",
+            hash,
+        ],
+    )?;
+    let mut files: Vec<GitFileChange> = Vec::new();
+    let tokens: Vec<&str> = names.split('\0').filter(|s| !s.is_empty()).collect();
+    let mut i = 0;
+    while i < tokens.len() {
+        let st = tokens[i];
+        let code = st.chars().next().unwrap_or(' ');
+        i += 1;
+        if code == 'R' || code == 'C' {
+            // status, orig, new
+            let orig = tokens.get(i).map(|s| s.to_string()).unwrap_or_default();
+            let newp = tokens.get(i + 1).map(|s| s.to_string()).unwrap_or_default();
+            i += 2;
+            files.push(GitFileChange {
+                path: newp,
+                orig_path: orig,
+                status: code.to_string(),
+                untracked: false,
+            });
+        } else {
+            let p = tokens.get(i).map(|s| s.to_string()).unwrap_or_default();
+            i += 1;
+            files.push(GitFileChange {
+                path: p,
+                orig_path: String::new(),
+                status: code.to_string(),
+                untracked: false,
+            });
+        }
+    }
+
+    Ok(GitCommitDetail {
+        commit,
+        body,
+        files,
+    })
+}
+
+// === Branches ===
+
+/// Liệt kê tất cả branch (local + remote).
+pub fn branches(repo_path: &str) -> AppResult<Vec<GitBranch>> {
+    let format = format!(
+        "--format=%(refname){FS}%(HEAD){FS}%(refname:short){FS}%(upstream:short){FS}%(contents:subject)"
+    );
+    let raw = run(
+        repo_path,
+        &["for-each-ref", &format, "refs/heads", "refs/remotes"],
+    )?;
+
+    let mut out: Vec<GitBranch> = Vec::new();
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(FS).collect();
+        if f.len() < 5 {
+            continue;
+        }
+        let full = f[0];
+        let short = f[2].to_string();
+        // Bỏ qua con trỏ symbolic origin/HEAD.
+        if short.ends_with("/HEAD") {
+            continue;
+        }
+        let is_remote = full.starts_with("refs/remotes/");
+        out.push(GitBranch {
+            name: short,
+            is_current: f[1] == "*",
+            is_remote,
+            upstream: f[3].to_string(),
+            last_commit_subject: f[4].to_string(),
+        });
+    }
+    Ok(out)
+}
+
+/// Checkout sang một branch đã tồn tại.
+pub fn checkout_branch(repo_path: &str, name: &str) -> AppResult<String> {
+    run(repo_path, &["checkout", name])
+}
+
+/// Tạo branch mới từ HEAD (hoặc từ `from` nếu có) và checkout sang đó.
+pub fn create_branch(repo_path: &str, name: &str, from: &str) -> AppResult<String> {
+    if name.trim().is_empty() {
+        return Err(AppError::new("Tên branch không được để trống."));
+    }
+    if from.trim().is_empty() {
+        run(repo_path, &["checkout", "-b", name])
+    } else {
+        run(repo_path, &["checkout", "-b", name, from])
+    }
+}
+
+/// Xóa một branch local. `force = true` → dùng `-D`.
+pub fn delete_branch(repo_path: &str, name: &str, force: bool) -> AppResult<String> {
+    let flag = if force { "-D" } else { "-d" };
+    run(repo_path, &["branch", flag, name])
+}
+
+// === Network (fetch / pull / push) ===
+
+/// Fetch tất cả remote + prune branch đã xóa.
+pub fn fetch(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["fetch", "--all", "--prune"])
+}
+
+/// Pull branch hiện tại từ upstream.
+pub fn pull(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["pull"])
+}
+
+/// Push branch hiện tại. Nếu chưa có upstream → tự set `-u origin <branch>`.
+pub fn push(repo_path: &str) -> AppResult<String> {
+    let info = repo_info(repo_path)?;
+    if info.upstream.is_empty() {
+        if info.current_branch.is_empty() || info.detached {
+            return Err(AppError::new(
+                "Đang ở detached HEAD — hãy checkout một branch trước khi push.",
+            ));
+        }
+        run(
+            repo_path,
+            &["push", "-u", "origin", &info.current_branch],
+        )
+    } else {
+        run(repo_path, &["push"])
+    }
+}
+
+// === Stash ===
+
+/// Liệt kê stash.
+pub fn stash_list(repo_path: &str) -> AppResult<Vec<GitStash>> {
+    let format = format!("--pretty=format:%gd{FS}%s");
+    let raw = run(repo_path, &["stash", "list", &format])?;
+    let mut out = Vec::new();
+    for (idx, line) in raw.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(FS).collect();
+        let reference = f.first().map(|s| s.to_string()).unwrap_or_default();
+        let message = f.get(1).map(|s| s.to_string()).unwrap_or_default();
+        out.push(GitStash {
+            index: idx as u32,
+            reference,
+            message,
+        });
+    }
+    Ok(out)
+}
+
+/// Cất thay đổi hiện tại vào stash (kèm untracked). `message` có thể rỗng.
+pub fn stash_save(repo_path: &str, message: &str) -> AppResult<String> {
+    let mut args: Vec<&str> = vec!["stash", "push", "--include-untracked"];
+    if !message.trim().is_empty() {
+        args.push("-m");
+        args.push(message);
+    }
+    run(repo_path, &args)
+}
+
+/// Áp dụng một stash. `pop = true` → apply rồi xóa stash.
+pub fn stash_apply(repo_path: &str, reference: &str, pop: bool) -> AppResult<String> {
+    let sub = if pop { "pop" } else { "apply" };
+    run(repo_path, &["stash", sub, reference])
+}
+
+/// Xóa một stash.
+pub fn stash_drop(repo_path: &str, reference: &str) -> AppResult<String> {
+    run(repo_path, &["stash", "drop", reference])
+}
+
+// === Clone ===
+
+/// Clone một repo về `dest` (thư mục đích đầy đủ). Trả về đường dẫn đích.
+pub fn clone(url: &str, dest: &str) -> AppResult<String> {
+    if url.trim().is_empty() {
+        return Err(AppError::new("URL repository không được để trống."));
+    }
+    let mut cmd = Command::new("git");
+    configure(&mut cmd);
+    let output = cmd
+        .args(["clone", url, dest])
+        .output()
+        .map_err(|e| AppError::new(format!("Không chạy được git: {e}")))?;
+    if output.status.success() {
+        Ok(dest.to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Err(AppError::new(if stderr.is_empty() {
+            "Clone thất bại.".to_string()
+        } else {
+            stderr
+        }))
+    }
+}

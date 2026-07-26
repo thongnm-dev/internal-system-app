@@ -62,6 +62,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('checkMonthlyReport', 'Check Monthly Report', '/check-monthly-report', 'pi-database', 'Tools', TRUE, 7),
     ('sqlEditor',       'SQL Editor',        '/sql-editor',        'pi-server',     'Tools',      TRUE, 8),
     ('exploreFaster',   'Explore Faster',    '/explore-faster',    'pi-compass',    'Tools',      TRUE, 9),
+    ('git',             'Git Desktop',       '/git',               'pi-github',     'Tools',      TRUE, 10),
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),
     ('cloudS3Download', 'S3 Download',       '/cloud/s3-download', 'pi-download',   'Cloud',      TRUE, 12),

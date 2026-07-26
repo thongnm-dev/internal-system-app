@@ -60,6 +60,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Fast file browser — navigate folders and search documents quickly.",
   },
   {
+    key: "git",
+    path: "/git",
+    title: "Git Desktop",
+    subtitle: "Quản lý repository, commit, branch và đồng bộ Git ngay trong ứng dụng.",
+  },
+  {
     key: "dailyWorkNotes",
     path: "/daily-work-notes",
     title: "Daily Work Notes",
@@ -318,6 +324,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/explore-faster",
     component: () => import("@/features/tools/components/ExploreFasterPage.vue"),
     meta: { key: "exploreFaster" as MenuKey },
+  },
+  {
+    path: "/git",
+    component: () => import("@/features/git/components/GitDesktopPage.vue"),
+    meta: { key: "git" as MenuKey },
   },
   {
     path: "/daily-work-notes",
