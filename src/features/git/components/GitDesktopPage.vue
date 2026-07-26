@@ -622,54 +622,51 @@ onUnmounted(closeCommitMenu);
 
       <!-- ======================= MAIN ======================= -->
       <div v-else class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-        <!-- Tabs -->
-        <div class="flex items-center gap-1 rounded-lg border border-divider bg-panel p-1 shadow-sm">
-          <button
-            class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="git.tab.value === 'changes' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
-            @click="git.switchTab('changes')"
-          >
-            <i class="pi pi-pencil text-[11px]" /> Changes
-            <span
-              v-if="git.hasChanges.value"
-              class="rounded-full px-1.5 text-[10px] font-bold"
-              :class="git.tab.value === 'changes' ? 'bg-white/25' : 'bg-canvas text-secondary'"
-            >
-              {{ git.staged.value.length + git.unstaged.value.length }}
-            </span>
-          </button>
-          <button
-            class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="git.tab.value === 'history' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
-            @click="git.switchTab('history')"
-          >
-            <i class="pi pi-history text-[11px]" /> History
-          </button>
-
-          <div class="ml-auto flex items-center gap-1 px-1 text-[11px] text-muted">
-            <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin text-[11px]" />
-            <button
-              class="rounded p-1 transition-colors hover:bg-canvas hover:text-brand"
-              title="Làm mới"
-              @click="git.refreshStatusAndInfo()"
-            >
-              <i class="pi pi-sync text-[11px]" />
-            </button>
-          </div>
-        </div>
-
         <!-- ================= CHANGES TAB ================= -->
         <div
           v-show="git.tab.value === 'changes'"
           class="flex min-h-0 flex-1 overflow-hidden"
           :class="isResizing ? 'select-none' : ''"
         >
-          <!-- Left: file list + commit box -->
+          <!-- Left: tabs + file list + commit box -->
           <div
             ref="changesListRef"
             class="flex shrink-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm"
             :style="{ width: changesListWidth + 'px' }"
           >
+            <!-- Tabs (trong cột 1) -->
+            <div class="flex items-center gap-1 border-b border-divider p-1">
+              <button
+                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                :class="git.tab.value === 'changes' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
+                @click="git.switchTab('changes')"
+              >
+                <i class="pi pi-pencil text-[11px]" /> Changes
+                <span
+                  v-if="git.hasChanges.value"
+                  class="rounded-full px-1.5 text-[10px] font-bold"
+                  :class="git.tab.value === 'changes' ? 'bg-white/25' : 'bg-canvas text-secondary'"
+                >
+                  {{ git.staged.value.length + git.unstaged.value.length }}
+                </span>
+              </button>
+              <button
+                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                :class="git.tab.value === 'history' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
+                @click="git.switchTab('history')"
+              >
+                <i class="pi pi-history text-[11px]" /> History
+              </button>
+              <button
+                class="rounded p-1 text-muted transition-colors hover:bg-canvas hover:text-brand"
+                title="Làm mới"
+                @click="git.refreshStatusAndInfo()"
+              >
+                <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin text-[11px]" />
+                <i v-else class="pi pi-sync text-[11px]" />
+              </button>
+            </div>
+
             <div class="min-h-0 flex-1 overflow-y-auto">
               <!-- Staged -->
               <div v-if="git.staged.value.length" class="border-b border-divider">
@@ -876,9 +873,46 @@ onUnmounted(closeCommitMenu);
             class="flex shrink-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm"
             :style="{ width: commitListWidth + 'px' }"
           >
-            <div class="border-b border-divider px-3 py-2 text-xs font-bold uppercase tracking-wide text-muted">
-              Commits ({{ git.commits.value.length }})
+            <!-- Tabs (trong cột 1) -->
+            <div class="flex items-center gap-1 border-b border-divider p-1">
+              <button
+                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                :class="git.tab.value === 'changes' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
+                @click="git.switchTab('changes')"
+              >
+                <i class="pi pi-pencil text-[11px]" /> Changes
+                <span
+                  v-if="git.hasChanges.value"
+                  class="rounded-full px-1.5 text-[10px] font-bold"
+                  :class="git.tab.value === 'changes' ? 'bg-white/25' : 'bg-canvas text-secondary'"
+                >
+                  {{ git.staged.value.length + git.unstaged.value.length }}
+                </span>
+              </button>
+              <button
+                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                :class="git.tab.value === 'history' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
+                @click="git.switchTab('history')"
+              >
+                <i class="pi pi-history text-[11px]" /> History
+                <span
+                  v-if="git.commits.value.length"
+                  class="rounded-full px-1.5 text-[10px] font-bold"
+                  :class="git.tab.value === 'history' ? 'bg-white/25' : 'bg-canvas text-secondary'"
+                >
+                  {{ git.commits.value.length }}
+                </span>
+              </button>
+              <button
+                class="rounded p-1 text-muted transition-colors hover:bg-canvas hover:text-brand"
+                title="Làm mới"
+                @click="git.refreshStatusAndInfo()"
+              >
+                <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin text-[11px]" />
+                <i v-else class="pi pi-sync text-[11px]" />
+              </button>
             </div>
+
             <div class="min-h-0 flex-1 overflow-y-auto">
               <button
                 v-for="c in git.commits.value"
