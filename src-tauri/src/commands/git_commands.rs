@@ -499,6 +499,14 @@ pub async fn git_open_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn git_open_terminal(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::open_terminal(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
 pub async fn git_cherry_pick(path: String, hash: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::cherry_pick(&path, &hash))
         .await

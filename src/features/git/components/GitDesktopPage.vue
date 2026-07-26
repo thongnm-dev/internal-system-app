@@ -490,6 +490,71 @@ async function doUpdateFromMain() {
   if (ok) updateDialog.value = false;
 }
 
+// === File actions: copy path / show in folder (context menu) ===
+function absPath(rel: string): string {
+  const root = git.info.value?.path || git.activeRepo.value?.path || "";
+  if (!root) return rel;
+  const sep = root.includes("\\") ? "\\" : "/";
+  const relNorm = sep === "\\" ? rel.replace(/\//g, "\\") : rel;
+  return `${root.replace(/[/\\]+$/, "")}${sep}${relNorm}`;
+}
+const fileMenu = ref<{ x: number; y: number; rel: string } | null>(null);
+function openFileMenu(e: MouseEvent, rel: string) {
+  e.preventDefault();
+  e.stopPropagation();
+  const x = Math.min(e.clientX, window.innerWidth - 220);
+  const y = Math.min(e.clientY, window.innerHeight - 160);
+  fileMenu.value = { x: Math.max(8, x), y: Math.max(8, y), rel };
+  requestAnimationFrame(() => {
+    window.addEventListener("click", closeFileMenu);
+    window.addEventListener("contextmenu", closeFileMenu);
+    window.addEventListener("scroll", closeFileMenu, true);
+  });
+}
+function closeFileMenu() {
+  fileMenu.value = null;
+  window.removeEventListener("click", closeFileMenu);
+  window.removeEventListener("contextmenu", closeFileMenu);
+  window.removeEventListener("scroll", closeFileMenu, true);
+}
+onUnmounted(closeFileMenu);
+
+// === Commit browser (duyệt commit + copy nhiều SHA) ===
+const browserDialog = ref(false);
+const browserSelected = ref<Set<string>>(new Set());
+const browserFocusedHash = ref("");
+const browserFileSel = ref("");
+async function openCommitBrowser() {
+  closeMenus();
+  browserDialog.value = true;
+  browserSelected.value = new Set();
+  browserFocusedHash.value = "";
+  browserFileSel.value = "";
+  await git.loadBrowserCommits();
+  if (git.browserCommits.value.length) focusBrowser(git.browserCommits.value[0]);
+}
+function focusBrowser(c: GitCommit) {
+  browserFocusedHash.value = c.hash;
+  browserFileSel.value = "";
+  void git.focusBrowserCommit(c.hash);
+}
+function selectBrowserFile(f: GitFileChange) {
+  browserFileSel.value = f.path;
+  void git.selectBrowserFile(browserFocusedHash.value, f.path);
+}
+function toggleBrowserSel(hash: string) {
+  const s = new Set(browserSelected.value);
+  if (s.has(hash)) s.delete(hash);
+  else s.add(hash);
+  browserSelected.value = s;
+}
+function copySelectedShas() {
+  const shas = git.browserCommits.value
+    .filter((c) => browserSelected.value.has(c.hash))
+    .map((c) => c.hash);
+  if (shas.length) git.copyText(shas.join("\n"), `${shas.length} SHA`);
+}
+
 // === Context menu trên history ===
 const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
 const ctxItem =
@@ -721,6 +786,20 @@ onUnmounted(closeCommitMenu);
         <div class="ml-auto flex items-center gap-0.5">
           <template v-if="git.activeRepo.value">
             <button
+              class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Mở terminal tại repo"
+              @click="git.openTerminal()"
+            >
+              <i class="pi pi-desktop text-[11px]" />
+            </button>
+            <button
+              class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Mở thư mục repo"
+              @click="git.showInFolder(git.info.value?.path || git.activeRepo.value.path)"
+            >
+              <i class="pi pi-folder-open text-[11px]" />
+            </button>
+            <button
               class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:opacity-50"
               :disabled="git.syncing.value"
               @click="git.fetch()"
@@ -788,6 +867,9 @@ onUnmounted(closeCommitMenu);
                 </button>
                 <button :class="ctxItem" @click="openCleanupDialog">
                   <i class="pi pi-eraser text-xs" /> Cleanup branch đã merge…
+                </button>
+                <button :class="ctxItem" @click="openCommitBrowser">
+                  <i class="pi pi-copy text-xs" /> Duyệt commit / copy SHA…
                 </button>
               </div>
             </div>
@@ -942,6 +1024,7 @@ onUnmounted(closeCommitMenu);
                   class="group flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-canvas"
                   :class="isFileSelected(f.path, true) ? 'bg-canvas' : ''"
                   @click="git.selectFile(f, true)"
+                  @contextmenu="openFileMenu($event, f.path)"
                 >
                   <Checkbox :model-value="true" binary @click.stop @change="git.unstageFiles([f.path])" />
                   <i class="pi pi-file shrink-0 text-xs" :class="statusMeta(f.status).cls" />
@@ -987,6 +1070,7 @@ onUnmounted(closeCommitMenu);
                   class="group flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-canvas"
                   :class="isFileSelected(f.path, false) ? 'bg-canvas' : ''"
                   @click="git.selectFile(f, false)"
+                  @contextmenu="openFileMenu($event, f.path)"
                 >
                   <Checkbox :model-value="false" binary @click.stop @change="git.stageFiles([f.path])" />
                   <i class="pi pi-file shrink-0 text-xs" :class="statusMeta(f.status).cls" />
@@ -1241,6 +1325,7 @@ onUnmounted(closeCommitMenu);
                   class="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-canvas"
                   :class="git.commitFileDiff.value?.path === f.path ? 'bg-canvas' : ''"
                   @click="git.selectCommitFile(f)"
+                  @contextmenu="openFileMenu($event, f.path)"
                 >
                   <span class="shrink-0 text-xs font-bold" :class="statusMeta(f.status).cls">{{ f.status }}</span>
                   <span class="min-w-0 flex-1 truncate text-xs text-ink" :title="f.path">{{ baseName(f.path) }}</span>
@@ -1747,6 +1832,7 @@ onUnmounted(closeCommitMenu);
                 class="flex w-full items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-canvas"
                 :class="git.comparisonDiff.value?.path === f.path ? 'bg-canvas' : ''"
                 @click="git.compareSelectFile(f)"
+                @contextmenu="openFileMenu($event, f.path)"
               >
                 <span class="shrink-0 text-xs font-bold" :class="statusMeta(f.status).cls">{{ f.status }}</span>
                 <span class="min-w-0 flex-1 truncate text-xs text-ink" :title="f.path">{{ baseName(f.path) }}</span>
@@ -2007,6 +2093,124 @@ onUnmounted(closeCommitMenu);
         </Button>
       </template>
     </Dialog>
+
+    <!-- Commit browser dialog -->
+    <Dialog v-model:visible="browserDialog" modal header="Duyệt commit" :style="{ width: '900px' }">
+      <div class="flex h-[460px] gap-2">
+        <!-- commit list (multi-select) -->
+        <div class="flex w-80 shrink-0 flex-col overflow-hidden rounded-md border border-divider">
+          <div class="flex items-center gap-2 border-b border-divider bg-canvas px-2 py-1 text-[11px] text-muted">
+            <span class="font-bold uppercase tracking-wide">Commits</span>
+            <span v-if="browserSelected.size" class="ml-auto text-brand">{{ browserSelected.size }} chọn</span>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto">
+            <div v-if="git.browserLoading.value" class="p-6 text-center text-sm text-muted">
+              <i class="pi pi-spinner pi-spin mr-1.5" /> Đang tải…
+            </div>
+            <div
+              v-for="c in git.browserCommits.value"
+              v-else
+              :key="c.hash"
+              class="flex items-start gap-2 border-b border-divider-light px-2 py-1.5 transition-colors hover:bg-canvas"
+              :class="browserFocusedHash === c.hash ? 'bg-canvas' : ''"
+            >
+              <Checkbox
+                :model-value="browserSelected.has(c.hash)"
+                binary
+                class="mt-0.5"
+                @click.stop
+                @change="toggleBrowserSel(c.hash)"
+              />
+              <button class="min-w-0 flex-1 text-left" @click="focusBrowser(c)">
+                <span class="block truncate text-sm text-ink">{{ c.subject }}</span>
+                <span class="flex items-center gap-2 text-[10px] text-muted">
+                  <span class="font-mono">{{ c.short_hash }}</span>
+                  <span class="truncate">{{ c.author_name }}</span>
+                  <span class="ml-auto shrink-0">{{ c.relative_date }}</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- files of focused commit -->
+        <div class="flex w-56 shrink-0 flex-col overflow-hidden rounded-md border border-divider">
+          <div class="border-b border-divider bg-canvas px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted">
+            Files ({{ git.browserFiles.value.length }})
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto">
+            <button
+              v-for="f in git.browserFiles.value"
+              :key="f.path"
+              class="flex w-full items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-canvas"
+              :class="browserFileSel === f.path ? 'bg-canvas' : ''"
+              @click="selectBrowserFile(f)"
+              @contextmenu="openFileMenu($event, f.path)"
+            >
+              <span class="shrink-0 text-xs font-bold" :class="statusMeta(f.status).cls">{{ f.status }}</span>
+              <span class="min-w-0 flex-1 truncate text-xs text-ink" :title="f.path">{{ baseName(f.path) }}</span>
+            </button>
+            <div v-if="!git.browserFiles.value.length" class="p-4 text-center text-xs text-muted">—</div>
+          </div>
+        </div>
+        <!-- diff -->
+        <div class="min-h-0 flex-1 overflow-auto rounded-md border border-divider">
+          <div v-if="!git.browserDiff.value" class="flex h-full items-center justify-center p-6 text-center text-xs text-muted">
+            Chọn một file để xem diff.
+          </div>
+          <div v-else-if="git.browserDiff.value.is_binary" class="p-4 text-xs text-muted">File nhị phân.</div>
+          <table v-else class="w-full border-collapse font-mono text-xs leading-5">
+            <tbody>
+              <tr
+                v-for="(line, i) in git.browserDiff.value.lines"
+                :key="i"
+                :class="{
+                  'bg-emerald-50': line.kind === 'add',
+                  'bg-red-50': line.kind === 'del',
+                  'bg-slate-100': line.kind === 'hunk',
+                }"
+              >
+                <td class="w-10 select-none border-r border-divider px-2 text-right text-[10px] text-muted">{{ line.old_line || "" }}</td>
+                <td class="w-10 select-none border-r border-divider px-2 text-right text-[10px] text-muted">{{ line.new_line || "" }}</td>
+                <td
+                  class="whitespace-pre-wrap break-all px-2"
+                  :class="{
+                    'text-emerald-700': line.kind === 'add',
+                    'text-red-700': line.kind === 'del',
+                    'font-semibold text-sky-700': line.kind === 'hunk',
+                    'text-secondary': line.kind === 'context',
+                  }"
+                ><span class="select-none text-muted">{{ line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' ' }}</span>{{ line.content }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <template #footer>
+        <span class="mr-auto text-xs text-muted">Tick chọn nhiều commit rồi copy SHA.</span>
+        <Button size="small" outlined severity="secondary" @click="browserDialog = false">Đóng</Button>
+        <Button size="small" :disabled="!browserSelected.size" @click="copySelectedShas">
+          <i class="pi pi-copy mr-1.5" /> Copy {{ browserSelected.size }} SHA
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- File context menu (copy path / show in folder) -->
+    <div
+      v-if="fileMenu"
+      class="fixed z-40 w-52 rounded-lg border border-divider bg-panel p-1 shadow-float"
+      :style="{ left: fileMenu.x + 'px', top: fileMenu.y + 'px' }"
+      @click.stop
+    >
+      <button :class="ctxItem" @click="closeFileMenu(); git.copyText(absPath(fileMenu.rel), 'đường dẫn')">
+        <i class="pi pi-copy text-xs" /> Copy path
+      </button>
+      <button :class="ctxItem" @click="closeFileMenu(); git.copyText(fileMenu.rel, 'đường dẫn tương đối')">
+        <i class="pi pi-copy text-xs" /> Copy relative path
+      </button>
+      <button :class="ctxItem" @click="closeFileMenu(); git.showInFolder(absPath(fileMenu.rel))">
+        <i class="pi pi-folder-open text-xs" /> Show in folder
+      </button>
+    </div>
 
     <!-- Context menu: history commit -->
     <div

@@ -228,6 +228,10 @@ export function gitOpenUrl(url: string) {
   return safeInvoke<void>("git_open_url", { url });
 }
 
+export function gitOpenTerminal(path: string) {
+  return safeInvoke<void>("git_open_terminal", { path });
+}
+
 export function gitCreatePullRequest(path: string, base: string, head: string) {
   return safeInvoke<string>("git_create_pull_request", { path, base, head });
 }

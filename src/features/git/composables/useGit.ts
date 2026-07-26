@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { explorerOpen } from "@/tauri/commands/explorer";
 import {
   gitAddRepo,
   gitBranches,
@@ -20,6 +21,7 @@ import {
   gitListPullRequests,
   gitMerge,
   gitMergeAbort,
+  gitOpenTerminal,
   gitOpenUrl,
   gitResolveConflict,
   gitTagCreate,
@@ -109,6 +111,12 @@ export function useGit() {
   const pullRequestsLoading = ref(false);
 
   const conflicts = ref<string[]>([]);
+
+  // Commit browser (dialog duyệt commit + copy SHA).
+  const browserCommits = ref<GitCommit[]>([]);
+  const browserFiles = ref<GitFileChange[]>([]);
+  const browserDiff = ref<GitDiff | null>(null);
+  const browserLoading = ref(false);
 
   const selectedFile = ref<SelectedFile | null>(null);
   const diff = ref<GitDiff | null>(null);
@@ -1021,6 +1029,65 @@ export function useGit() {
     }
   }
 
+  /** Mở terminal tại thư mục repo hiện tại. */
+  async function openTerminal() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitOpenTerminal(path);
+    } catch (e) {
+      reportError("Không mở được terminal", e);
+    }
+  }
+
+  /** Hiện một file/thư mục trong file explorer của hệ điều hành. */
+  async function showInFolder(absolutePath: string) {
+    try {
+      await explorerOpen(absolutePath);
+    } catch (e) {
+      reportError("Không mở được thư mục", e);
+    }
+  }
+
+  // === Commit browser ===
+
+  async function loadBrowserCommits() {
+    const path = repoPath();
+    if (!path) return;
+    browserLoading.value = true;
+    browserFiles.value = [];
+    browserDiff.value = null;
+    try {
+      browserCommits.value = await gitLog(path, 200);
+    } catch (e) {
+      reportError("Không tải được commit", e);
+    } finally {
+      browserLoading.value = false;
+    }
+  }
+
+  async function focusBrowserCommit(hash: string) {
+    const path = repoPath();
+    if (!path) return;
+    browserDiff.value = null;
+    try {
+      const detail = await gitCommitDetail(path, hash);
+      browserFiles.value = detail.files;
+    } catch (e) {
+      reportError("Không đọc được commit", e);
+    }
+  }
+
+  async function selectBrowserFile(hash: string, file: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      browserDiff.value = await gitCommitFileDiff(path, hash, file);
+    } catch (e) {
+      reportError("Không đọc được diff", e);
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -1081,6 +1148,10 @@ export function useGit() {
     pullRequests,
     pullRequestsLoading,
     conflicts,
+    browserCommits,
+    browserFiles,
+    browserDiff,
+    browserLoading,
     selectedFile,
     diff,
     diffLoading,
@@ -1150,6 +1221,11 @@ export function useGit() {
     createPullRequest,
     loadPullRequests,
     openUrl,
+    openTerminal,
+    showInFolder,
+    loadBrowserCommits,
+    focusBrowserCommit,
+    selectBrowserFile,
     loadConflicts,
     resolveConflict,
     markResolved,

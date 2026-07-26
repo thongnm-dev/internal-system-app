@@ -58,7 +58,7 @@ use commands::git_commands::{
     git_commit_detail, git_commit_file_diff, git_commit_no_edit, git_compare, git_compare_file_diff,
     git_create_branch, git_create_pull_request, git_delete_branch, git_discard, git_fetch,
     git_file_diff, git_list_conflicts, git_list_pull_requests, git_list_repos, git_log, git_merge,
-    git_merge_abort, git_open_url, git_pull, git_push, git_rebase, git_rebase_abort,
+    git_merge_abort, git_open_terminal, git_open_url, git_pull, git_push, git_rebase, git_rebase_abort,
     git_rebase_continue, git_remove_repo, git_repo_info, git_reset, git_resolve_conflict,
     git_revert, git_revert_abort, git_stage, git_stash_apply, git_stash_drop, git_stash_list,
     git_stash_save, git_status, git_tag_create, git_tag_delete, git_tag_list, git_touch_repo,
@@ -365,6 +365,7 @@ pub fn run() {
             git_create_pull_request,
             git_list_pull_requests,
             git_open_url,
+            git_open_terminal,
             git_worktree_add,
             git_worktree_remove,
             // === AI Usage commands ===

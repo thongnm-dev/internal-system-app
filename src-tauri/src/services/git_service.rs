@@ -1198,6 +1198,46 @@ pub fn open_url(url: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Mở terminal của hệ điều hành tại thư mục `dir`.
+pub fn open_terminal(dir: &str) -> AppResult<()> {
+    let p = Path::new(dir);
+    if !p.is_dir() {
+        return Err(AppError::new(format!("Không phải thư mục: {dir}")));
+    }
+    // Lưu ý: KHÔNG dùng `configure()` ở đây vì nó set CREATE_NO_WINDOW (ẩn cửa sổ)
+    // — ta lại cần hiện cửa sổ terminal.
+    #[cfg(target_os = "windows")]
+    {
+        // Ưu tiên Windows Terminal, fallback về cmd.
+        if Command::new("wt").arg("-d").arg(dir).spawn().is_err() {
+            Command::new("cmd")
+                .args(["/C", "start", "cmd"])
+                .current_dir(dir)
+                .spawn()
+                .map_err(|e| AppError::new(format!("Không mở được terminal: {e}")))?;
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(["-a", "Terminal"])
+            .arg(dir)
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được terminal: {e}")))?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let candidates = ["x-terminal-emulator", "gnome-terminal", "konsole", "xterm"];
+        let opened = candidates
+            .iter()
+            .any(|term| Command::new(term).current_dir(dir).spawn().is_ok());
+        if !opened {
+            return Err(AppError::new("Không tìm thấy terminal trên hệ thống."));
+        }
+    }
+    Ok(())
+}
+
 /// Tạo Pull Request: mở trang tạo PR trên host (GitHub Desktop cũng mở trình duyệt).
 /// Trả về URL đã mở.
 pub fn create_pull_request(repo_path: &str, base: &str, head: &str) -> AppResult<String> {
