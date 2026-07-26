@@ -55,9 +55,10 @@ use commands::explorer_commands::{
 use commands::git_commands::{
     git_add_repo, git_branches, git_checkout_branch, git_clone, git_commit, git_commit_detail,
     git_commit_file_diff, git_create_branch, git_delete_branch, git_discard, git_fetch,
-    git_file_diff, git_list_repos, git_log, git_pull, git_push, git_remove_repo, git_repo_info,
-    git_stage, git_stash_apply, git_stash_drop, git_stash_list, git_stash_save, git_status,
-    git_touch_repo, git_unstage,
+    git_file_diff, git_list_repos, git_log, git_pull, git_push, git_rebase, git_rebase_abort,
+    git_rebase_continue, git_remove_repo, git_repo_info, git_revert, git_revert_abort, git_stage,
+    git_stash_apply, git_stash_drop, git_stash_list, git_stash_save, git_status, git_touch_repo,
+    git_unstage, git_worktree_add, git_worktree_list, git_worktree_remove,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::menu_permission_commands::{
@@ -334,6 +335,14 @@ pub fn run() {
             git_stash_apply,
             git_stash_drop,
             git_clone,
+            git_worktree_list,
+            git_revert,
+            git_revert_abort,
+            git_rebase,
+            git_rebase_abort,
+            git_rebase_continue,
+            git_worktree_add,
+            git_worktree_remove,
             // === AI Usage commands ===
             ai_usage_add_account,
             ai_usage_detect_local,

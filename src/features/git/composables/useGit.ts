@@ -19,8 +19,13 @@ import {
   gitLog,
   gitPull,
   gitPush,
+  gitRebase,
+  gitRebaseAbort,
+  gitRebaseContinue,
   gitRemoveRepo,
   gitRepoInfo,
+  gitRevert,
+  gitRevertAbort,
   gitStage,
   gitStashApply,
   gitStashDrop,
@@ -29,6 +34,9 @@ import {
   gitStatus,
   gitTouchRepo,
   gitUnstage,
+  gitWorktreeAdd,
+  gitWorktreeList,
+  gitWorktreeRemove,
 } from "@/tauri/commands/git";
 import type {
   GitBranch,
@@ -39,6 +47,7 @@ import type {
   GitRepo,
   GitRepoInfo,
   GitStash,
+  GitWorktree,
 } from "@/_/types/git";
 import { useToast } from "@/shared/composables/useToast";
 
@@ -65,6 +74,7 @@ export function useGit() {
   const unstaged = ref<GitFileChange[]>([]);
   const branches = ref<GitBranch[]>([]);
   const stashes = ref<GitStash[]>([]);
+  const worktrees = ref<GitWorktree[]>([]);
   const commits = ref<GitCommit[]>([]);
 
   const selectedFile = ref<SelectedFile | null>(null);
@@ -465,6 +475,148 @@ export function useGit() {
     }
   }
 
+  // === Revert ===
+
+  async function revert(hash: string) {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang revert…";
+    try {
+      await gitRevert(path, hash);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches(), loadHistory()]);
+      toast.success("Đã revert commit.");
+    } catch (e) {
+      reportError("Revert thất bại", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function revertAbort() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitRevertAbort(path);
+      await refreshStatusAndInfo();
+      toast.success("Đã hủy revert.");
+    } catch (e) {
+      reportError("Không hủy được revert", e);
+    }
+  }
+
+  // === Rebase ===
+
+  async function rebaseOnto(onto: string) {
+    const path = repoPath();
+    if (!path || !onto.trim()) return;
+    busyMessage.value = `Đang rebase lên ${onto}…`;
+    try {
+      await gitRebase(path, onto);
+      selectedCommit.value = null;
+      commits.value = [];
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success(`Đã rebase lên "${onto}".`);
+    } catch (e) {
+      reportError("Rebase gặp lỗi (có thể do xung đột)", e);
+      await refreshStatusAndInfo();
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function rebaseAbort() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang hủy rebase…";
+    try {
+      await gitRebaseAbort(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      toast.success("Đã hủy rebase.");
+    } catch (e) {
+      reportError("Không hủy được rebase", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function rebaseContinue() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang tiếp tục rebase…";
+    try {
+      await gitRebaseContinue(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success("Đã tiếp tục rebase.");
+    } catch (e) {
+      reportError("Không tiếp tục được rebase (còn xung đột chưa xử lý?)", e);
+      await refreshStatusAndInfo();
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  // === Worktree ===
+
+  async function loadWorktrees() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      worktrees.value = await gitWorktreeList(path);
+    } catch (e) {
+      reportError("Không lấy được danh sách worktree", e);
+    }
+  }
+
+  /** Tạo worktree. Trả về đường dẫn đã tạo (rỗng nếu thất bại). */
+  async function worktreeAdd(
+    worktreePath: string,
+    branch: string,
+    newBranch: string,
+  ): Promise<string> {
+    const path = repoPath();
+    if (!path || !worktreePath.trim()) return "";
+    busyMessage.value = "Đang tạo worktree…";
+    try {
+      const created = await gitWorktreeAdd(path, worktreePath, branch, newBranch);
+      await Promise.all([loadWorktrees(), refreshBranches()]);
+      toast.success("Đã tạo worktree.");
+      return created;
+    } catch (e) {
+      reportError("Không tạo được worktree", e);
+      return "";
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function worktreeRemove(worktreePath: string, force: boolean) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitWorktreeRemove(path, worktreePath, force);
+      await loadWorktrees();
+      toast.success("Đã gỡ worktree.");
+    } catch (e) {
+      reportError("Không gỡ được worktree", e);
+    }
+  }
+
+  /** Thêm một đường dẫn (vd. worktree vừa tạo) vào danh sách repo và mở nó. */
+  async function openPathAsRepo(targetPath: string) {
+    if (!targetPath.trim()) return;
+    try {
+      const repo = await gitAddRepo(targetPath);
+      if (!repos.value.some((r) => r.id === repo.id)) {
+        repos.value = [repo, ...repos.value];
+      }
+      await openRepo(repo);
+    } catch (e) {
+      reportError("Không mở được thư mục", e);
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -513,6 +665,7 @@ export function useGit() {
     localBranches,
     remoteBranches,
     stashes,
+    worktrees,
     commits,
     selectedFile,
     diff,
@@ -559,5 +712,14 @@ export function useGit() {
     stashApply,
     stashDrop,
     cloneRepo,
+    revert,
+    revertAbort,
+    rebaseOnto,
+    rebaseAbort,
+    rebaseContinue,
+    loadWorktrees,
+    worktreeAdd,
+    worktreeRemove,
+    openPathAsRepo,
   };
 }

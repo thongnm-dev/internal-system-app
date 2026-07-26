@@ -8,6 +8,7 @@ import type {
   GitRepoInfo,
   GitStash,
   GitStatus,
+  GitWorktree,
 } from "@/_/types/git";
 
 // === Quản lý danh sách repo (lưu cục bộ) ===
@@ -60,6 +61,10 @@ export function gitBranches(path: string) {
 
 export function gitStashList(path: string) {
   return safeInvoke<GitStash[]>("git_stash_list", { path });
+}
+
+export function gitWorktreeList(path: string) {
+  return safeInvoke<GitWorktree[]>("git_worktree_list", { path });
 }
 
 // === Thao tác ghi / mạng ===
@@ -118,4 +123,32 @@ export function gitStashDrop(path: string, reference: string) {
 
 export function gitClone(url: string, dest: string) {
   return safeInvoke<string>("git_clone", { url, dest });
+}
+
+export function gitRevert(path: string, hash: string) {
+  return safeInvoke<string>("git_revert", { path, hash });
+}
+
+export function gitRevertAbort(path: string) {
+  return safeInvoke<string>("git_revert_abort", { path });
+}
+
+export function gitRebase(path: string, onto: string) {
+  return safeInvoke<string>("git_rebase", { path, onto });
+}
+
+export function gitRebaseAbort(path: string) {
+  return safeInvoke<string>("git_rebase_abort", { path });
+}
+
+export function gitRebaseContinue(path: string) {
+  return safeInvoke<string>("git_rebase_continue", { path });
+}
+
+export function gitWorktreeAdd(path: string, worktreePath: string, branch: string, newBranch: string) {
+  return safeInvoke<string>("git_worktree_add", { path, worktreePath, branch, newBranch });
+}
+
+export function gitWorktreeRemove(path: string, worktreePath: string, force: boolean) {
+  return safeInvoke<string>("git_worktree_remove", { path, worktreePath, force });
 }

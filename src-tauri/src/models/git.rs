@@ -36,6 +36,25 @@ pub struct GitRepoInfo {
     pub behind: u32,
     /// URL remote `origin` (rỗng nếu không có).
     pub remote_url: String,
+    /// Đang trong quá trình rebase (có thư mục rebase-merge/rebase-apply).
+    pub rebase_in_progress: bool,
+}
+
+/// Một Git worktree.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitWorktree {
+    /// Đường dẫn thư mục làm việc của worktree.
+    pub path: String,
+    /// SHA của HEAD.
+    pub head: String,
+    /// Tên branch đang checkout (rỗng nếu detached/bare).
+    pub branch: String,
+    /// Worktree bare (không có working tree).
+    pub is_bare: bool,
+    /// Đang ở detached HEAD.
+    pub is_detached: bool,
+    /// Là worktree chính đang mở (khớp với repo hiện tại).
+    pub is_current: bool,
 }
 
 /// Một file trong danh sách thay đổi (working tree hoặc staged).

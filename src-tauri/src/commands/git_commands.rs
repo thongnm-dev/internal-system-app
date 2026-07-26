@@ -11,6 +11,7 @@ use crate::app::error::log_err;
 use crate::database::git_repo_store::{self, GitRepoData};
 use crate::models::git::{
     GitBranch, GitCommit, GitCommitDetail, GitDiff, GitRepo, GitRepoInfo, GitStash, GitStatus,
+    GitWorktree,
 };
 use crate::services::git_service;
 
@@ -130,6 +131,11 @@ pub fn git_branches(path: String) -> Result<Vec<GitBranch>, String> {
 #[tauri::command]
 pub fn git_stash_list(path: String) -> Result<Vec<GitStash>, String> {
     git_service::stash_list(&path).map_err(log_err)
+}
+
+#[tauri::command]
+pub fn git_worktree_list(path: String) -> Result<Vec<GitWorktree>, String> {
+    git_service::worktree_list(&path).map_err(log_err)
 }
 
 // === Thao tác ghi / mạng (async) ===
@@ -256,4 +262,73 @@ pub async fn git_clone(url: String, dest: String) -> Result<String, String> {
         .await
         .map_err(log_err)?
         .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_revert(path: String, hash: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::revert(&path, &hash))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_revert_abort(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::revert_abort(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_rebase(path: String, onto: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::rebase(&path, &onto))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_rebase_abort(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::rebase_abort(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_rebase_continue(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::rebase_continue(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_worktree_add(
+    path: String,
+    worktree_path: String,
+    branch: String,
+    new_branch: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::worktree_add(&path, &worktree_path, &branch, &new_branch)
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_worktree_remove(
+    path: String,
+    worktree_path: String,
+    force: bool,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::worktree_remove(&path, &worktree_path, force)
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }

@@ -17,6 +17,17 @@ export interface GitRepoInfo {
   ahead: number;
   behind: number;
   remote_url: string;
+  rebase_in_progress: boolean;
+}
+
+/** Một Git worktree. */
+export interface GitWorktree {
+  path: string;
+  head: string;
+  branch: string;
+  is_bare: boolean;
+  is_detached: boolean;
+  is_current: boolean;
 }
 
 /** Một file trong danh sách thay đổi. */

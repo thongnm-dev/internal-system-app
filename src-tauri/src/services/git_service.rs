@@ -16,7 +16,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::git::{
     GitBranch, GitCommit, GitCommitDetail, GitDiff, GitDiffLine, GitFileChange, GitRepoInfo,
-    GitStash, GitStatus,
+    GitStash, GitStatus, GitWorktree,
 };
 
 /// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
@@ -133,6 +133,21 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
 
     let remote_url = run_opt(repo_path, &["remote", "get-url", "origin"]);
 
+    let rebase_in_progress = {
+        let git_dir = run_opt(repo_path, &["rev-parse", "--git-dir"]);
+        if git_dir.is_empty() {
+            false
+        } else {
+            let base = Path::new(&git_dir);
+            let dir = if base.is_absolute() {
+                base.to_path_buf()
+            } else {
+                Path::new(repo_path).join(base)
+            };
+            dir.join("rebase-merge").exists() || dir.join("rebase-apply").exists()
+        }
+    };
+
     Ok(GitRepoInfo {
         path,
         current_branch,
@@ -141,6 +156,7 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
         ahead,
         behind,
         remote_url,
+        rebase_in_progress,
     })
 }
 
@@ -609,6 +625,161 @@ pub fn create_branch(repo_path: &str, name: &str, from: &str) -> AppResult<Strin
 pub fn delete_branch(repo_path: &str, name: &str, force: bool) -> AppResult<String> {
     let flag = if force { "-D" } else { "-d" };
     run(repo_path, &["branch", flag, name])
+}
+
+// === Revert ===
+
+/// Revert một commit (tạo commit mới đảo ngược thay đổi). Dùng `--no-edit`.
+pub fn revert(repo_path: &str, hash: &str) -> AppResult<String> {
+    if hash.trim().is_empty() {
+        return Err(AppError::new("Thiếu mã commit để revert."));
+    }
+    run(repo_path, &["revert", "--no-edit", hash])
+}
+
+/// Hủy một revert đang dở (khi có xung đột).
+pub fn revert_abort(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["revert", "--abort"])
+}
+
+// === Rebase ===
+
+/// Rebase branch hiện tại lên trên `onto` (branch/ref đích).
+pub fn rebase(repo_path: &str, onto: &str) -> AppResult<String> {
+    if onto.trim().is_empty() {
+        return Err(AppError::new("Thiếu branch đích để rebase."));
+    }
+    run(repo_path, &["rebase", onto])
+}
+
+/// Hủy rebase đang dở, đưa branch về trạng thái trước rebase.
+pub fn rebase_abort(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["rebase", "--abort"])
+}
+
+/// Tiếp tục rebase sau khi đã giải quyết xung đột (và stage các file).
+pub fn rebase_continue(repo_path: &str) -> AppResult<String> {
+    let mut cmd = git_in(repo_path);
+    // `rebase --continue` mở editor cho commit message — tránh treo bằng cách
+    // dùng editor "true" (không tương tác, giữ nguyên message).
+    cmd.env("GIT_EDITOR", "true");
+    let output = cmd
+        .args(["rebase", "--continue"])
+        .output()
+        .map_err(|e| AppError::new(format!("Không chạy được git: {e}")))?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Err(AppError::new(if stderr.is_empty() {
+            "Rebase --continue thất bại.".to_string()
+        } else {
+            stderr
+        }))
+    }
+}
+
+// === Worktree ===
+
+/// Liệt kê các worktree của repo.
+pub fn worktree_list(repo_path: &str) -> AppResult<Vec<GitWorktree>> {
+    let raw = run(repo_path, &["worktree", "list", "--porcelain"])?;
+    let top = normalize_path(&run_opt(repo_path, &["rev-parse", "--show-toplevel"]));
+
+    let mut out: Vec<GitWorktree> = Vec::new();
+    let mut cur: Option<GitWorktree> = None;
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            if let Some(w) = cur.take() {
+                out.push(w);
+            }
+            continue;
+        }
+        if let Some(p) = line.strip_prefix("worktree ") {
+            if let Some(w) = cur.take() {
+                out.push(w);
+            }
+            cur = Some(GitWorktree {
+                path: p.to_string(),
+                head: String::new(),
+                branch: String::new(),
+                is_bare: false,
+                is_detached: false,
+                is_current: false,
+            });
+        } else if let Some(w) = cur.as_mut() {
+            if let Some(h) = line.strip_prefix("HEAD ") {
+                w.head = h.to_string();
+            } else if let Some(b) = line.strip_prefix("branch ") {
+                w.branch = b.trim_start_matches("refs/heads/").to_string();
+            } else if line == "bare" {
+                w.is_bare = true;
+            } else if line == "detached" {
+                w.is_detached = true;
+            }
+        }
+    }
+    if let Some(w) = cur.take() {
+        out.push(w);
+    }
+
+    for w in out.iter_mut() {
+        w.is_current = normalize_path(&w.path) == top && !top.is_empty();
+    }
+    Ok(out)
+}
+
+/// Chuẩn hóa đường dẫn để so sánh (đồng nhất dấu phân tách, bỏ `/` cuối).
+fn normalize_path(p: &str) -> String {
+    let mut s = p.replace('\\', "/");
+    while s.len() > 1 && s.ends_with('/') {
+        s.pop();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        s = s.to_lowercase();
+    }
+    s
+}
+
+/// Tạo worktree mới tại `path`.
+/// - `new_branch` không rỗng → tạo branch mới (`-b`), xuất phát từ `branch` nếu có.
+/// - ngược lại → checkout `branch` (đã tồn tại) vào worktree; rỗng thì dùng HEAD.
+pub fn worktree_add(
+    repo_path: &str,
+    path: &str,
+    branch: &str,
+    new_branch: &str,
+) -> AppResult<String> {
+    if path.trim().is_empty() {
+        return Err(AppError::new("Thiếu đường dẫn cho worktree."));
+    }
+    let mut args: Vec<&str> = vec!["worktree", "add"];
+    if !new_branch.trim().is_empty() {
+        args.push("-b");
+        args.push(new_branch);
+        args.push(path);
+        if !branch.trim().is_empty() {
+            args.push(branch);
+        }
+    } else {
+        args.push(path);
+        if !branch.trim().is_empty() {
+            args.push(branch);
+        }
+    }
+    run(repo_path, &args)?;
+    Ok(path.to_string())
+}
+
+/// Gỡ một worktree. `force = true` → dùng `--force`.
+pub fn worktree_remove(repo_path: &str, path: &str, force: bool) -> AppResult<String> {
+    let mut args: Vec<&str> = vec!["worktree", "remove"];
+    if force {
+        args.push("--force");
+    }
+    args.push(path);
+    run(repo_path, &args)
 }
 
 // === Network (fetch / pull / push) ===
