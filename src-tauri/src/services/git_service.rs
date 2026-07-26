@@ -462,6 +462,24 @@ pub fn commit(repo_path: &str, message: &str) -> AppResult<String> {
     run(repo_path, &["commit", "-m", message])
 }
 
+/// Hoàn tác commit gần nhất, giữ lại thay đổi ở staged (`reset --soft HEAD~1`).
+pub fn undo_last_commit(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["reset", "--soft", "HEAD~1"])
+}
+
+/// Reset branch hiện tại về một commit. `mode`: "soft" | "mixed" | "hard".
+pub fn reset_to(repo_path: &str, hash: &str, mode: &str) -> AppResult<String> {
+    if hash.trim().is_empty() {
+        return Err(AppError::new("Thiếu mã commit để reset."));
+    }
+    let flag = match mode {
+        "soft" => "--soft",
+        "hard" => "--hard",
+        _ => "--mixed",
+    };
+    run(repo_path, &["reset", flag, hash])
+}
+
 // === Log / History ===
 
 /// Lấy lịch sử commit của branch hiện tại (giới hạn `limit`).

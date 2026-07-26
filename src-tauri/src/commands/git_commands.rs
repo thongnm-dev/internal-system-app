@@ -265,6 +265,22 @@ pub async fn git_clone(url: String, dest: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub async fn git_undo_last_commit(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::undo_last_commit(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_reset(path: String, hash: String, mode: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::reset_to(&path, &hash, &mode))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
 pub async fn git_revert(path: String, hash: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::revert(&path, &hash))
         .await

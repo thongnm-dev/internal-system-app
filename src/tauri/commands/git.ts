@@ -125,6 +125,14 @@ export function gitClone(url: string, dest: string) {
   return safeInvoke<string>("git_clone", { url, dest });
 }
 
+export function gitUndoLastCommit(path: string) {
+  return safeInvoke<string>("git_undo_last_commit", { path });
+}
+
+export function gitReset(path: string, hash: string, mode: "soft" | "mixed" | "hard") {
+  return safeInvoke<string>("git_reset", { path, hash, mode });
+}
+
 export function gitRevert(path: string, hash: string) {
   return safeInvoke<string>("git_revert", { path, hash });
 }

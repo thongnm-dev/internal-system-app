@@ -293,6 +293,71 @@ async function doWorktreeCreate() {
     if (wtOpenAfter.value) await git.openPathAsRepo(created);
   }
 }
+
+// === Context menu trên history ===
+const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
+const ctxItem =
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-secondary transition-colors hover:bg-canvas hover:text-brand";
+const ctxDanger =
+  "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50";
+
+function openCommitMenu(e: MouseEvent, commit: GitCommit) {
+  e.preventDefault();
+  e.stopPropagation();
+  git.selectCommit(commit);
+  // Kẹp vị trí để menu không tràn khỏi cửa sổ.
+  const x = Math.min(e.clientX, window.innerWidth - 240);
+  const y = Math.min(e.clientY, window.innerHeight - 320);
+  commitMenu.value = { x: Math.max(8, x), y: Math.max(8, y), commit };
+  requestAnimationFrame(() => {
+    window.addEventListener("click", closeCommitMenu);
+    window.addEventListener("contextmenu", closeCommitMenu);
+    window.addEventListener("scroll", closeCommitMenu, true);
+  });
+}
+
+function closeCommitMenu() {
+  commitMenu.value = null;
+  window.removeEventListener("click", closeCommitMenu);
+  window.removeEventListener("contextmenu", closeCommitMenu);
+  window.removeEventListener("scroll", closeCommitMenu, true);
+}
+
+function isTopCommit(c: GitCommit) {
+  return git.commits.value[0]?.hash === c.hash;
+}
+
+// Reset (hard) — cần xác nhận vì mất dữ liệu.
+const resetHardDialog = ref(false);
+const resetHardCommit = ref<GitCommit | null>(null);
+function askResetHard(c: GitCommit) {
+  resetHardCommit.value = c;
+  resetHardDialog.value = true;
+}
+async function doResetHard() {
+  if (resetHardCommit.value) await git.resetTo(resetHardCommit.value.hash, "hard");
+  resetHardDialog.value = false;
+  resetHardCommit.value = null;
+}
+
+// Tạo branch từ commit.
+const branchFromDialog = ref(false);
+const branchFromName = ref("");
+const branchFromCommit = ref<GitCommit | null>(null);
+function askBranchFrom(c: GitCommit) {
+  branchFromCommit.value = c;
+  branchFromName.value = "";
+  branchFromDialog.value = true;
+}
+async function doBranchFrom() {
+  if (!branchFromCommit.value || !branchFromName.value.trim()) return;
+  await git.createBranchAt(branchFromName.value, branchFromCommit.value.hash);
+  branchFromDialog.value = false;
+  branchFromName.value = "";
+  branchFromCommit.value = null;
+}
+
+onUnmounted(closeCommitMenu);
 </script>
 
 <template>
@@ -809,6 +874,7 @@ async function doWorktreeCreate() {
                 class="flex w-full flex-col gap-0.5 border-b border-divider-light px-3 py-2 text-left transition-colors hover:bg-canvas"
                 :class="git.selectedCommit.value?.hash === c.hash ? 'bg-canvas' : ''"
                 @click="git.selectCommit(c)"
+                @contextmenu="openCommitMenu($event, c)"
               >
                 <span class="truncate text-sm font-medium text-ink">{{ c.subject }}</span>
                 <span class="flex items-center gap-2 text-[11px] text-muted">
@@ -1140,5 +1206,81 @@ async function doWorktreeCreate() {
         </Button>
       </template>
     </Dialog>
+
+    <!-- Reset (hard) confirm -->
+    <Dialog v-model:visible="resetHardDialog" modal header="Reset (hard)" :style="{ width: '470px' }">
+      <p class="text-sm text-secondary">
+        Reset branch về <strong class="text-ink">{{ resetHardCommit?.short_hash }}</strong> và
+        <strong class="text-red-600">xóa toàn bộ thay đổi</strong> sau commit này (kể cả file đang sửa).
+        Thao tác này không thể hoàn tác.
+      </p>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="resetHardDialog = false">Hủy</Button>
+        <Button size="small" severity="danger" :disabled="!!git.busyMessage.value" @click="doResetHard">
+          <i class="pi pi-exclamation-triangle mr-1.5" /> Reset hard
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Create branch from commit -->
+    <Dialog v-model:visible="branchFromDialog" modal header="Tạo branch từ commit" :style="{ width: '440px' }">
+      <div class="flex flex-col gap-3">
+        <div v-if="branchFromCommit" class="rounded-md border border-divider bg-canvas p-2.5">
+          <p class="text-sm font-medium text-ink">{{ branchFromCommit.subject }}</p>
+          <p class="mt-0.5 font-mono text-[11px] text-muted">{{ branchFromCommit.short_hash }}</p>
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-ink">Tên branch</label>
+          <InputText
+            v-model="branchFromName"
+            placeholder="feature/ten-branch"
+            class="w-full"
+            @keydown.enter="doBranchFrom"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="branchFromDialog = false">Hủy</Button>
+        <Button size="small" :disabled="!branchFromName.trim()" @click="doBranchFrom">
+          <i class="pi pi-sitemap mr-1.5" /> Tạo branch
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Context menu: history commit -->
+    <div
+      v-if="commitMenu"
+      class="fixed z-40 w-56 rounded-lg border border-divider bg-panel p-1 shadow-float"
+      :style="{ left: commitMenu.x + 'px', top: commitMenu.y + 'px' }"
+      @click.stop
+    >
+      <button v-if="isTopCommit(commitMenu.commit)" :class="ctxItem" @click="closeCommitMenu(); git.undoLastCommit()">
+        <i class="pi pi-replay text-xs" /> Undo commit này
+      </button>
+      <button :class="ctxItem" @click="closeCommitMenu(); askRevert(commitMenu.commit)">
+        <i class="pi pi-undo text-xs" /> Revert commit…
+      </button>
+      <div class="my-1 border-t border-divider" />
+      <button :class="ctxItem" @click="closeCommitMenu(); askBranchFrom(commitMenu.commit)">
+        <i class="pi pi-sitemap text-xs" /> Tạo branch từ đây…
+      </button>
+      <button :class="ctxItem" @click="closeCommitMenu(); git.checkoutCommit(commitMenu.commit.hash)">
+        <i class="pi pi-arrow-right text-xs" /> Checkout commit (detached)
+      </button>
+      <div class="my-1 border-t border-divider" />
+      <button :class="ctxItem" @click="closeCommitMenu(); git.resetTo(commitMenu.commit.hash, 'mixed')">
+        <i class="pi pi-history text-xs" /> Reset về đây (giữ thay đổi)
+      </button>
+      <button :class="ctxDanger" @click="closeCommitMenu(); askResetHard(commitMenu.commit)">
+        <i class="pi pi-exclamation-triangle text-xs" /> Reset về đây (xóa thay đổi)…
+      </button>
+      <div class="my-1 border-t border-divider" />
+      <button :class="ctxItem" @click="closeCommitMenu(); git.copyText(commitMenu.commit.hash, 'SHA')">
+        <i class="pi pi-copy text-xs" /> Copy SHA
+      </button>
+      <button :class="ctxItem" @click="closeCommitMenu(); git.copyText(commitMenu.commit.subject, 'commit message')">
+        <i class="pi pi-copy text-xs" /> Copy message
+      </button>
+    </div>
   </section>
 </template>

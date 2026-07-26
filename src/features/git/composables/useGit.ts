@@ -24,6 +24,7 @@ import {
   gitRebaseContinue,
   gitRemoveRepo,
   gitRepoInfo,
+  gitReset,
   gitRevert,
   gitRevertAbort,
   gitStage,
@@ -33,6 +34,7 @@ import {
   gitStashSave,
   gitStatus,
   gitTouchRepo,
+  gitUndoLastCommit,
   gitUnstage,
   gitWorktreeAdd,
   gitWorktreeList,
@@ -357,6 +359,87 @@ export function useGit() {
       }
     } catch (e) {
       reportError("Không tải được lịch sử", e);
+    }
+  }
+
+  /** Refresh sau khi lịch sử/HEAD thay đổi (undo, reset, checkout commit…). */
+  async function refreshAfterHistoryChange() {
+    selectedCommit.value = null;
+    commits.value = [];
+    selectedFile.value = null;
+    diff.value = null;
+    await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+    if (tab.value === "history") await loadHistory();
+  }
+
+  /** Undo commit gần nhất (giữ thay đổi ở staged). */
+  async function undoLastCommit() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang undo commit…";
+    try {
+      await gitUndoLastCommit(path);
+      await refreshAfterHistoryChange();
+      toast.success("Đã undo commit gần nhất (thay đổi giữ ở staged).");
+    } catch (e) {
+      reportError("Không undo được commit", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  /** Reset branch hiện tại về một commit. */
+  async function resetTo(hash: string, mode: "soft" | "mixed" | "hard") {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang reset…";
+    try {
+      await gitReset(path, hash, mode);
+      await refreshAfterHistoryChange();
+      toast.success(`Đã reset (${mode}) về commit.`);
+    } catch (e) {
+      reportError("Reset thất bại", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  /** Checkout một commit (detached HEAD). */
+  async function checkoutCommit(hash: string) {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang checkout commit…";
+    try {
+      await gitCheckoutBranch(path, hash);
+      await refreshAfterHistoryChange();
+      toast.success("Đã checkout commit (detached HEAD).");
+    } catch (e) {
+      reportError("Không checkout được commit", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  /** Tạo branch mới tại một commit cụ thể rồi checkout sang đó. */
+  async function createBranchAt(name: string, from: string) {
+    const path = repoPath();
+    if (!path || !name.trim()) return;
+    try {
+      await gitCreateBranch(path, name.trim(), from);
+      await refreshAfterHistoryChange();
+      toast.success(`Đã tạo branch "${name.trim()}" tại commit.`);
+    } catch (e) {
+      reportError("Không tạo được branch", e);
+    }
+  }
+
+  /** Copy một đoạn text vào clipboard. */
+  async function copyText(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Đã copy ${label}.`);
+    } catch (e) {
+      reportError("Không copy được", e);
     }
   }
 
@@ -712,6 +795,11 @@ export function useGit() {
     stashApply,
     stashDrop,
     cloneRepo,
+    undoLastCommit,
+    resetTo,
+    checkoutCommit,
+    createBranchAt,
+    copyText,
     revert,
     revertAbort,
     rebaseOnto,
