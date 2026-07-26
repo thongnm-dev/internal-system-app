@@ -361,7 +361,7 @@ onUnmounted(closeCommitMenu);
 </script>
 
 <template>
-  <section class="relative flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+  <section class="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
     <!-- Runtime unavailable (browser preview) -->
     <div
       v-if="!git.runtimeAvailable.value"
@@ -374,26 +374,26 @@ onUnmounted(closeCommitMenu);
     </div>
 
     <template v-else>
-      <!-- ======================= TOOLBAR ======================= -->
+      <!-- ======================= BOTTOM ACTION BAR (VSCode-style) ======================= -->
       <div
-        class="flex flex-wrap items-center gap-2 rounded-lg border border-divider bg-panel px-3 py-2 shadow-sm"
+        class="order-last flex shrink-0 flex-wrap items-center gap-1 rounded-lg border border-divider bg-panel px-2 py-1 text-xs shadow-sm"
       >
         <!-- Repo picker -->
         <div class="relative">
           <button
-            class="flex h-9 min-w-[180px] max-w-[280px] items-center gap-2 rounded-md border border-divider bg-canvas px-3 text-sm transition-colors hover:border-brand"
+            class="flex h-7 min-w-[140px] max-w-[240px] items-center gap-1.5 rounded-md px-2 transition-colors hover:bg-canvas"
             @click="toggleRepoMenu"
           >
-            <i class="pi pi-book shrink-0 text-brand" />
+            <i class="pi pi-book shrink-0 text-[11px] text-brand" />
             <span class="truncate font-semibold text-ink">
               {{ git.activeRepo.value?.name ?? "Chọn repository" }}
             </span>
-            <i class="pi pi-chevron-down ml-auto shrink-0 text-[10px] text-muted" />
+            <i class="pi pi-chevron-up ml-auto shrink-0 text-[9px] text-muted" />
           </button>
 
           <div
             v-if="repoMenuOpen"
-            class="absolute left-0 top-11 z-30 w-[320px] rounded-lg border border-divider bg-panel p-1.5 shadow-float"
+            class="absolute bottom-full left-0 z-30 mb-2 w-[320px] rounded-lg border border-divider bg-panel p-1.5 shadow-float"
           >
             <div class="max-h-64 overflow-y-auto">
               <div
@@ -441,22 +441,25 @@ onUnmounted(closeCommitMenu);
           </div>
         </div>
 
-        <!-- Branch picker -->
+        <!-- Branch picker (button → dropdown, giống VSCode) -->
         <div v-if="git.activeRepo.value" class="relative">
           <button
-            class="flex h-9 min-w-[150px] max-w-[240px] items-center gap-2 rounded-md border border-divider bg-canvas px-3 text-sm transition-colors hover:border-brand"
+            class="flex h-7 min-w-[110px] max-w-[220px] items-center gap-1.5 rounded-md px-2 transition-colors hover:bg-canvas"
+            title="Đổi branch"
             @click="toggleBranchMenu"
           >
-            <i class="pi pi-sitemap shrink-0 text-brand" />
+            <i class="pi pi-sitemap shrink-0 text-[11px] text-brand" />
             <span class="truncate font-medium text-ink">
               {{ git.info.value?.detached ? "detached @ " + git.info.value?.current_branch : (git.info.value?.current_branch || "—") }}
             </span>
-            <i class="pi pi-chevron-down ml-auto shrink-0 text-[10px] text-muted" />
+            <span v-if="git.info.value?.behind" class="shrink-0 text-[10px] font-semibold text-sky-600">↓{{ git.info.value.behind }}</span>
+            <span v-if="git.info.value?.ahead" class="shrink-0 text-[10px] font-semibold text-emerald-600">↑{{ git.info.value.ahead }}</span>
+            <i class="pi pi-chevron-up ml-auto shrink-0 text-[9px] text-muted" />
           </button>
 
           <div
             v-if="branchMenuOpen"
-            class="absolute left-0 top-11 z-30 w-[300px] rounded-lg border border-divider bg-panel p-1.5 shadow-float"
+            class="absolute bottom-full left-0 z-30 mb-2 w-[300px] rounded-lg border border-divider bg-panel p-1.5 shadow-float"
           >
             <div class="relative mb-1">
               <i class="pi pi-search pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted" />
@@ -502,65 +505,57 @@ onUnmounted(closeCommitMenu);
           </div>
         </div>
 
-        <div class="ml-auto flex items-center gap-1.5">
+        <!-- Trạng thái bận -->
+        <span v-if="git.busyMessage.value" class="ml-2 flex items-center gap-1 text-[11px] text-muted">
+          <i class="pi pi-spinner pi-spin text-[11px]" /> {{ git.busyMessage.value }}
+        </span>
+
+        <div class="ml-auto flex items-center gap-0.5">
           <template v-if="git.activeRepo.value">
-            <Button
-              size="small"
-              outlined
-              severity="secondary"
-              :loading="git.syncing.value"
+            <button
+              class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:opacity-50"
+              :disabled="git.syncing.value"
               @click="git.fetch()"
             >
-              <i class="pi pi-refresh mr-1.5 text-xs" /> Fetch
-            </Button>
-            <Button
-              size="small"
-              outlined
-              severity="secondary"
+              <i class="pi text-[11px]" :class="git.syncing.value ? 'pi-spinner pi-spin' : 'pi-refresh'" /> Fetch
+            </button>
+            <button
+              class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:opacity-50"
               :disabled="git.syncing.value"
               @click="git.pull()"
             >
-              <i class="pi pi-arrow-down mr-1.5 text-xs" /> Pull
-              <span v-if="git.info.value?.behind" class="ml-1.5 rounded-full bg-sky-100 px-1.5 text-[10px] font-bold text-sky-700">
-                {{ git.info.value.behind }}
-              </span>
-            </Button>
-            <Button
-              size="small"
+              <i class="pi pi-arrow-down text-[11px]" /> Pull
+              <span v-if="git.info.value?.behind" class="rounded-full bg-sky-100 px-1 text-[9px] font-bold text-sky-700">{{ git.info.value.behind }}</span>
+            </button>
+            <button
+              class="flex h-7 items-center gap-1 rounded-md bg-brand px-2.5 font-medium text-white transition-colors hover:brightness-110 disabled:opacity-50"
               :disabled="git.syncing.value"
               @click="git.push()"
             >
-              <i class="pi pi-arrow-up mr-1.5 text-xs" /> Push
-              <span v-if="git.info.value?.ahead" class="ml-1.5 rounded-full bg-white/25 px-1.5 text-[10px] font-bold">
-                {{ git.info.value.ahead }}
-              </span>
-            </Button>
+              <i class="pi pi-arrow-up text-[11px]" /> Push
+              <span v-if="git.info.value?.ahead" class="rounded-full bg-white/25 px-1 text-[9px] font-bold">{{ git.info.value.ahead }}</span>
+            </button>
 
             <!-- More actions -->
             <div class="relative">
-              <Button size="small" outlined severity="secondary" title="Thao tác khác" @click="toggleMoreMenu">
-                <i class="pi pi-ellipsis-h" />
-              </Button>
+              <button
+                class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+                title="Thao tác khác"
+                @click="toggleMoreMenu"
+              >
+                <i class="pi pi-ellipsis-h text-[11px]" />
+              </button>
               <div
                 v-if="moreMenuOpen"
-                class="absolute right-0 top-11 z-30 w-60 rounded-lg border border-divider bg-panel p-1.5 shadow-float"
+                class="absolute bottom-full right-0 z-30 mb-2 w-60 rounded-lg border border-divider bg-panel p-1.5 shadow-float"
               >
-                <button
-                  class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-secondary transition-colors hover:bg-canvas hover:text-brand"
-                  @click="openRebaseDialog"
-                >
+                <button :class="ctxItem" @click="openRebaseDialog">
                   <i class="pi pi-arrows-v text-xs" /> Rebase branch hiện tại…
                 </button>
-                <button
-                  class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-secondary transition-colors hover:bg-canvas hover:text-brand"
-                  @click="openWorktreeCreate"
-                >
+                <button :class="ctxItem" @click="openWorktreeCreate">
                   <i class="pi pi-clone text-xs" /> Tạo worktree…
                 </button>
-                <button
-                  class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-secondary transition-colors hover:bg-canvas hover:text-brand"
-                  @click="openWorktreeList"
-                >
+                <button :class="ctxItem" @click="openWorktreeList">
                   <i class="pi pi-list text-xs" /> Quản lý worktree…
                 </button>
               </div>
@@ -626,15 +621,15 @@ onUnmounted(closeCommitMenu);
       </div>
 
       <!-- ======================= MAIN ======================= -->
-      <div v-else class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div v-else class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
         <!-- Tabs -->
         <div class="flex items-center gap-1 rounded-lg border border-divider bg-panel p-1 shadow-sm">
           <button
-            class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+            class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="git.tab.value === 'changes' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
             @click="git.switchTab('changes')"
           >
-            <i class="pi pi-pencil text-xs" /> Changes
+            <i class="pi pi-pencil text-[11px]" /> Changes
             <span
               v-if="git.hasChanges.value"
               class="rounded-full px-1.5 text-[10px] font-bold"
@@ -644,22 +639,21 @@ onUnmounted(closeCommitMenu);
             </span>
           </button>
           <button
-            class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+            class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="git.tab.value === 'history' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
             @click="git.switchTab('history')"
           >
-            <i class="pi pi-history text-xs" /> History
+            <i class="pi pi-history text-[11px]" /> History
           </button>
 
-          <div class="ml-auto flex items-center gap-2 px-2 text-xs text-muted">
-            <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin" />
-            <span v-if="git.busyMessage.value">{{ git.busyMessage.value }}</span>
+          <div class="ml-auto flex items-center gap-1 px-1 text-[11px] text-muted">
+            <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin text-[11px]" />
             <button
               class="rounded p-1 transition-colors hover:bg-canvas hover:text-brand"
               title="Làm mới"
               @click="git.refreshStatusAndInfo()"
             >
-              <i class="pi pi-sync text-xs" />
+              <i class="pi pi-sync text-[11px]" />
             </button>
           </div>
         </div>
