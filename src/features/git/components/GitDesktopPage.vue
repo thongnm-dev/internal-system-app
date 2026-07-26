@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
@@ -119,6 +119,48 @@ function isFileSelected(path: string, staged: boolean) {
 const displayDiff = computed(() =>
   git.tab.value === "history" ? git.commitFileDiff.value : git.diff.value,
 );
+
+// === Drag-to-resize (History tab) ===
+const isResizing = ref(false);
+const commitListWidth = ref(340); // cột danh sách commit
+const commitListRef = ref<HTMLElement | null>(null);
+const commitFilesWidth = ref(224); // cột file trong commit
+const commitFilesRef = ref<HTMLElement | null>(null);
+let activeMove: ((e: MouseEvent) => void) | null = null;
+
+function beginResize(move: (e: MouseEvent) => void, e: MouseEvent) {
+  e.preventDefault();
+  isResizing.value = true;
+  activeMove = move;
+  document.addEventListener("mousemove", move);
+  document.addEventListener("mouseup", endResize);
+}
+
+function endResize() {
+  isResizing.value = false;
+  if (activeMove) document.removeEventListener("mousemove", activeMove);
+  document.removeEventListener("mouseup", endResize);
+  activeMove = null;
+}
+
+function startResizeCommitList(e: MouseEvent) {
+  beginResize((ev) => {
+    const left = commitListRef.value?.getBoundingClientRect().left ?? 0;
+    commitListWidth.value = Math.max(220, Math.min(600, ev.clientX - left));
+  }, e);
+}
+
+function startResizeCommitFiles(e: MouseEvent) {
+  beginResize((ev) => {
+    const left = commitFilesRef.value?.getBoundingClientRect().left ?? 0;
+    commitFilesWidth.value = Math.max(140, Math.min(500, ev.clientX - left));
+  }, e);
+}
+
+onUnmounted(() => {
+  if (activeMove) document.removeEventListener("mousemove", activeMove);
+  document.removeEventListener("mouseup", endResize);
+});
 </script>
 
 <template>
@@ -549,9 +591,17 @@ const displayDiff = computed(() =>
         </div>
 
         <!-- ================= HISTORY TAB ================= -->
-        <div v-show="git.tab.value === 'history'" class="flex min-h-0 flex-1 gap-3 overflow-hidden">
+        <div
+          v-show="git.tab.value === 'history'"
+          class="flex min-h-0 flex-1 overflow-hidden"
+          :class="isResizing ? 'select-none' : ''"
+        >
           <!-- Commit list -->
-          <div class="flex w-[340px] shrink-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+          <div
+            ref="commitListRef"
+            class="flex shrink-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm"
+            :style="{ width: commitListWidth + 'px' }"
+          >
             <div class="border-b border-divider px-3 py-2 text-xs font-bold uppercase tracking-wide text-muted">
               Commits ({{ git.commits.value.length }})
             </div>
@@ -577,6 +627,15 @@ const displayDiff = computed(() =>
             </div>
           </div>
 
+          <!-- Resize handle: commit list | detail -->
+          <div
+            class="flex w-2 shrink-0 cursor-col-resize items-center justify-center hover:bg-brand/10"
+            :class="isResizing ? 'bg-brand/20' : ''"
+            @mousedown="startResizeCommitList"
+          >
+            <div class="h-8 w-0.5 rounded-full bg-divider" :class="isResizing ? 'bg-brand' : ''" />
+          </div>
+
           <!-- Commit detail + file diff -->
           <div class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
             <div v-if="git.commitDetail.value" class="border-b border-divider bg-canvas px-4 py-2.5">
@@ -592,9 +651,13 @@ const displayDiff = computed(() =>
                 <span class="font-mono">{{ git.commitDetail.value.commit.short_hash }}</span>
               </p>
             </div>
-            <div class="flex min-h-0 flex-1 overflow-hidden">
+            <div class="flex min-h-0 flex-1 overflow-hidden" :class="isResizing ? 'select-none' : ''">
               <!-- files in commit -->
-              <div class="w-56 shrink-0 overflow-y-auto border-r border-divider">
+              <div
+                ref="commitFilesRef"
+                class="shrink-0 overflow-y-auto"
+                :style="{ width: commitFilesWidth + 'px' }"
+              >
                 <button
                   v-for="f in git.commitDetail.value?.files ?? []"
                   :key="f.path"
@@ -609,6 +672,16 @@ const displayDiff = computed(() =>
                   —
                 </div>
               </div>
+
+              <!-- Resize handle: files | diff -->
+              <div
+                class="flex w-2 shrink-0 cursor-col-resize items-center justify-center border-l border-divider hover:bg-brand/10"
+                :class="isResizing ? 'bg-brand/20' : ''"
+                @mousedown="startResizeCommitFiles"
+              >
+                <div class="h-8 w-0.5 rounded-full bg-divider" :class="isResizing ? 'bg-brand' : ''" />
+              </div>
+
               <!-- diff of selected file -->
               <div class="min-h-0 flex-1 overflow-auto">
                 <div v-if="git.diffLoading.value" class="p-4 text-sm text-muted">
