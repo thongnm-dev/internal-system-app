@@ -204,6 +204,26 @@ export function gitListPullRequests(path: string, state: string) {
   return safeInvoke<GitPullRequest[]>("git_list_pull_requests", { path, state });
 }
 
+export function gitListConflicts(path: string) {
+  return safeInvoke<string[]>("git_list_conflicts", { path });
+}
+
+export function gitResolveConflict(path: string, file: string, side: "ours" | "theirs") {
+  return safeInvoke<void>("git_resolve_conflict", { path, file, side });
+}
+
+export function gitCommitNoEdit(path: string) {
+  return safeInvoke<string>("git_commit_no_edit", { path });
+}
+
+export function gitCleanupScan(path: string) {
+  return safeInvoke<string[]>("git_cleanup_scan", { path });
+}
+
+export function gitCleanupDelete(path: string, branches: string[]) {
+  return safeInvoke<string[]>("git_cleanup_delete", { path, branches });
+}
+
 export function gitOpenUrl(url: string) {
   return safeInvoke<void>("git_open_url", { url });
 }

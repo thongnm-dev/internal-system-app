@@ -991,6 +991,77 @@ pub fn merge_abort(repo_path: &str) -> AppResult<String> {
     run(repo_path, &["merge", "--abort"])
 }
 
+/// Commit để hoàn tất merge (giữ message mặc định, không mở editor).
+pub fn commit_no_edit(repo_path: &str) -> AppResult<String> {
+    run_no_editor(repo_path, &["commit", "--no-edit"])
+}
+
+// === Resolve conflict ===
+
+/// Danh sách file đang xung đột (unmerged).
+pub fn list_conflicts(repo_path: &str) -> AppResult<Vec<String>> {
+    let raw = run(
+        repo_path,
+        &["diff", "--name-only", "--diff-filter=U", "-z"],
+    )?;
+    Ok(raw
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect())
+}
+
+/// Giải quyết xung đột một file bằng cách chọn một phía rồi stage.
+/// `side`: "ours" (bản HEAD) | "theirs" (bản đến).
+pub fn resolve_conflict(repo_path: &str, file: &str, side: &str) -> AppResult<()> {
+    let flag = if side == "theirs" { "--theirs" } else { "--ours" };
+    run(repo_path, &["checkout", flag, "--", file])?;
+    run(repo_path, &["add", "--", file])?;
+    Ok(())
+}
+
+// === Cleanup branch đã merge (upstream bị xóa) ===
+
+/// Fetch --prune rồi trả về các branch local có upstream đã bị xóa ([gone]),
+/// trừ branch hiện tại. Dùng để dọn branch sau khi PR đã merge + xóa remote.
+pub fn cleanup_scan(repo_path: &str) -> AppResult<Vec<String>> {
+    // Prune remote-tracking refs trước để phát hiện upstream đã mất.
+    let _ = run(repo_path, &["fetch", "--all", "--prune"]);
+
+    let current = run(repo_path, &["symbolic-ref", "--short", "-q", "HEAD"])
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    let fmt = format!("--format=%(refname:short){FS}%(upstream:track)");
+    let raw = run(repo_path, &["for-each-ref", &fmt, "refs/heads"])?;
+
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(FS).collect();
+        let name = f[0].trim();
+        let track = f.get(1).copied().unwrap_or("");
+        if track.contains("gone") && !name.is_empty() && name != current {
+            out.push(name.to_string());
+        }
+    }
+    Ok(out)
+}
+
+/// Xóa (force) các branch local đã chọn. Trả về danh sách đã xóa thành công.
+pub fn cleanup_delete(repo_path: &str, branches: &[String]) -> AppResult<Vec<String>> {
+    let mut deleted = Vec::new();
+    for b in branches {
+        if run(repo_path, &["branch", "-D", b]).is_ok() {
+            deleted.push(b.clone());
+        }
+    }
+    Ok(deleted)
+}
+
 // === Compare / Pull Request ===
 
 fn count_range(repo_path: &str, range: &str) -> u32 {

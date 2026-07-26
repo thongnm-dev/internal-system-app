@@ -139,6 +139,11 @@ pub fn git_worktree_list(path: String) -> Result<Vec<GitWorktree>, String> {
 }
 
 #[tauri::command]
+pub fn git_list_conflicts(path: String) -> Result<Vec<String>, String> {
+    git_service::list_conflicts(&path).map_err(log_err)
+}
+
+#[tauri::command]
 pub fn git_tag_list(path: String) -> Result<Vec<GitTag>, String> {
     git_service::tag_list(&path).map_err(log_err)
 }
@@ -405,6 +410,45 @@ pub async fn git_merge(
 #[tauri::command]
 pub async fn git_merge_abort(path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::merge_abort(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_commit_no_edit(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::commit_no_edit(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_resolve_conflict(
+    path: String,
+    file: String,
+    side: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::resolve_conflict(&path, &file, &side))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_cleanup_scan(path: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cleanup_scan(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_cleanup_delete(
+    path: String,
+    branches: Vec<String>,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cleanup_delete(&path, &branches))
         .await
         .map_err(log_err)?
         .map_err(log_err)

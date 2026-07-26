@@ -9,14 +9,19 @@ import {
   gitCherryPick,
   gitCherryPickAbort,
   gitCherryPickContinue,
+  gitCleanupDelete,
+  gitCleanupScan,
   gitClone,
+  gitCommitNoEdit,
   gitCompare,
   gitCompareFileDiff,
   gitCreatePullRequest,
+  gitListConflicts,
   gitListPullRequests,
   gitMerge,
   gitMergeAbort,
   gitOpenUrl,
+  gitResolveConflict,
   gitTagCreate,
   gitTagDelete,
   gitTagList,
@@ -102,6 +107,8 @@ export function useGit() {
 
   const pullRequests = ref<GitPullRequest[]>([]);
   const pullRequestsLoading = ref(false);
+
+  const conflicts = ref<string[]>([]);
 
   const selectedFile = ref<SelectedFile | null>(null);
   const diff = ref<GitDiff | null>(null);
@@ -868,6 +875,90 @@ export function useGit() {
     }
   }
 
+  // === Resolve conflict ===
+
+  async function loadConflicts() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      conflicts.value = await gitListConflicts(path);
+    } catch (e) {
+      reportError("Không lấy được danh sách xung đột", e);
+    }
+  }
+
+  async function resolveConflict(file: string, side: "ours" | "theirs") {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitResolveConflict(path, file, side);
+      await Promise.all([loadConflicts(), refreshStatusAndInfo()]);
+    } catch (e) {
+      reportError("Không giải quyết được xung đột", e);
+    }
+  }
+
+  /** Đánh dấu file đã tự xử lý (stage nó). */
+  async function markResolved(file: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitStage(path, [file]);
+      await Promise.all([loadConflicts(), refreshStatusAndInfo()]);
+    } catch (e) {
+      reportError("Không stage được file", e);
+    }
+  }
+
+  /** Hoàn tất sau khi hết xung đột: tùy trạng thái mà continue/commit. */
+  async function finishConflict() {
+    const path = repoPath();
+    if (!path) return;
+    if (info.value?.rebase_in_progress) return rebaseContinue();
+    if (info.value?.cherry_pick_in_progress) return cherryPickContinue();
+    // merge (kể cả pull dạng merge)
+    busyMessage.value = "Đang hoàn tất merge…";
+    try {
+      await gitCommitNoEdit(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success("Đã hoàn tất merge.");
+    } catch (e) {
+      reportError("Không hoàn tất được merge", e);
+      await refreshStatusAndInfo();
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  // === Cleanup branch đã merge ===
+
+  async function cleanupScan(): Promise<string[]> {
+    const path = repoPath();
+    if (!path) return [];
+    busyMessage.value = "Đang quét branch đã merge…";
+    try {
+      return await gitCleanupScan(path);
+    } catch (e) {
+      reportError("Không quét được branch", e);
+      return [];
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function cleanupDelete(list: string[]) {
+    const path = repoPath();
+    if (!path || !list.length) return;
+    try {
+      const deleted = await gitCleanupDelete(path, list);
+      await refreshBranches();
+      toast.success(`Đã dọn ${deleted.length} branch.`);
+    } catch (e) {
+      reportError("Không dọn được branch", e);
+    }
+  }
+
   // === Compare / Pull Request ===
 
   async function compareBranches(base: string, head: string) {
@@ -989,6 +1080,7 @@ export function useGit() {
     comparisonDiff,
     pullRequests,
     pullRequestsLoading,
+    conflicts,
     selectedFile,
     diff,
     diffLoading,
@@ -1058,6 +1150,12 @@ export function useGit() {
     createPullRequest,
     loadPullRequests,
     openUrl,
+    loadConflicts,
+    resolveConflict,
+    markResolved,
+    finishConflict,
+    cleanupScan,
+    cleanupDelete,
     loadWorktrees,
     worktreeAdd,
     worktreeRemove,

@@ -406,6 +406,90 @@ function prStateBadge(s: string) {
   return "bg-emerald-100 text-emerald-700";
 }
 
+// Xem diff của một PR: mở lại dialog Compare với base/head của PR.
+function resolveRef(name: string): string {
+  const refs = git.branches.value;
+  if (refs.some((b) => b.is_remote && b.name === `origin/${name}`)) return `origin/${name}`;
+  if (refs.some((b) => !b.is_remote && b.name === name)) return name;
+  return `origin/${name}`;
+}
+function openCompareForPR(pr: { base: string; head: string }) {
+  prDialog.value = false;
+  cmpBase.value = resolveRef(pr.base);
+  cmpHead.value = resolveRef(pr.head);
+  git.comparison.value = null;
+  git.comparisonDiff.value = null;
+  compareDialog.value = true;
+  void runCompare();
+}
+
+// === Reset HEAD ===
+const resetHeadDialog = ref(false);
+const resetTarget = ref("HEAD");
+const resetMode = ref<"soft" | "mixed" | "hard">("mixed");
+function openResetHeadDialog() {
+  closeMenus();
+  resetTarget.value = "HEAD";
+  resetMode.value = "mixed";
+  resetHeadDialog.value = true;
+}
+async function doResetHead() {
+  await git.resetTo(resetTarget.value.trim() || "HEAD", resetMode.value);
+  resetHeadDialog.value = false;
+}
+
+// === Cleanup branch đã merge ===
+const cleanupDialog = ref(false);
+const cleanupList = ref<string[]>([]);
+const cleanupSelected = ref<Set<string>>(new Set());
+const cleanupScanning = ref(false);
+async function openCleanupDialog() {
+  closeMenus();
+  cleanupDialog.value = true;
+  cleanupScanning.value = true;
+  cleanupList.value = [];
+  cleanupSelected.value = new Set();
+  cleanupList.value = await git.cleanupScan();
+  cleanupSelected.value = new Set(cleanupList.value);
+  cleanupScanning.value = false;
+}
+function toggleCleanup(name: string) {
+  const s = new Set(cleanupSelected.value);
+  if (s.has(name)) s.delete(name);
+  else s.add(name);
+  cleanupSelected.value = s;
+}
+async function doCleanup() {
+  await git.cleanupDelete([...cleanupSelected.value]);
+  cleanupDialog.value = false;
+}
+
+// === Resolve conflict ===
+const conflictDialog = ref(false);
+function openConflictDialog() {
+  closeMenus();
+  git.loadConflicts();
+  conflictDialog.value = true;
+}
+async function doFinishConflict() {
+  await git.finishConflict();
+  if (!git.conflicts.value.length) conflictDialog.value = false;
+}
+
+// === Update from main/master ===
+const updateDialog = ref(false);
+const updateBranchSel = ref("");
+function openUpdateDialog() {
+  closeMenus();
+  updateBranchSel.value = guessBase(git.info.value?.current_branch || "");
+  updateDialog.value = true;
+}
+async function doUpdateFromMain() {
+  if (!updateBranchSel.value) return;
+  const ok = await git.mergeBranch(updateBranchSel.value, false, "");
+  if (ok) updateDialog.value = false;
+}
+
 // === Context menu trên history ===
 const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
 const ctxItem =
@@ -695,6 +779,16 @@ onUnmounted(closeCommitMenu);
                 <button :class="ctxItem" @click="openPrDialog">
                   <i class="pi pi-flag text-xs" /> Xem Pull Requests…
                 </button>
+                <div class="my-1 border-t border-divider" />
+                <button :class="ctxItem" @click="openUpdateDialog">
+                  <i class="pi pi-arrow-circle-down text-xs" /> Cập nhật từ main/master…
+                </button>
+                <button :class="ctxItem" @click="openResetHeadDialog">
+                  <i class="pi pi-backward text-xs" /> Reset HEAD…
+                </button>
+                <button :class="ctxItem" @click="openCleanupDialog">
+                  <i class="pi pi-eraser text-xs" /> Cleanup branch đã merge…
+                </button>
               </div>
             </div>
           </template>
@@ -710,6 +804,9 @@ onUnmounted(closeCommitMenu);
         <span class="font-semibold text-amber-800">Đang có một rebase dở dang.</span>
         <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Tiếp tục, hoặc Hủy để quay lại.</span>
         <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="secondary" @click="openConflictDialog">
+            <i class="pi pi-wrench mr-1.5 text-xs" /> Xử lý xung đột
+          </Button>
           <Button size="small" :disabled="!!git.busyMessage.value" @click="git.rebaseContinue()">
             <i class="pi pi-play mr-1.5 text-xs" /> Tiếp tục
           </Button>
@@ -728,6 +825,9 @@ onUnmounted(closeCommitMenu);
         <span class="font-semibold text-amber-800">Đang có một cherry-pick dở dang.</span>
         <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Tiếp tục, hoặc Hủy để quay lại.</span>
         <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="secondary" @click="openConflictDialog">
+            <i class="pi pi-wrench mr-1.5 text-xs" /> Xử lý xung đột
+          </Button>
           <Button size="small" :disabled="!!git.busyMessage.value" @click="git.cherryPickContinue()">
             <i class="pi pi-play mr-1.5 text-xs" /> Tiếp tục
           </Button>
@@ -746,6 +846,9 @@ onUnmounted(closeCommitMenu);
         <span class="font-semibold text-amber-800">Đang có một merge dở dang.</span>
         <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Commit để hoàn tất, hoặc Hủy.</span>
         <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="secondary" @click="openConflictDialog">
+            <i class="pi pi-wrench mr-1.5 text-xs" /> Xử lý xung đột
+          </Button>
           <Button size="small" outlined severity="danger" :disabled="!!git.busyMessage.value" @click="git.mergeAbort()">
             <i class="pi pi-times mr-1.5 text-xs" /> Hủy merge
           </Button>
@@ -1527,12 +1630,11 @@ onUnmounted(closeCommitMenu);
           <div v-else-if="!git.pullRequests.value.length" class="p-8 text-center text-sm text-muted">
             Không có Pull Request nào.
           </div>
-          <button
+          <div
             v-for="pr in git.pullRequests.value"
             v-else
             :key="pr.number"
-            class="flex w-full items-start gap-3 border-b border-divider-light px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-canvas"
-            @click="git.openUrl(pr.url)"
+            class="group flex items-start gap-3 border-b border-divider-light px-3 py-2.5 transition-colors last:border-0 hover:bg-canvas"
           >
             <span class="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" :class="prStateBadge(pr.state)">
               {{ pr.state }}
@@ -1546,8 +1648,21 @@ onUnmounted(closeCommitMenu);
                 <span class="font-mono">{{ pr.head }} → {{ pr.base }}</span>
               </span>
             </span>
-            <i class="pi pi-external-link mt-1 shrink-0 text-xs text-muted" />
-          </button>
+            <button
+              class="shrink-0 rounded p-1 text-muted transition-colors hover:bg-panel hover:text-brand"
+              title="Xem diff của PR"
+              @click="openCompareForPR(pr)"
+            >
+              <i class="pi pi-file-edit text-xs" />
+            </button>
+            <button
+              class="shrink-0 rounded p-1 text-muted transition-colors hover:bg-panel hover:text-brand"
+              title="Mở trên trình duyệt"
+              @click="git.openUrl(pr.url)"
+            >
+              <i class="pi pi-external-link text-xs" />
+            </button>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -1732,6 +1847,163 @@ onUnmounted(closeCommitMenu);
         <Button size="small" outlined severity="secondary" @click="branchFromDialog = false">Hủy</Button>
         <Button size="small" :disabled="!branchFromName.trim()" @click="doBranchFrom">
           <i class="pi pi-sitemap mr-1.5" /> Tạo branch
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Update from main/master dialog -->
+    <Dialog v-model:visible="updateDialog" modal header="Cập nhật từ main/master" :style="{ width: '460px' }">
+      <div class="flex flex-col gap-3">
+        <p class="text-sm text-secondary">
+          Merge nhánh mặc định vào <strong class="text-ink">{{ git.info.value?.current_branch }}</strong>:
+        </p>
+        <Select
+          v-model="updateBranchSel"
+          :options="allBranchRefs"
+          option-label="label"
+          option-value="value"
+          filter
+          class="w-full"
+        />
+        <p class="text-xs text-muted">
+          Nếu có xung đột, dùng nút "Xử lý xung đột" trên thanh cảnh báo để giải quyết.
+        </p>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="updateDialog = false">Hủy</Button>
+        <Button size="small" :disabled="!updateBranchSel || !!git.busyMessage.value" @click="doUpdateFromMain">
+          <i class="pi pi-arrow-circle-down mr-1.5" /> Cập nhật
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Reset HEAD dialog -->
+    <Dialog v-model:visible="resetHeadDialog" modal header="Reset HEAD" :style="{ width: '460px' }">
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-ink">Reset về (ref/commit)</label>
+          <InputText v-model="resetTarget" placeholder="HEAD, HEAD~1, origin/main…" class="w-full" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-ink">Chế độ</label>
+          <div class="flex overflow-hidden rounded-md border border-divider text-xs">
+            <button
+              v-for="m in (['soft','mixed','hard'] as const)"
+              :key="m"
+              class="flex-1 px-2 py-1.5 font-medium transition-colors"
+              :class="resetMode === m ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
+              @click="resetMode = m"
+            >
+              {{ m }}
+            </button>
+          </div>
+          <p class="mt-1 text-xs text-muted">
+            <template v-if="resetMode === 'soft'">Giữ nguyên index và working tree (chỉ dời HEAD).</template>
+            <template v-else-if="resetMode === 'mixed'">Giữ working tree, bỏ stage (mặc định).</template>
+            <template v-else class="text-red-600">Xóa toàn bộ thay đổi working tree — không hoàn tác được.</template>
+          </p>
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="resetHeadDialog = false">Hủy</Button>
+        <Button
+          size="small"
+          :severity="resetMode === 'hard' ? 'danger' : undefined"
+          :disabled="!!git.busyMessage.value"
+          @click="doResetHead"
+        >
+          <i class="pi pi-backward mr-1.5" /> Reset ({{ resetMode }})
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Cleanup dialog -->
+    <Dialog v-model:visible="cleanupDialog" modal header="Cleanup branch đã merge" :style="{ width: '520px' }">
+      <div class="flex flex-col gap-2">
+        <p class="text-xs text-muted">
+          Đã <strong>fetch --prune</strong>. Các branch local có remote đã bị xóa (thường sau khi PR đã merge &amp; xóa nhánh):
+        </p>
+        <div v-if="cleanupScanning" class="p-6 text-center text-sm text-muted">
+          <i class="pi pi-spinner pi-spin mr-1.5" /> Đang quét…
+        </div>
+        <div v-else-if="!cleanupList.length" class="p-6 text-center text-sm text-muted">
+          Không có branch nào cần dọn. 🎉
+        </div>
+        <div v-else class="max-h-64 overflow-y-auto rounded-md border border-divider">
+          <label
+            v-for="b in cleanupList"
+            :key="b"
+            class="flex cursor-pointer items-center gap-2 border-b border-divider-light px-2.5 py-1.5 last:border-0 hover:bg-canvas"
+          >
+            <Checkbox :model-value="cleanupSelected.has(b)" binary @change="toggleCleanup(b)" />
+            <i class="pi pi-sitemap text-xs text-muted" />
+            <span class="min-w-0 flex-1 truncate text-sm text-ink">{{ b }}</span>
+            <span class="shrink-0 rounded-full bg-red-100 px-1.5 text-[10px] font-bold text-red-700">gone</span>
+          </label>
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="cleanupDialog = false">Đóng</Button>
+        <Button
+          size="small"
+          severity="danger"
+          :disabled="!cleanupSelected.size"
+          @click="doCleanup"
+        >
+          <i class="pi pi-trash mr-1.5" /> Xóa {{ cleanupSelected.size }} branch
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Resolve conflict dialog -->
+    <Dialog v-model:visible="conflictDialog" modal header="Xử lý xung đột" :style="{ width: '640px' }">
+      <div class="flex flex-col gap-2">
+        <p class="text-xs text-muted">
+          Chọn phía giữ lại cho từng file, hoặc tự sửa file trong editor rồi bấm "Đã xử lý". Khi hết xung đột, bấm "Hoàn tất".
+        </p>
+        <div v-if="!git.conflicts.value.length" class="p-5 text-center text-sm text-muted">
+          <i class="pi pi-check-circle mr-1.5 text-emerald-500" /> Không còn file xung đột. Bấm "Hoàn tất" để kết thúc.
+        </div>
+        <div v-else class="max-h-80 overflow-y-auto rounded-md border border-divider">
+          <div
+            v-for="f in git.conflicts.value"
+            :key="f"
+            class="flex items-center gap-2 border-b border-divider-light px-2.5 py-2 last:border-0"
+          >
+            <i class="pi pi-exclamation-triangle shrink-0 text-xs text-red-500" />
+            <span class="min-w-0 flex-1 truncate font-mono text-xs text-ink" :title="f">{{ f }}</span>
+            <button
+              class="shrink-0 rounded border border-divider px-2 py-0.5 text-[11px] text-secondary transition-colors hover:border-brand hover:text-brand"
+              title="Giữ bản HEAD (ours)"
+              @click="git.resolveConflict(f, 'ours')"
+            >
+              Giữ HEAD
+            </button>
+            <button
+              class="shrink-0 rounded border border-divider px-2 py-0.5 text-[11px] text-secondary transition-colors hover:border-brand hover:text-brand"
+              title="Giữ bản đến (theirs)"
+              @click="git.resolveConflict(f, 'theirs')"
+            >
+              Giữ bản đến
+            </button>
+            <button
+              class="shrink-0 rounded border border-divider px-2 py-0.5 text-[11px] text-secondary transition-colors hover:border-brand hover:text-brand"
+              title="Đã tự sửa xong (stage file)"
+              @click="git.markResolved(f)"
+            >
+              Đã xử lý
+            </button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="conflictDialog = false">Đóng</Button>
+        <Button
+          size="small"
+          :disabled="!!git.conflicts.value.length || !!git.busyMessage.value"
+          @click="doFinishConflict"
+        >
+          <i class="pi pi-check mr-1.5" /> Hoàn tất
         </Button>
       </template>
     </Dialog>
