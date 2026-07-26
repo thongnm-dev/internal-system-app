@@ -60,6 +60,10 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Fast file browser — navigate folders and search documents quickly.",
   },
   {
+    key: "terminal",
+    path: "/terminal",
+    title: "Terminal",
+    subtitle: "Run interactive shell sessions inside the app to drive workflows.",
     key: "git",
     path: "/git",
     title: "Git Desktop",
@@ -326,6 +330,9 @@ export const vueRoutes: RouteRecordRaw[] = [
     meta: { key: "exploreFaster" as MenuKey },
   },
   {
+    path: "/terminal",
+    component: () => import("@/features/tools/components/TerminalPage.vue"),
+    meta: { key: "terminal" as MenuKey },
     path: "/git",
     component: () => import("@/features/git/components/GitDesktopPage.vue"),
     meta: { key: "git" as MenuKey },

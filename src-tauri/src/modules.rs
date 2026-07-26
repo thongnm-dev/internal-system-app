@@ -71,6 +71,8 @@ mod commands {
     pub mod ai_translate_cowork_commands;
     /// Commands cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_commands;
+    /// Commands cho module Terminal nhúng (PTY): spawn/write/resize/kill.
+    pub mod terminal_commands;
     /// Commands cho màn hình Git Desktop (thao tác git + quản lý danh sách repo).
     pub mod git_commands;
 }
@@ -253,6 +255,8 @@ mod services {
     pub mod ai_translate_cowork_service;
     /// Service cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_service;
+    /// Service quản lý phiên terminal nhúng (PTY): spawn/write/resize/kill.
+    pub mod terminal_service;
     /// Service cho màn hình Git Desktop — gọi `git` CLI cho mọi thao tác.
     pub mod git_service;
 }
