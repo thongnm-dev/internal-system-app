@@ -1,6 +1,6 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::ai_workflow::{AiWorkflow, AiWorkflowStep};
+use crate::models::ai_workflow::{AiModel, AiWorkflow, AiWorkflowStep};
 use crate::utils::pgsql_connect;
 use serde_json::Value as JsonValue;
 
@@ -100,13 +100,15 @@ pub async fn insert_step(
     description: &str,
     icon: &str,
     step_order: i32,
+    is_latest_step: bool,
+    model_id: Option<i32>,
 ) -> AppResult<AiWorkflowStep> {
     let client = pgsql_connect::connect().await?;
 
     let row = client
         .query_one(
-            "SELECT * FROM sp_ai_workflow_step_insert($1, $2, $3, $4, $5, $6, $7)",
-            &[&workflow_id, &name, &step_type, &skill_name, &description, &icon, &step_order],
+            "SELECT * FROM sp_ai_workflow_step_insert($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            &[&workflow_id, &name, &step_type, &skill_name, &description, &icon, &step_order, &is_latest_step, &model_id],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to insert step: {e}")))?;
@@ -136,13 +138,15 @@ pub async fn update_step(
     description: &str,
     icon: &str,
     step_order: i32,
+    is_latest_step: bool,
+    model_id: Option<i32>,
 ) -> AppResult<Option<AiWorkflowStep>> {
     let client = pgsql_connect::connect().await?;
 
     let row = client
         .query_opt(
-            "SELECT * FROM sp_ai_workflow_step_update($1, $2, $3, $4, $5, $6, $7)",
-            &[&id, &name, &step_type, &skill_name, &description, &icon, &step_order],
+            "SELECT * FROM sp_ai_workflow_step_update($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            &[&id, &name, &step_type, &skill_name, &description, &icon, &step_order, &is_latest_step, &model_id],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to update step: {e}")))?;
@@ -221,6 +225,27 @@ fn row_to_step(row: &tokio_postgres::Row) -> AiWorkflowStep {
         description: row.get("description"),
         icon: row.get("icon"),
         step_order: row.get("step_order"),
+        is_latest_step: row.get("is_latest_step"),
+        model_id: row.get("model_id"),
         created_at: row.get("created_at"),
     }
+}
+
+pub async fn select_models() -> AppResult<Vec<AiModel>> {
+    let client = pgsql_connect::connect().await?;
+
+    let rows = client
+        .query("SELECT * FROM sp_ai_model_select_list()", &[])
+        .await
+        .map_err(|e| AppError::new(format!("Failed to query AI models: {e}")))?;
+
+    Ok(rows
+        .iter()
+        .map(|row| AiModel {
+            id: row.get("id"),
+            provider: row.get("provider"),
+            model: row.get("model"),
+            version: row.get("version"),
+        })
+        .collect())
 }

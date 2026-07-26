@@ -7,6 +7,7 @@ export type MenuKey =
   | "sqlEditor"
   | "exploreFaster"
   | "terminal"
+  | "git"
   | "dailyWorkNotes"
   | "dailyReport"
   | "checkMonthlyReport"

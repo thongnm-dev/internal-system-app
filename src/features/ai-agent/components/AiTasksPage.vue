@@ -6,8 +6,8 @@ import DataTable from "primevue/datatable";
 import Fieldset from "primevue/fieldset";
 import InputText from "primevue/inputtext";
 import { useAiTasks } from "../composables/useAiTasks";
-import { TASK_CATEGORY_META } from "@/_/types/ai-task";
-import type { AiTaskCategory, AiTaskResult } from "@/tauri/commands/ai-task";
+import { TASK_CATEGORY_META, STEP_STATUS_META } from "@/_/types/ai-task";
+import type { AiTaskCategory, AiTaskResult, WfProcStepStatus } from "@/tauri/commands/ai-task";
 import AiTaskDialog from "./AiTaskDialog.vue";
 import type { TaskDialogPayload } from "./AiTaskDialog.vue";
 
@@ -47,6 +47,10 @@ function categoryLabel(cat: string): string {
 
 function categoryBadgeClass(cat: string): string {
   return TASK_CATEGORY_META[cat as AiTaskCategory]?.badgeClass ?? "bg-canvas text-muted";
+}
+
+function stepStatusMeta(status: string) {
+  return STEP_STATUS_META[status as WfProcStepStatus];
 }
 
 function formatDate(value: string): string {
@@ -97,7 +101,7 @@ function formatDate(value: string): string {
         :row-class="() => 'cursor-pointer'"
         scrollable
         scroll-height="flex"
-        :table-style="{ minWidth: '780px' }"
+        :table-style="{ minWidth: '980px' }"
         :value="ctrl.tasks.value"
         paginator
         :rows="20"
@@ -115,6 +119,23 @@ function formatDate(value: string): string {
             <span :class="['inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold', categoryBadgeClass(data.category)]">
               {{ categoryLabel(data.category) }}
             </span>
+          </template>
+        </Column>
+        <Column header="Process đang thực hiện">
+          <template #body="{ data }">
+            <div v-if="data.current_step_name" class="flex flex-col items-start gap-1">
+              <span class="text-xs font-semibold text-ink">
+                <i class="pi pi-sitemap text-[10px] text-muted" /> {{ data.current_wf_name }}
+                <span class="text-muted">›</span> {{ data.current_step_name }}
+              </span>
+              <span
+                v-if="stepStatusMeta(data.current_step_status)"
+                :class="['inline-block rounded-full px-2 py-0.5 text-[10px] font-bold', stepStatusMeta(data.current_step_status).badgeClass]"
+              >
+                {{ stepStatusMeta(data.current_step_status).label }}
+              </span>
+            </div>
+            <span v-else class="text-xs text-muted">—</span>
           </template>
         </Column>
         <Column header="Status" header-class="text-center" body-class="text-center">

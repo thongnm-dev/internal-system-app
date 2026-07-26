@@ -772,14 +772,26 @@ pub async fn run_poll_loop(app: AppHandle) {
 
 /// Mở terminal với `CLAUDE_CONFIG_DIR` trong working directory chỉ định.
 /// `prompt`, nếu có, được truyền sẵn cho `claude` như một câu lệnh skill (vd. `/translator-qa QA20260724`).
-pub fn open_terminal(config_dir: &str, work_dir: &str, prompt: Option<&str>) -> AppResult<()> {
-    let command = build_claude_command(prompt);
+pub fn open_terminal(
+    config_dir: &str,
+    work_dir: &str,
+    prompt: Option<&str>,
+    model: Option<&str>,
+) -> AppResult<()> {
+    let command = build_claude_command(prompt, model);
     spawn_terminal(config_dir, work_dir, Some(&command))
 }
 
-/// Ghép câu lệnh `claude` với prompt đã sanitize (loại bỏ dấu ngoặc kép để tránh phá vỡ quoting theo OS).
-fn build_claude_command(prompt: Option<&str>) -> String {
+/// Ghép câu lệnh `claude` với model (`--model <model>`) và prompt đã sanitize
+/// (loại bỏ dấu ngoặc kép để tránh phá vỡ quoting theo OS).
+fn build_claude_command(prompt: Option<&str>, model: Option<&str>) -> String {
     let mut command = String::from("claude --dangerously-skip-permissions");
+    if let Some(m) = model {
+        let sanitized = m.trim().replace('"', "");
+        if !sanitized.is_empty() {
+            command.push_str(&format!(" --model {sanitized}"));
+        }
+    }
     if let Some(p) = prompt {
         let sanitized = p.trim().replace('"', "");
         if !sanitized.is_empty() {
@@ -842,16 +854,34 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
     }
     #[cfg(target_os = "macos")]
     {
-        let mut script_body = format!("cd '{expanded_wd}'");
+        use std::os::unix::fs::PermissionsExt;
+        // Ghi câu lệnh ra 1 file `.command` tạm rồi mở bằng Terminal, thay vì nhồi cả câu lệnh
+        // (có dấu `"` bọc quanh prompt) vào chuỗi AppleScript `do script "..."` — dấu `"` đó cắt
+        // sớm chuỗi literal của AppleScript và gây lỗi cú pháp (-2740). Trong file script, dấu `"`
+        // chỉ là quoting shell bình thường.
+        let mut script = format!("#!/bin/bash\ncd '{expanded_wd}'\n");
         if !is_default {
-            script_body.push_str(&format!(" && export CLAUDE_CONFIG_DIR='{expanded_dir}'"));
+            script.push_str(&format!("export CLAUDE_CONFIG_DIR='{expanded_dir}'\n"));
         }
         if let Some(cmd) = command {
-            script_body.push_str(&format!(" && {cmd}"));
+            script.push_str(&format!("{cmd}\n"));
         }
-        let script = format!("tell application \"Terminal\" to do script \"{script_body}\"");
-        std::process::Command::new("osascript")
-            .args(["-e", &script])
+        script.push_str("exec bash\n");
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let script_path = std::env::temp_dir()
+            .join(format!("ai_usage_terminal_{}_{seq}.command", std::process::id()));
+        std::fs::write(&script_path, script)
+            .map_err(|e| AppError::new(&format!("Không thể tạo script terminal: {e}")))?;
+        let mut perms = std::fs::metadata(&script_path)
+            .map_err(|e| AppError::new(&format!("Không thể đọc quyền file terminal: {e}")))?
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms)
+            .map_err(|e| AppError::new(&format!("Không thể set quyền file terminal: {e}")))?;
+        std::process::Command::new("open")
+            .args(["-a", "Terminal"])
+            .arg(&script_path)
             .spawn()
             .map_err(|e| AppError::new(&format!("Không thể mở Terminal: {e}")))?;
     }

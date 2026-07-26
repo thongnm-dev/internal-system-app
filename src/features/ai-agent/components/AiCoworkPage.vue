@@ -14,7 +14,7 @@ import { useAiCowork } from "../composables/useAiCowork";
 import AiTaskDialog from "./AiTaskDialog.vue";
 import type { TaskDialogPayload } from "./AiTaskDialog.vue";
 import { STEP_TYPE_META } from "@/_/types/ai-workflow";
-import { TASK_CATEGORY_META } from "@/_/types/ai-task";
+import { TASK_CATEGORY_META, STEP_STATUS_META } from "@/_/types/ai-task";
 import type { AiTaskCategory } from "@/tauri/commands/ai-task";
 import type { AiAccount, AiAccountStatus, AiProvider } from "@/_/types/ai-usage";
 import type { FileEntry } from "@/tauri/commands/explorer";
@@ -403,7 +403,8 @@ function isMarkdown(entry: FileEntry): boolean {
             <div
               v-for="(step, index) in ctrl.steps.value"
               :key="step.id"
-              class="flex items-start gap-2.5 rounded-lg border border-divider bg-canvas/50 p-3"
+              class="flex items-start gap-2.5 rounded-lg border p-3"
+              :class="ctrl.isCurrentTaskStep(step) ? 'border-brand ring-1 ring-brand/40 bg-brand/5' : 'border-divider bg-canvas/50'"
             >
               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">
                 {{ index + 1 }}
@@ -414,6 +415,13 @@ function isMarkdown(entry: FileEntry): boolean {
                   <span class="truncate font-semibold text-ink">{{ step.name }}</span>
                   <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', STEP_TYPE_META[step.type].badgeClass]">
                     {{ STEP_TYPE_META[step.type].label }}
+                  </span>
+                  <span
+                    v-if="ctrl.isCurrentTaskStep(step)"
+                    class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand"
+                    title="Bước hiện tại của task đã chọn"
+                  >
+                    <i class="pi pi-map-marker text-[9px]" />Bước hiện tại
                   </span>
                 </div>
                 <p v-if="step.description" class="mt-0.5 truncate text-xs text-muted" :title="step.description">
@@ -427,9 +435,9 @@ function isMarkdown(entry: FileEntry): boolean {
                 outlined
                 rounded
                 size="small"
-                :disabled="!ctrl.hasMatchingSkill(step)"
+                :disabled="!ctrl.canOpenStepTerminal(step)"
                 :loading="ctrl.openingTerminalStepId.value === step.id"
-                :title="ctrl.hasMatchingSkill(step) ? 'Mở terminal cho skill này' : 'Không tìm thấy skill khớp trong .claude/skills'"
+                :title="ctrl.stepTerminalTitle(step)"
                 @click="ctrl.openStepTerminal(step)"
               />
             </div>
@@ -441,6 +449,18 @@ function isMarkdown(entry: FileEntry): boolean {
             {{ ctrl.workflows.value.length ? "Chọn workflow rồi bấm Apply để nạp danh sách step." : "Chưa có workflow nào." }}
           </p>
         </div>
+
+        <!-- Run toàn bộ workflow cho đúng 1 task (chạy tuần tự từng step) -->
+        <Button
+          v-if="ctrl.appliedWorkflowId.value !== null && ctrl.steps.value.length"
+          label="Run workflow"
+          icon="pi pi-play"
+          class="mt-3 w-full shrink-0"
+          :disabled="!ctrl.canRunWorkflow()"
+          :loading="ctrl.isRunningWorkflow.value"
+          :title="ctrl.runWorkflowTitle()"
+          @click="ctrl.runWorkflow"
+        />
       </div>
 
       <!-- Drag handle: Workflow ↔ Project Directory -->
@@ -599,6 +619,50 @@ function isMarkdown(entry: FileEntry): boolean {
       </template>
     </Dialog>
 
+    <!-- Lỗi: các task đang chọn không cùng 1 workflow_proc_step -->
+    <Dialog
+      :visible="ctrl.showTaskStepConflict.value"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="true"
+      modal
+      @update:visible="ctrl.showTaskStepConflict.value = $event"
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink">
+          <i class="pi pi-exclamation-triangle text-amber-500" />Task không cùng bước workflow
+        </h3>
+      </template>
+
+      <p class="text-sm text-muted">
+        Các task đang chọn không cùng một bước workflow
+        (<code class="rounded bg-canvas px-1">workflow_proc_step</code>). Hãy đưa các task về cùng một bước
+        trước khi mở terminal cho skill này.
+      </p>
+
+      <div class="mt-3 space-y-2">
+        <div
+          v-for="group in ctrl.taskStepConflictGroups.value"
+          :key="group.stepLabel"
+          class="rounded-lg border border-divider bg-canvas/50 p-3"
+        >
+          <p class="mb-1 text-xs font-bold text-ink">{{ group.stepLabel }}</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span
+              v-for="cd in group.taskCds"
+              :key="cd"
+              class="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
+            >
+              {{ cd }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Đã hiểu" @click="ctrl.showTaskStepConflict.value = false" />
+      </template>
+    </Dialog>
+
     <!-- Danh sách skill available trong .claude/skills của project directory -->
     <Dialog
       :visible="ctrl.showSkillListDialog.value"
@@ -730,6 +794,56 @@ function isMarkdown(entry: FileEntry): boolean {
               @click="ctrl.confirmTaskPicker"
             />
           </div>
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Run workflow: tiến trình chạy từng step (mỗi step 1 terminal, bấm hoàn thành để sang step kế) -->
+    <Dialog
+      :visible="ctrl.isWorkflowRunActive.value"
+      class="w-full max-w-md rounded-lg bg-panel shadow-xl"
+      :closable="false"
+      modal
+    >
+      <template #header>
+        <h3 class="flex items-center gap-2 font-bold text-ink">
+          <i class="pi pi-play text-brand" />Run workflow — {{ ctrl.workflowRun.value?.task.task_cd }}
+        </h3>
+      </template>
+
+      <p class="text-sm text-muted">
+        Mỗi step chạy trong một terminal riêng. Khi step hiện tại đã chạy xong, bấm
+        <span class="font-semibold text-ink">Hoàn thành step</span> để mở terminal step kế tiếp.
+      </p>
+
+      <div class="mt-3 space-y-2">
+        <div
+          v-for="(step, i) in ctrl.workflowRun.value?.steps"
+          :key="step.id"
+          class="flex items-center gap-2.5 rounded-lg border p-2.5"
+          :class="i === ctrl.workflowRun.value?.currentIndex ? 'border-brand ring-1 ring-brand/40 bg-brand/5' : 'border-divider bg-canvas/50'"
+        >
+          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">
+            {{ i + 1 }}
+          </span>
+          <span class="min-w-0 flex-1 truncate font-semibold text-ink">{{ step.name }}</span>
+          <span
+            :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', STEP_STATUS_META[ctrl.workflowRun.value?.statuses[i] ?? 'pending'].badgeClass]"
+          >
+            {{ STEP_STATUS_META[ctrl.workflowRun.value?.statuses[i] ?? 'pending'].label }}
+          </span>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex w-full items-center justify-between gap-2">
+          <Button label="Huỷ" severity="secondary" text @click="ctrl.cancelWorkflowRun" />
+          <Button
+            :label="ctrl.isLastRunStep.value ? 'Hoàn thành workflow' : 'Hoàn thành step & mở step kế'"
+            icon="pi pi-check"
+            :loading="ctrl.isRunningWorkflow.value"
+            @click="ctrl.advanceWorkflowStep"
+          />
         </div>
       </template>
     </Dialog>

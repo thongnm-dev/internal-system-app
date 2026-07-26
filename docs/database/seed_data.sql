@@ -63,6 +63,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('sqlEditor',       'SQL Editor',        '/sql-editor',        'pi-server',     'Tools',      TRUE, 8),
     ('exploreFaster',   'Explore Faster',    '/explore-faster',    'pi-compass',    'Tools',      TRUE, 9),
     ('terminal',        'Terminal',          '/terminal',          'pi-desktop',    'Tools',      TRUE, 31),
+    ('git',             'Git Desktop',       '/git',               'pi-github',     'Tools',      TRUE, 10),
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),
     ('cloudS3Download', 'S3 Download',       '/cloud/s3-download', 'pi-download',   'Cloud',      TRUE, 12),
@@ -122,3 +123,13 @@ ON CONFLICT (id) DO NOTHING;
 -- Project member mặc định
 INSERT INTO public.project_members (id, project_id, username, "name") VALUES(1, 1, 'Thongnm', 'Thongnm')
 ON CONFLICT (id) DO NOTHING;
+-- Model AI mặc định (hiện chỉ đối ứng provider 'claude'; provider khác bổ sung sau).
+-- Version rỗng = chạy model latest (alias); có version = pin cụ thể (model-version).
+INSERT INTO ai_models (provider, model, version) VALUES
+    ('claude', 'opus', ''),
+    ('claude', 'sonnet', ''),
+    ('claude', 'haiku', ''),
+    ('claude', 'opus', '5'),
+    ('claude', 'sonnet', '5'),
+    ('claude', 'haiku', '4.5')
+ON CONFLICT (provider, model, version) DO NOTHING;

@@ -62,6 +62,10 @@ fn row_to_task(row: &tokio_postgres::Row) -> AiTask {
         created_by: row.get("created_by"),
         updated_at: row.get("updated_at"),
         updated_by: row.get("updated_by"),
+        // Chỉ có ở sp_ai_task_select_list; insert/update không trả nên dùng try_get mặc định "".
+        current_wf_name: row.try_get::<_, String>("current_wf_name").unwrap_or_default(),
+        current_step_name: row.try_get::<_, String>("current_step_name").unwrap_or_default(),
+        current_step_status: row.try_get::<_, String>("current_step_status").unwrap_or_default(),
     }
 }
 

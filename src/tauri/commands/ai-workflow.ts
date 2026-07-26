@@ -20,7 +20,16 @@ export type AiWorkflowStepResult = {
   description: string;
   icon: string;
   step_order: number;
+  is_latest_step: boolean;
+  model_id: number | null;
   created_at: string;
+};
+
+export type AiModelResult = {
+  id: number;
+  provider: string;
+  model: string;
+  version: string;
 };
 
 export type CreateWorkflowRequest = {
@@ -40,6 +49,8 @@ export type CreateStepRequest = {
   description: string;
   icon: string;
   step_order: number;
+  is_latest_step: boolean;
+  model_id: number | null;
 };
 
 export type UpdateStepRequest = {
@@ -49,6 +60,8 @@ export type UpdateStepRequest = {
   description: string;
   icon: string;
   step_order: number;
+  is_latest_step: boolean;
+  model_id: number | null;
 };
 
 export function aiWorkflowCreate(username: string, request: CreateWorkflowRequest) {
@@ -69,6 +82,10 @@ export function aiWorkflowDelete(id: number, username: string) {
 
 export function aiWorkflowStepList(workflowId: number) {
   return safeInvoke<AiWorkflowStepResult[]>("ai_workflow_step_list", { workflowId });
+}
+
+export function aiModelList() {
+  return safeInvoke<AiModelResult[]>("ai_model_list", {});
 }
 
 export function aiWorkflowStepCreate(workflowId: number, request: CreateStepRequest) {

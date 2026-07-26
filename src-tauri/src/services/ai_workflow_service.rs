@@ -2,7 +2,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::ai_workflow_store;
 use crate::models::ai_workflow::{
-    AiWorkflow, AiWorkflowStep, CreateStepRequest, CreateWorkflowRequest, UpdateStepRequest,
+    AiModel, AiWorkflow, AiWorkflowStep, CreateStepRequest, CreateWorkflowRequest, UpdateStepRequest,
     UpdateWorkflowRequest,
 };
 
@@ -48,6 +48,10 @@ pub async fn list_steps(workflow_id: i32) -> AppResult<Vec<AiWorkflowStep>> {
     ai_workflow_store::select_steps(workflow_id).await
 }
 
+pub async fn list_models() -> AppResult<Vec<AiModel>> {
+    ai_workflow_store::select_models().await
+}
+
 pub async fn create_step(
     workflow_id: i32,
     request: CreateStepRequest,
@@ -70,6 +74,8 @@ pub async fn create_step(
         request.description.trim(),
         request.icon.trim(),
         request.step_order,
+        request.is_latest_step,
+        request.model_id,
     )
     .await
 }
@@ -96,6 +102,8 @@ pub async fn update_step(
         request.description.trim(),
         request.icon.trim(),
         request.step_order,
+        request.is_latest_step,
+        request.model_id,
     )
     .await?
     .ok_or_else(|| AppError::new(format!("Step '{id}' not found.")))
