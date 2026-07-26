@@ -19,3 +19,4 @@ export * from "./ai-workflow";
 export * from "./ai-task";
 export * from "./ai-translate-cowork";
 export * from "./ai-cowork";
+export * from "./git";
