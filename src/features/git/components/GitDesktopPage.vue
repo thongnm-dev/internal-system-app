@@ -120,13 +120,32 @@ const displayDiff = computed(() =>
   git.tab.value === "history" ? git.commitFileDiff.value : git.diff.value,
 );
 
-// === Drag-to-resize (History tab) ===
+// === Drag-to-resize (nhớ độ rộng vào localStorage) ===
+const WIDTH_KEYS = {
+  changesList: "git.width.changesList",
+  commitList: "git.width.commitList",
+  commitFiles: "git.width.commitFiles",
+} as const;
+
+function loadWidth(key: string, def: number, min: number, max: number) {
+  const raw = Number(localStorage.getItem(key) ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.max(min, Math.min(max, raw)) : def;
+}
+
 const isResizing = ref(false);
-const commitListWidth = ref(340); // cột danh sách commit
+const changesListWidth = ref(loadWidth(WIDTH_KEYS.changesList, 340, 240, 600)); // cột file (tab Changes)
+const changesListRef = ref<HTMLElement | null>(null);
+const commitListWidth = ref(loadWidth(WIDTH_KEYS.commitList, 340, 220, 600)); // cột danh sách commit
 const commitListRef = ref<HTMLElement | null>(null);
-const commitFilesWidth = ref(224); // cột file trong commit
+const commitFilesWidth = ref(loadWidth(WIDTH_KEYS.commitFiles, 224, 140, 500)); // cột file trong commit
 const commitFilesRef = ref<HTMLElement | null>(null);
 let activeMove: ((e: MouseEvent) => void) | null = null;
+
+function persistWidths() {
+  localStorage.setItem(WIDTH_KEYS.changesList, String(Math.round(changesListWidth.value)));
+  localStorage.setItem(WIDTH_KEYS.commitList, String(Math.round(commitListWidth.value)));
+  localStorage.setItem(WIDTH_KEYS.commitFiles, String(Math.round(commitFilesWidth.value)));
+}
 
 function beginResize(move: (e: MouseEvent) => void, e: MouseEvent) {
   e.preventDefault();
@@ -141,6 +160,14 @@ function endResize() {
   if (activeMove) document.removeEventListener("mousemove", activeMove);
   document.removeEventListener("mouseup", endResize);
   activeMove = null;
+  persistWidths();
+}
+
+function startResizeChangesList(e: MouseEvent) {
+  beginResize((ev) => {
+    const left = changesListRef.value?.getBoundingClientRect().left ?? 0;
+    changesListWidth.value = Math.max(240, Math.min(600, ev.clientX - left));
+  }, e);
 }
 
 function startResizeCommitList(e: MouseEvent) {
@@ -402,9 +429,17 @@ onUnmounted(() => {
         </div>
 
         <!-- ================= CHANGES TAB ================= -->
-        <div v-show="git.tab.value === 'changes'" class="flex min-h-0 flex-1 gap-3 overflow-hidden">
+        <div
+          v-show="git.tab.value === 'changes'"
+          class="flex min-h-0 flex-1 overflow-hidden"
+          :class="isResizing ? 'select-none' : ''"
+        >
           <!-- Left: file list + commit box -->
-          <div class="flex w-[340px] shrink-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
+          <div
+            ref="changesListRef"
+            class="flex shrink-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm"
+            :style="{ width: changesListWidth + 'px' }"
+          >
             <div class="min-h-0 flex-1 overflow-y-auto">
               <!-- Staged -->
               <div v-if="git.staged.value.length" class="border-b border-divider">
@@ -530,6 +565,15 @@ onUnmounted(() => {
                 {{ git.staged.value.length }} file được stage sẽ được commit.
               </div>
             </div>
+          </div>
+
+          <!-- Resize handle: file list | diff -->
+          <div
+            class="flex w-2 shrink-0 cursor-col-resize items-center justify-center hover:bg-brand/10"
+            :class="isResizing ? 'bg-brand/20' : ''"
+            @mousedown="startResizeChangesList"
+          >
+            <div class="h-8 w-0.5 rounded-full bg-divider" :class="isResizing ? 'bg-brand' : ''" />
           </div>
 
           <!-- Right: diff -->
