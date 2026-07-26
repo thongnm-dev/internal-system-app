@@ -386,6 +386,26 @@ async function doCreatePR() {
   await git.createPullRequest(cmpBase.value, cmpHead.value);
 }
 
+// === Danh sách Pull Request ===
+const prDialog = ref(false);
+const prStateFilter = ref<"open" | "closed" | "all">("open");
+function openPrDialog() {
+  closeMenus();
+  prStateFilter.value = "open";
+  prDialog.value = true;
+  git.loadPullRequests(prStateFilter.value);
+}
+function changePrState(state: "open" | "closed" | "all") {
+  prStateFilter.value = state;
+  git.loadPullRequests(state);
+}
+function prStateBadge(s: string) {
+  if (s === "merged") return "bg-purple-100 text-purple-700";
+  if (s === "closed") return "bg-red-100 text-red-700";
+  if (s === "draft") return "bg-slate-100 text-slate-600";
+  return "bg-emerald-100 text-emerald-700";
+}
+
 // === Context menu trên history ===
 const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
 const ctxItem =
@@ -659,6 +679,9 @@ onUnmounted(closeCommitMenu);
                 </button>
                 <button :class="ctxItem" @click="openCompareDialog">
                   <i class="pi pi-arrows-h text-xs" /> So sánh / Pull Request…
+                </button>
+                <button :class="ctxItem" @click="openPrDialog">
+                  <i class="pi pi-flag text-xs" /> Xem Pull Requests…
                 </button>
               </div>
             </div>
@@ -1456,6 +1479,69 @@ onUnmounted(closeCommitMenu);
         <Button size="small" outlined severity="secondary" @click="mergeDialog = false">Hủy</Button>
         <Button size="small" :disabled="!mergeBranchSel || !!git.busyMessage.value" @click="doMerge">
           <i class="pi pi-code-branch mr-1.5" /> {{ mergeSquash ? "Squash & merge" : "Merge" }}
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Pull Requests list dialog -->
+    <Dialog v-model:visible="prDialog" modal header="Pull Requests" :style="{ width: '720px' }">
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <div class="flex overflow-hidden rounded-md border border-divider">
+            <button
+              v-for="opt in (['open','closed','all'] as const)"
+              :key="opt"
+              class="px-3 py-1 text-xs font-medium transition-colors"
+              :class="prStateFilter === opt ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
+              @click="changePrState(opt)"
+            >
+              {{ opt === 'open' ? 'Đang mở' : opt === 'closed' ? 'Đã đóng' : 'Tất cả' }}
+            </button>
+          </div>
+          <button
+            class="rounded p-1.5 text-muted transition-colors hover:bg-canvas hover:text-brand"
+            title="Làm mới"
+            @click="git.loadPullRequests(prStateFilter)"
+          >
+            <i class="pi text-xs" :class="git.pullRequestsLoading.value ? 'pi-spinner pi-spin' : 'pi-refresh'" />
+          </button>
+          <span class="ml-auto text-xs text-muted">Dùng credential git đã lưu để truy cập repo riêng tư.</span>
+        </div>
+
+        <div class="min-h-[280px] max-h-[440px] overflow-y-auto rounded-md border border-divider">
+          <div v-if="git.pullRequestsLoading.value" class="p-8 text-center text-sm text-muted">
+            <i class="pi pi-spinner pi-spin mr-1.5" /> Đang tải…
+          </div>
+          <div v-else-if="!git.pullRequests.value.length" class="p-8 text-center text-sm text-muted">
+            Không có Pull Request nào.
+          </div>
+          <button
+            v-for="pr in git.pullRequests.value"
+            v-else
+            :key="pr.number"
+            class="flex w-full items-start gap-3 border-b border-divider-light px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-canvas"
+            @click="git.openUrl(pr.url)"
+          >
+            <span class="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" :class="prStateBadge(pr.state)">
+              {{ pr.state }}
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium text-ink">
+                #{{ pr.number }} {{ pr.title }}
+              </span>
+              <span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted">
+                <span>{{ pr.author }}</span>
+                <span class="font-mono">{{ pr.head }} → {{ pr.base }}</span>
+              </span>
+            </span>
+            <i class="pi pi-external-link mt-1 shrink-0 text-xs text-muted" />
+          </button>
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="prDialog = false">Đóng</Button>
+        <Button size="small" @click="prDialog = false; openCompareDialog()">
+          <i class="pi pi-plus mr-1.5" /> Tạo Pull Request
         </Button>
       </template>
     </Dialog>

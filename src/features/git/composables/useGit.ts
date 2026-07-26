@@ -13,8 +13,10 @@ import {
   gitCompare,
   gitCompareFileDiff,
   gitCreatePullRequest,
+  gitListPullRequests,
   gitMerge,
   gitMergeAbort,
+  gitOpenUrl,
   gitTagCreate,
   gitTagDelete,
   gitTagList,
@@ -58,6 +60,7 @@ import type {
   GitComparison,
   GitDiff,
   GitFileChange,
+  GitPullRequest,
   GitRepo,
   GitRepoInfo,
   GitStash,
@@ -95,6 +98,9 @@ export function useGit() {
 
   const comparison = ref<GitComparison | null>(null);
   const comparisonDiff = ref<GitDiff | null>(null);
+
+  const pullRequests = ref<GitPullRequest[]>([]);
+  const pullRequestsLoading = ref(false);
 
   const selectedFile = ref<SelectedFile | null>(null);
   const diff = ref<GitDiff | null>(null);
@@ -889,6 +895,30 @@ export function useGit() {
     }
   }
 
+  /** Lấy danh sách Pull Request từ host (GitHub/GitLab), tận dụng credential đã lưu. */
+  async function loadPullRequests(state: string) {
+    const path = repoPath();
+    if (!path) return;
+    pullRequestsLoading.value = true;
+    try {
+      pullRequests.value = await gitListPullRequests(path, state);
+    } catch (e) {
+      pullRequests.value = [];
+      reportError("Không lấy được danh sách Pull Request", e);
+    } finally {
+      pullRequestsLoading.value = false;
+    }
+  }
+
+  /** Mở một URL bằng trình duyệt mặc định. */
+  async function openUrl(url: string) {
+    try {
+      await gitOpenUrl(url);
+    } catch (e) {
+      reportError("Không mở được liên kết", e);
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -942,6 +972,8 @@ export function useGit() {
     commits,
     comparison,
     comparisonDiff,
+    pullRequests,
+    pullRequestsLoading,
     selectedFile,
     diff,
     diffLoading,
@@ -1008,6 +1040,8 @@ export function useGit() {
     compareBranches,
     compareSelectFile,
     createPullRequest,
+    loadPullRequests,
+    openUrl,
     loadWorktrees,
     worktreeAdd,
     worktreeRemove,

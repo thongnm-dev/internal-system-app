@@ -56,6 +56,22 @@ pub struct GitTag {
     pub date: String,
 }
 
+/// Một Pull Request / Merge Request lấy từ API của host.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitPullRequest {
+    pub number: u64,
+    pub title: String,
+    pub author: String,
+    /// "open" | "closed" | "merged" | "draft".
+    pub state: String,
+    pub draft: bool,
+    pub head: String,
+    pub base: String,
+    pub url: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 /// Kết quả so sánh 2 branch (dùng cho Compare + preview Pull Request).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GitComparison {

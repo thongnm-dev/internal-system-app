@@ -5,6 +5,7 @@ import type {
   GitCommitDetail,
   GitComparison,
   GitDiff,
+  GitPullRequest,
   GitRepo,
   GitRepoInfo,
   GitStash,
@@ -188,6 +189,14 @@ export function gitMergeAbort(path: string) {
 
 export function gitCompare(path: string, base: string, head: string) {
   return safeInvoke<GitComparison>("git_compare", { path, base, head });
+}
+
+export function gitListPullRequests(path: string, state: string) {
+  return safeInvoke<GitPullRequest[]>("git_list_pull_requests", { path, state });
+}
+
+export function gitOpenUrl(url: string) {
+  return safeInvoke<void>("git_open_url", { url });
 }
 
 export function gitCreatePullRequest(path: string, base: string, head: string) {

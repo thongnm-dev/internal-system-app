@@ -11,12 +11,15 @@
 
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
+
+use reqwest::Client;
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::git::{
     GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitDiffLine, GitFileChange,
-    GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
+    GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 
 /// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
@@ -987,6 +990,239 @@ pub fn create_pull_request(repo_path: &str, base: &str, head: &str) -> AppResult
     let url = pull_request_url(&web, base, head);
     open_url(&url)?;
     Ok(url)
+}
+
+// === Pull Request list (gọi API host) ===
+
+/// Thông tin host để gọi API liệt kê Pull Request.
+pub struct PrSource {
+    /// "github" | "gitlab" | "bitbucket" | "other".
+    pub kind: String,
+    pub host: String,
+    pub owner: String,
+    pub repo: String,
+}
+
+/// Phân tích host/owner/repo từ remote origin.
+pub fn pr_source(repo_path: &str) -> AppResult<PrSource> {
+    let web = remote_web_url(repo_path);
+    if web.is_empty() {
+        return Err(AppError::new("Repo không có remote origin."));
+    }
+    let after = web
+        .strip_prefix("https://")
+        .or_else(|| web.strip_prefix("http://"))
+        .unwrap_or(&web);
+    let (host, path) = after
+        .split_once('/')
+        .ok_or_else(|| AppError::new("Không phân tích được URL remote."))?;
+    let segs: Vec<&str> = path.trim_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+    if segs.len() < 2 {
+        return Err(AppError::new("Không xác định được owner/repo từ remote."));
+    }
+    let repo = segs[segs.len() - 1].to_string();
+    let owner = segs[..segs.len() - 1].join("/");
+    let kind = if host.contains("github") {
+        "github"
+    } else if host.contains("gitlab") {
+        "gitlab"
+    } else if host.contains("bitbucket") {
+        "bitbucket"
+    } else {
+        "other"
+    }
+    .to_string();
+    Ok(PrSource {
+        kind,
+        host: host.to_string(),
+        owner,
+        repo,
+    })
+}
+
+/// Lấy token cho `host` từ git credential helper (best-effort; rỗng nếu không có).
+/// Tận dụng credential đã lưu để không cần cấu hình token riêng trong app.
+pub fn credential_token(host: &str) -> String {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut cmd = Command::new("git");
+    configure(&mut cmd);
+    let child = cmd
+        .args(["credential", "fill"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn();
+    let mut child = match child {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+    if let Some(mut sin) = child.stdin.take() {
+        let _ = write!(sin, "protocol=https\nhost={host}\n\n");
+    }
+    let out = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(_) => return String::new(),
+    };
+    if !out.status.success() {
+        return String::new();
+    }
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        if let Some(p) = line.strip_prefix("password=") {
+            return p.trim().to_string();
+        }
+    }
+    String::new()
+}
+
+fn build_http() -> AppResult<Client> {
+    Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| AppError::new(format!("Không tạo được HTTP client: {e}")))
+}
+
+/// Liệt kê Pull Request / Merge Request. `state`: "open" | "closed" | "all".
+pub async fn list_pull_requests(repo_path: &str, state: &str) -> AppResult<Vec<GitPullRequest>> {
+    let src = pr_source(repo_path)?;
+    let token = credential_token(&src.host);
+    match src.kind.as_str() {
+        "github" => github_pull_requests(&src, &token, state).await,
+        "gitlab" => gitlab_merge_requests(&src, &token, state).await,
+        _ => Err(AppError::new(
+            "Chỉ hỗ trợ liệt kê Pull Request cho GitHub và GitLab.",
+        )),
+    }
+}
+
+async fn github_pull_requests(
+    src: &PrSource,
+    token: &str,
+    state: &str,
+) -> AppResult<Vec<GitPullRequest>> {
+    let api = if src.host == "github.com" {
+        "https://api.github.com".to_string()
+    } else {
+        format!("https://{}/api/v3", src.host)
+    };
+    let gh_state = match state {
+        "closed" => "closed",
+        "all" => "all",
+        _ => "open",
+    };
+    let url = format!(
+        "{api}/repos/{}/{}/pulls?state={gh_state}&per_page=50&sort=updated&direction=desc",
+        src.owner, src.repo
+    );
+    let client = build_http()?;
+    let mut req = client
+        .get(&url)
+        .header("User-Agent", "management-systems")
+        .header("Accept", "application/vnd.github+json");
+    if !token.is_empty() {
+        req = req.header("Authorization", format!("Bearer {token}"));
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Gọi GitHub API lỗi: {e}")))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let msg = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v["message"].as_str().map(|s| s.to_string()))
+            .unwrap_or(body);
+        return Err(AppError::new(format!(
+            "GitHub API {}: {msg}",
+            status.as_u16()
+        )));
+    }
+    let arr: Vec<serde_json::Value> = resp
+        .json()
+        .await
+        .map_err(|e| AppError::new(format!("Lỗi đọc dữ liệu GitHub: {e}")))?;
+    let out = arr
+        .iter()
+        .map(|v| {
+            let draft = v["draft"].as_bool().unwrap_or(false);
+            let st = v["state"].as_str().unwrap_or("open").to_string();
+            GitPullRequest {
+                number: v["number"].as_u64().unwrap_or(0),
+                title: v["title"].as_str().unwrap_or("").to_string(),
+                author: v["user"]["login"].as_str().unwrap_or("").to_string(),
+                state: if draft && st == "open" { "draft".to_string() } else { st },
+                draft,
+                head: v["head"]["ref"].as_str().unwrap_or("").to_string(),
+                base: v["base"]["ref"].as_str().unwrap_or("").to_string(),
+                url: v["html_url"].as_str().unwrap_or("").to_string(),
+                created_at: v["created_at"].as_str().unwrap_or("").to_string(),
+                updated_at: v["updated_at"].as_str().unwrap_or("").to_string(),
+            }
+        })
+        .collect();
+    Ok(out)
+}
+
+async fn gitlab_merge_requests(
+    src: &PrSource,
+    token: &str,
+    state: &str,
+) -> AppResult<Vec<GitPullRequest>> {
+    let proj = urlencoding::encode(&format!("{}/{}", src.owner, src.repo)).into_owned();
+    let gl_state = match state {
+        "closed" => "closed",
+        "all" => "all",
+        _ => "opened",
+    };
+    let url = format!(
+        "https://{}/api/v4/projects/{}/merge_requests?state={gl_state}&per_page=50&order_by=updated_at",
+        src.host, proj
+    );
+    let client = build_http()?;
+    let mut req = client.get(&url).header("User-Agent", "management-systems");
+    if !token.is_empty() {
+        req = req.header("PRIVATE-TOKEN", token);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Gọi GitLab API lỗi: {e}")))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(AppError::new(format!("GitLab API {}: {body}", status.as_u16())));
+    }
+    let arr: Vec<serde_json::Value> = resp
+        .json()
+        .await
+        .map_err(|e| AppError::new(format!("Lỗi đọc dữ liệu GitLab: {e}")))?;
+    let out = arr
+        .iter()
+        .map(|v| {
+            let draft = v["draft"].as_bool().or_else(|| v["work_in_progress"].as_bool()).unwrap_or(false);
+            let raw_state = v["state"].as_str().unwrap_or("opened");
+            let st = match raw_state {
+                "opened" => if draft { "draft" } else { "open" },
+                other => other,
+            }
+            .to_string();
+            GitPullRequest {
+                number: v["iid"].as_u64().unwrap_or(0),
+                title: v["title"].as_str().unwrap_or("").to_string(),
+                author: v["author"]["username"].as_str().unwrap_or("").to_string(),
+                state: st,
+                draft,
+                head: v["source_branch"].as_str().unwrap_or("").to_string(),
+                base: v["target_branch"].as_str().unwrap_or("").to_string(),
+                url: v["web_url"].as_str().unwrap_or("").to_string(),
+                created_at: v["created_at"].as_str().unwrap_or("").to_string(),
+                updated_at: v["updated_at"].as_str().unwrap_or("").to_string(),
+            }
+        })
+        .collect();
+    Ok(out)
 }
 
 // === Worktree ===

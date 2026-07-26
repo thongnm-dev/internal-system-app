@@ -30,6 +30,21 @@ export interface GitTag {
   date: string;
 }
 
+/** Một Pull Request / Merge Request lấy từ API host. */
+export interface GitPullRequest {
+  number: number;
+  title: string;
+  author: string;
+  /** "open" | "closed" | "merged" | "draft" */
+  state: string;
+  draft: boolean;
+  head: string;
+  base: string;
+  url: string;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Kết quả so sánh 2 branch (Compare + preview Pull Request). */
 export interface GitComparison {
   base: string;

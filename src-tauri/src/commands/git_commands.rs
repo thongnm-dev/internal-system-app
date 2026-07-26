@@ -10,8 +10,8 @@
 use crate::app::error::log_err;
 use crate::database::git_repo_store::{self, GitRepoData};
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitRepo, GitRepoInfo, GitStash,
-    GitStatus, GitTag, GitWorktree,
+    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitPullRequest, GitRepo,
+    GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 use crate::services::git_service;
 
@@ -405,6 +405,24 @@ pub async fn git_create_pull_request(
     .await
     .map_err(log_err)?
     .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_list_pull_requests(
+    path: String,
+    state: String,
+) -> Result<Vec<GitPullRequest>, String> {
+    git_service::list_pull_requests(&path, &state)
+        .await
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_open_url(url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::open_url(&url))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
 }
 
 #[tauri::command]
