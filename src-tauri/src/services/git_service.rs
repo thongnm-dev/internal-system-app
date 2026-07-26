@@ -133,10 +133,10 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
 
     let remote_url = run_opt(repo_path, &["remote", "get-url", "origin"]);
 
-    let rebase_in_progress = {
+    let (rebase_in_progress, cherry_pick_in_progress) = {
         let git_dir = run_opt(repo_path, &["rev-parse", "--git-dir"]);
         if git_dir.is_empty() {
-            false
+            (false, false)
         } else {
             let base = Path::new(&git_dir);
             let dir = if base.is_absolute() {
@@ -144,7 +144,10 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
             } else {
                 Path::new(repo_path).join(base)
             };
-            dir.join("rebase-merge").exists() || dir.join("rebase-apply").exists()
+            let rebase =
+                dir.join("rebase-merge").exists() || dir.join("rebase-apply").exists();
+            let cherry = dir.join("CHERRY_PICK_HEAD").exists();
+            (rebase, cherry)
         }
     };
 
@@ -157,6 +160,7 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
         behind,
         remote_url,
         rebase_in_progress,
+        cherry_pick_in_progress,
     })
 }
 
@@ -675,14 +679,13 @@ pub fn rebase_abort(repo_path: &str) -> AppResult<String> {
     run(repo_path, &["rebase", "--abort"])
 }
 
-/// Tiếp tục rebase sau khi đã giải quyết xung đột (và stage các file).
-pub fn rebase_continue(repo_path: &str) -> AppResult<String> {
+/// Chạy một lệnh git với editor không tương tác (`GIT_EDITOR=true`) — dùng cho
+/// các lệnh `--continue` vốn sẽ mở editor commit message và làm treo app.
+fn run_no_editor(repo_path: &str, args: &[&str]) -> AppResult<String> {
     let mut cmd = git_in(repo_path);
-    // `rebase --continue` mở editor cho commit message — tránh treo bằng cách
-    // dùng editor "true" (không tương tác, giữ nguyên message).
     cmd.env("GIT_EDITOR", "true");
     let output = cmd
-        .args(["rebase", "--continue"])
+        .args(args)
         .output()
         .map_err(|e| AppError::new(format!("Không chạy được git: {e}")))?;
     if output.status.success() {
@@ -690,11 +693,36 @@ pub fn rebase_continue(repo_path: &str) -> AppResult<String> {
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         Err(AppError::new(if stderr.is_empty() {
-            "Rebase --continue thất bại.".to_string()
+            "Lệnh git thất bại.".to_string()
         } else {
             stderr
         }))
     }
+}
+
+/// Tiếp tục rebase sau khi đã giải quyết xung đột (và stage các file).
+pub fn rebase_continue(repo_path: &str) -> AppResult<String> {
+    run_no_editor(repo_path, &["rebase", "--continue"])
+}
+
+// === Cherry-pick ===
+
+/// Cherry-pick một commit vào branch hiện tại.
+pub fn cherry_pick(repo_path: &str, hash: &str) -> AppResult<String> {
+    if hash.trim().is_empty() {
+        return Err(AppError::new("Thiếu mã commit để cherry-pick."));
+    }
+    run(repo_path, &["cherry-pick", hash])
+}
+
+/// Hủy cherry-pick đang dở (khi có xung đột).
+pub fn cherry_pick_abort(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["cherry-pick", "--abort"])
+}
+
+/// Tiếp tục cherry-pick sau khi đã giải quyết xung đột (và stage các file).
+pub fn cherry_pick_continue(repo_path: &str) -> AppResult<String> {
+    run_no_editor(repo_path, &["cherry-pick", "--continue"])
 }
 
 // === Worktree ===

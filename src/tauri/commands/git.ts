@@ -153,6 +153,18 @@ export function gitRebaseContinue(path: string) {
   return safeInvoke<string>("git_rebase_continue", { path });
 }
 
+export function gitCherryPick(path: string, hash: string) {
+  return safeInvoke<string>("git_cherry_pick", { path, hash });
+}
+
+export function gitCherryPickAbort(path: string) {
+  return safeInvoke<string>("git_cherry_pick_abort", { path });
+}
+
+export function gitCherryPickContinue(path: string) {
+  return safeInvoke<string>("git_cherry_pick_continue", { path });
+}
+
 export function gitWorktreeAdd(path: string, worktreePath: string, branch: string, newBranch: string) {
   return safeInvoke<string>("git_worktree_add", { path, worktreePath, branch, newBranch });
 }

@@ -18,6 +18,7 @@ export interface GitRepoInfo {
   behind: number;
   remote_url: string;
   rebase_in_progress: boolean;
+  cherry_pick_in_progress: boolean;
 }
 
 /** Một Git worktree. */

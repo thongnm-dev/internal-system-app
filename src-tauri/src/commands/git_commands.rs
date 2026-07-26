@@ -321,6 +321,30 @@ pub async fn git_rebase_continue(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub async fn git_cherry_pick(path: String, hash: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cherry_pick(&path, &hash))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_cherry_pick_abort(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cherry_pick_abort(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_cherry_pick_continue(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cherry_pick_continue(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
 pub async fn git_worktree_add(
     path: String,
     worktree_path: String,

@@ -38,6 +38,8 @@ pub struct GitRepoInfo {
     pub remote_url: String,
     /// Đang trong quá trình rebase (có thư mục rebase-merge/rebase-apply).
     pub rebase_in_progress: bool,
+    /// Đang trong quá trình cherry-pick (có file CHERRY_PICK_HEAD).
+    pub cherry_pick_in_progress: bool,
 }
 
 /// Một Git worktree.

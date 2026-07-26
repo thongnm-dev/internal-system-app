@@ -6,6 +6,9 @@ import {
   gitAddRepo,
   gitBranches,
   gitCheckoutBranch,
+  gitCherryPick,
+  gitCherryPickAbort,
+  gitCherryPickContinue,
   gitClone,
   gitCommit,
   gitCommitDetail,
@@ -640,6 +643,57 @@ export function useGit() {
     }
   }
 
+  // === Cherry-pick ===
+
+  async function cherryPick(hash: string) {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang cherry-pick…";
+    try {
+      await gitCherryPick(path, hash);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success("Đã cherry-pick commit.");
+    } catch (e) {
+      reportError("Cherry-pick gặp lỗi (có thể do xung đột)", e);
+      await refreshStatusAndInfo();
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function cherryPickAbort() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang hủy cherry-pick…";
+    try {
+      await gitCherryPickAbort(path);
+      await refreshStatusAndInfo();
+      toast.success("Đã hủy cherry-pick.");
+    } catch (e) {
+      reportError("Không hủy được cherry-pick", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function cherryPickContinue() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang tiếp tục cherry-pick…";
+    try {
+      await gitCherryPickContinue(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success("Đã tiếp tục cherry-pick.");
+    } catch (e) {
+      reportError("Không tiếp tục được cherry-pick (còn xung đột?)", e);
+      await refreshStatusAndInfo();
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
   // === Worktree ===
 
   async function loadWorktrees() {
@@ -805,6 +859,9 @@ export function useGit() {
     rebaseOnto,
     rebaseAbort,
     rebaseContinue,
+    cherryPick,
+    cherryPickAbort,
+    cherryPickContinue,
     loadWorktrees,
     worktreeAdd,
     worktreeRemove,

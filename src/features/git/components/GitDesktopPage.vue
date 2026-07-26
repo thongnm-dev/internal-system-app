@@ -587,6 +587,24 @@ onUnmounted(closeCommitMenu);
         </div>
       </div>
 
+      <!-- Cherry-pick in progress banner -->
+      <div
+        v-if="git.info.value?.cherry_pick_in_progress"
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm"
+      >
+        <i class="pi pi-exclamation-triangle text-amber-600" />
+        <span class="font-semibold text-amber-800">Đang có một cherry-pick dở dang.</span>
+        <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Tiếp tục, hoặc Hủy để quay lại.</span>
+        <div class="ml-auto flex gap-2">
+          <Button size="small" :disabled="!!git.busyMessage.value" @click="git.cherryPickContinue()">
+            <i class="pi pi-play mr-1.5 text-xs" /> Tiếp tục
+          </Button>
+          <Button size="small" outlined severity="danger" :disabled="!!git.busyMessage.value" @click="git.cherryPickAbort()">
+            <i class="pi pi-times mr-1.5 text-xs" /> Hủy cherry-pick
+          </Button>
+        </div>
+      </div>
+
       <!-- ======================= EMPTY STATE ======================= -->
       <div
         v-if="!git.activeRepo.value"
@@ -1259,6 +1277,9 @@ onUnmounted(closeCommitMenu);
       </button>
       <button :class="ctxItem" @click="closeCommitMenu(); askRevert(commitMenu.commit)">
         <i class="pi pi-undo text-xs" /> Revert commit…
+      </button>
+      <button :class="ctxItem" @click="closeCommitMenu(); git.cherryPick(commitMenu.commit.hash)">
+        <i class="pi pi-share-alt text-xs" /> Cherry-pick vào branch hiện tại
       </button>
       <div class="my-1 border-t border-divider" />
       <button :class="ctxItem" @click="closeCommitMenu(); askBranchFrom(commitMenu.commit)">

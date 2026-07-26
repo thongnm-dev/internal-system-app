@@ -53,7 +53,8 @@ use commands::explorer_commands::{
     explorer_search,
 };
 use commands::git_commands::{
-    git_add_repo, git_branches, git_checkout_branch, git_clone, git_commit, git_commit_detail,
+    git_add_repo, git_branches, git_checkout_branch, git_cherry_pick, git_cherry_pick_abort,
+    git_cherry_pick_continue, git_clone, git_commit, git_commit_detail,
     git_commit_file_diff, git_create_branch, git_delete_branch, git_discard, git_fetch,
     git_file_diff, git_list_repos, git_log, git_pull, git_push, git_rebase, git_rebase_abort,
     git_rebase_continue, git_remove_repo, git_repo_info, git_reset, git_revert, git_revert_abort,
@@ -344,6 +345,9 @@ pub fn run() {
             git_rebase,
             git_rebase_abort,
             git_rebase_continue,
+            git_cherry_pick,
+            git_cherry_pick_abort,
+            git_cherry_pick_continue,
             git_worktree_add,
             git_worktree_remove,
             // === AI Usage commands ===
