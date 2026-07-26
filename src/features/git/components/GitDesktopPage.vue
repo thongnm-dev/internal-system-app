@@ -130,6 +130,9 @@ const displayDiff = computed(() =>
   git.tab.value === "history" ? git.commitFileDiff.value : git.diff.value,
 );
 
+// Thu gọn/mở rộng vùng commit detail (collapse chỉ hiện tiêu đề + metadata author).
+const detailExpanded = ref(true);
+
 // === Drag-to-resize (nhớ độ rộng vào localStorage) ===
 const WIDTH_KEYS = {
   changesList: "git.width.changesList",
@@ -950,18 +953,19 @@ onUnmounted(closeCommitMenu);
             <div v-if="git.commitDetail.value" class="border-b border-divider bg-canvas px-4 py-2.5">
               <div class="flex items-start gap-2">
                 <p class="min-w-0 flex-1 text-sm font-semibold text-ink">{{ git.commitDetail.value.commit.subject }}</p>
-                <Button
-                  size="small"
-                  outlined
-                  severity="secondary"
-                  class="shrink-0"
-                  title="Revert commit này"
-                  @click="askRevert(git.commitDetail.value.commit)"
+                <button
+                  v-if="git.commitDetail.value.body"
+                  class="shrink-0 rounded p-1 text-muted transition-colors hover:bg-panel hover:text-brand"
+                  :title="detailExpanded ? 'Thu gọn' : 'Mở rộng'"
+                  @click="detailExpanded = !detailExpanded"
                 >
-                  <i class="pi pi-undo mr-1.5 text-xs" /> Revert
-                </Button>
+                  <i class="pi text-xs" :class="detailExpanded ? 'pi-chevron-up' : 'pi-chevron-down'" />
+                </button>
               </div>
-              <p v-if="git.commitDetail.value.body" class="mt-1 whitespace-pre-wrap text-xs text-secondary">
+              <p
+                v-if="git.commitDetail.value.body && detailExpanded"
+                class="mt-1 whitespace-pre-wrap text-xs text-secondary"
+              >
                 {{ git.commitDetail.value.body }}
               </p>
               <p class="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
