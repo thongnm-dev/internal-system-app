@@ -19,6 +19,27 @@ export interface GitRepoInfo {
   remote_url: string;
   rebase_in_progress: boolean;
   cherry_pick_in_progress: boolean;
+  merge_in_progress: boolean;
+}
+
+/** Một tag. */
+export interface GitTag {
+  name: string;
+  target: string;
+  subject: string;
+  date: string;
+}
+
+/** Kết quả so sánh 2 branch (Compare + preview Pull Request). */
+export interface GitComparison {
+  base: string;
+  head: string;
+  ahead: number;
+  behind: number;
+  commits: GitCommit[];
+  files: GitFileChange[];
+  web_url: string;
+  pr_url: string;
 }
 
 /** Một Git worktree. */

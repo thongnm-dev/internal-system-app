@@ -3,11 +3,13 @@ import type {
   GitBranch,
   GitCommit,
   GitCommitDetail,
+  GitComparison,
   GitDiff,
   GitRepo,
   GitRepoInfo,
   GitStash,
   GitStatus,
+  GitTag,
   GitWorktree,
 } from "@/_/types/git";
 
@@ -65,6 +67,14 @@ export function gitStashList(path: string) {
 
 export function gitWorktreeList(path: string) {
   return safeInvoke<GitWorktree[]>("git_worktree_list", { path });
+}
+
+export function gitTagList(path: string) {
+  return safeInvoke<GitTag[]>("git_tag_list", { path });
+}
+
+export function gitCompareFileDiff(path: string, base: string, head: string, file: string) {
+  return safeInvoke<GitDiff>("git_compare_file_diff", { path, base, head, file });
 }
 
 // === Thao tác ghi / mạng ===
@@ -151,6 +161,37 @@ export function gitRebaseAbort(path: string) {
 
 export function gitRebaseContinue(path: string) {
   return safeInvoke<string>("git_rebase_continue", { path });
+}
+
+export function gitTagCreate(
+  path: string,
+  name: string,
+  hash: string,
+  message: string,
+  annotated: boolean,
+  push: boolean,
+) {
+  return safeInvoke<string>("git_tag_create", { path, name, hash, message, annotated, push });
+}
+
+export function gitTagDelete(path: string, name: string, remote: boolean) {
+  return safeInvoke<string>("git_tag_delete", { path, name, remote });
+}
+
+export function gitMerge(path: string, branch: string, squash: boolean, message: string) {
+  return safeInvoke<string>("git_merge", { path, branch, squash, message });
+}
+
+export function gitMergeAbort(path: string) {
+  return safeInvoke<string>("git_merge_abort", { path });
+}
+
+export function gitCompare(path: string, base: string, head: string) {
+  return safeInvoke<GitComparison>("git_compare", { path, base, head });
+}
+
+export function gitCreatePullRequest(path: string, base: string, head: string) {
+  return safeInvoke<string>("git_create_pull_request", { path, base, head });
 }
 
 export function gitCherryPick(path: string, hash: string) {

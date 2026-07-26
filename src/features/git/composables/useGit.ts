@@ -10,6 +10,14 @@ import {
   gitCherryPickAbort,
   gitCherryPickContinue,
   gitClone,
+  gitCompare,
+  gitCompareFileDiff,
+  gitCreatePullRequest,
+  gitMerge,
+  gitMergeAbort,
+  gitTagCreate,
+  gitTagDelete,
+  gitTagList,
   gitCommit,
   gitCommitDetail,
   gitCommitFileDiff,
@@ -47,11 +55,13 @@ import type {
   GitBranch,
   GitCommit,
   GitCommitDetail,
+  GitComparison,
   GitDiff,
   GitFileChange,
   GitRepo,
   GitRepoInfo,
   GitStash,
+  GitTag,
   GitWorktree,
 } from "@/_/types/git";
 import { useToast } from "@/shared/composables/useToast";
@@ -80,7 +90,11 @@ export function useGit() {
   const branches = ref<GitBranch[]>([]);
   const stashes = ref<GitStash[]>([]);
   const worktrees = ref<GitWorktree[]>([]);
+  const tags = ref<GitTag[]>([]);
   const commits = ref<GitCommit[]>([]);
+
+  const comparison = ref<GitComparison | null>(null);
+  const comparisonDiff = ref<GitDiff | null>(null);
 
   const selectedFile = ref<SelectedFile | null>(null);
   const diff = ref<GitDiff | null>(null);
@@ -754,6 +768,127 @@ export function useGit() {
     }
   }
 
+  // === Tag ===
+
+  async function loadTags() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      tags.value = await gitTagList(path);
+    } catch (e) {
+      reportError("Không lấy được tag", e);
+    }
+  }
+
+  async function createTag(
+    name: string,
+    hash: string,
+    message: string,
+    annotated: boolean,
+    push: boolean,
+  ): Promise<boolean> {
+    const path = repoPath();
+    if (!path || !name.trim()) return false;
+    busyMessage.value = "Đang tạo tag…";
+    try {
+      await gitTagCreate(path, name.trim(), hash, message, annotated, push);
+      await loadTags();
+      toast.success(`Đã tạo tag "${name.trim()}"${push ? " và push lên origin" : ""}.`);
+      return true;
+    } catch (e) {
+      reportError("Không tạo được tag", e);
+      return false;
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function deleteTag(name: string, remote: boolean) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitTagDelete(path, name, remote);
+      await loadTags();
+      toast.success(`Đã xóa tag "${name}".`);
+    } catch (e) {
+      reportError("Không xóa được tag", e);
+    }
+  }
+
+  // === Merge ===
+
+  async function mergeBranch(branch: string, squash: boolean, message: string): Promise<boolean> {
+    const path = repoPath();
+    if (!path || !branch.trim()) return false;
+    busyMessage.value = squash ? "Đang squash & merge…" : "Đang merge…";
+    try {
+      await gitMerge(path, branch, squash, message);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success(squash ? `Đã squash & merge "${branch}".` : `Đã merge "${branch}".`);
+      return true;
+    } catch (e) {
+      reportError("Merge gặp lỗi (có thể do xung đột)", e);
+      await refreshStatusAndInfo();
+      return false;
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function mergeAbort() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang hủy merge…";
+    try {
+      await gitMergeAbort(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      toast.success("Đã hủy merge.");
+    } catch (e) {
+      reportError("Không hủy được merge", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  // === Compare / Pull Request ===
+
+  async function compareBranches(base: string, head: string) {
+    const path = repoPath();
+    if (!path || !base.trim() || !head.trim()) return;
+    comparisonDiff.value = null;
+    busyMessage.value = "Đang so sánh…";
+    try {
+      comparison.value = await gitCompare(path, base, head);
+    } catch (e) {
+      reportError("Không so sánh được branch", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function compareSelectFile(file: GitFileChange) {
+    const path = repoPath();
+    const cmp = comparison.value;
+    if (!path || !cmp) return;
+    try {
+      comparisonDiff.value = await gitCompareFileDiff(path, cmp.base, cmp.head, file.path);
+    } catch (e) {
+      reportError("Không đọc được diff", e);
+    }
+  }
+
+  async function createPullRequest(base: string, head: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      const url = await gitCreatePullRequest(path, base, head);
+      toast.success(`Đã mở trang tạo Pull Request: ${url}`);
+    } catch (e) {
+      reportError("Không tạo được Pull Request", e);
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -803,7 +938,10 @@ export function useGit() {
     remoteBranches,
     stashes,
     worktrees,
+    tags,
     commits,
+    comparison,
+    comparisonDiff,
     selectedFile,
     diff,
     diffLoading,
@@ -862,6 +1000,14 @@ export function useGit() {
     cherryPick,
     cherryPickAbort,
     cherryPickContinue,
+    loadTags,
+    createTag,
+    deleteTag,
+    mergeBranch,
+    mergeAbort,
+    compareBranches,
+    compareSelectFile,
+    createPullRequest,
     loadWorktrees,
     worktreeAdd,
     worktreeRemove,

@@ -297,6 +297,95 @@ async function doWorktreeCreate() {
   }
 }
 
+// === Tag ===
+const tagDialog = ref(false);
+const tagName = ref("");
+const tagMessage = ref("");
+const tagAnnotated = ref(true);
+const tagPush = ref(false);
+const tagTarget = ref<{ hash: string; label: string }>({ hash: "", label: "HEAD" });
+function openTagDialog(target?: { hash: string; label: string }) {
+  closeMenus();
+  closeCommitMenu();
+  tagTarget.value = target ?? { hash: "", label: "HEAD (branch hiện tại)" };
+  tagName.value = "";
+  tagMessage.value = "";
+  tagAnnotated.value = true;
+  tagPush.value = false;
+  git.loadTags();
+  tagDialog.value = true;
+}
+async function doCreateTag() {
+  const ok = await git.createTag(
+    tagName.value,
+    tagTarget.value.hash,
+    tagMessage.value,
+    tagAnnotated.value,
+    tagPush.value,
+  );
+  if (ok) {
+    tagName.value = "";
+    tagMessage.value = "";
+  }
+}
+
+// === Merge ===
+const mergeDialog = ref(false);
+const mergeBranchSel = ref("");
+const mergeSquash = ref(true);
+const mergeMessage = ref("");
+const mergeableBranches = computed(() =>
+  git.branches.value
+    .filter((b) => !b.is_current && !b.name.endsWith("/HEAD"))
+    .map((b) => ({ label: b.is_remote ? `${b.name} (remote)` : b.name, value: b.name })),
+);
+function openMergeDialog() {
+  closeMenus();
+  mergeBranchSel.value = "";
+  mergeSquash.value = true;
+  mergeMessage.value = "";
+  mergeDialog.value = true;
+}
+async function doMerge() {
+  if (!mergeBranchSel.value) return;
+  const ok = await git.mergeBranch(mergeBranchSel.value, mergeSquash.value, mergeMessage.value);
+  if (ok) mergeDialog.value = false;
+}
+
+// === Compare / Pull Request ===
+const compareDialog = ref(false);
+const cmpBase = ref("");
+const cmpHead = ref("");
+const allBranchRefs = computed(() =>
+  git.branches.value
+    .filter((b) => !b.name.endsWith("/HEAD"))
+    .map((b) => ({ label: b.is_remote ? `${b.name} (remote)` : b.name, value: b.name })),
+);
+function guessBase(head: string): string {
+  const names = git.branches.value.map((b) => b.name);
+  for (const cand of ["origin/main", "origin/master", "main", "master", "develop"]) {
+    if (cand !== head && names.includes(cand)) return cand;
+  }
+  return git.info.value?.upstream || names.find((n) => n !== head) || "";
+}
+function openCompareDialog() {
+  closeMenus();
+  cmpHead.value = git.info.value?.current_branch || "";
+  cmpBase.value = guessBase(cmpHead.value);
+  git.comparison.value = null;
+  git.comparisonDiff.value = null;
+  compareDialog.value = true;
+  void runCompare();
+}
+async function runCompare() {
+  if (cmpBase.value && cmpHead.value && cmpBase.value !== cmpHead.value) {
+    await git.compareBranches(cmpBase.value, cmpHead.value);
+  }
+}
+async function doCreatePR() {
+  await git.createPullRequest(cmpBase.value, cmpHead.value);
+}
+
 // === Context menu trên history ===
 const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
 const ctxItem =
@@ -561,6 +650,16 @@ onUnmounted(closeCommitMenu);
                 <button :class="ctxItem" @click="openWorktreeList">
                   <i class="pi pi-list text-xs" /> Quản lý worktree…
                 </button>
+                <div class="my-1 border-t border-divider" />
+                <button :class="ctxItem" @click="openTagDialog()">
+                  <i class="pi pi-tag text-xs" /> Tạo tag…
+                </button>
+                <button :class="ctxItem" @click="openMergeDialog">
+                  <i class="pi pi-code-branch text-xs" /> Merge branch…
+                </button>
+                <button :class="ctxItem" @click="openCompareDialog">
+                  <i class="pi pi-arrows-h text-xs" /> So sánh / Pull Request…
+                </button>
               </div>
             </div>
           </template>
@@ -599,6 +698,21 @@ onUnmounted(closeCommitMenu);
           </Button>
           <Button size="small" outlined severity="danger" :disabled="!!git.busyMessage.value" @click="git.cherryPickAbort()">
             <i class="pi pi-times mr-1.5 text-xs" /> Hủy cherry-pick
+          </Button>
+        </div>
+      </div>
+
+      <!-- Merge in progress banner -->
+      <div
+        v-if="git.info.value?.merge_in_progress"
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm"
+      >
+        <i class="pi pi-exclamation-triangle text-amber-600" />
+        <span class="font-semibold text-amber-800">Đang có một merge dở dang.</span>
+        <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Commit để hoàn tất, hoặc Hủy.</span>
+        <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="danger" :disabled="!!git.busyMessage.value" @click="git.mergeAbort()">
+            <i class="pi pi-times mr-1.5 text-xs" /> Hủy merge
           </Button>
         </div>
       </div>
@@ -1257,6 +1371,233 @@ onUnmounted(closeCommitMenu);
       </template>
     </Dialog>
 
+    <!-- Tag dialog -->
+    <Dialog v-model:visible="tagDialog" modal header="Tạo tag" :style="{ width: '520px' }">
+      <div class="flex flex-col gap-3">
+        <p class="text-xs text-muted">Tạo tag tại: <strong class="text-ink">{{ tagTarget.label }}</strong></p>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-ink">Tên tag</label>
+          <InputText v-model="tagName" placeholder="v1.0.0" class="w-full" @keydown.enter="doCreateTag" />
+        </div>
+        <div class="flex items-center gap-2">
+          <Checkbox v-model="tagAnnotated" binary input-id="tag-annotated" />
+          <label for="tag-annotated" class="text-sm text-ink">Annotated (kèm message)</label>
+        </div>
+        <div v-if="tagAnnotated">
+          <label class="mb-1 block text-sm font-medium text-ink">Message</label>
+          <InputText v-model="tagMessage" placeholder="Mô tả cho tag" class="w-full" />
+        </div>
+        <div class="flex items-center gap-2">
+          <Checkbox v-model="tagPush" binary input-id="tag-push" />
+          <label for="tag-push" class="text-sm text-ink">Push tag lên origin sau khi tạo</label>
+        </div>
+        <div v-if="git.tags.value.length" class="mt-1">
+          <p class="mb-1 text-xs font-bold uppercase tracking-wide text-muted">Tag hiện có</p>
+          <div class="max-h-40 overflow-y-auto rounded-md border border-divider">
+            <div
+              v-for="t in git.tags.value"
+              :key="t.name"
+              class="flex items-center gap-2 border-b border-divider-light px-2.5 py-1.5 last:border-0"
+            >
+              <i class="pi pi-tag shrink-0 text-xs text-brand" />
+              <span class="min-w-0 flex-1 truncate text-sm text-ink" :title="t.subject">{{ t.name }}</span>
+              <span class="shrink-0 font-mono text-[11px] text-muted">{{ t.target }}</span>
+              <button
+                class="shrink-0 rounded p-1 text-muted transition-colors hover:text-red-600"
+                title="Xóa tag (local)"
+                @click="git.deleteTag(t.name, false)"
+              >
+                <i class="pi pi-trash text-xs" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="tagDialog = false">Đóng</Button>
+        <Button size="small" :disabled="!tagName.trim() || !!git.busyMessage.value" @click="doCreateTag">
+          <i class="pi pi-tag mr-1.5" /> Tạo tag
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Merge dialog -->
+    <Dialog v-model:visible="mergeDialog" modal header="Merge branch" :style="{ width: '480px' }">
+      <div class="flex flex-col gap-3">
+        <p class="text-sm text-secondary">
+          Merge một branch vào <strong class="text-ink">{{ git.info.value?.current_branch }}</strong>:
+        </p>
+        <Select
+          v-model="mergeBranchSel"
+          :options="mergeableBranches"
+          option-label="label"
+          option-value="value"
+          placeholder="Chọn branch nguồn…"
+          filter
+          class="w-full"
+        />
+        <div class="flex items-center gap-2">
+          <Checkbox v-model="mergeSquash" binary input-id="merge-squash" />
+          <label for="merge-squash" class="text-sm text-ink">Squash &amp; merge (gộp thành 1 commit)</label>
+        </div>
+        <div v-if="mergeSquash">
+          <label class="mb-1 block text-sm font-medium text-ink">Commit message (tùy chọn)</label>
+          <InputText
+            v-model="mergeMessage"
+            :placeholder="`Squash merge branch '${mergeBranchSel || '...'}'`"
+            class="w-full"
+          />
+        </div>
+        <p class="text-xs text-muted">
+          Nếu có xung đột, merge sẽ tạm dừng — giải quyết ở tab Changes rồi commit để hoàn tất.
+        </p>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="mergeDialog = false">Hủy</Button>
+        <Button size="small" :disabled="!mergeBranchSel || !!git.busyMessage.value" @click="doMerge">
+          <i class="pi pi-code-branch mr-1.5" /> {{ mergeSquash ? "Squash & merge" : "Merge" }}
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Compare / Pull Request dialog -->
+    <Dialog v-model:visible="compareDialog" modal header="So sánh branch / Pull Request" :style="{ width: '840px' }">
+      <div class="flex flex-col gap-3">
+        <div class="flex items-end gap-2">
+          <div class="min-w-0 flex-1">
+            <label class="mb-1 block text-xs font-medium text-muted">Base (đích merge vào)</label>
+            <Select
+              v-model="cmpBase"
+              :options="allBranchRefs"
+              option-label="label"
+              option-value="value"
+              filter
+              class="w-full"
+              @change="runCompare"
+            />
+          </div>
+          <i class="pi pi-arrow-left mb-2 shrink-0 text-muted" />
+          <div class="min-w-0 flex-1">
+            <label class="mb-1 block text-xs font-medium text-muted">Head (nguồn)</label>
+            <Select
+              v-model="cmpHead"
+              :options="allBranchRefs"
+              option-label="label"
+              option-value="value"
+              filter
+              class="w-full"
+              @change="runCompare"
+            />
+          </div>
+        </div>
+
+        <p v-if="cmpBase === cmpHead" class="text-xs text-amber-600">
+          Base và head đang trùng nhau — hãy chọn hai branch khác nhau.
+        </p>
+
+        <div v-if="git.comparison.value" class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
+            {{ git.comparison.value.ahead }} commit sẽ vào PR
+          </span>
+          <span v-if="git.comparison.value.behind" class="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-700">
+            base đi trước {{ git.comparison.value.behind }}
+          </span>
+          <span class="text-muted">{{ git.comparison.value.files.length }} file thay đổi</span>
+        </div>
+
+        <div v-if="git.comparison.value" class="flex h-[380px] gap-2">
+          <!-- commits + files -->
+          <div class="flex w-64 shrink-0 flex-col overflow-hidden rounded-md border border-divider">
+            <div class="border-b border-divider bg-canvas px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted">
+              Commits ({{ git.comparison.value.commits.length }})
+            </div>
+            <div class="max-h-36 overflow-y-auto">
+              <div
+                v-for="c in git.comparison.value.commits"
+                :key="c.hash"
+                class="border-b border-divider-light px-2 py-1"
+              >
+                <p class="truncate text-xs text-ink">{{ c.subject }}</p>
+                <p class="text-[10px] text-muted">{{ c.author_name }} · {{ c.short_hash }}</p>
+              </div>
+              <div v-if="!git.comparison.value.commits.length" class="p-3 text-center text-xs text-muted">
+                Không có commit chênh lệch.
+              </div>
+            </div>
+            <div class="border-y border-divider bg-canvas px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted">
+              Files ({{ git.comparison.value.files.length }})
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto">
+              <button
+                v-for="f in git.comparison.value.files"
+                :key="f.path"
+                class="flex w-full items-center gap-2 px-2 py-1 text-left transition-colors hover:bg-canvas"
+                :class="git.comparisonDiff.value?.path === f.path ? 'bg-canvas' : ''"
+                @click="git.compareSelectFile(f)"
+              >
+                <span class="shrink-0 text-xs font-bold" :class="statusMeta(f.status).cls">{{ f.status }}</span>
+                <span class="min-w-0 flex-1 truncate text-xs text-ink" :title="f.path">{{ baseName(f.path) }}</span>
+              </button>
+            </div>
+          </div>
+          <!-- diff -->
+          <div class="min-h-0 flex-1 overflow-auto rounded-md border border-divider">
+            <div v-if="!git.comparisonDiff.value" class="flex h-full items-center justify-center p-6 text-center text-xs text-muted">
+              Chọn một file để xem diff.
+            </div>
+            <div v-else-if="git.comparisonDiff.value.is_binary" class="p-4 text-xs text-muted">
+              File nhị phân — không hiển thị diff.
+            </div>
+            <table v-else class="w-full border-collapse font-mono text-xs leading-5">
+              <tbody>
+                <tr
+                  v-for="(line, i) in git.comparisonDiff.value.lines"
+                  :key="i"
+                  :class="{
+                    'bg-emerald-50': line.kind === 'add',
+                    'bg-red-50': line.kind === 'del',
+                    'bg-slate-100': line.kind === 'hunk',
+                  }"
+                >
+                  <td class="w-10 select-none border-r border-divider px-2 text-right text-[10px] text-muted">
+                    {{ line.old_line || "" }}
+                  </td>
+                  <td class="w-10 select-none border-r border-divider px-2 text-right text-[10px] text-muted">
+                    {{ line.new_line || "" }}
+                  </td>
+                  <td
+                    class="whitespace-pre-wrap break-all px-2"
+                    :class="{
+                      'text-emerald-700': line.kind === 'add',
+                      'text-red-700': line.kind === 'del',
+                      'font-semibold text-sky-700': line.kind === 'hunk',
+                      'text-secondary': line.kind === 'context',
+                    }"
+                  ><span class="select-none text-muted">{{ line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' ' }}</span>{{ line.content }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <span
+          v-if="git.comparison.value && !git.comparison.value.web_url"
+          class="mr-auto text-xs text-amber-600"
+        >
+          Repo không có remote origin — không tạo được Pull Request.
+        </span>
+        <Button size="small" outlined severity="secondary" @click="compareDialog = false">Đóng</Button>
+        <Button
+          size="small"
+          :disabled="!git.comparison.value?.web_url || !git.comparison.value?.ahead"
+          @click="doCreatePR"
+        >
+          <i class="pi pi-external-link mr-1.5" /> Tạo Pull Request
+        </Button>
+      </template>
+    </Dialog>
+
     <!-- Reset (hard) confirm -->
     <Dialog v-model:visible="resetHardDialog" modal header="Reset (hard)" :style="{ width: '470px' }">
       <p class="text-sm text-secondary">
@@ -1319,6 +1660,9 @@ onUnmounted(closeCommitMenu);
       </button>
       <button :class="ctxItem" @click="closeCommitMenu(); git.checkoutCommit(commitMenu.commit.hash)">
         <i class="pi pi-arrow-right text-xs" /> Checkout commit (detached)
+      </button>
+      <button :class="ctxItem" @click="openTagDialog({ hash: commitMenu.commit.hash, label: commitMenu.commit.short_hash + ' — ' + commitMenu.commit.subject })">
+        <i class="pi pi-tag text-xs" /> Tạo tag tại đây…
       </button>
       <div class="my-1 border-t border-divider" />
       <button :class="ctxItem" @click="closeCommitMenu(); git.resetTo(commitMenu.commit.hash, 'mixed')">
