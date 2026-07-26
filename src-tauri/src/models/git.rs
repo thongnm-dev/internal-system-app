@@ -56,6 +56,17 @@ pub struct GitTag {
     pub date: String,
 }
 
+/// Một mốc tiến trình của thao tác mạng (fetch/pull/push/clone), parse từ stderr git.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitProgress {
+    /// Giai đoạn (vd. "Receiving objects", "Resolving deltas").
+    pub phase: String,
+    /// Phần trăm (0-100).
+    pub percent: u32,
+    /// Dòng gốc để hiển thị chi tiết nếu cần.
+    pub raw: String,
+}
+
 /// Một Pull Request / Merge Request lấy từ API của host.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GitPullRequest {

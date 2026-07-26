@@ -60,6 +60,7 @@ import type {
   GitComparison,
   GitDiff,
   GitFileChange,
+  GitProgress,
   GitPullRequest,
   GitRepo,
   GitRepoInfo,
@@ -119,6 +120,7 @@ export function useGit() {
   const committing = ref(false);
   const syncing = ref(false);
   const busyMessage = ref("");
+  const syncProgress = ref<GitProgress | null>(null);
 
   const runtimeAvailable = computed(() => canUseTauriRuntime());
   const hasChanges = computed(() => staged.value.length + unstaged.value.length > 0);
@@ -338,17 +340,22 @@ export function useGit() {
   // === Sync: fetch / pull / push ===
 
   async function fetch() {
-    await runSync(() => gitFetch(repoPath()), "Đang fetch…", "Fetch xong.", "Fetch thất bại");
+    await runSync(
+      (onP) => gitFetch(repoPath(), onP),
+      "Đang fetch…",
+      "Fetch xong.",
+      "Fetch thất bại",
+    );
   }
   async function pull() {
-    await runSync(() => gitPull(repoPath()), "Đang pull…", "Pull xong.", "Pull thất bại");
+    await runSync((onP) => gitPull(repoPath(), onP), "Đang pull…", "Pull xong.", "Pull thất bại");
   }
   async function push() {
-    await runSync(() => gitPush(repoPath()), "Đang push…", "Push xong.", "Push thất bại");
+    await runSync((onP) => gitPush(repoPath(), onP), "Đang push…", "Push xong.", "Push thất bại");
   }
 
   async function runSync(
-    fn: () => Promise<string>,
+    fn: (onProgress: (p: GitProgress) => void) => Promise<string>,
     busy: string,
     ok: string,
     errPrefix: string,
@@ -357,8 +364,11 @@ export function useGit() {
     if (!path || syncing.value) return;
     syncing.value = true;
     busyMessage.value = busy;
+    syncProgress.value = null;
     try {
-      await fn();
+      await fn((p) => {
+        syncProgress.value = p;
+      });
       await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
       if (tab.value === "history") await loadHistory();
       toast.success(ok);
@@ -367,6 +377,7 @@ export function useGit() {
     } finally {
       syncing.value = false;
       busyMessage.value = "";
+      syncProgress.value = null;
     }
   }
 
@@ -932,8 +943,11 @@ export function useGit() {
 
     syncing.value = true;
     busyMessage.value = `Đang clone ${name}…`;
+    syncProgress.value = null;
     try {
-      await gitClone(url.trim(), dest);
+      await gitClone(url.trim(), dest, (p) => {
+        syncProgress.value = p;
+      });
       const repo = await gitAddRepo(dest);
       if (!repos.value.some((r) => r.id === repo.id)) {
         repos.value = [repo, ...repos.value];
@@ -947,6 +961,7 @@ export function useGit() {
     } finally {
       syncing.value = false;
       busyMessage.value = "";
+      syncProgress.value = null;
     }
   }
 
@@ -987,6 +1002,7 @@ export function useGit() {
     committing,
     syncing,
     busyMessage,
+    syncProgress,
     // computed
     runtimeAvailable,
     hasChanges,

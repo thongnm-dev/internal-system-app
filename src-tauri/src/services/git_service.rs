@@ -19,7 +19,7 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::git::{
     GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitDiffLine, GitFileChange,
-    GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
+    GitProgress, GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 
 /// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
@@ -739,6 +739,155 @@ pub fn cherry_pick_abort(repo_path: &str) -> AppResult<String> {
 /// Tiếp tục cherry-pick sau khi đã giải quyết xung đột (và stage các file).
 pub fn cherry_pick_continue(repo_path: &str) -> AppResult<String> {
     run_no_editor(repo_path, &["cherry-pick", "--continue"])
+}
+
+// === Thao tác mạng có tiến trình (fetch/pull/push/clone) ===
+
+/// Parse một dòng progress của git (vd. "Receiving objects:  45% (450/1000)").
+fn parse_progress(line: &str) -> Option<GitProgress> {
+    let l = line.trim();
+    let l = l.strip_prefix("remote: ").unwrap_or(l).trim();
+    let pct_pos = l.find('%')?;
+    let bytes = l.as_bytes();
+    let mut start = pct_pos;
+    while start > 0 && bytes[start - 1].is_ascii_digit() {
+        start -= 1;
+    }
+    if start == pct_pos {
+        return None;
+    }
+    let percent: u32 = l[start..pct_pos].parse().ok()?;
+    let phase = l.split(':').next().unwrap_or("").trim().to_string();
+    Some(GitProgress {
+        phase,
+        percent: percent.min(100),
+        raw: l.to_string(),
+    })
+}
+
+/// Chạy một lệnh git (đã cấu hình), stream stderr để bắt tiến trình `--progress`,
+/// gọi `on` cho mỗi mốc %. Trả về stdout khi thành công.
+fn run_progress<F: FnMut(GitProgress)>(mut cmd: Command, mut on: F) -> AppResult<String> {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| AppError::new(format!("Không chạy được git: {e}. Hãy chắc chắn đã cài Git.")))?;
+
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| AppError::new("Không đọc được tiến trình git."))?;
+
+    let mut buf = [0u8; 4096];
+    let mut line = String::new();
+    let mut all_err = String::new();
+    loop {
+        match stderr.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                let chunk = String::from_utf8_lossy(&buf[..n]);
+                all_err.push_str(&chunk);
+                // Git dùng '\r' để cập nhật cùng một dòng progress.
+                for ch in chunk.chars() {
+                    if ch == '\r' || ch == '\n' {
+                        if !line.trim().is_empty() {
+                            if let Some(p) = parse_progress(&line) {
+                                on(p);
+                            }
+                        }
+                        line.clear();
+                    } else {
+                        line.push(ch);
+                    }
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    if !line.trim().is_empty() {
+        if let Some(p) = parse_progress(&line) {
+            on(p);
+        }
+    }
+
+    let mut out = String::new();
+    if let Some(mut so) = child.stdout.take() {
+        let _ = so.read_to_string(&mut out);
+    }
+    let status = child
+        .wait()
+        .map_err(|e| AppError::new(format!("Lỗi chờ tiến trình git: {e}")))?;
+
+    if status.success() {
+        Ok(out)
+    } else {
+        // Bỏ các dòng progress (%) khi dựng thông báo lỗi.
+        let clean: Vec<&str> = all_err
+            .split(['\r', '\n'])
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && !s.contains('%'))
+            .collect();
+        let msg = if clean.is_empty() {
+            all_err.trim().to_string()
+        } else {
+            clean.join("\n")
+        };
+        Err(AppError::new(if msg.is_empty() {
+            "Lệnh git thất bại.".to_string()
+        } else {
+            msg
+        }))
+    }
+}
+
+/// Fetch có tiến trình.
+pub fn fetch_with_progress<F: FnMut(GitProgress)>(repo_path: &str, on: F) -> AppResult<String> {
+    let mut cmd = git_in(repo_path);
+    cmd.args(["fetch", "--all", "--prune", "--progress"]);
+    run_progress(cmd, on)
+}
+
+/// Pull có tiến trình.
+pub fn pull_with_progress<F: FnMut(GitProgress)>(repo_path: &str, on: F) -> AppResult<String> {
+    let mut cmd = git_in(repo_path);
+    cmd.args(["pull", "--progress"]);
+    run_progress(cmd, on)
+}
+
+/// Push có tiến trình. Chưa có upstream → tự set `-u origin <branch>`.
+pub fn push_with_progress<F: FnMut(GitProgress)>(repo_path: &str, on: F) -> AppResult<String> {
+    let info = repo_info(repo_path)?;
+    let mut cmd = git_in(repo_path);
+    if info.upstream.is_empty() {
+        if info.current_branch.is_empty() || info.detached {
+            return Err(AppError::new(
+                "Đang ở detached HEAD — hãy checkout một branch trước khi push.",
+            ));
+        }
+        cmd.args(["push", "--progress", "-u", "origin", &info.current_branch]);
+    } else {
+        cmd.args(["push", "--progress"]);
+    }
+    run_progress(cmd, on)
+}
+
+/// Clone có tiến trình.
+pub fn clone_with_progress<F: FnMut(GitProgress)>(
+    url: &str,
+    dest: &str,
+    on: F,
+) -> AppResult<String> {
+    if url.trim().is_empty() {
+        return Err(AppError::new("URL repository không được để trống."));
+    }
+    let mut cmd = Command::new("git");
+    configure(&mut cmd);
+    cmd.args(["clone", "--progress", url, dest]);
+    run_progress(cmd, on)?;
+    Ok(dest.to_string())
 }
 
 // === Tag ===

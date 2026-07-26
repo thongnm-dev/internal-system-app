@@ -10,8 +10,8 @@
 use crate::app::error::log_err;
 use crate::database::git_repo_store::{self, GitRepoData};
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitPullRequest, GitRepo,
-    GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
+    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitProgress, GitPullRequest,
+    GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 use crate::services::git_service;
 
@@ -220,27 +220,48 @@ pub async fn git_delete_branch(
 }
 
 #[tauri::command]
-pub async fn git_fetch(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::fetch(&path))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_fetch(
+    path: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::fetch_with_progress(&path, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
-pub async fn git_pull(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::pull(&path))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_pull(
+    path: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::pull_with_progress(&path, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
-pub async fn git_push(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::push(&path))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_push(
+    path: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::push_with_progress(&path, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
@@ -272,11 +293,19 @@ pub async fn git_stash_drop(path: String, reference: String) -> Result<String, S
 }
 
 #[tauri::command]
-pub async fn git_clone(url: String, dest: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::clone(&url, &dest))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_clone(
+    url: String,
+    dest: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::clone_with_progress(&url, &dest, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]

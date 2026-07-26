@@ -617,10 +617,22 @@ onUnmounted(closeCommitMenu);
           </div>
         </div>
 
-        <!-- Trạng thái bận -->
-        <span v-if="git.busyMessage.value" class="ml-2 flex items-center gap-1 text-[11px] text-muted">
-          <i class="pi pi-spinner pi-spin text-[11px]" /> {{ git.busyMessage.value }}
-        </span>
+        <!-- Trạng thái bận / tiến trình -->
+        <div v-if="git.busyMessage.value" class="ml-2 flex items-center gap-2 text-[11px] text-muted">
+          <i class="pi pi-spinner pi-spin text-[11px]" />
+          <template v-if="git.syncProgress.value">
+            <span class="whitespace-nowrap">
+              {{ git.syncProgress.value.phase }} {{ git.syncProgress.value.percent }}%
+            </span>
+            <span class="h-1.5 w-24 overflow-hidden rounded-full bg-canvas">
+              <span
+                class="block h-full rounded-full bg-brand transition-[width] duration-150"
+                :style="{ width: git.syncProgress.value.percent + '%' }"
+              />
+            </span>
+          </template>
+          <span v-else class="whitespace-nowrap">{{ git.busyMessage.value }}</span>
+        </div>
 
         <div class="ml-auto flex items-center gap-0.5">
           <template v-if="git.activeRepo.value">

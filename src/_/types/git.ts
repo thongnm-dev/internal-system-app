@@ -30,6 +30,13 @@ export interface GitTag {
   date: string;
 }
 
+/** Mốc tiến trình của thao tác mạng (fetch/pull/push/clone). */
+export interface GitProgress {
+  phase: string;
+  percent: number;
+  raw: string;
+}
+
 /** Một Pull Request / Merge Request lấy từ API host. */
 export interface GitPullRequest {
   number: number;

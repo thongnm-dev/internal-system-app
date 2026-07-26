@@ -1,3 +1,4 @@
+import { Channel } from "@tauri-apps/api/core";
 import { safeInvoke } from "./_base";
 import type {
   GitBranch,
@@ -5,6 +6,7 @@ import type {
   GitCommitDetail,
   GitComparison,
   GitDiff,
+  GitProgress,
   GitPullRequest,
   GitRepo,
   GitRepoInfo,
@@ -13,6 +15,13 @@ import type {
   GitTag,
   GitWorktree,
 } from "@/_/types/git";
+
+/** Tạo Channel nhận tiến trình; gắn callback nếu có. */
+function progressChannel(onProgress?: (p: GitProgress) => void) {
+  const channel = new Channel<GitProgress>();
+  if (onProgress) channel.onmessage = onProgress;
+  return channel;
+}
 
 // === Quản lý danh sách repo (lưu cục bộ) ===
 
@@ -108,16 +117,16 @@ export function gitDeleteBranch(path: string, name: string, force: boolean) {
   return safeInvoke<string>("git_delete_branch", { path, name, force });
 }
 
-export function gitFetch(path: string) {
-  return safeInvoke<string>("git_fetch", { path });
+export function gitFetch(path: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_fetch", { path, onProgress: progressChannel(onProgress) });
 }
 
-export function gitPull(path: string) {
-  return safeInvoke<string>("git_pull", { path });
+export function gitPull(path: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_pull", { path, onProgress: progressChannel(onProgress) });
 }
 
-export function gitPush(path: string) {
-  return safeInvoke<string>("git_push", { path });
+export function gitPush(path: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_push", { path, onProgress: progressChannel(onProgress) });
 }
 
 export function gitStashSave(path: string, message: string) {
@@ -132,8 +141,8 @@ export function gitStashDrop(path: string, reference: string) {
   return safeInvoke<string>("git_stash_drop", { path, reference });
 }
 
-export function gitClone(url: string, dest: string) {
-  return safeInvoke<string>("git_clone", { url, dest });
+export function gitClone(url: string, dest: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_clone", { url, dest, onProgress: progressChannel(onProgress) });
 }
 
 export function gitUndoLastCommit(path: string) {
