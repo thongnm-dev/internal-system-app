@@ -1,12 +1,10 @@
 import { ref, shallowRef } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import type { UnlistenFn } from "@tauri-apps/api/event";
 import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { terminalKill, terminalResize, terminalSpawn, terminalWrite } from "@/tauri/commands/terminal";
-import { onTerminalExit, onTerminalOutput } from "@/tauri/events";
 
 /** Một tab terminal hiển thị trên UI (phần reactive, nhẹ). */
 export interface TerminalTab {
@@ -56,13 +54,10 @@ export function useTerminal() {
   const tabs = ref<TerminalTab[]>([]);
   const activeKey = ref<string>("");
 
-  // Map instance xterm theo key tab (không reactive) + tra ngược sessionId → key.
+  // Map instance xterm theo key tab (không reactive).
   const entries = new Map<string, TermEntry>();
-  const sessionToKey = new Map<string, string>();
   const startDir = shallowRef<string>("");
 
-  let unlistenOutput: UnlistenFn | null = null;
-  let unlistenExit: UnlistenFn | null = null;
   let counter = 0;
 
   function nextKey(): string {
@@ -129,9 +124,22 @@ export function useTerminal() {
     entry.ro = ro;
 
     try {
-      const sessionId = await terminalSpawn(term.rows, term.cols, startDir.value || undefined);
+      const sessionId = await terminalSpawn(
+        term.rows,
+        term.cols,
+        // Output đến qua Channel riêng của phiên → nạp thẳng vào đúng terminal.
+        (dataBase64) => term.write(base64ToBytes(dataBase64)),
+        (code) => {
+          const tab = tabs.value.find((t) => t.key === key);
+          if (tab) {
+            tab.exited = true;
+            tab.exitCode = code;
+          }
+          term.writeln(`\r\n\x1b[90m[process exited${code === null ? "" : ` with code ${code}`}]\x1b[0m`);
+        },
+        startDir.value || undefined,
+      );
       entry.sessionId = sessionId;
-      sessionToKey.set(sessionId, key);
       const tab = tabs.value.find((t) => t.key === key);
       if (tab) tab.sessionId = sessionId;
     } catch (e) {
@@ -155,10 +163,7 @@ export function useTerminal() {
     const entry = entries.get(key);
     if (entry) {
       entry.ro?.disconnect();
-      if (entry.sessionId) {
-        sessionToKey.delete(entry.sessionId);
-        await terminalKill(entry.sessionId).catch(() => undefined);
-      }
+      if (entry.sessionId) await terminalKill(entry.sessionId).catch(() => undefined);
       entry.term.dispose();
       entries.delete(key);
     }
@@ -178,38 +183,18 @@ export function useTerminal() {
     startDir.value = dir;
   }
 
-  /** Đăng ký lắng nghe event backend + mở sẵn 1 tab đầu tiên. */
-  async function init() {
+  /** Mở sẵn 1 tab đầu tiên nếu đang chạy trong Tauri runtime. */
+  function init() {
     if (!canUseTauriRuntime()) return;
-    unlistenOutput = await onTerminalOutput(({ id, data }) => {
-      const key = sessionToKey.get(id);
-      if (!key) return;
-      entries.get(key)?.term.write(base64ToBytes(data));
-    });
-    unlistenExit = await onTerminalExit(({ id, code }) => {
-      const key = sessionToKey.get(id);
-      if (!key) return;
-      const tab = tabs.value.find((t) => t.key === key);
-      if (tab) {
-        tab.exited = true;
-        tab.exitCode = code;
-      }
-      entries.get(key)?.term.writeln(`\r\n\x1b[90m[process exited${code === null ? "" : ` with code ${code}`}]\x1b[0m`);
-    });
     if (tabs.value.length === 0) addTab();
   }
 
-  /** Dọn dẹp toàn bộ: gỡ listener, kill + dispose mọi phiên terminal. */
+  /** Dọn dẹp toàn bộ: kill + dispose mọi phiên terminal. */
   async function dispose() {
-    unlistenOutput?.();
-    unlistenExit?.();
-    unlistenOutput = null;
-    unlistenExit = null;
     for (const [key, entry] of entries) {
       entry.ro?.disconnect();
       if (entry.sessionId) await terminalKill(entry.sessionId).catch(() => undefined);
       entry.term.dispose();
-      sessionToKey.clear();
       entries.delete(key);
     }
     tabs.value = [];

@@ -3,20 +3,24 @@
 //! Tầng mỏng — chỉ nhận request từ frontend và uỷ quyền xuống
 //! `services::terminal_service`.
 
-use tauri::AppHandle;
+use tauri::ipc::Channel;
 
 use crate::services::terminal_service;
 
 /// Mở một phiên terminal mới, trả về id phiên để frontend dùng cho các lệnh sau.
+///
+/// `output_channel` / `exit_channel` là các `ipc::Channel` do frontend tạo và
+/// truyền vào — backend đẩy output và tín hiệu kết thúc trực tiếp qua đó.
 #[tauri::command]
 pub fn terminal_spawn(
-    app: AppHandle,
     cwd: Option<String>,
     shell: Option<String>,
     rows: u16,
     cols: u16,
+    output_channel: Channel<String>,
+    exit_channel: Channel<Option<i32>>,
 ) -> Result<String, String> {
-    terminal_service::spawn(app, cwd, shell, rows, cols)
+    terminal_service::spawn(cwd, shell, rows, cols, output_channel, exit_channel)
 }
 
 /// Gửi dữ liệu người dùng gõ vào shell của phiên `id`.

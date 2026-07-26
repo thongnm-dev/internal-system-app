@@ -173,8 +173,6 @@ mod models {
     pub mod ai_workflow;
     /// Model cho module AI Task (task code + phân loại).
     pub mod ai_task;
-    /// Model cho module Terminal nhúng (payload event output/exit).
-    pub mod terminal;
 }
 
 /// Tầng business logic — xử lý nghiệp vụ, validation, điều phối.

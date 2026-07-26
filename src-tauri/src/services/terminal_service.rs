@@ -7,10 +7,11 @@
 //! - `resize` — đổi kích thước (số hàng/cột) khi khung terminal thay đổi.
 //! - `kill`  — kết thúc phiên.
 //!
-//! Output của shell được đọc trong một thread nền riêng cho từng phiên và bắn
-//! về frontend qua event `terminal-output`; khi tiến trình kết thúc bắn
-//! `terminal-exit`. Đây là hạ tầng độc lập, không đụng tới bất kỳ nghiệp vụ nào
-//! của các màn hình hiện có.
+//! Output của shell được đọc trong một thread nền riêng cho từng phiên và đẩy
+//! thẳng về frontend qua **`ipc::Channel`** (không dùng event bus `emit`/`listen`
+//! — trên macOS/WKWebView đường event có độ trễ giao nhận cao gây lag gõ phím;
+//! Channel là đường IPC trực tiếp, độ trễ thấp). Đây là hạ tầng độc lập, không
+//! đụng tới bất kỳ nghiệp vụ nào của các màn hình hiện có.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -18,14 +19,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize};
-use tauri::{AppHandle, Emitter};
-
-use crate::models::terminal::{TerminalExit, TerminalOutput};
-
-/// Tên event bắn mỗi khi có chunk output mới từ một phiên terminal.
-pub const TERMINAL_OUTPUT_EVENT: &str = "terminal-output";
-/// Tên event bắn khi tiến trình shell của một phiên kết thúc.
-pub const TERMINAL_EXIT_EVENT: &str = "terminal-exit";
+use tauri::ipc::Channel;
 
 /// Một phiên terminal đang mở — giữ những handle cần cho write/resize/kill.
 struct Session {
@@ -59,7 +53,8 @@ fn default_shell() -> String {
 }
 
 /// Mã hoá base64 chuẩn (không phụ thuộc crate ngoài) cho dữ liệu byte thô đọc
-/// từ PTY, để truyền an toàn qua ranh giới IPC dưới dạng chuỗi.
+/// từ PTY, để truyền an toàn qua ranh giới IPC dưới dạng chuỗi (tránh làm hỏng
+/// ký tự UTF-8 nhiều byte bị cắt ngang và mã hoá được cả byte không phải UTF-8).
 fn base64_encode(input: &[u8]) -> String {
     const TABLE: &[u8; 64] =
         b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -90,12 +85,15 @@ fn base64_encode(input: &[u8]) -> String {
 /// - `cwd`   — thư mục làm việc ban đầu (rỗng → thư mục home của user).
 /// - `shell` — đường dẫn shell (rỗng → shell mặc định của OS).
 /// - `rows`/`cols` — kích thước khởi tạo của terminal.
+/// - `output_channel` — kênh đẩy output (chuỗi base64) về frontend.
+/// - `exit_channel` — kênh báo tiến trình kết thúc kèm mã thoát (nếu có).
 pub fn spawn(
-    app: AppHandle,
     cwd: Option<String>,
     shell: Option<String>,
     rows: u16,
     cols: u16,
+    output_channel: Channel<String>,
+    exit_channel: Channel<Option<i32>>,
 ) -> Result<String, String> {
     let pty_system = portable_pty::native_pty_system();
     let size = PtySize {
@@ -142,66 +140,27 @@ pub fn spawn(
         },
     );
 
-    // Đọc output bằng 2 thread để tránh nghẽn cầu IPC của webview:
-    //  1. Reader thread: `read()` chặn (blocking) trên PTY, đẩy từng chunk thô
-    //     qua channel — không tự emit.
-    //  2. Emit thread: gom (coalesce) các chunk đến trong một cửa sổ ngắn thành
-    //     MỘT event `terminal-output`. Khi shell vẽ lại prompt nhiều màu theo
-    //     từng phím, hàng loạt chunk nhỏ được gộp lại → giảm mạnh số lần vượt
-    //     cầu IPC, loại bỏ độ trễ gõ phím.
-    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
-
+    // Thread nền: đọc output của shell và đẩy thẳng qua Channel cho tới EOF/lỗi.
+    // Mỗi lần đọc gửi ngay một message (không chờ gom) — Channel đủ nhẹ để làm
+    // vậy mà vẫn giữ độ trễ thấp; xterm ở frontend tự gộp khi render.
+    let reader_id = id.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    if tx.send(buf[..n].to_vec()).is_err() {
+                    if output_channel.send(base64_encode(&buf[..n])).is_err() {
                         break;
                     }
                 }
                 Err(_) => break,
             }
         }
-        // Trả về → `tx` bị drop → channel đóng để emit thread biết đã EOF.
-    });
-
-    let emit_id = id.clone();
-    std::thread::spawn(move || {
-        use std::sync::mpsc::RecvTimeoutError;
-        // Trần kích thước một lần gộp (64 KiB) để output lớn vẫn chảy mượt.
-        const MAX_BATCH: usize = 64 * 1024;
-        // Cửa sổ gom ngắn (8ms): đủ nhỏ để cảm giác tức thì, đủ để gộp 1 burst.
-        const WINDOW: std::time::Duration = std::time::Duration::from_millis(8);
-
-        loop {
-            let mut batch = match rx.recv() {
-                Ok(chunk) => chunk,
-                Err(_) => break, // reader kết thúc và channel rỗng.
-            };
-            while batch.len() < MAX_BATCH {
-                match rx.recv_timeout(WINDOW) {
-                    Ok(mut more) => batch.append(&mut more),
-                    Err(RecvTimeoutError::Timeout) => break,
-                    Err(RecvTimeoutError::Disconnected) => break,
-                }
-            }
-            let payload = TerminalOutput {
-                id: emit_id.clone(),
-                data: base64_encode(&batch),
-            };
-            if app.emit(TERMINAL_OUTPUT_EVENT, payload).is_err() {
-                break;
-            }
-        }
 
         let code = child.wait().ok().map(|status| status.exit_code() as i32);
-        sessions().lock().unwrap().remove(&emit_id);
-        let _ = app.emit(
-            TERMINAL_EXIT_EVENT,
-            TerminalExit { id: emit_id, code },
-        );
+        sessions().lock().unwrap().remove(&reader_id);
+        let _ = exit_channel.send(code);
     });
 
     Ok(id)
