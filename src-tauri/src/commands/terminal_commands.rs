@@ -20,6 +20,10 @@ pub fn terminal_spawn(
 }
 
 /// Gửi dữ liệu người dùng gõ vào shell của phiên `id`.
+///
+/// Cố tình để đồng bộ (không `async`): các lệnh write chạy tuần tự theo đúng thứ
+/// tự IPC nhận được, giữ nguyên thứ tự byte gõ vào (async runtime có thể đảo thứ
+/// tự 2 phím gõ nhanh). Mỗi lần chỉ ghi vài byte nên không chặn đáng kể.
 #[tauri::command]
 pub fn terminal_write(id: String, data: String) -> Result<(), String> {
     terminal_service::write(&id, &data)

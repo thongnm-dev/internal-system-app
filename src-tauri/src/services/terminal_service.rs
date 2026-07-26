@@ -142,34 +142,65 @@ pub fn spawn(
         },
     );
 
-    // Thread nền: đọc output của shell và bắn về frontend cho tới khi EOF/lỗi.
-    let reader_id = id.clone();
+    // Đọc output bằng 2 thread để tránh nghẽn cầu IPC của webview:
+    //  1. Reader thread: `read()` chặn (blocking) trên PTY, đẩy từng chunk thô
+    //     qua channel — không tự emit.
+    //  2. Emit thread: gom (coalesce) các chunk đến trong một cửa sổ ngắn thành
+    //     MỘT event `terminal-output`. Khi shell vẽ lại prompt nhiều màu theo
+    //     từng phím, hàng loạt chunk nhỏ được gộp lại → giảm mạnh số lần vượt
+    //     cầu IPC, loại bỏ độ trễ gõ phím.
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+
     std::thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let payload = TerminalOutput {
-                        id: reader_id.clone(),
-                        data: base64_encode(&buf[..n]),
-                    };
-                    if app.emit(TERMINAL_OUTPUT_EVENT, payload).is_err() {
+                    if tx.send(buf[..n].to_vec()).is_err() {
                         break;
                     }
                 }
                 Err(_) => break,
             }
         }
+        // Trả về → `tx` bị drop → channel đóng để emit thread biết đã EOF.
+    });
+
+    let emit_id = id.clone();
+    std::thread::spawn(move || {
+        use std::sync::mpsc::RecvTimeoutError;
+        // Trần kích thước một lần gộp (64 KiB) để output lớn vẫn chảy mượt.
+        const MAX_BATCH: usize = 64 * 1024;
+        // Cửa sổ gom ngắn (8ms): đủ nhỏ để cảm giác tức thì, đủ để gộp 1 burst.
+        const WINDOW: std::time::Duration = std::time::Duration::from_millis(8);
+
+        loop {
+            let mut batch = match rx.recv() {
+                Ok(chunk) => chunk,
+                Err(_) => break, // reader kết thúc và channel rỗng.
+            };
+            while batch.len() < MAX_BATCH {
+                match rx.recv_timeout(WINDOW) {
+                    Ok(mut more) => batch.append(&mut more),
+                    Err(RecvTimeoutError::Timeout) => break,
+                    Err(RecvTimeoutError::Disconnected) => break,
+                }
+            }
+            let payload = TerminalOutput {
+                id: emit_id.clone(),
+                data: base64_encode(&batch),
+            };
+            if app.emit(TERMINAL_OUTPUT_EVENT, payload).is_err() {
+                break;
+            }
+        }
 
         let code = child.wait().ok().map(|status| status.exit_code() as i32);
-        sessions().lock().unwrap().remove(&reader_id);
+        sessions().lock().unwrap().remove(&emit_id);
         let _ = app.emit(
             TERMINAL_EXIT_EVENT,
-            TerminalExit {
-                id: reader_id,
-                code,
-            },
+            TerminalExit { id: emit_id, code },
         );
     });
 
