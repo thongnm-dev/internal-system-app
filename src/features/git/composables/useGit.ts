@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { explorerOpen } from "@/tauri/commands/explorer";
 import {
   gitAddRepo,
   gitBranches,
@@ -9,7 +10,24 @@ import {
   gitCherryPick,
   gitCherryPickAbort,
   gitCherryPickContinue,
+  gitCleanupDelete,
+  gitCleanupScan,
   gitClone,
+  gitCommitNoEdit,
+  gitCompare,
+  gitCompareFileDiff,
+  gitCreatePullRequest,
+  gitGraph,
+  gitListConflicts,
+  gitListPullRequests,
+  gitMerge,
+  gitMergeAbort,
+  gitOpenTerminal,
+  gitOpenUrl,
+  gitResolveConflict,
+  gitTagCreate,
+  gitTagDelete,
+  gitTagList,
   gitCommit,
   gitCommitDetail,
   gitCommitFileDiff,
@@ -47,11 +65,16 @@ import type {
   GitBranch,
   GitCommit,
   GitCommitDetail,
+  GitComparison,
   GitDiff,
   GitFileChange,
+  GitGraphCommit,
+  GitProgress,
+  GitPullRequest,
   GitRepo,
   GitRepoInfo,
   GitStash,
+  GitTag,
   GitWorktree,
 } from "@/_/types/git";
 import { useToast } from "@/shared/composables/useToast";
@@ -80,7 +103,25 @@ export function useGit() {
   const branches = ref<GitBranch[]>([]);
   const stashes = ref<GitStash[]>([]);
   const worktrees = ref<GitWorktree[]>([]);
+  const tags = ref<GitTag[]>([]);
   const commits = ref<GitCommit[]>([]);
+
+  const comparison = ref<GitComparison | null>(null);
+  const comparisonDiff = ref<GitDiff | null>(null);
+
+  const pullRequests = ref<GitPullRequest[]>([]);
+  const pullRequestsLoading = ref(false);
+
+  const conflicts = ref<string[]>([]);
+
+  const graphCommits = ref<GitGraphCommit[]>([]);
+  const graphLoading = ref(false);
+
+  // Commit browser (dialog duyệt commit + copy SHA).
+  const browserCommits = ref<GitCommit[]>([]);
+  const browserFiles = ref<GitFileChange[]>([]);
+  const browserDiff = ref<GitDiff | null>(null);
+  const browserLoading = ref(false);
 
   const selectedFile = ref<SelectedFile | null>(null);
   const diff = ref<GitDiff | null>(null);
@@ -99,6 +140,7 @@ export function useGit() {
   const committing = ref(false);
   const syncing = ref(false);
   const busyMessage = ref("");
+  const syncProgress = ref<GitProgress | null>(null);
 
   const runtimeAvailable = computed(() => canUseTauriRuntime());
   const hasChanges = computed(() => staged.value.length + unstaged.value.length > 0);
@@ -318,17 +360,22 @@ export function useGit() {
   // === Sync: fetch / pull / push ===
 
   async function fetch() {
-    await runSync(() => gitFetch(repoPath()), "Đang fetch…", "Fetch xong.", "Fetch thất bại");
+    await runSync(
+      (onP) => gitFetch(repoPath(), onP),
+      "Đang fetch…",
+      "Fetch xong.",
+      "Fetch thất bại",
+    );
   }
   async function pull() {
-    await runSync(() => gitPull(repoPath()), "Đang pull…", "Pull xong.", "Pull thất bại");
+    await runSync((onP) => gitPull(repoPath(), onP), "Đang pull…", "Pull xong.", "Pull thất bại");
   }
   async function push() {
-    await runSync(() => gitPush(repoPath()), "Đang push…", "Push xong.", "Push thất bại");
+    await runSync((onP) => gitPush(repoPath(), onP), "Đang push…", "Push xong.", "Push thất bại");
   }
 
   async function runSync(
-    fn: () => Promise<string>,
+    fn: (onProgress: (p: GitProgress) => void) => Promise<string>,
     busy: string,
     ok: string,
     errPrefix: string,
@@ -337,8 +384,11 @@ export function useGit() {
     if (!path || syncing.value) return;
     syncing.value = true;
     busyMessage.value = busy;
+    syncProgress.value = null;
     try {
-      await fn();
+      await fn((p) => {
+        syncProgress.value = p;
+      });
       await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
       if (tab.value === "history") await loadHistory();
       toast.success(ok);
@@ -347,6 +397,7 @@ export function useGit() {
     } finally {
       syncing.value = false;
       busyMessage.value = "";
+      syncProgress.value = null;
     }
   }
 
@@ -754,6 +805,309 @@ export function useGit() {
     }
   }
 
+  // === Tag ===
+
+  async function loadTags() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      tags.value = await gitTagList(path);
+    } catch (e) {
+      reportError("Không lấy được tag", e);
+    }
+  }
+
+  async function createTag(
+    name: string,
+    hash: string,
+    message: string,
+    annotated: boolean,
+    push: boolean,
+  ): Promise<boolean> {
+    const path = repoPath();
+    if (!path || !name.trim()) return false;
+    busyMessage.value = "Đang tạo tag…";
+    try {
+      await gitTagCreate(path, name.trim(), hash, message, annotated, push);
+      await loadTags();
+      toast.success(`Đã tạo tag "${name.trim()}"${push ? " và push lên origin" : ""}.`);
+      return true;
+    } catch (e) {
+      reportError("Không tạo được tag", e);
+      return false;
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function deleteTag(name: string, remote: boolean) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitTagDelete(path, name, remote);
+      await loadTags();
+      toast.success(`Đã xóa tag "${name}".`);
+    } catch (e) {
+      reportError("Không xóa được tag", e);
+    }
+  }
+
+  // === Merge ===
+
+  async function mergeBranch(branch: string, squash: boolean, message: string): Promise<boolean> {
+    const path = repoPath();
+    if (!path || !branch.trim()) return false;
+    busyMessage.value = squash ? "Đang squash & merge…" : "Đang merge…";
+    try {
+      await gitMerge(path, branch, squash, message);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success(squash ? `Đã squash & merge "${branch}".` : `Đã merge "${branch}".`);
+      return true;
+    } catch (e) {
+      reportError("Merge gặp lỗi (có thể do xung đột)", e);
+      await refreshStatusAndInfo();
+      return false;
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function mergeAbort() {
+    const path = repoPath();
+    if (!path) return;
+    busyMessage.value = "Đang hủy merge…";
+    try {
+      await gitMergeAbort(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      toast.success("Đã hủy merge.");
+    } catch (e) {
+      reportError("Không hủy được merge", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  // === Resolve conflict ===
+
+  async function loadConflicts() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      conflicts.value = await gitListConflicts(path);
+    } catch (e) {
+      reportError("Không lấy được danh sách xung đột", e);
+    }
+  }
+
+  async function resolveConflict(file: string, side: "ours" | "theirs") {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitResolveConflict(path, file, side);
+      await Promise.all([loadConflicts(), refreshStatusAndInfo()]);
+    } catch (e) {
+      reportError("Không giải quyết được xung đột", e);
+    }
+  }
+
+  /** Đánh dấu file đã tự xử lý (stage nó). */
+  async function markResolved(file: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitStage(path, [file]);
+      await Promise.all([loadConflicts(), refreshStatusAndInfo()]);
+    } catch (e) {
+      reportError("Không stage được file", e);
+    }
+  }
+
+  /** Hoàn tất sau khi hết xung đột: tùy trạng thái mà continue/commit. */
+  async function finishConflict() {
+    const path = repoPath();
+    if (!path) return;
+    if (info.value?.rebase_in_progress) return rebaseContinue();
+    if (info.value?.cherry_pick_in_progress) return cherryPickContinue();
+    // merge (kể cả pull dạng merge)
+    busyMessage.value = "Đang hoàn tất merge…";
+    try {
+      await gitCommitNoEdit(path);
+      await Promise.all([refreshStatusAndInfo(), refreshBranches()]);
+      if (tab.value === "history") await loadHistory();
+      toast.success("Đã hoàn tất merge.");
+    } catch (e) {
+      reportError("Không hoàn tất được merge", e);
+      await refreshStatusAndInfo();
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  // === Cleanup branch đã merge ===
+
+  async function cleanupScan(): Promise<string[]> {
+    const path = repoPath();
+    if (!path) return [];
+    busyMessage.value = "Đang quét branch đã merge…";
+    try {
+      return await gitCleanupScan(path);
+    } catch (e) {
+      reportError("Không quét được branch", e);
+      return [];
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function cleanupDelete(list: string[]) {
+    const path = repoPath();
+    if (!path || !list.length) return;
+    try {
+      const deleted = await gitCleanupDelete(path, list);
+      await refreshBranches();
+      toast.success(`Đã dọn ${deleted.length} branch.`);
+    } catch (e) {
+      reportError("Không dọn được branch", e);
+    }
+  }
+
+  // === Compare / Pull Request ===
+
+  async function compareBranches(base: string, head: string) {
+    const path = repoPath();
+    if (!path || !base.trim() || !head.trim()) return;
+    comparisonDiff.value = null;
+    busyMessage.value = "Đang so sánh…";
+    try {
+      comparison.value = await gitCompare(path, base, head);
+    } catch (e) {
+      reportError("Không so sánh được branch", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function compareSelectFile(file: GitFileChange) {
+    const path = repoPath();
+    const cmp = comparison.value;
+    if (!path || !cmp) return;
+    try {
+      comparisonDiff.value = await gitCompareFileDiff(path, cmp.base, cmp.head, file.path);
+    } catch (e) {
+      reportError("Không đọc được diff", e);
+    }
+  }
+
+  async function createPullRequest(base: string, head: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      const url = await gitCreatePullRequest(path, base, head);
+      toast.success(`Đã mở trang tạo Pull Request: ${url}`);
+    } catch (e) {
+      reportError("Không tạo được Pull Request", e);
+    }
+  }
+
+  /** Lấy danh sách Pull Request từ host (GitHub/GitLab), tận dụng credential đã lưu. */
+  async function loadPullRequests(state: string) {
+    const path = repoPath();
+    if (!path) return;
+    pullRequestsLoading.value = true;
+    try {
+      pullRequests.value = await gitListPullRequests(path, state);
+    } catch (e) {
+      pullRequests.value = [];
+      reportError("Không lấy được danh sách Pull Request", e);
+    } finally {
+      pullRequestsLoading.value = false;
+    }
+  }
+
+  /** Mở một URL bằng trình duyệt mặc định. */
+  async function openUrl(url: string) {
+    try {
+      await gitOpenUrl(url);
+    } catch (e) {
+      reportError("Không mở được liên kết", e);
+    }
+  }
+
+  /** Mở terminal tại thư mục repo hiện tại. */
+  async function openTerminal() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitOpenTerminal(path);
+    } catch (e) {
+      reportError("Không mở được terminal", e);
+    }
+  }
+
+  /** Hiện một file/thư mục trong file explorer của hệ điều hành. */
+  async function showInFolder(absolutePath: string) {
+    try {
+      await explorerOpen(absolutePath);
+    } catch (e) {
+      reportError("Không mở được thư mục", e);
+    }
+  }
+
+  // === Visualization (đồ thị commit) ===
+
+  async function loadGraph(limit = 300) {
+    const path = repoPath();
+    if (!path) return;
+    graphLoading.value = true;
+    try {
+      graphCommits.value = await gitGraph(path, limit);
+    } catch (e) {
+      reportError("Không tải được đồ thị commit", e);
+    } finally {
+      graphLoading.value = false;
+    }
+  }
+
+  // === Commit browser ===
+
+  async function loadBrowserCommits() {
+    const path = repoPath();
+    if (!path) return;
+    browserLoading.value = true;
+    browserFiles.value = [];
+    browserDiff.value = null;
+    try {
+      browserCommits.value = await gitLog(path, 200);
+    } catch (e) {
+      reportError("Không tải được commit", e);
+    } finally {
+      browserLoading.value = false;
+    }
+  }
+
+  async function focusBrowserCommit(hash: string) {
+    const path = repoPath();
+    if (!path) return;
+    browserDiff.value = null;
+    try {
+      const detail = await gitCommitDetail(path, hash);
+      browserFiles.value = detail.files;
+    } catch (e) {
+      reportError("Không đọc được commit", e);
+    }
+  }
+
+  async function selectBrowserFile(hash: string, file: string) {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      browserDiff.value = await gitCommitFileDiff(path, hash, file);
+    } catch (e) {
+      reportError("Không đọc được diff", e);
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -767,8 +1121,11 @@ export function useGit() {
 
     syncing.value = true;
     busyMessage.value = `Đang clone ${name}…`;
+    syncProgress.value = null;
     try {
-      await gitClone(url.trim(), dest);
+      await gitClone(url.trim(), dest, (p) => {
+        syncProgress.value = p;
+      });
       const repo = await gitAddRepo(dest);
       if (!repos.value.some((r) => r.id === repo.id)) {
         repos.value = [repo, ...repos.value];
@@ -782,6 +1139,7 @@ export function useGit() {
     } finally {
       syncing.value = false;
       busyMessage.value = "";
+      syncProgress.value = null;
     }
   }
 
@@ -803,7 +1161,19 @@ export function useGit() {
     remoteBranches,
     stashes,
     worktrees,
+    tags,
     commits,
+    comparison,
+    comparisonDiff,
+    pullRequests,
+    pullRequestsLoading,
+    conflicts,
+    browserCommits,
+    browserFiles,
+    browserDiff,
+    browserLoading,
+    graphCommits,
+    graphLoading,
     selectedFile,
     diff,
     diffLoading,
@@ -817,6 +1187,7 @@ export function useGit() {
     committing,
     syncing,
     busyMessage,
+    syncProgress,
     // computed
     runtimeAvailable,
     hasChanges,
@@ -862,9 +1233,33 @@ export function useGit() {
     cherryPick,
     cherryPickAbort,
     cherryPickContinue,
+    loadTags,
+    createTag,
+    deleteTag,
+    mergeBranch,
+    mergeAbort,
+    compareBranches,
+    compareSelectFile,
+    createPullRequest,
+    loadPullRequests,
+    openUrl,
+    openTerminal,
+    showInFolder,
+    loadBrowserCommits,
+    focusBrowserCommit,
+    selectBrowserFile,
+    loadGraph,
+    loadConflicts,
+    resolveConflict,
+    markResolved,
+    finishConflict,
+    cleanupScan,
+    cleanupDelete,
     loadWorktrees,
     worktreeAdd,
     worktreeRemove,
     openPathAsRepo,
   };
 }
+
+export type GitApi = ReturnType<typeof useGit>;

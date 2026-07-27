@@ -40,6 +40,80 @@ pub struct GitRepoInfo {
     pub rebase_in_progress: bool,
     /// Đang trong quá trình cherry-pick (có file CHERRY_PICK_HEAD).
     pub cherry_pick_in_progress: bool,
+    /// Đang trong quá trình merge (có file MERGE_HEAD).
+    pub merge_in_progress: bool,
+}
+
+/// Một tag.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitTag {
+    pub name: String,
+    /// SHA ngắn của đối tượng tag trỏ tới.
+    pub target: String,
+    /// Tiêu đề (message annotated tag hoặc subject commit).
+    pub subject: String,
+    /// Ngày tạo (short).
+    pub date: String,
+}
+
+/// Một commit dùng cho đồ thị (visualization): kèm parents + refs để dựng lane.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitGraphCommit {
+    pub hash: String,
+    pub short_hash: String,
+    pub subject: String,
+    pub author_name: String,
+    pub relative_date: String,
+    /// Hash các commit cha (parent). Nhiều cha = merge commit.
+    pub parents: Vec<String>,
+    /// Nhãn tham chiếu (branch/tag), vd. "HEAD -> main", "origin/main", "tag: v1".
+    pub refs: Vec<String>,
+}
+
+/// Một mốc tiến trình của thao tác mạng (fetch/pull/push/clone), parse từ stderr git.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitProgress {
+    /// Giai đoạn (vd. "Receiving objects", "Resolving deltas").
+    pub phase: String,
+    /// Phần trăm (0-100).
+    pub percent: u32,
+    /// Dòng gốc để hiển thị chi tiết nếu cần.
+    pub raw: String,
+}
+
+/// Một Pull Request / Merge Request lấy từ API của host.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitPullRequest {
+    pub number: u64,
+    pub title: String,
+    pub author: String,
+    /// "open" | "closed" | "merged" | "draft".
+    pub state: String,
+    pub draft: bool,
+    pub head: String,
+    pub base: String,
+    pub url: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Kết quả so sánh 2 branch (dùng cho Compare + preview Pull Request).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitComparison {
+    pub base: String,
+    pub head: String,
+    /// Số commit có ở `head` mà chưa có ở `base` (sẽ được đưa vào PR).
+    pub ahead: u32,
+    /// Số commit có ở `base` mà chưa có ở `head`.
+    pub behind: u32,
+    /// Danh sách commit `base..head`.
+    pub commits: Vec<GitCommit>,
+    /// Danh sách file thay đổi `base...head`.
+    pub files: Vec<GitFileChange>,
+    /// URL web của repo (rỗng nếu không có remote).
+    pub web_url: String,
+    /// URL tạo Pull Request tương ứng (rỗng nếu không xác định được).
+    pub pr_url: String,
 }
 
 /// Một Git worktree.

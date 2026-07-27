@@ -11,12 +11,16 @@
 
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
+
+use reqwest::Client;
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitDiff, GitDiffLine, GitFileChange, GitRepoInfo,
-    GitStash, GitStatus, GitWorktree,
+    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitDiffLine, GitFileChange,
+    GitGraphCommit, GitProgress, GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag,
+    GitWorktree,
 };
 
 /// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
@@ -133,10 +137,10 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
 
     let remote_url = run_opt(repo_path, &["remote", "get-url", "origin"]);
 
-    let (rebase_in_progress, cherry_pick_in_progress) = {
+    let (rebase_in_progress, cherry_pick_in_progress, merge_in_progress) = {
         let git_dir = run_opt(repo_path, &["rev-parse", "--git-dir"]);
         if git_dir.is_empty() {
-            (false, false)
+            (false, false, false)
         } else {
             let base = Path::new(&git_dir);
             let dir = if base.is_absolute() {
@@ -147,7 +151,8 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
             let rebase =
                 dir.join("rebase-merge").exists() || dir.join("rebase-apply").exists();
             let cherry = dir.join("CHERRY_PICK_HEAD").exists();
-            (rebase, cherry)
+            let merge = dir.join("MERGE_HEAD").exists();
+            (rebase, cherry, merge)
         }
     };
 
@@ -161,6 +166,7 @@ pub fn repo_info(repo_path: &str) -> AppResult<GitRepoInfo> {
         remote_url,
         rebase_in_progress,
         cherry_pick_in_progress,
+        merge_in_progress,
     })
 }
 
@@ -488,12 +494,51 @@ pub fn reset_to(repo_path: &str, hash: &str, mode: &str) -> AppResult<String> {
 
 /// Lấy lịch sử commit của branch hiện tại (giới hạn `limit`).
 pub fn log(repo_path: &str, limit: u32) -> AppResult<Vec<GitCommit>> {
-    let format = format!(
-        "--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ae{FS}%aI{FS}%ar{RS}"
-    );
+    log_range(repo_path, "", limit)
+}
+
+/// Lấy lịch sử commit. `range` rỗng → HEAD; ngược lại dùng revision range (vd. `base..head`).
+pub fn log_range(repo_path: &str, range: &str, limit: u32) -> AppResult<Vec<GitCommit>> {
+    let format = format!("--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ae{FS}%aI{FS}%ar{RS}");
     let limit_arg = format!("-{limit}");
-    let raw = run(repo_path, &["log", &limit_arg, &format])?;
+    let mut args: Vec<&str> = vec!["log", &limit_arg, &format];
+    if !range.trim().is_empty() {
+        args.push(range);
+    }
+    let raw = run(repo_path, &args)?;
     Ok(parse_commits(&raw))
+}
+
+/// Parse output `--name-status -z` (kèm rename `-M`) thành danh sách file thay đổi.
+fn parse_name_status_z(raw: &str) -> Vec<GitFileChange> {
+    let tokens: Vec<&str> = raw.split('\0').filter(|s| !s.is_empty()).collect();
+    let mut files: Vec<GitFileChange> = Vec::new();
+    let mut i = 0;
+    while i < tokens.len() {
+        let code = tokens[i].chars().next().unwrap_or(' ');
+        i += 1;
+        if code == 'R' || code == 'C' {
+            let orig = tokens.get(i).map(|s| s.to_string()).unwrap_or_default();
+            let newp = tokens.get(i + 1).map(|s| s.to_string()).unwrap_or_default();
+            i += 2;
+            files.push(GitFileChange {
+                path: newp,
+                orig_path: orig,
+                status: code.to_string(),
+                untracked: false,
+            });
+        } else {
+            let p = tokens.get(i).map(|s| s.to_string()).unwrap_or_default();
+            i += 1;
+            files.push(GitFileChange {
+                path: p,
+                orig_path: String::new(),
+                status: code.to_string(),
+                untracked: false,
+            });
+        }
+    }
+    files
 }
 
 fn parse_commits(raw: &str) -> Vec<GitCommit> {
@@ -516,6 +561,52 @@ fn parse_commits(raw: &str) -> Vec<GitCommit> {
             })
         })
         .collect()
+}
+
+/// Lấy dữ liệu đồ thị commit (tất cả branch) để visualization: kèm parents + refs.
+pub fn graph(repo_path: &str, limit: u32) -> AppResult<Vec<GitGraphCommit>> {
+    let format =
+        format!("--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ar{FS}%P{FS}%D{RS}");
+    let limit_arg = format!("-{limit}");
+    let raw = run(
+        repo_path,
+        &["log", "--all", "--date-order", &limit_arg, &format],
+    )?;
+
+    let out = raw
+        .split(RS)
+        .map(|r| r.trim_matches(['\n', '\r']))
+        .filter(|r| !r.is_empty())
+        .filter_map(|record| {
+            let f: Vec<&str> = record.split(FS).collect();
+            if f.len() < 6 {
+                return None;
+            }
+            let parents = f[5]
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>();
+            let refs = f
+                .get(6)
+                .map(|s| {
+                    s.split(", ")
+                        .map(|x| x.trim().to_string())
+                        .filter(|x| !x.is_empty())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            Some(GitGraphCommit {
+                hash: f[0].to_string(),
+                short_hash: f[1].to_string(),
+                subject: f[2].to_string(),
+                author_name: f[3].to_string(),
+                relative_date: f[4].to_string(),
+                parents,
+                refs,
+            })
+        })
+        .collect();
+    Ok(out)
 }
 
 /// Chi tiết một commit: meta + body + danh sách file đã đổi.
@@ -550,35 +641,7 @@ pub fn commit_detail(repo_path: &str, hash: &str) -> AppResult<GitCommitDetail> 
             hash,
         ],
     )?;
-    let mut files: Vec<GitFileChange> = Vec::new();
-    let tokens: Vec<&str> = names.split('\0').filter(|s| !s.is_empty()).collect();
-    let mut i = 0;
-    while i < tokens.len() {
-        let st = tokens[i];
-        let code = st.chars().next().unwrap_or(' ');
-        i += 1;
-        if code == 'R' || code == 'C' {
-            // status, orig, new
-            let orig = tokens.get(i).map(|s| s.to_string()).unwrap_or_default();
-            let newp = tokens.get(i + 1).map(|s| s.to_string()).unwrap_or_default();
-            i += 2;
-            files.push(GitFileChange {
-                path: newp,
-                orig_path: orig,
-                status: code.to_string(),
-                untracked: false,
-            });
-        } else {
-            let p = tokens.get(i).map(|s| s.to_string()).unwrap_or_default();
-            i += 1;
-            files.push(GitFileChange {
-                path: p,
-                orig_path: String::new(),
-                status: code.to_string(),
-                untracked: false,
-            });
-        }
-    }
+    let files = parse_name_status_z(&names);
 
     Ok(GitCommitDetail {
         commit,
@@ -723,6 +786,750 @@ pub fn cherry_pick_abort(repo_path: &str) -> AppResult<String> {
 /// Tiếp tục cherry-pick sau khi đã giải quyết xung đột (và stage các file).
 pub fn cherry_pick_continue(repo_path: &str) -> AppResult<String> {
     run_no_editor(repo_path, &["cherry-pick", "--continue"])
+}
+
+// === Thao tác mạng có tiến trình (fetch/pull/push/clone) ===
+
+/// Parse một dòng progress của git (vd. "Receiving objects:  45% (450/1000)").
+fn parse_progress(line: &str) -> Option<GitProgress> {
+    let l = line.trim();
+    let l = l.strip_prefix("remote: ").unwrap_or(l).trim();
+    let pct_pos = l.find('%')?;
+    let bytes = l.as_bytes();
+    let mut start = pct_pos;
+    while start > 0 && bytes[start - 1].is_ascii_digit() {
+        start -= 1;
+    }
+    if start == pct_pos {
+        return None;
+    }
+    let percent: u32 = l[start..pct_pos].parse().ok()?;
+    let phase = l.split(':').next().unwrap_or("").trim().to_string();
+    Some(GitProgress {
+        phase,
+        percent: percent.min(100),
+        raw: l.to_string(),
+    })
+}
+
+/// Chạy một lệnh git (đã cấu hình), stream stderr để bắt tiến trình `--progress`,
+/// gọi `on` cho mỗi mốc %. Trả về stdout khi thành công.
+fn run_progress<F: FnMut(GitProgress)>(mut cmd: Command, mut on: F) -> AppResult<String> {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| AppError::new(format!("Không chạy được git: {e}. Hãy chắc chắn đã cài Git.")))?;
+
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| AppError::new("Không đọc được tiến trình git."))?;
+
+    let mut buf = [0u8; 4096];
+    let mut line = String::new();
+    let mut all_err = String::new();
+    loop {
+        match stderr.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                let chunk = String::from_utf8_lossy(&buf[..n]);
+                all_err.push_str(&chunk);
+                // Git dùng '\r' để cập nhật cùng một dòng progress.
+                for ch in chunk.chars() {
+                    if ch == '\r' || ch == '\n' {
+                        if !line.trim().is_empty() {
+                            if let Some(p) = parse_progress(&line) {
+                                on(p);
+                            }
+                        }
+                        line.clear();
+                    } else {
+                        line.push(ch);
+                    }
+                }
+            }
+            Err(_) => break,
+        }
+    }
+    if !line.trim().is_empty() {
+        if let Some(p) = parse_progress(&line) {
+            on(p);
+        }
+    }
+
+    let mut out = String::new();
+    if let Some(mut so) = child.stdout.take() {
+        let _ = so.read_to_string(&mut out);
+    }
+    let status = child
+        .wait()
+        .map_err(|e| AppError::new(format!("Lỗi chờ tiến trình git: {e}")))?;
+
+    if status.success() {
+        Ok(out)
+    } else {
+        // Bỏ các dòng progress (%) khi dựng thông báo lỗi.
+        let clean: Vec<&str> = all_err
+            .split(['\r', '\n'])
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty() && !s.contains('%'))
+            .collect();
+        let msg = if clean.is_empty() {
+            all_err.trim().to_string()
+        } else {
+            clean.join("\n")
+        };
+        Err(AppError::new(if msg.is_empty() {
+            "Lệnh git thất bại.".to_string()
+        } else {
+            msg
+        }))
+    }
+}
+
+/// Fetch có tiến trình.
+pub fn fetch_with_progress<F: FnMut(GitProgress)>(repo_path: &str, on: F) -> AppResult<String> {
+    let mut cmd = git_in(repo_path);
+    cmd.args(["fetch", "--all", "--prune", "--progress"]);
+    run_progress(cmd, on)
+}
+
+/// Pull có tiến trình.
+pub fn pull_with_progress<F: FnMut(GitProgress)>(repo_path: &str, on: F) -> AppResult<String> {
+    let mut cmd = git_in(repo_path);
+    cmd.args(["pull", "--progress"]);
+    run_progress(cmd, on)
+}
+
+/// Push có tiến trình. Chưa có upstream → tự set `-u origin <branch>`.
+pub fn push_with_progress<F: FnMut(GitProgress)>(repo_path: &str, on: F) -> AppResult<String> {
+    let info = repo_info(repo_path)?;
+    let mut cmd = git_in(repo_path);
+    if info.upstream.is_empty() {
+        if info.current_branch.is_empty() || info.detached {
+            return Err(AppError::new(
+                "Đang ở detached HEAD — hãy checkout một branch trước khi push.",
+            ));
+        }
+        cmd.args(["push", "--progress", "-u", "origin", &info.current_branch]);
+    } else {
+        cmd.args(["push", "--progress"]);
+    }
+    run_progress(cmd, on)
+}
+
+/// Clone có tiến trình.
+pub fn clone_with_progress<F: FnMut(GitProgress)>(
+    url: &str,
+    dest: &str,
+    on: F,
+) -> AppResult<String> {
+    if url.trim().is_empty() {
+        return Err(AppError::new("URL repository không được để trống."));
+    }
+    let mut cmd = Command::new("git");
+    configure(&mut cmd);
+    cmd.args(["clone", "--progress", url, dest]);
+    run_progress(cmd, on)?;
+    Ok(dest.to_string())
+}
+
+// === Tag ===
+
+/// Liệt kê tag (mới nhất trước).
+pub fn tag_list(repo_path: &str) -> AppResult<Vec<GitTag>> {
+    let format = format!(
+        "--format=%(refname:short){FS}%(objectname:short){FS}%(contents:subject){FS}%(creatordate:short)"
+    );
+    let raw = run(
+        repo_path,
+        &["for-each-ref", "--sort=-creatordate", &format, "refs/tags"],
+    )?;
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(FS).collect();
+        if f.is_empty() {
+            continue;
+        }
+        out.push(GitTag {
+            name: f[0].to_string(),
+            target: f.get(1).map(|s| s.to_string()).unwrap_or_default(),
+            subject: f.get(2).map(|s| s.to_string()).unwrap_or_default(),
+            date: f.get(3).map(|s| s.to_string()).unwrap_or_default(),
+        });
+    }
+    Ok(out)
+}
+
+/// Tạo tag. `annotated` → tag có message (`-a -m`); `hash` rỗng → dùng HEAD.
+/// `push` → đẩy tag lên origin sau khi tạo.
+pub fn tag_create(
+    repo_path: &str,
+    name: &str,
+    hash: &str,
+    message: &str,
+    annotated: bool,
+    push: bool,
+) -> AppResult<String> {
+    if name.trim().is_empty() {
+        return Err(AppError::new("Tên tag không được để trống."));
+    }
+    // Annotated cần message (rỗng sẽ mở editor và treo) — fallback dùng tên tag.
+    let msg = if message.trim().is_empty() { name } else { message };
+    let mut args: Vec<&str> = vec!["tag"];
+    if annotated {
+        args.push("-a");
+        args.push(name);
+        args.push("-m");
+        args.push(msg);
+    } else {
+        args.push(name);
+    }
+    if !hash.trim().is_empty() {
+        args.push(hash);
+    }
+    run(repo_path, &args)?;
+    if push {
+        run(repo_path, &["push", "origin", name])?;
+    }
+    Ok(name.to_string())
+}
+
+/// Xóa một tag local. `remote = true` → xóa cả trên origin.
+pub fn tag_delete(repo_path: &str, name: &str, remote: bool) -> AppResult<String> {
+    run(repo_path, &["tag", "-d", name])?;
+    if remote {
+        run(repo_path, &["push", "origin", "--delete", name])?;
+    }
+    Ok(name.to_string())
+}
+
+// === Merge ===
+
+/// Merge một branch vào branch hiện tại.
+/// - `squash = true` → `merge --squash` rồi commit (một commit gộp).
+/// - ngược lại → merge thường (tạo merge commit hoặc fast-forward).
+pub fn merge(repo_path: &str, branch: &str, squash: bool, message: &str) -> AppResult<String> {
+    if branch.trim().is_empty() {
+        return Err(AppError::new("Thiếu branch để merge."));
+    }
+    if squash {
+        run(repo_path, &["merge", "--squash", branch])?;
+        let default_msg = format!("Squash merge branch '{branch}'");
+        let msg = if message.trim().is_empty() {
+            default_msg.as_str()
+        } else {
+            message
+        };
+        run(repo_path, &["commit", "-m", msg])
+    } else {
+        run(repo_path, &["merge", "--no-edit", branch])
+    }
+}
+
+/// Hủy merge đang dở (khi có xung đột).
+pub fn merge_abort(repo_path: &str) -> AppResult<String> {
+    run(repo_path, &["merge", "--abort"])
+}
+
+/// Commit để hoàn tất merge (giữ message mặc định, không mở editor).
+pub fn commit_no_edit(repo_path: &str) -> AppResult<String> {
+    run_no_editor(repo_path, &["commit", "--no-edit"])
+}
+
+// === Resolve conflict ===
+
+/// Danh sách file đang xung đột (unmerged).
+pub fn list_conflicts(repo_path: &str) -> AppResult<Vec<String>> {
+    let raw = run(
+        repo_path,
+        &["diff", "--name-only", "--diff-filter=U", "-z"],
+    )?;
+    Ok(raw
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect())
+}
+
+/// Giải quyết xung đột một file bằng cách chọn một phía rồi stage.
+/// `side`: "ours" (bản HEAD) | "theirs" (bản đến).
+pub fn resolve_conflict(repo_path: &str, file: &str, side: &str) -> AppResult<()> {
+    let flag = if side == "theirs" { "--theirs" } else { "--ours" };
+    run(repo_path, &["checkout", flag, "--", file])?;
+    run(repo_path, &["add", "--", file])?;
+    Ok(())
+}
+
+// === Cleanup branch đã merge (upstream bị xóa) ===
+
+/// Fetch --prune rồi trả về các branch local có upstream đã bị xóa ([gone]),
+/// trừ branch hiện tại. Dùng để dọn branch sau khi PR đã merge + xóa remote.
+pub fn cleanup_scan(repo_path: &str) -> AppResult<Vec<String>> {
+    // Prune remote-tracking refs trước để phát hiện upstream đã mất.
+    let _ = run(repo_path, &["fetch", "--all", "--prune"]);
+
+    let current = run(repo_path, &["symbolic-ref", "--short", "-q", "HEAD"])
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    let fmt = format!("--format=%(refname:short){FS}%(upstream:track)");
+    let raw = run(repo_path, &["for-each-ref", &fmt, "refs/heads"])?;
+
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let f: Vec<&str> = line.split(FS).collect();
+        let name = f[0].trim();
+        let track = f.get(1).copied().unwrap_or("");
+        if track.contains("gone") && !name.is_empty() && name != current {
+            out.push(name.to_string());
+        }
+    }
+    Ok(out)
+}
+
+/// Xóa (force) các branch local đã chọn. Trả về danh sách đã xóa thành công.
+pub fn cleanup_delete(repo_path: &str, branches: &[String]) -> AppResult<Vec<String>> {
+    let mut deleted = Vec::new();
+    for b in branches {
+        if run(repo_path, &["branch", "-D", b]).is_ok() {
+            deleted.push(b.clone());
+        }
+    }
+    Ok(deleted)
+}
+
+// === Compare / Pull Request ===
+
+fn count_range(repo_path: &str, range: &str) -> u32 {
+    run_opt(repo_path, &["rev-list", "--count", range])
+        .parse()
+        .unwrap_or(0)
+}
+
+/// So sánh 2 branch: commit `base..head` + file `base...head` + URL tạo PR.
+pub fn compare(repo_path: &str, base: &str, head: &str) -> AppResult<GitComparison> {
+    if base.trim().is_empty() || head.trim().is_empty() {
+        return Err(AppError::new("Cần chọn cả base và head để so sánh."));
+    }
+    let ahead = count_range(repo_path, &format!("{base}..{head}"));
+    let behind = count_range(repo_path, &format!("{head}..{base}"));
+    let commits = log_range(repo_path, &format!("{base}..{head}"), 300)?;
+
+    let names = run(
+        repo_path,
+        &[
+            "diff",
+            "--name-status",
+            "-M",
+            "-z",
+            &format!("{base}...{head}"),
+        ],
+    )?;
+    let files = parse_name_status_z(&names);
+
+    let web_url = remote_web_url(repo_path);
+    let pr_url = pull_request_url(&web_url, base, head);
+
+    Ok(GitComparison {
+        base: base.to_string(),
+        head: head.to_string(),
+        ahead,
+        behind,
+        commits,
+        files,
+        web_url,
+        pr_url,
+    })
+}
+
+/// Diff của một file giữa 2 branch (`base...head`).
+pub fn compare_file_diff(
+    repo_path: &str,
+    base: &str,
+    head: &str,
+    file: &str,
+) -> AppResult<GitDiff> {
+    let raw = run(
+        repo_path,
+        &["diff", "--no-color", &format!("{base}...{head}"), "--", file],
+    )?;
+    Ok(parse_diff(file, &raw))
+}
+
+/// Chuyển remote origin (ssh/https) thành URL web `https://host/owner/repo`.
+fn remote_web_url(repo_path: &str) -> String {
+    let raw = run_opt(repo_path, &["remote", "get-url", "origin"]);
+    if raw.is_empty() {
+        return String::new();
+    }
+    let mut u = raw.trim().to_string();
+    if let Some(rest) = u.strip_prefix("git@") {
+        // git@host:owner/repo(.git)
+        if let Some((host, path)) = rest.split_once(':') {
+            u = format!("https://{host}/{path}");
+        }
+    } else if let Some(rest) = u.strip_prefix("ssh://") {
+        let rest = rest.strip_prefix("git@").unwrap_or(rest);
+        u = format!("https://{rest}");
+    }
+    if let Some(stripped) = u.strip_suffix(".git") {
+        u = stripped.to_string();
+    }
+    while u.ends_with('/') {
+        u.pop();
+    }
+    u
+}
+
+/// Dựng URL tạo Pull Request/Merge Request theo host (GitHub/GitLab/Bitbucket).
+fn pull_request_url(web: &str, base: &str, head: &str) -> String {
+    if web.is_empty() {
+        return String::new();
+    }
+    if web.contains("gitlab") {
+        let h = urlencoding::encode(head);
+        let b = urlencoding::encode(base);
+        format!(
+            "{web}/-/merge_requests/new?merge_request[source_branch]={h}&merge_request[target_branch]={b}"
+        )
+    } else if web.contains("bitbucket") {
+        let h = urlencoding::encode(head);
+        let b = urlencoding::encode(base);
+        format!("{web}/pull-requests/new?source={h}&dest={b}")
+    } else {
+        // GitHub-style compare (giữ nguyên dấu `/` trong tên branch cho hợp lệ).
+        format!("{web}/compare/{base}...{head}?expand=1")
+    }
+}
+
+/// Mở một URL bằng trình duyệt mặc định của hệ điều hành.
+pub fn open_url(url: &str) -> AppResult<()> {
+    if url.trim().is_empty() {
+        return Err(AppError::new("URL rỗng."));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = Command::new("cmd");
+        configure(&mut cmd);
+        cmd.args(["/C", "start", "", url])
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được trình duyệt: {e}")))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let mut cmd = Command::new("open");
+        configure(&mut cmd);
+        cmd.arg(url)
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được trình duyệt: {e}")))?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let mut cmd = Command::new("xdg-open");
+        configure(&mut cmd);
+        cmd.arg(url)
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được trình duyệt: {e}")))?;
+    }
+    Ok(())
+}
+
+/// Mở terminal của hệ điều hành tại thư mục `dir`.
+pub fn open_terminal(dir: &str) -> AppResult<()> {
+    let p = Path::new(dir);
+    if !p.is_dir() {
+        return Err(AppError::new(format!("Không phải thư mục: {dir}")));
+    }
+    // Lưu ý: KHÔNG dùng `configure()` ở đây vì nó set CREATE_NO_WINDOW (ẩn cửa sổ)
+    // — ta lại cần hiện cửa sổ terminal.
+    #[cfg(target_os = "windows")]
+    {
+        // Ưu tiên Windows Terminal, fallback về cmd.
+        if Command::new("wt").arg("-d").arg(dir).spawn().is_err() {
+            Command::new("cmd")
+                .args(["/C", "start", "cmd"])
+                .current_dir(dir)
+                .spawn()
+                .map_err(|e| AppError::new(format!("Không mở được terminal: {e}")))?;
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .args(["-a", "Terminal"])
+            .arg(dir)
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được terminal: {e}")))?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let candidates = ["x-terminal-emulator", "gnome-terminal", "konsole", "xterm"];
+        let opened = candidates
+            .iter()
+            .any(|term| Command::new(term).current_dir(dir).spawn().is_ok());
+        if !opened {
+            return Err(AppError::new("Không tìm thấy terminal trên hệ thống."));
+        }
+    }
+    Ok(())
+}
+
+/// Tạo Pull Request: mở trang tạo PR trên host (GitHub Desktop cũng mở trình duyệt).
+/// Trả về URL đã mở.
+pub fn create_pull_request(repo_path: &str, base: &str, head: &str) -> AppResult<String> {
+    let web = remote_web_url(repo_path);
+    if web.is_empty() {
+        return Err(AppError::new(
+            "Không tìm thấy remote origin để tạo Pull Request.",
+        ));
+    }
+    let url = pull_request_url(&web, base, head);
+    open_url(&url)?;
+    Ok(url)
+}
+
+// === Pull Request list (gọi API host) ===
+
+/// Thông tin host để gọi API liệt kê Pull Request.
+pub struct PrSource {
+    /// "github" | "gitlab" | "bitbucket" | "other".
+    pub kind: String,
+    pub host: String,
+    pub owner: String,
+    pub repo: String,
+}
+
+/// Phân tích host/owner/repo từ remote origin.
+pub fn pr_source(repo_path: &str) -> AppResult<PrSource> {
+    let web = remote_web_url(repo_path);
+    if web.is_empty() {
+        return Err(AppError::new("Repo không có remote origin."));
+    }
+    let after = web
+        .strip_prefix("https://")
+        .or_else(|| web.strip_prefix("http://"))
+        .unwrap_or(&web);
+    let (host, path) = after
+        .split_once('/')
+        .ok_or_else(|| AppError::new("Không phân tích được URL remote."))?;
+    let segs: Vec<&str> = path.trim_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+    if segs.len() < 2 {
+        return Err(AppError::new("Không xác định được owner/repo từ remote."));
+    }
+    let repo = segs[segs.len() - 1].to_string();
+    let owner = segs[..segs.len() - 1].join("/");
+    let kind = if host.contains("github") {
+        "github"
+    } else if host.contains("gitlab") {
+        "gitlab"
+    } else if host.contains("bitbucket") {
+        "bitbucket"
+    } else {
+        "other"
+    }
+    .to_string();
+    Ok(PrSource {
+        kind,
+        host: host.to_string(),
+        owner,
+        repo,
+    })
+}
+
+/// Lấy token cho `host` từ git credential helper (best-effort; rỗng nếu không có).
+/// Tận dụng credential đã lưu để không cần cấu hình token riêng trong app.
+pub fn credential_token(host: &str) -> String {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut cmd = Command::new("git");
+    configure(&mut cmd);
+    let child = cmd
+        .args(["credential", "fill"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn();
+    let mut child = match child {
+        Ok(c) => c,
+        Err(_) => return String::new(),
+    };
+    if let Some(mut sin) = child.stdin.take() {
+        let _ = write!(sin, "protocol=https\nhost={host}\n\n");
+    }
+    let out = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(_) => return String::new(),
+    };
+    if !out.status.success() {
+        return String::new();
+    }
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        if let Some(p) = line.strip_prefix("password=") {
+            return p.trim().to_string();
+        }
+    }
+    String::new()
+}
+
+fn build_http() -> AppResult<Client> {
+    Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| AppError::new(format!("Không tạo được HTTP client: {e}")))
+}
+
+/// Liệt kê Pull Request / Merge Request. `state`: "open" | "closed" | "all".
+pub async fn list_pull_requests(repo_path: &str, state: &str) -> AppResult<Vec<GitPullRequest>> {
+    let src = pr_source(repo_path)?;
+    let token = credential_token(&src.host);
+    match src.kind.as_str() {
+        "github" => github_pull_requests(&src, &token, state).await,
+        "gitlab" => gitlab_merge_requests(&src, &token, state).await,
+        _ => Err(AppError::new(
+            "Chỉ hỗ trợ liệt kê Pull Request cho GitHub và GitLab.",
+        )),
+    }
+}
+
+async fn github_pull_requests(
+    src: &PrSource,
+    token: &str,
+    state: &str,
+) -> AppResult<Vec<GitPullRequest>> {
+    let api = if src.host == "github.com" {
+        "https://api.github.com".to_string()
+    } else {
+        format!("https://{}/api/v3", src.host)
+    };
+    let gh_state = match state {
+        "closed" => "closed",
+        "all" => "all",
+        _ => "open",
+    };
+    let url = format!(
+        "{api}/repos/{}/{}/pulls?state={gh_state}&per_page=50&sort=updated&direction=desc",
+        src.owner, src.repo
+    );
+    let client = build_http()?;
+    let mut req = client
+        .get(&url)
+        .header("User-Agent", "management-systems")
+        .header("Accept", "application/vnd.github+json");
+    if !token.is_empty() {
+        req = req.header("Authorization", format!("Bearer {token}"));
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Gọi GitHub API lỗi: {e}")))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let msg = serde_json::from_str::<serde_json::Value>(&body)
+            .ok()
+            .and_then(|v| v["message"].as_str().map(|s| s.to_string()))
+            .unwrap_or(body);
+        return Err(AppError::new(format!(
+            "GitHub API {}: {msg}",
+            status.as_u16()
+        )));
+    }
+    let arr: Vec<serde_json::Value> = resp
+        .json()
+        .await
+        .map_err(|e| AppError::new(format!("Lỗi đọc dữ liệu GitHub: {e}")))?;
+    let out = arr
+        .iter()
+        .map(|v| {
+            let draft = v["draft"].as_bool().unwrap_or(false);
+            let st = v["state"].as_str().unwrap_or("open").to_string();
+            GitPullRequest {
+                number: v["number"].as_u64().unwrap_or(0),
+                title: v["title"].as_str().unwrap_or("").to_string(),
+                author: v["user"]["login"].as_str().unwrap_or("").to_string(),
+                state: if draft && st == "open" { "draft".to_string() } else { st },
+                draft,
+                head: v["head"]["ref"].as_str().unwrap_or("").to_string(),
+                base: v["base"]["ref"].as_str().unwrap_or("").to_string(),
+                url: v["html_url"].as_str().unwrap_or("").to_string(),
+                created_at: v["created_at"].as_str().unwrap_or("").to_string(),
+                updated_at: v["updated_at"].as_str().unwrap_or("").to_string(),
+            }
+        })
+        .collect();
+    Ok(out)
+}
+
+async fn gitlab_merge_requests(
+    src: &PrSource,
+    token: &str,
+    state: &str,
+) -> AppResult<Vec<GitPullRequest>> {
+    let proj = urlencoding::encode(&format!("{}/{}", src.owner, src.repo)).into_owned();
+    let gl_state = match state {
+        "closed" => "closed",
+        "all" => "all",
+        _ => "opened",
+    };
+    let url = format!(
+        "https://{}/api/v4/projects/{}/merge_requests?state={gl_state}&per_page=50&order_by=updated_at",
+        src.host, proj
+    );
+    let client = build_http()?;
+    let mut req = client.get(&url).header("User-Agent", "management-systems");
+    if !token.is_empty() {
+        req = req.header("PRIVATE-TOKEN", token);
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| AppError::new(format!("Gọi GitLab API lỗi: {e}")))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(AppError::new(format!("GitLab API {}: {body}", status.as_u16())));
+    }
+    let arr: Vec<serde_json::Value> = resp
+        .json()
+        .await
+        .map_err(|e| AppError::new(format!("Lỗi đọc dữ liệu GitLab: {e}")))?;
+    let out = arr
+        .iter()
+        .map(|v| {
+            let draft = v["draft"].as_bool().or_else(|| v["work_in_progress"].as_bool()).unwrap_or(false);
+            let raw_state = v["state"].as_str().unwrap_or("opened");
+            let st = match raw_state {
+                "opened" => if draft { "draft" } else { "open" },
+                other => other,
+            }
+            .to_string();
+            GitPullRequest {
+                number: v["iid"].as_u64().unwrap_or(0),
+                title: v["title"].as_str().unwrap_or("").to_string(),
+                author: v["author"]["username"].as_str().unwrap_or("").to_string(),
+                state: st,
+                draft,
+                head: v["source_branch"].as_str().unwrap_or("").to_string(),
+                base: v["target_branch"].as_str().unwrap_or("").to_string(),
+                url: v["web_url"].as_str().unwrap_or("").to_string(),
+                created_at: v["created_at"].as_str().unwrap_or("").to_string(),
+                updated_at: v["updated_at"].as_str().unwrap_or("").to_string(),
+            }
+        })
+        .collect();
+    Ok(out)
 }
 
 // === Worktree ===

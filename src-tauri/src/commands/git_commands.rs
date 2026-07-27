@@ -10,8 +10,8 @@
 use crate::app::error::log_err;
 use crate::database::git_repo_store::{self, GitRepoData};
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitDiff, GitRepo, GitRepoInfo, GitStash, GitStatus,
-    GitWorktree,
+    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitGraphCommit, GitProgress,
+    GitPullRequest, GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 use crate::services::git_service;
 
@@ -119,6 +119,14 @@ pub fn git_log(path: String, limit: u32) -> Result<Vec<GitCommit>, String> {
 }
 
 #[tauri::command]
+pub async fn git_graph(path: String, limit: u32) -> Result<Vec<GitGraphCommit>, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::graph(&path, limit))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
 pub fn git_commit_detail(path: String, hash: String) -> Result<GitCommitDetail, String> {
     git_service::commit_detail(&path, &hash).map_err(log_err)
 }
@@ -136,6 +144,26 @@ pub fn git_stash_list(path: String) -> Result<Vec<GitStash>, String> {
 #[tauri::command]
 pub fn git_worktree_list(path: String) -> Result<Vec<GitWorktree>, String> {
     git_service::worktree_list(&path).map_err(log_err)
+}
+
+#[tauri::command]
+pub fn git_list_conflicts(path: String) -> Result<Vec<String>, String> {
+    git_service::list_conflicts(&path).map_err(log_err)
+}
+
+#[tauri::command]
+pub fn git_tag_list(path: String) -> Result<Vec<GitTag>, String> {
+    git_service::tag_list(&path).map_err(log_err)
+}
+
+#[tauri::command]
+pub fn git_compare_file_diff(
+    path: String,
+    base: String,
+    head: String,
+    file: String,
+) -> Result<GitDiff, String> {
+    git_service::compare_file_diff(&path, &base, &head, &file).map_err(log_err)
 }
 
 // === Thao tác ghi / mạng (async) ===
@@ -205,27 +233,48 @@ pub async fn git_delete_branch(
 }
 
 #[tauri::command]
-pub async fn git_fetch(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::fetch(&path))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_fetch(
+    path: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::fetch_with_progress(&path, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
-pub async fn git_pull(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::pull(&path))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_pull(
+    path: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::pull_with_progress(&path, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
-pub async fn git_push(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::push(&path))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_push(
+    path: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::push_with_progress(&path, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
@@ -257,11 +306,19 @@ pub async fn git_stash_drop(path: String, reference: String) -> Result<String, S
 }
 
 #[tauri::command]
-pub async fn git_clone(url: String, dest: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::clone(&url, &dest))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+pub async fn git_clone(
+    url: String,
+    dest: String,
+    on_progress: tauri::ipc::Channel<GitProgress>,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::clone_with_progress(&url, &dest, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
@@ -315,6 +372,143 @@ pub async fn git_rebase_abort(path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn git_rebase_continue(path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::rebase_continue(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_tag_create(
+    path: String,
+    name: String,
+    hash: String,
+    message: String,
+    annotated: bool,
+    push: bool,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::tag_create(&path, &name, &hash, &message, annotated, push)
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_tag_delete(path: String, name: String, remote: bool) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::tag_delete(&path, &name, remote))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_merge(
+    path: String,
+    branch: String,
+    squash: bool,
+    message: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::merge(&path, &branch, squash, &message))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_merge_abort(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::merge_abort(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_commit_no_edit(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::commit_no_edit(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_resolve_conflict(
+    path: String,
+    file: String,
+    side: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::resolve_conflict(&path, &file, &side))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_cleanup_scan(path: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cleanup_scan(&path))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_cleanup_delete(
+    path: String,
+    branches: Vec<String>,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::cleanup_delete(&path, &branches))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_compare(
+    path: String,
+    base: String,
+    head: String,
+) -> Result<GitComparison, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::compare(&path, &base, &head))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_create_pull_request(
+    path: String,
+    base: String,
+    head: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::create_pull_request(&path, &base, &head)
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_list_pull_requests(
+    path: String,
+    state: String,
+) -> Result<Vec<GitPullRequest>, String> {
+    git_service::list_pull_requests(&path, &state)
+        .await
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_open_url(url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::open_url(&url))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_open_terminal(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::open_terminal(&path))
         .await
         .map_err(log_err)?
         .map_err(log_err)

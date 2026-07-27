@@ -1,15 +1,28 @@
+import { Channel } from "@tauri-apps/api/core";
 import { safeInvoke } from "./_base";
 import type {
   GitBranch,
   GitCommit,
   GitCommitDetail,
+  GitComparison,
   GitDiff,
+  GitGraphCommit,
+  GitProgress,
+  GitPullRequest,
   GitRepo,
   GitRepoInfo,
   GitStash,
   GitStatus,
+  GitTag,
   GitWorktree,
 } from "@/_/types/git";
+
+/** Tạo Channel nhận tiến trình; gắn callback nếu có. */
+function progressChannel(onProgress?: (p: GitProgress) => void) {
+  const channel = new Channel<GitProgress>();
+  if (onProgress) channel.onmessage = onProgress;
+  return channel;
+}
 
 // === Quản lý danh sách repo (lưu cục bộ) ===
 
@@ -51,6 +64,10 @@ export function gitLog(path: string, limit: number) {
   return safeInvoke<GitCommit[]>("git_log", { path, limit });
 }
 
+export function gitGraph(path: string, limit: number) {
+  return safeInvoke<GitGraphCommit[]>("git_graph", { path, limit });
+}
+
 export function gitCommitDetail(path: string, hash: string) {
   return safeInvoke<GitCommitDetail>("git_commit_detail", { path, hash });
 }
@@ -65,6 +82,14 @@ export function gitStashList(path: string) {
 
 export function gitWorktreeList(path: string) {
   return safeInvoke<GitWorktree[]>("git_worktree_list", { path });
+}
+
+export function gitTagList(path: string) {
+  return safeInvoke<GitTag[]>("git_tag_list", { path });
+}
+
+export function gitCompareFileDiff(path: string, base: string, head: string, file: string) {
+  return safeInvoke<GitDiff>("git_compare_file_diff", { path, base, head, file });
 }
 
 // === Thao tác ghi / mạng ===
@@ -97,16 +122,16 @@ export function gitDeleteBranch(path: string, name: string, force: boolean) {
   return safeInvoke<string>("git_delete_branch", { path, name, force });
 }
 
-export function gitFetch(path: string) {
-  return safeInvoke<string>("git_fetch", { path });
+export function gitFetch(path: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_fetch", { path, onProgress: progressChannel(onProgress) });
 }
 
-export function gitPull(path: string) {
-  return safeInvoke<string>("git_pull", { path });
+export function gitPull(path: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_pull", { path, onProgress: progressChannel(onProgress) });
 }
 
-export function gitPush(path: string) {
-  return safeInvoke<string>("git_push", { path });
+export function gitPush(path: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_push", { path, onProgress: progressChannel(onProgress) });
 }
 
 export function gitStashSave(path: string, message: string) {
@@ -121,8 +146,8 @@ export function gitStashDrop(path: string, reference: string) {
   return safeInvoke<string>("git_stash_drop", { path, reference });
 }
 
-export function gitClone(url: string, dest: string) {
-  return safeInvoke<string>("git_clone", { url, dest });
+export function gitClone(url: string, dest: string, onProgress?: (p: GitProgress) => void) {
+  return safeInvoke<string>("git_clone", { url, dest, onProgress: progressChannel(onProgress) });
 }
 
 export function gitUndoLastCommit(path: string) {
@@ -151,6 +176,69 @@ export function gitRebaseAbort(path: string) {
 
 export function gitRebaseContinue(path: string) {
   return safeInvoke<string>("git_rebase_continue", { path });
+}
+
+export function gitTagCreate(
+  path: string,
+  name: string,
+  hash: string,
+  message: string,
+  annotated: boolean,
+  push: boolean,
+) {
+  return safeInvoke<string>("git_tag_create", { path, name, hash, message, annotated, push });
+}
+
+export function gitTagDelete(path: string, name: string, remote: boolean) {
+  return safeInvoke<string>("git_tag_delete", { path, name, remote });
+}
+
+export function gitMerge(path: string, branch: string, squash: boolean, message: string) {
+  return safeInvoke<string>("git_merge", { path, branch, squash, message });
+}
+
+export function gitMergeAbort(path: string) {
+  return safeInvoke<string>("git_merge_abort", { path });
+}
+
+export function gitCompare(path: string, base: string, head: string) {
+  return safeInvoke<GitComparison>("git_compare", { path, base, head });
+}
+
+export function gitListPullRequests(path: string, state: string) {
+  return safeInvoke<GitPullRequest[]>("git_list_pull_requests", { path, state });
+}
+
+export function gitListConflicts(path: string) {
+  return safeInvoke<string[]>("git_list_conflicts", { path });
+}
+
+export function gitResolveConflict(path: string, file: string, side: "ours" | "theirs") {
+  return safeInvoke<void>("git_resolve_conflict", { path, file, side });
+}
+
+export function gitCommitNoEdit(path: string) {
+  return safeInvoke<string>("git_commit_no_edit", { path });
+}
+
+export function gitCleanupScan(path: string) {
+  return safeInvoke<string[]>("git_cleanup_scan", { path });
+}
+
+export function gitCleanupDelete(path: string, branches: string[]) {
+  return safeInvoke<string[]>("git_cleanup_delete", { path, branches });
+}
+
+export function gitOpenUrl(url: string) {
+  return safeInvoke<void>("git_open_url", { url });
+}
+
+export function gitOpenTerminal(path: string) {
+  return safeInvoke<void>("git_open_terminal", { path });
+}
+
+export function gitCreatePullRequest(path: string, base: string, head: string) {
+  return safeInvoke<string>("git_create_pull_request", { path, base, head });
 }
 
 export function gitCherryPick(path: string, hash: string) {

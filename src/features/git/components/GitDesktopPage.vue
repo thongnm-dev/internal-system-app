@@ -2,14 +2,32 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
-import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
-import Select from "primevue/select";
 import Textarea from "primevue/textarea";
-import { open } from "@tauri-apps/plugin-dialog";
 
 import { useGit } from "../composables/useGit";
 import type { GitBranch, GitCommit, GitFileChange, GitRepo } from "@/_/types/git";
+import { statusMeta, baseName, dirName } from "../utils/fileStatus";
+
+import GitCloneRepoDialog from "./GitCloneRepoDialog.vue";
+import GitNewBranchDialog from "./GitNewBranchDialog.vue";
+import GitDiscardConfirmDialog from "./GitDiscardConfirmDialog.vue";
+import GitRebaseDialog from "./GitRebaseDialog.vue";
+import GitRevertDialog from "./GitRevertDialog.vue";
+import GitWorktreeCreateDialog from "./GitWorktreeCreateDialog.vue";
+import GitWorktreeListDialog from "./GitWorktreeListDialog.vue";
+import GitTagDialog from "./GitTagDialog.vue";
+import GitMergeDialog from "./GitMergeDialog.vue";
+import GitPullRequestsDialog from "./GitPullRequestsDialog.vue";
+import GitCompareDialog from "./GitCompareDialog.vue";
+import GitResetHeadDialog from "./GitResetHeadDialog.vue";
+import GitCleanupDialog from "./GitCleanupDialog.vue";
+import GitConflictDialog from "./GitConflictDialog.vue";
+import GitUpdateFromMainDialog from "./GitUpdateFromMainDialog.vue";
+import GitResetHardDialog from "./GitResetHardDialog.vue";
+import GitBranchFromCommitDialog from "./GitBranchFromCommitDialog.vue";
+import GitGraphDialog from "./GitGraphDialog.vue";
+import GitCommitBrowserDialog from "./GitCommitBrowserDialog.vue";
 
 const git = useGit();
 
@@ -64,60 +82,14 @@ async function pickBranch(b: GitBranch) {
 }
 
 // === Dialogs ===
-const cloneDialog = ref(false);
-const cloneUrl = ref("");
-const newBranchDialog = ref(false);
-const newBranchName = ref("");
-const discardDialog = ref(false);
+const cloneDialogVisible = ref(false);
+const newBranchDialogVisible = ref(false);
+const discardDialogVisible = ref(false);
 const discardTarget = ref<{ files: string[]; label: string } | null>(null);
-
-async function doClone() {
-  const ok = await git.cloneRepo(cloneUrl.value);
-  if (ok) {
-    cloneDialog.value = false;
-    cloneUrl.value = "";
-  }
-}
-
-async function doCreateBranch() {
-  const name = newBranchName.value.trim();
-  if (!name) return;
-  await git.createBranch(name);
-  newBranchDialog.value = false;
-  newBranchName.value = "";
-  branchMenuOpen.value = false;
-}
 
 function askDiscard(files: string[], label: string) {
   discardTarget.value = { files, label };
-  discardDialog.value = true;
-}
-async function confirmDiscard() {
-  if (discardTarget.value) await git.discardFiles(discardTarget.value.files);
-  discardDialog.value = false;
-  discardTarget.value = null;
-}
-
-// === Helpers: file status presentation ===
-const STATUS_META: Record<string, { label: string; cls: string; badge: string }> = {
-  M: { label: "Modified", cls: "text-amber-600", badge: "bg-amber-100 text-amber-700" },
-  A: { label: "Added", cls: "text-emerald-600", badge: "bg-emerald-100 text-emerald-700" },
-  D: { label: "Deleted", cls: "text-red-600", badge: "bg-red-100 text-red-700" },
-  R: { label: "Renamed", cls: "text-sky-600", badge: "bg-sky-100 text-sky-700" },
-  C: { label: "Copied", cls: "text-sky-600", badge: "bg-sky-100 text-sky-700" },
-  U: { label: "Conflict", cls: "text-red-600", badge: "bg-red-100 text-red-700" },
-  "?": { label: "New", cls: "text-emerald-600", badge: "bg-emerald-100 text-emerald-700" },
-};
-function statusMeta(code: string) {
-  return STATUS_META[code] ?? { label: code, cls: "text-muted", badge: "bg-slate-100 text-slate-600" };
-}
-function baseName(path: string) {
-  const parts = path.split("/");
-  return parts[parts.length - 1] || path;
-}
-function dirName(path: string) {
-  const idx = path.lastIndexOf("/");
-  return idx > 0 ? path.slice(0, idx) : "";
+  discardDialogVisible.value = true;
 }
 
 // === Staging selection ===
@@ -203,98 +175,138 @@ onUnmounted(() => {
 });
 
 // === Rebase ===
-const rebaseDialog = ref(false);
-const rebaseTarget = ref("");
-const rebaseOptions = computed(() =>
-  git.branches.value
-    .filter((b) => !b.is_current)
-    .map((b) => ({ label: b.is_remote ? `${b.name} (remote)` : b.name, value: b.name })),
-);
+const rebaseDialogVisible = ref(false);
 function openRebaseDialog() {
   closeMenus();
-  rebaseTarget.value = "";
-  rebaseDialog.value = true;
-}
-async function doRebase() {
-  if (!rebaseTarget.value) return;
-  await git.rebaseOnto(rebaseTarget.value);
-  rebaseDialog.value = false;
-  rebaseTarget.value = "";
+  rebaseDialogVisible.value = true;
 }
 
 // === Revert ===
-const revertDialog = ref(false);
+const revertDialogVisible = ref(false);
 const revertTarget = ref<GitCommit | null>(null);
 function askRevert(c: GitCommit) {
   revertTarget.value = c;
-  revertDialog.value = true;
-}
-async function doRevert() {
-  if (!revertTarget.value) return;
-  await git.revert(revertTarget.value.hash);
-  revertDialog.value = false;
-  revertTarget.value = null;
+  revertDialogVisible.value = true;
 }
 
 // === Worktree ===
-const worktreeDialog = ref(false);
-const worktreeListDialog = ref(false);
-const wtParent = ref("");
-const wtFolder = ref("");
-const wtCreateNewBranch = ref(false);
-const wtExistingBranch = ref("");
-const wtNewBranch = ref("");
-const wtOpenAfter = ref(true);
-
-const worktreeBranchOptions = computed(() =>
-  git.localBranches.value.map((b) => ({ label: b.name, value: b.name })),
-);
-
-function resetWorktreeForm() {
-  wtParent.value = "";
-  wtFolder.value = "";
-  wtCreateNewBranch.value = false;
-  wtExistingBranch.value = git.info.value?.current_branch ?? "";
-  wtNewBranch.value = "";
-  wtOpenAfter.value = true;
-}
+const worktreeCreateDialogVisible = ref(false);
+const worktreeListDialogVisible = ref(false);
 function openWorktreeCreate() {
   closeMenus();
-  resetWorktreeForm();
-  worktreeDialog.value = true;
+  worktreeCreateDialogVisible.value = true;
 }
 function openWorktreeList() {
   closeMenus();
-  git.loadWorktrees();
-  worktreeListDialog.value = true;
+  worktreeListDialogVisible.value = true;
 }
-async function pickWorktreeParent() {
-  const picked = await open({ directory: true, title: "Chọn thư mục cha cho worktree" });
-  if (picked && typeof picked === "string") wtParent.value = picked;
+
+// === Tag ===
+const tagDialogVisible = ref(false);
+const tagTarget = ref<{ hash: string; label: string }>({ hash: "", label: "HEAD" });
+function openTagDialog(target?: { hash: string; label: string }) {
+  closeMenus();
+  closeCommitMenu();
+  tagTarget.value = target ?? { hash: "", label: "HEAD (branch hiện tại)" };
+  tagDialogVisible.value = true;
 }
-function joinPath(parent: string, name: string) {
-  const sep = parent.includes("\\") ? "\\" : "/";
-  return `${parent.replace(/[/\\]+$/, "")}${sep}${name}`;
+
+// === Merge ===
+const mergeDialogVisible = ref(false);
+function openMergeDialog() {
+  closeMenus();
+  mergeDialogVisible.value = true;
 }
-const worktreeCanCreate = computed(() => {
-  if (!wtParent.value.trim()) return false;
-  return wtCreateNewBranch.value ? !!wtNewBranch.value.trim() : !!wtExistingBranch.value;
-});
-async function doWorktreeCreate() {
-  if (!worktreeCanCreate.value) return;
-  const branchRef = wtCreateNewBranch.value ? wtNewBranch.value.trim() : wtExistingBranch.value;
-  const defaultFolder = (branchRef.split(/[/\\]/).pop() || "worktree").trim();
-  const folder = (wtFolder.value.trim() || defaultFolder) || "worktree";
-  const fullPath = joinPath(wtParent.value, folder);
-  const created = await git.worktreeAdd(
-    fullPath,
-    wtCreateNewBranch.value ? "" : wtExistingBranch.value,
-    wtCreateNewBranch.value ? wtNewBranch.value.trim() : "",
-  );
-  if (created) {
-    worktreeDialog.value = false;
-    if (wtOpenAfter.value) await git.openPathAsRepo(created);
-  }
+
+// === Compare / Pull Request ===
+const compareDialogVisible = ref(false);
+const comparePr = ref<{ base: string; head: string } | null>(null);
+function openCompareDialog() {
+  closeMenus();
+  comparePr.value = null;
+  compareDialogVisible.value = true;
+}
+function handleOpenCompare(pr: { base: string; head: string } | null) {
+  comparePr.value = pr;
+  compareDialogVisible.value = true;
+}
+
+// === Danh sách Pull Request ===
+const prDialogVisible = ref(false);
+function openPrDialog() {
+  closeMenus();
+  prDialogVisible.value = true;
+}
+
+// === Reset HEAD ===
+const resetHeadDialogVisible = ref(false);
+function openResetHeadDialog() {
+  closeMenus();
+  resetHeadDialogVisible.value = true;
+}
+
+// === Cleanup branch đã merge ===
+const cleanupDialogVisible = ref(false);
+function openCleanupDialog() {
+  closeMenus();
+  cleanupDialogVisible.value = true;
+}
+
+// === Resolve conflict ===
+const conflictDialogVisible = ref(false);
+function openConflictDialog() {
+  closeMenus();
+  conflictDialogVisible.value = true;
+}
+
+// === Update from main/master ===
+const updateDialogVisible = ref(false);
+function openUpdateDialog() {
+  closeMenus();
+  updateDialogVisible.value = true;
+}
+
+// === File actions: copy path / show in folder (context menu) ===
+function absPath(rel: string): string {
+  const root = git.info.value?.path || git.activeRepo.value?.path || "";
+  if (!root) return rel;
+  const sep = root.includes("\\") ? "\\" : "/";
+  const relNorm = sep === "\\" ? rel.replace(/\//g, "\\") : rel;
+  return `${root.replace(/[/\\]+$/, "")}${sep}${relNorm}`;
+}
+const fileMenu = ref<{ x: number; y: number; rel: string } | null>(null);
+function openFileMenu(e: MouseEvent, rel: string) {
+  e.preventDefault();
+  e.stopPropagation();
+  const x = Math.min(e.clientX, window.innerWidth - 220);
+  const y = Math.min(e.clientY, window.innerHeight - 160);
+  fileMenu.value = { x: Math.max(8, x), y: Math.max(8, y), rel };
+  requestAnimationFrame(() => {
+    window.addEventListener("click", closeFileMenu);
+    window.addEventListener("contextmenu", closeFileMenu);
+    window.addEventListener("scroll", closeFileMenu, true);
+  });
+}
+function closeFileMenu() {
+  fileMenu.value = null;
+  window.removeEventListener("click", closeFileMenu);
+  window.removeEventListener("contextmenu", closeFileMenu);
+  window.removeEventListener("scroll", closeFileMenu, true);
+}
+onUnmounted(closeFileMenu);
+
+// === Commit browser (duyệt commit + copy nhiều SHA) ===
+const browserDialogVisible = ref(false);
+function openCommitBrowser() {
+  closeMenus();
+  browserDialogVisible.value = true;
+}
+
+// === Visualization (đồ thị commit) ===
+const graphDialogVisible = ref(false);
+function openGraphDialog() {
+  closeMenus();
+  graphDialogVisible.value = true;
 }
 
 // === Context menu trên history ===
@@ -331,33 +343,19 @@ function isTopCommit(c: GitCommit) {
 }
 
 // Reset (hard) — cần xác nhận vì mất dữ liệu.
-const resetHardDialog = ref(false);
+const resetHardDialogVisible = ref(false);
 const resetHardCommit = ref<GitCommit | null>(null);
 function askResetHard(c: GitCommit) {
   resetHardCommit.value = c;
-  resetHardDialog.value = true;
-}
-async function doResetHard() {
-  if (resetHardCommit.value) await git.resetTo(resetHardCommit.value.hash, "hard");
-  resetHardDialog.value = false;
-  resetHardCommit.value = null;
+  resetHardDialogVisible.value = true;
 }
 
 // Tạo branch từ commit.
-const branchFromDialog = ref(false);
-const branchFromName = ref("");
+const branchFromDialogVisible = ref(false);
 const branchFromCommit = ref<GitCommit | null>(null);
 function askBranchFrom(c: GitCommit) {
   branchFromCommit.value = c;
-  branchFromName.value = "";
-  branchFromDialog.value = true;
-}
-async function doBranchFrom() {
-  if (!branchFromCommit.value || !branchFromName.value.trim()) return;
-  await git.createBranchAt(branchFromName.value, branchFromCommit.value.hash);
-  branchFromDialog.value = false;
-  branchFromName.value = "";
-  branchFromCommit.value = null;
+  branchFromDialogVisible.value = true;
 }
 
 onUnmounted(closeCommitMenu);
@@ -436,7 +434,7 @@ onUnmounted(closeCommitMenu);
               </button>
               <button
                 class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-canvas hover:text-brand"
-                @click="closeMenus(); cloneDialog = true"
+                @click="closeMenus(); cloneDialogVisible = true"
               >
                 <i class="pi pi-cloud-download text-xs" /> Clone URL
               </button>
@@ -500,7 +498,7 @@ onUnmounted(closeCommitMenu);
             <div class="mt-1 border-t border-divider pt-1.5">
               <button
                 class="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium text-secondary transition-colors hover:bg-canvas hover:text-brand"
-                @click="branchMenuOpen = false; newBranchDialog = true"
+                @click="branchMenuOpen = false; newBranchDialogVisible = true"
               >
                 <i class="pi pi-plus text-xs" /> Tạo branch mới
               </button>
@@ -508,19 +506,55 @@ onUnmounted(closeCommitMenu);
           </div>
         </div>
 
-        <!-- Trạng thái bận -->
-        <span v-if="git.busyMessage.value" class="ml-2 flex items-center gap-1 text-[11px] text-muted">
-          <i class="pi pi-spinner pi-spin text-[11px]" /> {{ git.busyMessage.value }}
-        </span>
+        <!-- Fetch -->
+        <button
+          v-if="git.activeRepo.value"
+          class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:opacity-50"
+          :disabled="git.syncing.value"
+          @click="git.fetch()"
+        >
+          <i class="pi text-[11px]" :class="git.syncing.value ? 'pi-spinner pi-spin' : 'pi-refresh'" /> Fetch
+        </button>
+
+        <!-- Trạng thái bận / tiến trình -->
+        <div v-if="git.busyMessage.value" class="ml-2 flex items-center gap-2 text-[11px] text-muted">
+          <i class="pi pi-spinner pi-spin text-[11px]" />
+          <template v-if="git.syncProgress.value">
+            <span class="whitespace-nowrap">
+              {{ git.syncProgress.value.phase }} {{ git.syncProgress.value.percent }}%
+            </span>
+            <span class="h-1.5 w-24 overflow-hidden rounded-full bg-canvas">
+              <span
+                class="block h-full rounded-full bg-brand transition-[width] duration-150"
+                :style="{ width: git.syncProgress.value.percent + '%' }"
+              />
+            </span>
+          </template>
+          <span v-else class="whitespace-nowrap">{{ git.busyMessage.value }}</span>
+        </div>
 
         <div class="ml-auto flex items-center gap-0.5">
           <template v-if="git.activeRepo.value">
             <button
-              class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:opacity-50"
-              :disabled="git.syncing.value"
-              @click="git.fetch()"
+              class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Visualization — đồ thị commit"
+              @click="openGraphDialog"
             >
-              <i class="pi text-[11px]" :class="git.syncing.value ? 'pi-spinner pi-spin' : 'pi-refresh'" /> Fetch
+              <i class="pi pi-sitemap text-[11px]" /> Graph
+            </button>
+            <button
+              class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Mở terminal tại repo"
+              @click="git.openTerminal()"
+            >
+              <i class="pi pi-desktop text-[11px]" />
+            </button>
+            <button
+              class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Mở thư mục repo"
+              @click="git.showInFolder(git.info.value?.path || git.activeRepo.value.path)"
+            >
+              <i class="pi pi-folder-open text-[11px]" />
             </button>
             <button
               class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:opacity-50"
@@ -561,6 +595,32 @@ onUnmounted(closeCommitMenu);
                 <button :class="ctxItem" @click="openWorktreeList">
                   <i class="pi pi-list text-xs" /> Quản lý worktree…
                 </button>
+                <div class="my-1 border-t border-divider" />
+                <button :class="ctxItem" @click="openTagDialog()">
+                  <i class="pi pi-tag text-xs" /> Tạo tag…
+                </button>
+                <button :class="ctxItem" @click="openMergeDialog">
+                  <i class="pi pi-code-branch text-xs" /> Merge branch…
+                </button>
+                <button :class="ctxItem" @click="openCompareDialog">
+                  <i class="pi pi-arrows-h text-xs" /> So sánh / Pull Request…
+                </button>
+                <button :class="ctxItem" @click="openPrDialog">
+                  <i class="pi pi-flag text-xs" /> Xem Pull Requests…
+                </button>
+                <div class="my-1 border-t border-divider" />
+                <button :class="ctxItem" @click="openUpdateDialog">
+                  <i class="pi pi-arrow-circle-down text-xs" /> Cập nhật từ main/master…
+                </button>
+                <button :class="ctxItem" @click="openResetHeadDialog">
+                  <i class="pi pi-backward text-xs" /> Reset HEAD…
+                </button>
+                <button :class="ctxItem" @click="openCleanupDialog">
+                  <i class="pi pi-eraser text-xs" /> Cleanup branch đã merge…
+                </button>
+                <button :class="ctxItem" @click="openCommitBrowser">
+                  <i class="pi pi-copy text-xs" /> Duyệt commit / copy SHA…
+                </button>
               </div>
             </div>
           </template>
@@ -576,6 +636,9 @@ onUnmounted(closeCommitMenu);
         <span class="font-semibold text-amber-800">Đang có một rebase dở dang.</span>
         <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Tiếp tục, hoặc Hủy để quay lại.</span>
         <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="secondary" @click="openConflictDialog">
+            <i class="pi pi-wrench mr-1.5 text-xs" /> Xử lý xung đột
+          </Button>
           <Button size="small" :disabled="!!git.busyMessage.value" @click="git.rebaseContinue()">
             <i class="pi pi-play mr-1.5 text-xs" /> Tiếp tục
           </Button>
@@ -594,11 +657,32 @@ onUnmounted(closeCommitMenu);
         <span class="font-semibold text-amber-800">Đang có một cherry-pick dở dang.</span>
         <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Tiếp tục, hoặc Hủy để quay lại.</span>
         <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="secondary" @click="openConflictDialog">
+            <i class="pi pi-wrench mr-1.5 text-xs" /> Xử lý xung đột
+          </Button>
           <Button size="small" :disabled="!!git.busyMessage.value" @click="git.cherryPickContinue()">
             <i class="pi pi-play mr-1.5 text-xs" /> Tiếp tục
           </Button>
           <Button size="small" outlined severity="danger" :disabled="!!git.busyMessage.value" @click="git.cherryPickAbort()">
             <i class="pi pi-times mr-1.5 text-xs" /> Hủy cherry-pick
+          </Button>
+        </div>
+      </div>
+
+      <!-- Merge in progress banner -->
+      <div
+        v-if="git.info.value?.merge_in_progress"
+        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm"
+      >
+        <i class="pi pi-exclamation-triangle text-amber-600" />
+        <span class="font-semibold text-amber-800">Đang có một merge dở dang.</span>
+        <span class="text-amber-700">Giải quyết xung đột (stage file) rồi Commit để hoàn tất, hoặc Hủy.</span>
+        <div class="ml-auto flex gap-2">
+          <Button size="small" outlined severity="secondary" @click="openConflictDialog">
+            <i class="pi pi-wrench mr-1.5 text-xs" /> Xử lý xung đột
+          </Button>
+          <Button size="small" outlined severity="danger" :disabled="!!git.busyMessage.value" @click="git.mergeAbort()">
+            <i class="pi pi-times mr-1.5 text-xs" /> Hủy merge
           </Button>
         </div>
       </div>
@@ -617,7 +701,7 @@ onUnmounted(closeCommitMenu);
           <Button size="small" @click="git.addRepoFromDialog()">
             <i class="pi pi-folder-open mr-1.5" /> Thêm repo local
           </Button>
-          <Button size="small" outlined severity="secondary" @click="cloneDialog = true">
+          <Button size="small" outlined severity="secondary" @click="cloneDialogVisible = true">
             <i class="pi pi-cloud-download mr-1.5" /> Clone từ URL
           </Button>
         </div>
@@ -690,6 +774,7 @@ onUnmounted(closeCommitMenu);
                   class="group flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-canvas"
                   :class="isFileSelected(f.path, true) ? 'bg-canvas' : ''"
                   @click="git.selectFile(f, true)"
+                  @contextmenu="openFileMenu($event, f.path)"
                 >
                   <Checkbox :model-value="true" binary @click.stop @change="git.unstageFiles([f.path])" />
                   <i class="pi pi-file shrink-0 text-xs" :class="statusMeta(f.status).cls" />
@@ -735,6 +820,7 @@ onUnmounted(closeCommitMenu);
                   class="group flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-canvas"
                   :class="isFileSelected(f.path, false) ? 'bg-canvas' : ''"
                   @click="git.selectFile(f, false)"
+                  @contextmenu="openFileMenu($event, f.path)"
                 >
                   <Checkbox :model-value="false" binary @click.stop @change="git.stageFiles([f.path])" />
                   <i class="pi pi-file shrink-0 text-xs" :class="statusMeta(f.status).cls" />
@@ -989,6 +1075,7 @@ onUnmounted(closeCommitMenu);
                   class="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-canvas"
                   :class="git.commitFileDiff.value?.path === f.path ? 'bg-canvas' : ''"
                   @click="git.selectCommitFile(f)"
+                  @contextmenu="openFileMenu($event, f.path)"
                 >
                   <span class="shrink-0 text-xs font-bold" :class="statusMeta(f.status).cls">{{ f.status }}</span>
                   <span class="min-w-0 flex-1 truncate text-xs text-ink" :title="f.path">{{ baseName(f.path) }}</span>
@@ -1058,244 +1145,56 @@ onUnmounted(closeCommitMenu);
     <div v-if="repoMenuOpen || branchMenuOpen || moreMenuOpen" class="fixed inset-0 z-20" @click="closeMenus" />
 
     <!-- ======================= DIALOGS ======================= -->
-    <Dialog v-model:visible="cloneDialog" modal header="Clone repository" :style="{ width: '460px' }">
-      <div class="flex flex-col gap-3">
-        <label class="text-sm font-medium text-ink">URL repository</label>
-        <InputText
-          v-model="cloneUrl"
-          placeholder="https://github.com/user/repo.git"
-          class="w-full"
-          @keydown.enter="doClone"
-        />
-        <p class="text-xs text-muted">Sau khi nhập URL, bạn sẽ chọn thư mục để clone vào.</p>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="cloneDialog = false">Hủy</Button>
-        <Button size="small" :loading="git.syncing.value" :disabled="!cloneUrl.trim()" @click="doClone">
-          <i class="pi pi-cloud-download mr-1.5" /> Clone
-        </Button>
-      </template>
-    </Dialog>
+    <GitCloneRepoDialog v-model:visible="cloneDialogVisible" :git="git" />
+    <GitNewBranchDialog v-model:visible="newBranchDialogVisible" :git="git" />
+    <GitDiscardConfirmDialog v-model:visible="discardDialogVisible" :git="git" :target="discardTarget" />
+    <GitRebaseDialog v-model:visible="rebaseDialogVisible" :git="git" />
+    <GitRevertDialog v-model:visible="revertDialogVisible" :git="git" :target="revertTarget" />
+    <GitWorktreeCreateDialog v-model:visible="worktreeCreateDialogVisible" :git="git" />
+    <GitWorktreeListDialog
+      v-model:visible="worktreeListDialogVisible"
+      :git="git"
+      @create-worktree="worktreeCreateDialogVisible = true"
+    />
+    <GitTagDialog v-model:visible="tagDialogVisible" :git="git" :target="tagTarget" />
+    <GitMergeDialog v-model:visible="mergeDialogVisible" :git="git" />
+    <GitPullRequestsDialog
+      v-model:visible="prDialogVisible"
+      :git="git"
+      @open-compare="handleOpenCompare"
+    />
+    <GitCompareDialog
+      v-model:visible="compareDialogVisible"
+      :git="git"
+      :pr="comparePr"
+      :on-file-context="openFileMenu"
+    />
+    <GitResetHeadDialog v-model:visible="resetHeadDialogVisible" :git="git" />
+    <GitCleanupDialog v-model:visible="cleanupDialogVisible" :git="git" />
+    <GitConflictDialog v-model:visible="conflictDialogVisible" :git="git" />
+    <GitUpdateFromMainDialog v-model:visible="updateDialogVisible" :git="git" />
+    <GitResetHardDialog v-model:visible="resetHardDialogVisible" :git="git" :target="resetHardCommit" />
+    <GitBranchFromCommitDialog v-model:visible="branchFromDialogVisible" :git="git" :target="branchFromCommit" />
+    <GitGraphDialog v-model:visible="graphDialogVisible" :git="git" :on-file-context="openFileMenu" />
+    <GitCommitBrowserDialog v-model:visible="browserDialogVisible" :git="git" :on-file-context="openFileMenu" />
 
-    <Dialog v-model:visible="newBranchDialog" modal header="Tạo branch mới" :style="{ width: '420px' }">
-      <div class="flex flex-col gap-3">
-        <label class="text-sm font-medium text-ink">Tên branch</label>
-        <InputText
-          v-model="newBranchName"
-          placeholder="feature/ten-branch"
-          class="w-full"
-          @keydown.enter="doCreateBranch"
-        />
-        <p class="text-xs text-muted">
-          Tạo từ branch hiện tại (<strong>{{ git.info.value?.current_branch }}</strong>) và tự động chuyển sang.
-        </p>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="newBranchDialog = false">Hủy</Button>
-        <Button size="small" :disabled="!newBranchName.trim()" @click="doCreateBranch">
-          <i class="pi pi-plus mr-1.5" /> Tạo branch
-        </Button>
-      </template>
-    </Dialog>
-
-    <Dialog v-model:visible="discardDialog" modal header="Xác nhận discard" :style="{ width: '420px' }">
-      <p class="text-sm text-secondary">
-        Bỏ thay đổi của <strong class="text-ink">{{ discardTarget?.label }}</strong>?
-        Thao tác này không thể hoàn tác.
-      </p>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="discardDialog = false">Hủy</Button>
-        <Button size="small" severity="danger" @click="confirmDiscard">
-          <i class="pi pi-trash mr-1.5" /> Discard
-        </Button>
-      </template>
-    </Dialog>
-
-    <!-- Rebase dialog -->
-    <Dialog v-model:visible="rebaseDialog" modal header="Rebase branch hiện tại" :style="{ width: '460px' }">
-      <div class="flex flex-col gap-3">
-        <p class="text-sm text-secondary">
-          Rebase <strong class="text-ink">{{ git.info.value?.current_branch }}</strong> lên trên branch:
-        </p>
-        <Select
-          v-model="rebaseTarget"
-          :options="rebaseOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Chọn branch đích…"
-          filter
-          class="w-full"
-        />
-        <p class="text-xs text-muted">
-          Nếu có xung đột, rebase sẽ tạm dừng — bạn giải quyết ở tab Changes rồi bấm "Tiếp tục" trên thanh cảnh báo.
-        </p>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="rebaseDialog = false">Hủy</Button>
-        <Button size="small" :disabled="!rebaseTarget || !!git.busyMessage.value" @click="doRebase">
-          <i class="pi pi-arrows-v mr-1.5" /> Rebase
-        </Button>
-      </template>
-    </Dialog>
-
-    <!-- Revert dialog -->
-    <Dialog v-model:visible="revertDialog" modal header="Revert commit" :style="{ width: '460px' }">
-      <p class="text-sm text-secondary">
-        Tạo một commit mới đảo ngược thay đổi của:
-      </p>
-      <div v-if="revertTarget" class="mt-2 rounded-md border border-divider bg-canvas p-2.5">
-        <p class="text-sm font-medium text-ink">{{ revertTarget.subject }}</p>
-        <p class="mt-0.5 font-mono text-[11px] text-muted">{{ revertTarget.short_hash }} · {{ revertTarget.author_name }}</p>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="revertDialog = false">Hủy</Button>
-        <Button size="small" :disabled="!!git.busyMessage.value" @click="doRevert">
-          <i class="pi pi-undo mr-1.5" /> Revert
-        </Button>
-      </template>
-    </Dialog>
-
-    <!-- Worktree create dialog -->
-    <Dialog v-model:visible="worktreeDialog" modal header="Tạo worktree" :style="{ width: '520px' }">
-      <div class="flex flex-col gap-3">
-        <div>
-          <label class="mb-1 block text-sm font-medium text-ink">Thư mục cha</label>
-          <div class="flex gap-2">
-            <InputText :model-value="wtParent" readonly placeholder="Chọn thư mục…" class="min-w-0 flex-1" />
-            <Button size="small" outlined severity="secondary" @click="pickWorktreeParent">
-              <i class="pi pi-folder-open mr-1.5" /> Chọn
-            </Button>
-          </div>
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-ink">Tên thư mục worktree</label>
-          <InputText v-model="wtFolder" placeholder="(mặc định theo tên branch)" class="w-full" />
-        </div>
-        <div class="flex items-center gap-2">
-          <Checkbox v-model="wtCreateNewBranch" binary input-id="wt-new-branch" />
-          <label for="wt-new-branch" class="text-sm text-ink">Tạo branch mới (từ HEAD hiện tại)</label>
-        </div>
-        <div v-if="wtCreateNewBranch">
-          <label class="mb-1 block text-sm font-medium text-ink">Tên branch mới</label>
-          <InputText v-model="wtNewBranch" placeholder="feature/ten-branch" class="w-full" />
-        </div>
-        <div v-else>
-          <label class="mb-1 block text-sm font-medium text-ink">Branch (đã có)</label>
-          <Select
-            v-model="wtExistingBranch"
-            :options="worktreeBranchOptions"
-            option-label="label"
-            option-value="value"
-            placeholder="Chọn branch…"
-            filter
-            class="w-full"
-          />
-        </div>
-        <div class="flex items-center gap-2">
-          <Checkbox v-model="wtOpenAfter" binary input-id="wt-open-after" />
-          <label for="wt-open-after" class="text-sm text-ink">Mở worktree sau khi tạo</label>
-        </div>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="worktreeDialog = false">Hủy</Button>
-        <Button size="small" :disabled="!worktreeCanCreate || !!git.busyMessage.value" @click="doWorktreeCreate">
-          <i class="pi pi-clone mr-1.5" /> Tạo worktree
-        </Button>
-      </template>
-    </Dialog>
-
-    <!-- Worktree list dialog -->
-    <Dialog v-model:visible="worktreeListDialog" modal header="Worktrees" :style="{ width: '620px' }">
-      <div class="flex flex-col gap-2">
-        <div
-          v-for="w in git.worktrees.value"
-          :key="w.path"
-          class="flex items-center gap-2 rounded-md border border-divider px-3 py-2"
-        >
-          <i class="pi shrink-0 text-sm" :class="w.is_current ? 'pi-check-circle text-brand' : 'pi-folder text-muted'" />
-          <div class="min-w-0 flex-1">
-            <p class="truncate font-mono text-xs text-ink">{{ w.path }}</p>
-            <p class="text-[11px] text-muted">
-              <span v-if="w.is_bare">bare</span>
-              <span v-else-if="w.is_detached">detached @ {{ w.head.slice(0, 7) }}</span>
-              <span v-else>{{ w.branch }}</span>
-              <span v-if="w.is_current" class="ml-1 text-brand">· đang mở</span>
-            </p>
-          </div>
-          <Button
-            v-if="!w.is_current"
-            size="small"
-            outlined
-            severity="secondary"
-            class="shrink-0"
-            title="Mở worktree này"
-            @click="worktreeListDialog = false; git.openPathAsRepo(w.path)"
-          >
-            <i class="pi pi-external-link" />
-          </Button>
-          <Button
-            v-if="!w.is_current && !w.is_bare"
-            size="small"
-            outlined
-            severity="danger"
-            class="shrink-0"
-            title="Gỡ worktree"
-            @click="git.worktreeRemove(w.path, false)"
-          >
-            <i class="pi pi-trash" />
-          </Button>
-        </div>
-        <div v-if="!git.worktrees.value.length" class="p-4 text-center text-sm text-muted">
-          Chưa có worktree nào.
-        </div>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="worktreeListDialog = false">Đóng</Button>
-        <Button size="small" @click="worktreeListDialog = false; openWorktreeCreate()">
-          <i class="pi pi-plus mr-1.5" /> Tạo worktree
-        </Button>
-      </template>
-    </Dialog>
-
-    <!-- Reset (hard) confirm -->
-    <Dialog v-model:visible="resetHardDialog" modal header="Reset (hard)" :style="{ width: '470px' }">
-      <p class="text-sm text-secondary">
-        Reset branch về <strong class="text-ink">{{ resetHardCommit?.short_hash }}</strong> và
-        <strong class="text-red-600">xóa toàn bộ thay đổi</strong> sau commit này (kể cả file đang sửa).
-        Thao tác này không thể hoàn tác.
-      </p>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="resetHardDialog = false">Hủy</Button>
-        <Button size="small" severity="danger" :disabled="!!git.busyMessage.value" @click="doResetHard">
-          <i class="pi pi-exclamation-triangle mr-1.5" /> Reset hard
-        </Button>
-      </template>
-    </Dialog>
-
-    <!-- Create branch from commit -->
-    <Dialog v-model:visible="branchFromDialog" modal header="Tạo branch từ commit" :style="{ width: '440px' }">
-      <div class="flex flex-col gap-3">
-        <div v-if="branchFromCommit" class="rounded-md border border-divider bg-canvas p-2.5">
-          <p class="text-sm font-medium text-ink">{{ branchFromCommit.subject }}</p>
-          <p class="mt-0.5 font-mono text-[11px] text-muted">{{ branchFromCommit.short_hash }}</p>
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-ink">Tên branch</label>
-          <InputText
-            v-model="branchFromName"
-            placeholder="feature/ten-branch"
-            class="w-full"
-            @keydown.enter="doBranchFrom"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <Button size="small" outlined severity="secondary" @click="branchFromDialog = false">Hủy</Button>
-        <Button size="small" :disabled="!branchFromName.trim()" @click="doBranchFrom">
-          <i class="pi pi-sitemap mr-1.5" /> Tạo branch
-        </Button>
-      </template>
-    </Dialog>
+    <!-- File context menu (copy path / show in folder) -->
+    <div
+      v-if="fileMenu"
+      class="fixed z-40 w-52 rounded-lg border border-divider bg-panel p-1 shadow-float"
+      :style="{ left: fileMenu.x + 'px', top: fileMenu.y + 'px' }"
+      @click.stop
+    >
+      <button :class="ctxItem" @click="closeFileMenu(); git.copyText(absPath(fileMenu.rel), 'đường dẫn')">
+        <i class="pi pi-copy text-xs" /> Copy path
+      </button>
+      <button :class="ctxItem" @click="closeFileMenu(); git.copyText(fileMenu.rel, 'đường dẫn tương đối')">
+        <i class="pi pi-copy text-xs" /> Copy relative path
+      </button>
+      <button :class="ctxItem" @click="closeFileMenu(); git.showInFolder(absPath(fileMenu.rel))">
+        <i class="pi pi-folder-open text-xs" /> Show in folder
+      </button>
+    </div>
 
     <!-- Context menu: history commit -->
     <div
@@ -1319,6 +1218,9 @@ onUnmounted(closeCommitMenu);
       </button>
       <button :class="ctxItem" @click="closeCommitMenu(); git.checkoutCommit(commitMenu.commit.hash)">
         <i class="pi pi-arrow-right text-xs" /> Checkout commit (detached)
+      </button>
+      <button :class="ctxItem" @click="openTagDialog({ hash: commitMenu.commit.hash, label: commitMenu.commit.short_hash + ' — ' + commitMenu.commit.subject })">
+        <i class="pi pi-tag text-xs" /> Tạo tag tại đây…
       </button>
       <div class="my-1 border-t border-divider" />
       <button :class="ctxItem" @click="closeCommitMenu(); git.resetTo(commitMenu.commit.hash, 'mixed')">

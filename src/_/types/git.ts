@@ -19,6 +19,60 @@ export interface GitRepoInfo {
   remote_url: string;
   rebase_in_progress: boolean;
   cherry_pick_in_progress: boolean;
+  merge_in_progress: boolean;
+}
+
+/** Một tag. */
+export interface GitTag {
+  name: string;
+  target: string;
+  subject: string;
+  date: string;
+}
+
+/** Một commit cho đồ thị visualization (kèm parents + refs). */
+export interface GitGraphCommit {
+  hash: string;
+  short_hash: string;
+  subject: string;
+  author_name: string;
+  relative_date: string;
+  parents: string[];
+  refs: string[];
+}
+
+/** Mốc tiến trình của thao tác mạng (fetch/pull/push/clone). */
+export interface GitProgress {
+  phase: string;
+  percent: number;
+  raw: string;
+}
+
+/** Một Pull Request / Merge Request lấy từ API host. */
+export interface GitPullRequest {
+  number: number;
+  title: string;
+  author: string;
+  /** "open" | "closed" | "merged" | "draft" */
+  state: string;
+  draft: boolean;
+  head: string;
+  base: string;
+  url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Kết quả so sánh 2 branch (Compare + preview Pull Request). */
+export interface GitComparison {
+  base: string;
+  head: string;
+  ahead: number;
+  behind: number;
+  commits: GitCommit[];
+  files: GitFileChange[];
+  web_url: string;
+  pr_url: string;
 }
 
 /** Một Git worktree. */
