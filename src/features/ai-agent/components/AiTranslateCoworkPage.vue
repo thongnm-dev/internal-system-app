@@ -8,8 +8,10 @@ import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
 import InputText from "primevue/inputtext";
 import RadioButton from "primevue/radiobutton";
+import Select from "primevue/select";
 import { useAiTranslateCowork } from "../composables/useAiTranslateCowork";
 import type { AiAccount, AiAccountStatus, AiProvider } from "@/_/types/ai-usage";
+import type { AiModelResult } from "@/tauri/commands/ai-workflow";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
 const ctrl = useAiTranslateCowork();
@@ -397,6 +399,26 @@ function usageResetAt(account: AiAccount): string {
   return account.account_type === "subscription" ? account.session_reset_at : account.reset_at;
 }
 
+/** Nhãn hiển thị model: "Sonnet 5" (viết hoa chữ đầu + version). */
+function modelLabel(m: AiModelResult): string {
+  const name = m.model.charAt(0).toUpperCase() + m.model.slice(1);
+  return m.version ? `${name} ${m.version}` : name;
+}
+
+function modelOptions(account: AiAccount) {
+  return ctrl.modelOptionsFor(account).map((m) => ({ label: modelLabel(m), value: m.id }));
+}
+
+function selectAccountModel(account: AiAccount, modelId: number | null) {
+  ctrl.setSelectedModel(account.id, modelId);
+}
+
+const modelSelectPt = {
+  root: { class: "!bg-canvas !border-divider !min-h-0" },
+  label: { class: "!text-[11px] !py-1" },
+  option: { class: "!text-xs" },
+};
+
 function resetHint(resetAt: string): string {
   const raw = resetAt?.trim();
   if (!raw) return "—";
@@ -542,6 +564,19 @@ function isTextResult(entry: FileEntry): boolean {
             <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
               <i class="pi pi-clock" />reset {{ resetHint(usageResetAt(account)) }}
             </p>
+            <label v-if="modelOptions(account).length" class="mt-2 block" @click.stop>
+              <span class="text-[11px] font-bold text-muted">Model</span>
+              <Select
+                :model-value="ctrl.selectedModelIdFor(account)"
+                :options="modelOptions(account)"
+                option-label="label"
+                option-value="value"
+                placeholder="Mặc định (Sonnet)"
+                class="mt-1 w-full"
+                :pt="modelSelectPt"
+                @update:model-value="(v) => selectAccountModel(account, v)"
+              />
+            </label>
           </div>
         </div>
         <p v-else class="p-4 text-center text-xs text-muted">Chưa có account AI nào. Thêm ở màn AI Usage.</p>

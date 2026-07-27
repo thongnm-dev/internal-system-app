@@ -4,8 +4,10 @@ import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { aiUsageListAccounts, aiUsageOpenTerminal, aiUsageSetActive } from "@/tauri/commands/ai-usage";
+import { aiModelList } from "@/tauri/commands/ai-workflow";
 import { aiTranslateCoworkGetState, aiTranslateCoworkSaveState } from "@/tauri/commands/ai-translate-cowork";
 import type { AiAccount } from "@/_/types/ai-usage";
+import type { AiModelResult } from "@/tauri/commands/ai-workflow";
 import {
   explorerCreateFolder,
   explorerDelete,
@@ -39,6 +41,10 @@ export function useAiTranslateCowork() {
   const accounts = ref<AiAccount[]>([]);
   const isLoadingAccounts = ref(false);
   const settingActiveId = ref<number | null>(null);
+
+  // Model AI để chạy skill (`--model`), chọn riêng cho từng account (mặc định: Sonnet).
+  const models = ref<AiModelResult[]>([]);
+  const selectedModelId = ref<Record<number, number | null>>({});
 
   // Column 2 — skills discovered under `<projectDir>/.claude/skills`.
   const skillFolders = ref<string[]>([]);
@@ -363,6 +369,48 @@ export function useAiTranslateCowork() {
     }
   }
 
+  // --- Model AI (per-account) ---
+  async function loadModels() {
+    try {
+      models.value = await aiModelList();
+    } catch {
+      // Không load được danh mục model — bỏ qua, chạy skill với model mặc định của claude.
+      models.value = [];
+    }
+  }
+
+  /** Model AI khả dụng cho 1 account (lọc theo provider của account). */
+  function modelOptionsFor(account: AiAccount): AiModelResult[] {
+    return models.value.filter((m) => m.provider === account.provider);
+  }
+
+  /** Model mặc định của account: Sonnet (bản mới nhất nếu có nhiều version). */
+  function defaultModelIdFor(account: AiAccount): number | null {
+    const candidates = modelOptionsFor(account).filter((m) => m.model === "sonnet");
+    if (!candidates.length) return null;
+    return candidates[candidates.length - 1].id;
+  }
+
+  /** Model đang chọn cho 1 account (mặc định Sonnet nếu chưa chọn). */
+  function selectedModelIdFor(account: AiAccount): number | null {
+    const chosen = selectedModelId.value[account.id];
+    return chosen !== undefined ? chosen : defaultModelIdFor(account);
+  }
+
+  function setSelectedModel(accountId: number, modelId: number | null) {
+    selectedModelId.value = { ...selectedModelId.value, [accountId]: modelId };
+  }
+
+  /** Giá trị `--model` tương ứng model đang chọn cho account (undefined nếu chưa chọn / không tìm thấy). */
+  function resolveAccountModel(account: AiAccount): string | undefined {
+    const modelId = selectedModelIdFor(account);
+    if (modelId === null) return undefined;
+    const m = models.value.find((x) => x.id === modelId);
+    if (!m) return undefined;
+    const version = m.version.trim();
+    return version ? `${m.model}-${version}` : m.model;
+  }
+
   // --- Column 2: skills ---
   async function loadSkillFolders() {
     const dir = projectDir.value.trim();
@@ -426,7 +474,7 @@ export function useAiTranslateCowork() {
     }
     openingSkillTerminal.value = name;
     try {
-      await aiUsageOpenTerminal(active.config_dir, dir, prompt);
+      await aiUsageOpenTerminal(active.config_dir, dir, prompt, resolveAccountModel(active));
     } catch (e) {
       toast.error(friendlyError(e));
     } finally {
@@ -451,7 +499,7 @@ export function useAiTranslateCowork() {
   }
 
   async function init() {
-    await loadAccounts();
+    await Promise.all([loadAccounts(), loadModels()]);
     if (!canUseTauriRuntime()) return;
     try {
       const state = await aiTranslateCoworkGetState();
@@ -480,6 +528,10 @@ export function useAiTranslateCowork() {
     activeAccount,
     loadAccounts,
     setActiveAccount,
+    models,
+    modelOptionsFor,
+    selectedModelIdFor,
+    setSelectedModel,
     // col 1 — input / output folder panels
     clipboard,
     input,
