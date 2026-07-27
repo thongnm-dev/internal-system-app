@@ -42,6 +42,7 @@ calamine = { version = "0.26", features = ["dates"] }
 lettre = { version = "0.11", features = ["tokio1-native-tls", "builder", "smtp-transport"] }
 rand = "0.8"
 portable-pty = "0.8"
+notify = "8"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"

@@ -11,10 +11,12 @@ const emit = defineEmits<{
 }>();
 
 const prStateFilter = ref<"open" | "closed" | "all">("open");
+const isMaximized = ref(false);
 
 watch(visible, (v) => {
   if (v) {
     prStateFilter.value = "open";
+    isMaximized.value = false;
     props.git.loadPullRequests("open");
   }
 });
@@ -43,7 +45,15 @@ function createNewPr() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="Pull Requests" :style="{ width: '720px' }">
+  <Dialog
+    v-model:visible="visible"
+    modal
+    maximizable
+    header="Pull Requests"
+    :style="{ width: '720px' }"
+    @maximize="isMaximized = true"
+    @unmaximize="isMaximized = false"
+  >
     <div class="flex flex-col gap-3">
       <div class="flex items-center gap-2">
         <div class="flex overflow-hidden rounded-md border border-divider">
@@ -67,7 +77,10 @@ function createNewPr() {
         <span class="ml-auto text-xs text-muted">Dùng credential git đã lưu để truy cập repo riêng tư.</span>
       </div>
 
-      <div class="min-h-[280px] max-h-[440px] overflow-y-auto rounded-md border border-divider">
+      <div
+        class="overflow-y-auto rounded-md border border-divider"
+        :class="isMaximized ? 'h-[calc(100vh-260px)]' : 'min-h-[280px] max-h-[440px]'"
+      >
         <div v-if="git.pullRequestsLoading.value" class="p-8 text-center text-sm text-muted">
           <i class="pi pi-spinner pi-spin mr-1.5" /> Đang tải…
         </div>

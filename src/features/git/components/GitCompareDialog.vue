@@ -16,6 +16,7 @@ const visible = defineModel<boolean>("visible", { default: false });
 
 const cmpBase = ref("");
 const cmpHead = ref("");
+const isMaximized = ref(false);
 
 const allBranchRefs = computed(() =>
   props.git.branches.value
@@ -25,6 +26,7 @@ const allBranchRefs = computed(() =>
 
 watch(visible, (v) => {
   if (!v) return;
+  isMaximized.value = false;
   if (props.pr) {
     cmpBase.value = resolveRef(props.git.branches.value, props.pr.base);
     cmpHead.value = resolveRef(props.git.branches.value, props.pr.head);
@@ -53,7 +55,15 @@ async function doCreatePR() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="So sánh branch / Pull Request" :style="{ width: '840px' }">
+  <Dialog
+    v-model:visible="visible"
+    modal
+    maximizable
+    header="So sánh branch / Pull Request"
+    :style="{ width: '840px' }"
+    @maximize="isMaximized = true"
+    @unmaximize="isMaximized = false"
+  >
     <div class="flex flex-col gap-3">
       <div class="flex items-end gap-2">
         <div class="min-w-0 flex-1">
@@ -97,7 +107,11 @@ async function doCreatePR() {
         <span class="text-muted">{{ git.comparison.value.files.length }} file thay đổi</span>
       </div>
 
-      <div v-if="git.comparison.value" class="flex h-[380px] gap-2">
+      <div
+        v-if="git.comparison.value"
+        class="flex gap-2"
+        :class="isMaximized ? 'h-[calc(100vh-300px)]' : 'h-[380px]'"
+      >
         <!-- commits + files -->
         <div class="flex w-64 shrink-0 flex-col overflow-hidden rounded-md border border-divider">
           <div class="border-b border-divider bg-canvas px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-muted">

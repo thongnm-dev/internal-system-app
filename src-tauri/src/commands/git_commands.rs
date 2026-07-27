@@ -14,6 +14,7 @@ use crate::models::git::{
     GitPullRequest, GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 use crate::services::git_service;
+use crate::services::git_watch_service;
 
 // === Quản lý danh sách repo ===
 
@@ -565,4 +566,19 @@ pub async fn git_worktree_remove(
     .await
     .map_err(log_err)?
     .map_err(log_err)
+}
+
+// === Theo dõi thay đổi file (auto-refresh tab Changes, không cần bấm reload) ===
+
+/// Bắt đầu theo dõi thay đổi file trên đĩa của `path` — bắn event
+/// `git-repo-changed` cho frontend khi có thay đổi (đã debounce).
+#[tauri::command]
+pub fn git_watch_start(app: tauri::AppHandle, path: String) {
+    git_watch_service::start(app, path);
+}
+
+/// Dừng theo dõi (gọi khi đóng repo / rời màn hình Git Desktop).
+#[tauri::command]
+pub fn git_watch_stop() {
+    git_watch_service::stop();
 }

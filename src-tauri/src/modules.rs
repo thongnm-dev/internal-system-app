@@ -259,6 +259,8 @@ mod services {
     pub mod terminal_service;
     /// Service cho màn hình Git Desktop — gọi `git` CLI cho mọi thao tác.
     pub mod git_service;
+    /// Theo dõi thay đổi file trên đĩa của repo Git đang mở (auto-refresh tab Changes).
+    pub mod git_watch_service;
 }
 
 /// Tiện ích hạ tầng dùng chung (network, time, encoding, database).

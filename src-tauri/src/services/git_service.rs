@@ -1635,36 +1635,6 @@ pub fn worktree_remove(repo_path: &str, path: &str, force: bool) -> AppResult<St
     run(repo_path, &args)
 }
 
-// === Network (fetch / pull / push) ===
-
-/// Fetch tất cả remote + prune branch đã xóa.
-pub fn fetch(repo_path: &str) -> AppResult<String> {
-    run(repo_path, &["fetch", "--all", "--prune"])
-}
-
-/// Pull branch hiện tại từ upstream.
-pub fn pull(repo_path: &str) -> AppResult<String> {
-    run(repo_path, &["pull"])
-}
-
-/// Push branch hiện tại. Nếu chưa có upstream → tự set `-u origin <branch>`.
-pub fn push(repo_path: &str) -> AppResult<String> {
-    let info = repo_info(repo_path)?;
-    if info.upstream.is_empty() {
-        if info.current_branch.is_empty() || info.detached {
-            return Err(AppError::new(
-                "Đang ở detached HEAD — hãy checkout một branch trước khi push.",
-            ));
-        }
-        run(
-            repo_path,
-            &["push", "-u", "origin", &info.current_branch],
-        )
-    } else {
-        run(repo_path, &["push"])
-    }
-}
-
 // === Stash ===
 
 /// Liệt kê stash.
@@ -1707,29 +1677,4 @@ pub fn stash_apply(repo_path: &str, reference: &str, pop: bool) -> AppResult<Str
 /// Xóa một stash.
 pub fn stash_drop(repo_path: &str, reference: &str) -> AppResult<String> {
     run(repo_path, &["stash", "drop", reference])
-}
-
-// === Clone ===
-
-/// Clone một repo về `dest` (thư mục đích đầy đủ). Trả về đường dẫn đích.
-pub fn clone(url: &str, dest: &str) -> AppResult<String> {
-    if url.trim().is_empty() {
-        return Err(AppError::new("URL repository không được để trống."));
-    }
-    let mut cmd = Command::new("git");
-    configure(&mut cmd);
-    let output = cmd
-        .args(["clone", url, dest])
-        .output()
-        .map_err(|e| AppError::new(format!("Không chạy được git: {e}")))?;
-    if output.status.success() {
-        Ok(dest.to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Err(AppError::new(if stderr.is_empty() {
-            "Clone thất bại.".to_string()
-        } else {
-            stderr
-        }))
-    }
 }

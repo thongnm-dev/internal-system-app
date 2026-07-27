@@ -63,7 +63,8 @@ use commands::git_commands::{
     git_rebase_continue, git_remove_repo, git_repo_info, git_reset, git_resolve_conflict,
     git_revert, git_revert_abort, git_stage, git_stash_apply, git_stash_drop, git_stash_list,
     git_stash_save, git_status, git_tag_create, git_tag_delete, git_tag_list, git_touch_repo,
-    git_undo_last_commit, git_unstage, git_worktree_add, git_worktree_list, git_worktree_remove,
+    git_undo_last_commit, git_unstage, git_watch_start, git_watch_stop, git_worktree_add,
+    git_worktree_list, git_worktree_remove,
 };
 use commands::menu_config_commands::{list_menu_configs, save_all_menu_configs, save_menu_config};
 use commands::menu_permission_commands::{
@@ -373,6 +374,8 @@ pub fn run() {
             git_open_terminal,
             git_worktree_add,
             git_worktree_remove,
+            git_watch_start,
+            git_watch_stop,
             // === AI Usage commands ===
             ai_usage_add_account,
             ai_usage_detect_local,

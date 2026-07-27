@@ -36,3 +36,18 @@ export async function onS3NewDocuments(
   }
   return listen<S3NewDocumentsPayload>(S3_NEW_DOCUMENTS_EVENT, (event) => handler(event.payload));
 }
+
+/** Event backend bắn khi file watcher phát hiện thay đổi trong working tree của repo Git đang theo dõi. */
+export const GIT_REPO_CHANGED_EVENT = "git-repo-changed";
+
+/**
+ * Lắng nghe event `git-repo-changed` (file watcher nền cho repo Git đang mở).
+ * Payload là đường dẫn repo đã thay đổi. Trả về hàm huỷ đăng ký; no-op nếu
+ * không chạy trong Tauri runtime.
+ */
+export async function onGitRepoChanged(handler: (path: string) => void): Promise<UnlistenFn> {
+  if (!canUseTauriRuntime()) {
+    return () => {};
+  }
+  return listen<string>(GIT_REPO_CHANGED_EVENT, (event) => handler(event.payload));
+}

@@ -16,6 +16,7 @@ import GitRebaseDialog from "./GitRebaseDialog.vue";
 import GitRevertDialog from "./GitRevertDialog.vue";
 import GitWorktreeCreateDialog from "./GitWorktreeCreateDialog.vue";
 import GitWorktreeListDialog from "./GitWorktreeListDialog.vue";
+import GitStashListDialog from "./GitStashListDialog.vue";
 import GitTagDialog from "./GitTagDialog.vue";
 import GitMergeDialog from "./GitMergeDialog.vue";
 import GitPullRequestsDialog from "./GitPullRequestsDialog.vue";
@@ -201,6 +202,13 @@ function openWorktreeList() {
   worktreeListDialogVisible.value = true;
 }
 
+// === Stash ===
+const stashListDialogVisible = ref(false);
+function openStashList() {
+  closeMenus();
+  stashListDialogVisible.value = true;
+}
+
 // === Tag ===
 const tagDialogVisible = ref(false);
 const tagTarget = ref<{ hash: string; label: string }>({ hash: "", label: "HEAD" });
@@ -267,12 +275,18 @@ function openUpdateDialog() {
 }
 
 // === File actions: copy path / show in folder (context menu) ===
+// Git (kể cả trên Windows) luôn trả path với "/" — app chỉ chạy trên Windows
+// nên chuẩn hóa về "\" để khớp định dạng đường dẫn Windows quen thuộc.
+function winPath(p: string): string {
+  return p.replace(/\//g, "\\");
+}
 function absPath(rel: string): string {
   const root = git.info.value?.path || git.activeRepo.value?.path || "";
-  if (!root) return rel;
-  const sep = root.includes("\\") ? "\\" : "/";
-  const relNorm = sep === "\\" ? rel.replace(/\//g, "\\") : rel;
-  return `${root.replace(/[/\\]+$/, "")}${sep}${relNorm}`;
+  if (!root) return winPath(rel);
+  return `${winPath(root).replace(/\\+$/, "")}\\${winPath(rel)}`;
+}
+function relPath(rel: string): string {
+  return winPath(rel);
 }
 const fileMenu = ref<{ x: number; y: number; rel: string } | null>(null);
 function openFileMenu(e: MouseEvent, rel: string) {
@@ -596,6 +610,11 @@ onUnmounted(closeCommitMenu);
                   <i class="pi pi-list text-xs" /> Quản lý worktree…
                 </button>
                 <div class="my-1 border-t border-divider" />
+                <button :class="ctxItem" @click="openStashList">
+                  <i class="pi pi-inbox text-xs" /> Quản lý stash…
+                  <span v-if="git.stashes.value.length" class="ml-auto rounded-full bg-canvas px-1.5 text-[10px] font-semibold text-muted">{{ git.stashes.value.length }}</span>
+                </button>
+                <div class="my-1 border-t border-divider" />
                 <button :class="ctxItem" @click="openTagDialog()">
                   <i class="pi pi-tag text-xs" /> Tạo tag…
                 </button>
@@ -875,6 +894,17 @@ onUnmounted(closeCommitMenu);
                   @click="git.stashSave('')"
                 >
                   <i class="pi pi-inbox" />
+                </Button>
+                <Button
+                  v-if="git.stashes.value.length"
+                  size="small"
+                  outlined
+                  severity="secondary"
+                  title="Xem danh sách stash"
+                  @click="openStashList"
+                >
+                  <i class="pi pi-list" />
+                  <span class="ml-1">{{ git.stashes.value.length }}</span>
                 </Button>
               </div>
               <div v-if="git.staged.value.length" class="mt-1.5 text-[11px] text-muted">
@@ -1156,6 +1186,7 @@ onUnmounted(closeCommitMenu);
       :git="git"
       @create-worktree="worktreeCreateDialogVisible = true"
     />
+    <GitStashListDialog v-model:visible="stashListDialogVisible" :git="git" />
     <GitTagDialog v-model:visible="tagDialogVisible" :git="git" :target="tagTarget" />
     <GitMergeDialog v-model:visible="mergeDialogVisible" :git="git" />
     <GitPullRequestsDialog
@@ -1185,13 +1216,13 @@ onUnmounted(closeCommitMenu);
       :style="{ left: fileMenu.x + 'px', top: fileMenu.y + 'px' }"
       @click.stop
     >
-      <button :class="ctxItem" @click="closeFileMenu(); git.copyText(absPath(fileMenu.rel), 'đường dẫn')">
+      <button :class="ctxItem" @click="git.copyText(absPath(fileMenu.rel), 'đường dẫn'); closeFileMenu()">
         <i class="pi pi-copy text-xs" /> Copy path
       </button>
-      <button :class="ctxItem" @click="closeFileMenu(); git.copyText(fileMenu.rel, 'đường dẫn tương đối')">
+      <button :class="ctxItem" @click="git.copyText(relPath(fileMenu.rel), 'đường dẫn tương đối'); closeFileMenu()">
         <i class="pi pi-copy text-xs" /> Copy relative path
       </button>
-      <button :class="ctxItem" @click="closeFileMenu(); git.showInFolder(absPath(fileMenu.rel))">
+      <button :class="ctxItem" @click="git.showInFolder(absPath(fileMenu.rel)); closeFileMenu()">
         <i class="pi pi-folder-open text-xs" /> Show in folder
       </button>
     </div>
@@ -1203,37 +1234,37 @@ onUnmounted(closeCommitMenu);
       :style="{ left: commitMenu.x + 'px', top: commitMenu.y + 'px' }"
       @click.stop
     >
-      <button v-if="isTopCommit(commitMenu.commit)" :class="ctxItem" @click="closeCommitMenu(); git.undoLastCommit()">
+      <button v-if="isTopCommit(commitMenu.commit)" :class="ctxItem" @click="git.undoLastCommit(); closeCommitMenu()">
         <i class="pi pi-replay text-xs" /> Undo commit này
       </button>
-      <button :class="ctxItem" @click="closeCommitMenu(); askRevert(commitMenu.commit)">
+      <button :class="ctxItem" @click="askRevert(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-undo text-xs" /> Revert commit…
       </button>
-      <button :class="ctxItem" @click="closeCommitMenu(); git.cherryPick(commitMenu.commit.hash)">
+      <button :class="ctxItem" @click="git.cherryPick(commitMenu.commit.hash); closeCommitMenu()">
         <i class="pi pi-share-alt text-xs" /> Cherry-pick vào branch hiện tại
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="closeCommitMenu(); askBranchFrom(commitMenu.commit)">
+      <button :class="ctxItem" @click="askBranchFrom(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-sitemap text-xs" /> Tạo branch từ đây…
       </button>
-      <button :class="ctxItem" @click="closeCommitMenu(); git.checkoutCommit(commitMenu.commit.hash)">
+      <button :class="ctxItem" @click="git.checkoutCommit(commitMenu.commit.hash); closeCommitMenu()">
         <i class="pi pi-arrow-right text-xs" /> Checkout commit (detached)
       </button>
       <button :class="ctxItem" @click="openTagDialog({ hash: commitMenu.commit.hash, label: commitMenu.commit.short_hash + ' — ' + commitMenu.commit.subject })">
         <i class="pi pi-tag text-xs" /> Tạo tag tại đây…
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="closeCommitMenu(); git.resetTo(commitMenu.commit.hash, 'mixed')">
+      <button :class="ctxItem" @click="git.resetTo(commitMenu.commit.hash, 'mixed'); closeCommitMenu()">
         <i class="pi pi-history text-xs" /> Reset về đây (giữ thay đổi)
       </button>
-      <button :class="ctxDanger" @click="closeCommitMenu(); askResetHard(commitMenu.commit)">
+      <button :class="ctxDanger" @click="askResetHard(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-exclamation-triangle text-xs" /> Reset về đây (xóa thay đổi)…
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="closeCommitMenu(); git.copyText(commitMenu.commit.hash, 'SHA')">
+      <button :class="ctxItem" @click="git.copyText(commitMenu.commit.hash, 'SHA'); closeCommitMenu()">
         <i class="pi pi-copy text-xs" /> Copy SHA
       </button>
-      <button :class="ctxItem" @click="closeCommitMenu(); git.copyText(commitMenu.commit.subject, 'commit message')">
+      <button :class="ctxItem" @click="git.copyText(commitMenu.commit.subject, 'commit message'); closeCommitMenu()">
         <i class="pi pi-copy text-xs" /> Copy message
       </button>
     </div>

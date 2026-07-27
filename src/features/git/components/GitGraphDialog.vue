@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
@@ -30,11 +30,48 @@ const graphLimitOptions = [
 ];
 const graphSelected = ref<GitGraphCommit | null>(null);
 const graphFileSel = ref("");
+const isMaximized = ref(false);
+
+// === Drag-to-resize panel chi tiết commit (nhớ độ rộng vào localStorage) ===
+const DETAIL_WIDTH_KEY = "git.width.graphDetail";
+function loadWidth(key: string, def: number, min: number, max: number) {
+  const raw = Number(localStorage.getItem(key) ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.max(min, Math.min(max, raw)) : def;
+}
+const detailWidth = ref(loadWidth(DETAIL_WIDTH_KEY, 440, 300, 720));
+const rowRef = ref<HTMLElement | null>(null);
+const isResizing = ref(false);
+let activeMove: ((e: MouseEvent) => void) | null = null;
+
+function endResize() {
+  isResizing.value = false;
+  if (activeMove) document.removeEventListener("mousemove", activeMove);
+  document.removeEventListener("mouseup", endResize);
+  activeMove = null;
+  localStorage.setItem(DETAIL_WIDTH_KEY, String(Math.round(detailWidth.value)));
+}
+
+function startResizeDetail(e: MouseEvent) {
+  e.preventDefault();
+  isResizing.value = true;
+  activeMove = (ev) => {
+    const right = rowRef.value?.getBoundingClientRect().right ?? 0;
+    detailWidth.value = Math.max(300, Math.min(720, right - ev.clientX));
+  };
+  document.addEventListener("mousemove", activeMove);
+  document.addEventListener("mouseup", endResize);
+}
+
+onUnmounted(() => {
+  if (activeMove) document.removeEventListener("mousemove", activeMove);
+  document.removeEventListener("mouseup", endResize);
+});
 
 watch(visible, (v) => {
   if (v) {
     graphSelected.value = null;
     graphFileSel.value = "";
+    isMaximized.value = false;
     props.git.loadGraph(graphLimit.value);
   }
 });
@@ -145,7 +182,15 @@ function refClass(r: string) {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="Visualization — đồ thị commit" :style="{ width: '1100px' }">
+  <Dialog
+    v-model:visible="visible"
+    modal
+    maximizable
+    header="Visualization — đồ thị commit"
+    :style="{ width: '1100px' }"
+    @maximize="isMaximized = true"
+    @unmaximize="isMaximized = false"
+  >
     <div class="flex flex-col gap-2">
       <!-- Thanh điều khiển -->
       <div class="flex items-center gap-2">
@@ -170,7 +215,11 @@ function refClass(r: string) {
         </div>
       </div>
 
-      <div class="flex h-[520px] gap-2">
+      <div
+        ref="rowRef"
+        class="flex gap-2"
+        :class="[isMaximized ? 'h-[calc(100vh-230px)]' : 'h-[520px]', isResizing ? 'select-none' : '']"
+      >
         <!-- Graph + rows -->
         <div class="min-w-0 flex-1 overflow-auto rounded-md border border-divider">
           <div v-if="git.graphLoading.value" class="p-8 text-center text-sm text-muted">
@@ -225,8 +274,22 @@ function refClass(r: string) {
           </div>
         </div>
 
+        <!-- Resize handle: graph | chi tiết commit -->
+        <div
+          v-if="graphSelected"
+          class="flex w-2 shrink-0 cursor-col-resize items-center justify-center hover:bg-brand/10"
+          :class="isResizing ? 'bg-brand/20' : ''"
+          @mousedown="startResizeDetail"
+        >
+          <div class="h-8 w-0.5 rounded-full bg-divider" :class="isResizing ? 'bg-brand' : ''" />
+        </div>
+
         <!-- Chi tiết commit đã chọn -->
-        <div v-if="graphSelected" class="flex w-[440px] shrink-0 flex-col overflow-hidden rounded-md border border-divider">
+        <div
+          v-if="graphSelected"
+          class="flex shrink-0 flex-col overflow-hidden rounded-md border border-divider"
+          :style="{ width: detailWidth + 'px' }"
+        >
           <div class="border-b border-divider bg-canvas px-3 py-2">
             <p class="text-sm font-semibold text-ink">{{ graphSelected.subject }}</p>
             <p class="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">

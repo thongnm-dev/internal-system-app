@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { ref, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import type { GitApi } from "../composables/useGit";
@@ -8,8 +8,13 @@ const props = defineProps<{ git: GitApi }>();
 const visible = defineModel<boolean>("visible", { default: false });
 const emit = defineEmits<{ "create-worktree": [] }>();
 
+const isMaximized = ref(false);
+
 watch(visible, (v) => {
-  if (v) props.git.loadWorktrees();
+  if (v) {
+    isMaximized.value = false;
+    props.git.loadWorktrees();
+  }
 });
 
 function requestCreate() {
@@ -19,8 +24,19 @@ function requestCreate() {
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="Worktrees" :style="{ width: '620px' }">
-    <div class="flex flex-col gap-2">
+  <Dialog
+    v-model:visible="visible"
+    modal
+    maximizable
+    header="Worktrees"
+    :style="{ width: '620px' }"
+    @maximize="isMaximized = true"
+    @unmaximize="isMaximized = false"
+  >
+    <div
+      class="flex flex-col gap-2 overflow-y-auto"
+      :class="isMaximized ? 'h-[calc(100vh-260px)]' : 'max-h-[420px]'"
+    >
       <div
         v-for="w in git.worktrees.value"
         :key="w.path"

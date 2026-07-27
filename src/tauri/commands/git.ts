@@ -260,3 +260,13 @@ export function gitWorktreeAdd(path: string, worktreePath: string, branch: strin
 export function gitWorktreeRemove(path: string, worktreePath: string, force: boolean) {
   return safeInvoke<string>("git_worktree_remove", { path, worktreePath, force });
 }
+
+// === Theo dõi thay đổi file (auto-refresh tab Changes) ===
+
+export function gitWatchStart(path: string) {
+  return safeInvoke<void>("git_watch_start", { path });
+}
+
+export function gitWatchStop() {
+  return safeInvoke<void>("git_watch_stop");
+}

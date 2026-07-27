@@ -16,9 +16,11 @@ const visible = defineModel<boolean>("visible", { default: false });
 const browserSelected = ref<Set<string>>(new Set());
 const browserFocusedHash = ref("");
 const browserFileSel = ref("");
+const isMaximized = ref(false);
 
 watch(visible, async (v) => {
   if (!v) return;
+  isMaximized.value = false;
   browserSelected.value = new Set();
   browserFocusedHash.value = "";
   browserFileSel.value = "";
@@ -47,11 +49,47 @@ function copySelectedShas() {
     .map((c) => c.hash);
   if (shas.length) props.git.copyText(shas.join("\n"), `${shas.length} SHA`);
 }
+
+const copyingFiles = ref(false);
+async function copySelectedFiles() {
+  const hashes = props.git.browserCommits.value
+    .filter((c) => browserSelected.value.has(c.hash))
+    .map((c) => c.hash);
+  if (!hashes.length || copyingFiles.value) return;
+  copyingFiles.value = true;
+  try {
+    const seen = new Set<string>();
+    const files: string[] = [];
+    for (const hash of hashes) {
+      const paths = await props.git.commitChangedFiles(hash);
+      for (const p of paths) {
+        if (!seen.has(p)) {
+          seen.add(p);
+          files.push(p);
+        }
+      }
+    }
+    if (files.length) await props.git.copyText(files.join("\n"), `${files.length} file`);
+  } finally {
+    copyingFiles.value = false;
+  }
+}
 </script>
 
 <template>
-  <Dialog v-model:visible="visible" modal header="Duyệt commit" :style="{ width: '900px' }">
-    <div class="flex h-[460px] gap-2">
+  <Dialog
+    v-model:visible="visible"
+    modal
+    maximizable
+    header="Duyệt commit"
+    :style="{ width: '95vw', maxWidth: '1500px' }"
+    @maximize="isMaximized = true"
+    @unmaximize="isMaximized = false"
+  >
+    <div
+      class="flex gap-2 max-h-[80vh] min-h-[420px]"
+      :class="isMaximized ? 'h-[calc(100vh-230px)]' : 'h-[70vh]'"
+    >
       <!-- commit list (multi-select) -->
       <div class="flex w-80 shrink-0 flex-col overflow-hidden rounded-md border border-divider">
         <div class="flex items-center gap-2 border-b border-divider bg-canvas px-2 py-1 text-[11px] text-muted">
@@ -141,11 +179,20 @@ function copySelectedShas() {
       </div>
     </div>
     <template #footer>
-      <span class="mr-auto text-xs text-muted">Tick chọn nhiều commit rồi copy SHA.</span>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button size="small" :disabled="!browserSelected.size" @click="copySelectedShas">
-        <i class="pi pi-copy mr-1.5" /> Copy {{ browserSelected.size }} SHA
-      </Button>
+      <span class="mr-auto text-xs text-muted">Tick chọn nhiều commit rồi copy SHA hoặc danh sách file thay đổi.</span>
+      <Button
+      size="small"
+      outlined
+      :disabled="!browserSelected.size"
+      :loading="copyingFiles"
+      @click="copySelectedFiles"
+      >
+      <i class="pi pi-file-export mr-1.5" /> Copy file thay đổi
+    </Button>
+    <Button size="small" :disabled="!browserSelected.size" @click="copySelectedShas">
+      <i class="pi pi-copy mr-1.5" /> Copy {{ browserSelected.size }} SHA
+    </Button>
+    <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
     </template>
   </Dialog>
 </template>

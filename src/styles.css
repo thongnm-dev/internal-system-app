@@ -358,3 +358,17 @@
 .p-tabpanel {
   background: rgb(var(--color-panel)) !important;
 }
+
+/* PrimeVue Dialog — làm nổi bật dialog đang mở (viền + shadow), làm mờ nền phía sau */
+.p-dialog-mask {
+  background: rgb(2 6 23 / 0.55) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.p-dialog {
+  border: 1px solid rgb(var(--color-brand) / 0.4) !important;
+  box-shadow:
+    0 0 0 3px rgb(var(--color-brand) / 0.12),
+    var(--shadow-float) !important;
+}

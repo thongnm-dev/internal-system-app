@@ -1,8 +1,9 @@
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { explorerOpen } from "@/tauri/commands/explorer";
+import { onGitRepoChanged } from "@/tauri/events";
 import {
   gitAddRepo,
   gitBranches,
@@ -57,6 +58,8 @@ import {
   gitTouchRepo,
   gitUndoLastCommit,
   gitUnstage,
+  gitWatchStart,
+  gitWatchStop,
   gitWorktreeAdd,
   gitWorktreeList,
   gitWorktreeRemove,
@@ -194,7 +197,11 @@ export function useGit() {
         activeRepo.value = null;
         resetRepoState();
         const next = repos.value[0];
-        if (next) await openRepo(next);
+        if (next) {
+          await openRepo(next);
+        } else {
+          gitWatchStop().catch(() => {});
+        }
       }
       toast.success(`Đã gỡ repo "${repo.name}" khỏi danh sách.`);
     } catch (e) {
@@ -224,6 +231,7 @@ export function useGit() {
     try {
       await Promise.all([refreshStatusAndInfo(), refreshBranches(), refreshStashes()]);
       gitTouchRepo(repo.id).catch(() => {});
+      gitWatchStart(repo.path).catch(() => {});
     } catch (e) {
       reportError("Không mở được repo", e);
     } finally {
@@ -232,6 +240,20 @@ export function useGit() {
   }
 
   const repoPath = () => activeRepo.value?.path ?? "";
+
+  // === Theo dõi thay đổi file trên đĩa (auto-refresh tab Changes) ===
+
+  let repoChangedUnlisten: (() => void) | null = null;
+  onGitRepoChanged((changedPath) => {
+    if (changedPath === repoPath()) void refreshStatusAndInfo();
+  }).then((un) => {
+    repoChangedUnlisten = un;
+  });
+
+  onUnmounted(() => {
+    gitWatchStop().catch(() => {});
+    repoChangedUnlisten?.();
+  });
 
   // === Refresh (giữ dữ liệu cũ trong lúc tải để tránh nháy màn hình) ===
 
@@ -1108,6 +1130,19 @@ export function useGit() {
     }
   }
 
+  /** Lấy danh sách đường dẫn file thay đổi trong một commit (tương đương `git show --name-only`). */
+  async function commitChangedFiles(hash: string): Promise<string[]> {
+    const path = repoPath();
+    if (!path) return [];
+    try {
+      const detail = await gitCommitDetail(path, hash);
+      return detail.files.map((f) => f.path);
+    } catch (e) {
+      reportError("Không đọc được commit", e);
+      return [];
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -1199,6 +1234,7 @@ export function useGit() {
     openRepo,
     refreshStatusAndInfo,
     refreshBranches,
+    refreshStashes,
     selectFile,
     stageFiles,
     unstageFiles,
@@ -1248,6 +1284,7 @@ export function useGit() {
     loadBrowserCommits,
     focusBrowserCommit,
     selectBrowserFile,
+    commitChangedFiles,
     loadGraph,
     loadConflicts,
     resolveConflict,
