@@ -17,6 +17,7 @@ import GitRevertDialog from "./GitRevertDialog.vue";
 import GitWorktreeCreateDialog from "./GitWorktreeCreateDialog.vue";
 import GitWorktreeListDialog from "./GitWorktreeListDialog.vue";
 import GitStashListDialog from "./GitStashListDialog.vue";
+import GitStashSaveDialog from "./GitStashSaveDialog.vue";
 import GitTagDialog from "./GitTagDialog.vue";
 import GitMergeDialog from "./GitMergeDialog.vue";
 import GitPullRequestsDialog from "./GitPullRequestsDialog.vue";
@@ -204,9 +205,14 @@ function openWorktreeList() {
 
 // === Stash ===
 const stashListDialogVisible = ref(false);
+const stashSaveDialogVisible = ref(false);
 function openStashList() {
   closeMenus();
   stashListDialogVisible.value = true;
+}
+function openStashSave() {
+  closeMenus();
+  stashSaveDialogVisible.value = true;
 }
 
 // === Tag ===
@@ -891,7 +897,7 @@ onUnmounted(closeCommitMenu);
                   severity="secondary"
                   :disabled="!git.hasChanges.value"
                   title="Cất thay đổi vào stash"
-                  @click="git.stashSave('')"
+                  @click="openStashSave"
                 >
                   <i class="pi pi-inbox" />
                 </Button>
@@ -1187,6 +1193,7 @@ onUnmounted(closeCommitMenu);
       @create-worktree="worktreeCreateDialogVisible = true"
     />
     <GitStashListDialog v-model:visible="stashListDialogVisible" :git="git" />
+    <GitStashSaveDialog v-model:visible="stashSaveDialogVisible" :git="git" />
     <GitTagDialog v-model:visible="tagDialogVisible" :git="git" :target="tagTarget" />
     <GitMergeDialog v-model:visible="mergeDialogVisible" :git="git" />
     <GitPullRequestsDialog
