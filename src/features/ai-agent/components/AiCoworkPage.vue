@@ -17,6 +17,7 @@ import { STEP_TYPE_META } from "@/_/types/ai-workflow";
 import { TASK_CATEGORY_META, STEP_STATUS_META } from "@/_/types/ai-task";
 import type { AiTaskCategory } from "@/tauri/commands/ai-task";
 import type { AiAccount, AiAccountStatus, AiProvider } from "@/_/types/ai-usage";
+import type { AiModelResult } from "@/tauri/commands/ai-workflow";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
 function categoryLabel(cat: string): string {
@@ -167,6 +168,26 @@ function resetHint(resetAt: string): string {
   return `còn ${rel} · ${clock}`;
 }
 
+/** Nhãn hiển thị model: "Opus 5" (viết hoa chữ đầu + version). */
+function modelLabel(m: AiModelResult): string {
+  const name = m.model.charAt(0).toUpperCase() + m.model.slice(1);
+  return m.version ? `${name} ${m.version}` : name;
+}
+
+function modelOptions(account: AiAccount) {
+  return ctrl.modelOptionsFor(account).map((m) => ({ label: modelLabel(m), value: m.id }));
+}
+
+function selectAccountModel(account: AiAccount, modelId: number | null) {
+  ctrl.setSelectedModel(account.id, modelId);
+}
+
+const modelSelectPt = {
+  root: { class: "!bg-canvas !border-divider !min-h-0" },
+  label: { class: "!text-[11px] !py-1" },
+  option: { class: "!text-xs" },
+};
+
 function formatSize(entry: FileEntry): string {
   if (entry.is_dir) return "—";
   const units = ["B", "KB", "MB", "GB"];
@@ -275,6 +296,19 @@ function isMarkdown(entry: FileEntry): boolean {
             <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
               <i class="pi pi-clock" />reset {{ resetHint(usageResetAt(account)) }}
             </p>
+            <label v-if="modelOptions(account).length" class="mt-2 block">
+              <span class="text-[11px] font-bold text-muted">Model</span>
+              <Select
+                :model-value="ctrl.selectedModelIdFor(account)"
+                :options="modelOptions(account)"
+                option-label="label"
+                option-value="value"
+                placeholder="Mặc định (Opus)"
+                class="mt-1 w-full"
+                :pt="modelSelectPt"
+                @update:model-value="(v) => selectAccountModel(account, v)"
+              />
+            </label>
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <Button
                 icon="pi pi-check-circle"

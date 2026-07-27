@@ -115,6 +115,7 @@ export function useAiCowork() {
     task: AiTaskResult;
     procId: number;
     configDir: string;
+    account: AiAccount;
     steps: CoworkStep[];
     statuses: ("pending" | "in_progress" | "completed")[];
     currentIndex: number;
@@ -130,6 +131,8 @@ export function useAiCowork() {
   const accounts = ref<AiAccount[]>([]);
   const isLoadingAccounts = ref(false);
   const settingActiveId = ref<number | null>(null);
+  // Model AI đã chọn cho từng account (key = account.id); chưa chọn → dùng defaultModelIdFor.
+  const selectedModelId = ref<Record<number, number | null>>({});
 
   // Column "Tasks" — danh sách task đã chọn cho lần chạy này.
   const selectedTasks = ref<AiTaskResult[]>([]);
@@ -477,16 +480,48 @@ export function useAiCowork() {
     return `/${step.skillName} [${task.category.toUpperCase()}] ${task.task_cd}`;
   }
 
+  /** Model AI khả dụng cho 1 account (lọc theo provider của account). */
+  function modelOptionsFor(account: AiAccount): AiModelResult[] {
+    return models.value.filter((m) => m.provider === account.provider);
+  }
+
+  /** Model mặc định của account: Opus bản latest (không version), fallback candidate cuối nếu không có. */
+  function defaultModelIdFor(account: AiAccount): number | null {
+    const candidates = modelOptionsFor(account).filter((m) => m.model === "opus");
+    if (!candidates.length) return null;
+    const latest = candidates.find((m) => !m.version.trim());
+    return (latest ?? candidates[candidates.length - 1]).id;
+  }
+
+  /** Model đang chọn cho 1 account (mặc định Opus nếu chưa chọn). */
+  function selectedModelIdFor(account: AiAccount): number | null {
+    const chosen = selectedModelId.value[account.id];
+    return chosen !== undefined ? chosen : defaultModelIdFor(account);
+  }
+
+  function setSelectedModel(accountId: number, modelId: number | null) {
+    selectedModelId.value = { ...selectedModelId.value, [accountId]: modelId };
+  }
+
   /**
-   * Giá trị `--model` tương ứng model đã chọn cho step (undefined nếu chưa chọn / không tìm thấy).
+   * Giá trị `--model` tương ứng 1 model id (undefined nếu không tìm thấy).
    * Có version → pin cụ thể `model-version`; không có version → chạy model latest (chỉ alias `model`).
    */
-  function resolveStepModel(step: CoworkStep): string | undefined {
-    if (step.modelId === null) return undefined;
-    const m = models.value.find((x) => x.id === step.modelId);
+  function resolveModelFlag(modelId: number | null): string | undefined {
+    if (modelId === null) return undefined;
+    const m = models.value.find((x) => x.id === modelId);
     if (!m) return undefined;
     const version = m.version.trim();
     return version ? `${m.model}-${version}` : m.model;
+  }
+
+  /**
+   * Giá trị `--model` tương ứng model đã chọn cho step: nếu step không chỉ định model
+   * (`modelId === null`) thì dùng model đang chọn ở select option của account đang chạy.
+   */
+  function resolveStepModel(step: CoworkStep, account: AiAccount): string | undefined {
+    const modelId = step.modelId ?? selectedModelIdFor(account);
+    return resolveModelFlag(modelId);
   }
 
   /** Mở terminal tại project directory với account AI đang active để chạy step skill. */
@@ -544,12 +579,12 @@ export function useAiCowork() {
         await resolveConfirmedTaskSteps();
         // Mỗi task mở 1 terminal riêng (không gom chung) để tránh xung đột khi cùng xử lý 1 file.
         // Switch sang model của step trước khi chạy skill/prompt.
-        const model = resolveStepModel(step);
+        const model = resolveStepModel(step, active);
         for (const task of tasks) {
           await aiUsageOpenTerminal(active.config_dir, dir, buildTaskSkillPrompt(step, task), model);
         }
       } else {
-        await aiUsageOpenTerminal(active.config_dir, dir, undefined, resolveStepModel(step));
+        await aiUsageOpenTerminal(active.config_dir, dir, undefined, resolveStepModel(step, active));
       }
     } catch (e) {
       toast.error(friendlyError(e));
@@ -618,7 +653,7 @@ export function useAiCowork() {
       run.configDir,
       projectDir.value.trim(),
       buildTaskSkillPrompt(step, run.task),
-      resolveStepModel(step),
+      resolveStepModel(step, run.account),
     );
   }
 
@@ -651,6 +686,7 @@ export function useAiCowork() {
         task,
         procId: proc.id,
         configDir: active.config_dir,
+        account: active,
         steps: skillSteps,
         statuses: skillSteps.map(() => "pending"),
         currentIndex: -1,
@@ -888,6 +924,9 @@ export function useAiCowork() {
     accounts,
     isLoadingAccounts,
     settingActiveId,
+    modelOptionsFor,
+    selectedModelIdFor,
+    setSelectedModel,
     selectedTasks,
     showTaskPicker,
     taskSearchQuery,
