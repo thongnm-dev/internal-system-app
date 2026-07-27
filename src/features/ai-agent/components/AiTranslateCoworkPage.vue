@@ -597,6 +597,7 @@ function isTextResult(entry: FileEntry): boolean {
             <i class="pi pi-inbox" />Input
           </h3>
           <div class="mb-2 flex flex-wrap items-center gap-1.5">
+            <Button icon="pi pi-arrow-up" severity="secondary" outlined size="small" :disabled="ctrl.input.isAtRoot.value" title="Up" @click="ctrl.input.goUp" />
             <Button icon="pi pi-folder-plus" severity="secondary" outlined size="small" title="New folder" @click="openNewFolder('input')" />
             <Button icon="pi pi-copy" severity="secondary" outlined size="small" :disabled="!ctrl.input.selected.value.size" title="Copy" @click="ctrl.input.copySelected" />
             <Button icon="pi pi-clipboard" severity="secondary" outlined size="small" title="Paste" @click="ctrl.input.paste" />
@@ -665,6 +666,7 @@ function isTextResult(entry: FileEntry): boolean {
             <i class="pi pi-sparkles" />Output (Skill Result)
           </h3>
           <div class="mb-2 flex flex-wrap items-center gap-1.5">
+            <Button icon="pi pi-arrow-up" severity="secondary" outlined size="small" :disabled="ctrl.output.isAtRoot.value" title="Up" @click="ctrl.output.goUp" />
             <Button icon="pi pi-copy" severity="secondary" outlined size="small" :disabled="!ctrl.output.selected.value.size" title="Copy selected" @click="ctrl.output.copySelected" />
             <Button icon="pi pi-trash" severity="danger" outlined size="small" :disabled="!ctrl.output.selected.value.size" title="Delete selected" @click="openDeleteConfirm('output')" />
             <Button icon="pi pi-refresh" severity="secondary" text size="small" class="ml-auto" :loading="ctrl.output.isLoading.value" title="Reload" @click="ctrl.output.load" />

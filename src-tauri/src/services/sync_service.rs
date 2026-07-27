@@ -61,7 +61,9 @@ fn build_init_script(entries_json: &str, date: &str) -> String {
     entries: {entries_json},
   }};
 
-  if (window.__SYNC_FILLED__) return;
+  const SYNC_DONE_KEY = 'dailySyncDone:' + SYNC_DATA.date;
+
+  if (window.__SYNC_FILLED__ || sessionStorage.getItem(SYNC_DONE_KEY) === '1') return;
 
   const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
@@ -232,6 +234,7 @@ fn build_init_script(entries_json: &str, date: &str) -> String {
     btnOk.onmouseout = () => {{ btnOk.style.background = '#059669'; }};
     btnOk.onclick = () => {{
       backdrop.remove();
+      sessionStorage.setItem(SYNC_DONE_KEY, '1');
       const doc = getFormDoc();
       const btn = doc.getElementById('btnSaveDisplay') || document.getElementById('btnSaveDisplay');
       if (btn) {{
@@ -325,16 +328,12 @@ fn build_init_script(entries_json: &str, date: &str) -> String {
     return true;
   }}
 
-  function clickAddButton(doc) {{
-    const btns = doc.querySelectorAll('input[type="button"], button, input[type="submit"], a');
-    for (const btn of btns) {{
-      const text = (btn.value || btn.textContent || btn.innerText || '').toLowerCase();
-      if (text.includes('add') || text.includes('追加') || text.includes('thêm') || text.includes('行追加')) {{
-        btn.click();
-        return true;
-      }}
-    }}
-    return false;
+  function clickAddButton(doc, count) {{
+    setSelectValue(doc, 'cmbWorkPerInputAreaAdd', String(count));
+    const btn = findField(doc, 'btnAdd');
+    if (!btn) return false;
+    btn.click();
+    return true;
   }}
 
   function countExistingRows(doc) {{
@@ -358,21 +357,22 @@ fn build_init_script(entries_json: &str, date: &str) -> String {
   async function ensureRows(doc, needed) {{
     let current = countExistingRows(doc);
     if (current === 0) current = DEFAULT_ROWS;
-    // addLog('📊', 'Số dòng hiện tại: ' + current + ', cần: ' + needed, '#6b7280');
-    let added = 0;
-    while (current < needed) {{
-      const ok = clickAddButton(doc);
-      if (!ok) {{
-        addLog('⚠️', 'Không tìm thấy nút Add để thêm dòng.', '#dc2626');
-        break;
-      }}
-      await sleep(500);
-      current++;
-      added++;
-      addLog('➕', 'Đã thêm dòng ' + current, '#6b7280');
+    const diff = needed - current;
+    if (diff <= 0) return;
+
+    const ok = clickAddButton(doc, diff);
+    if (!ok) {{
+      addLog('⚠️', 'Không tìm thấy nút Add để thêm dòng.', '#dc2626');
+      return;
     }}
+    await sleep(500);
+
+    const after = countExistingRows(doc);
+    const added = after - current;
     if (added > 0) {{
       addLog('✅', 'Đã thêm ' + added + ' dòng.', '#059669');
+    }} else {{
+      addLog('⚠️', 'Không xác nhận được số dòng đã thêm.', '#dc2626');
     }}
   }}
 

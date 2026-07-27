@@ -384,11 +384,12 @@ export function useAiTranslateCowork() {
     return models.value.filter((m) => m.provider === account.provider);
   }
 
-  /** Model mặc định của account: Sonnet (bản mới nhất nếu có nhiều version). */
+  /** Model mặc định của account: Sonnet bản latest (không version), fallback candidate cuối nếu không có. */
   function defaultModelIdFor(account: AiAccount): number | null {
     const candidates = modelOptionsFor(account).filter((m) => m.model === "sonnet");
     if (!candidates.length) return null;
-    return candidates[candidates.length - 1].id;
+    const latest = candidates.find((m) => !m.version.trim());
+    return (latest ?? candidates[candidates.length - 1]).id;
   }
 
   /** Model đang chọn cho 1 account (mặc định Sonnet nếu chưa chọn). */

@@ -127,9 +127,9 @@ ON CONFLICT (id) DO NOTHING;
 -- Version rỗng = chạy model latest (alias); có version = pin cụ thể (model-version).
 INSERT INTO ai_models (provider, model, version) VALUES
     ('claude', 'opus', ''),
+    ('claude', 'opus', '4.8'),
+    ('claude', 'opus', '4.7'),
     ('claude', 'sonnet', ''),
-    ('claude', 'haiku', ''),
-    ('claude', 'opus', '5'),
-    ('claude', 'sonnet', '5'),
+    ('claude', 'sonnet', '4.6'),
     ('claude', 'haiku', '4.5')
 ON CONFLICT (provider, model, version) DO NOTHING;
