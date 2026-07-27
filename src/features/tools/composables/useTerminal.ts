@@ -48,6 +48,15 @@ const TERMINAL_THEME = {
   selectionBackground: "#33415580",
 };
 
+/**
+ * Backend PTY trên Windows dùng ConPTY (qua `portable-pty`), vốn không phát ra
+ * đúng chuỗi bao dòng (line-wrap) như PTY thật trên Unix. Nếu không khai báo
+ * `windowsPty`, xterm hiểu sai việc bao dòng khi ứng dụng full-screen (vd. Claude
+ * Code CLI) vẽ lại toàn màn hình, dẫn tới layout vỡ như đường viền box bị đứt/lệch.
+ * Xem: https://github.com/xtermjs/xterm.js — option `windowsPty`.
+ */
+const IS_WINDOWS = navigator.userAgent.includes("Windows");
+
 export function useTerminal() {
   const toast = useToast();
 
@@ -100,6 +109,7 @@ export function useTerminal() {
       cursorBlink: true,
       scrollback: 5000,
       theme: TERMINAL_THEME,
+      windowsPty: IS_WINDOWS ? { backend: "conpty", buildNumber: 0 } : undefined,
     });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
@@ -142,6 +152,10 @@ export function useTerminal() {
       entry.sessionId = sessionId;
       const tab = tabs.value.find((t) => t.key === key);
       if (tab) tab.sessionId = sessionId;
+      // Container có thể đã fit lại (đúng kích thước) trong lúc chờ spawn — lúc đó
+      // sessionId còn null nên onResize không kịp báo cho backend. Đồng bộ lại ngay
+      // để PTY khớp với kích thước xterm hiện tại, tránh app con vẽ theo cols cũ (hẹp).
+      void terminalResize(sessionId, term.rows, term.cols).catch(() => undefined);
     } catch (e) {
       term.writeln(`\x1b[31m${friendlyError(e)}\x1b[0m`);
     }
