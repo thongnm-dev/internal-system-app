@@ -30,6 +30,17 @@ export interface GitTag {
   date: string;
 }
 
+/** Một commit cho đồ thị visualization (kèm parents + refs). */
+export interface GitGraphCommit {
+  hash: string;
+  short_hash: string;
+  subject: string;
+  author_name: string;
+  relative_date: string;
+  parents: string[];
+  refs: string[];
+}
+
 /** Mốc tiến trình của thao tác mạng (fetch/pull/push/clone). */
 export interface GitProgress {
   phase: string;

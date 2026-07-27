@@ -6,6 +6,7 @@ import type {
   GitCommitDetail,
   GitComparison,
   GitDiff,
+  GitGraphCommit,
   GitProgress,
   GitPullRequest,
   GitRepo,
@@ -61,6 +62,10 @@ export function gitCommitFileDiff(path: string, hash: string, file: string) {
 
 export function gitLog(path: string, limit: number) {
   return safeInvoke<GitCommit[]>("git_log", { path, limit });
+}
+
+export function gitGraph(path: string, limit: number) {
+  return safeInvoke<GitGraphCommit[]>("git_graph", { path, limit });
 }
 
 export function gitCommitDetail(path: string, hash: string) {

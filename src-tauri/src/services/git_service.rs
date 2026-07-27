@@ -19,7 +19,8 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::git::{
     GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitDiffLine, GitFileChange,
-    GitProgress, GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
+    GitGraphCommit, GitProgress, GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag,
+    GitWorktree,
 };
 
 /// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
@@ -560,6 +561,52 @@ fn parse_commits(raw: &str) -> Vec<GitCommit> {
             })
         })
         .collect()
+}
+
+/// Lấy dữ liệu đồ thị commit (tất cả branch) để visualization: kèm parents + refs.
+pub fn graph(repo_path: &str, limit: u32) -> AppResult<Vec<GitGraphCommit>> {
+    let format =
+        format!("--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ar{FS}%P{FS}%D{RS}");
+    let limit_arg = format!("-{limit}");
+    let raw = run(
+        repo_path,
+        &["log", "--all", "--date-order", &limit_arg, &format],
+    )?;
+
+    let out = raw
+        .split(RS)
+        .map(|r| r.trim_matches(['\n', '\r']))
+        .filter(|r| !r.is_empty())
+        .filter_map(|record| {
+            let f: Vec<&str> = record.split(FS).collect();
+            if f.len() < 6 {
+                return None;
+            }
+            let parents = f[5]
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>();
+            let refs = f
+                .get(6)
+                .map(|s| {
+                    s.split(", ")
+                        .map(|x| x.trim().to_string())
+                        .filter(|x| !x.is_empty())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            Some(GitGraphCommit {
+                hash: f[0].to_string(),
+                short_hash: f[1].to_string(),
+                subject: f[2].to_string(),
+                author_name: f[3].to_string(),
+                relative_date: f[4].to_string(),
+                parents,
+                refs,
+            })
+        })
+        .collect();
+    Ok(out)
 }
 
 /// Chi tiết một commit: meta + body + danh sách file đã đổi.

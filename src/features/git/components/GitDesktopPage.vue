@@ -555,6 +555,110 @@ function copySelectedShas() {
   if (shas.length) git.copyText(shas.join("\n"), `${shas.length} SHA`);
 }
 
+// === Visualization (đồ thị commit) ===
+const graphDialog = ref(false);
+const GRAPH_ROW_H = 32;
+const GRAPH_LANE_GAP = 16;
+const GRAPH_PAD_X = 14;
+const GRAPH_COLORS = [
+  "#0d9373", "#3b82f6", "#a855f7", "#f59e0b",
+  "#ef4444", "#06b6d4", "#ec4899", "#84cc16",
+];
+function openGraphDialog() {
+  closeMenus();
+  graphDialog.value = true;
+  git.loadGraph(300);
+}
+
+/** Tính lane/column cho từng commit rồi dựng node + edge (đường cong) cho SVG. */
+const graphLayout = computed(() => {
+  const commits = git.graphCommits.value;
+  const n = commits.length;
+  const rowOf = new Map<string, number>();
+  commits.forEach((c, i) => rowOf.set(c.hash, i));
+
+  const lanes: (string | null)[] = [];
+  const colOf: number[] = new Array(n).fill(0);
+  const firstFree = () => {
+    const idx = lanes.indexOf(null);
+    if (idx !== -1) return idx;
+    lanes.push(null);
+    return lanes.length - 1;
+  };
+
+  for (let i = 0; i < n; i++) {
+    const c = commits[i];
+    let col = lanes.indexOf(c.hash);
+    if (col === -1) col = firstFree();
+    colOf[i] = col;
+    for (let j = 0; j < lanes.length; j++) {
+      if (j !== col && lanes[j] === c.hash) lanes[j] = null;
+    }
+    if (!c.parents.length) {
+      lanes[col] = null;
+    } else {
+      lanes[col] = c.parents[0];
+      for (let k = 1; k < c.parents.length; k++) {
+        const p = c.parents[k];
+        if (lanes.indexOf(p) === -1) lanes[firstFree()] = p;
+      }
+    }
+  }
+
+  const colX = (col: number) => GRAPH_PAD_X + col * GRAPH_LANE_GAP;
+  const rowY = (row: number) => row * GRAPH_ROW_H + GRAPH_ROW_H / 2;
+  const colorAt = (col: number) => GRAPH_COLORS[col % GRAPH_COLORS.length];
+
+  let maxCol = 0;
+  for (let i = 0; i < n; i++) maxCol = Math.max(maxCol, colOf[i]);
+
+  const nodes = commits.map((c, i) => ({
+    x: colX(colOf[i]),
+    y: rowY(i),
+    color: colorAt(colOf[i]),
+  }));
+
+  const edges: { d: string; color: string }[] = [];
+  for (let i = 0; i < n; i++) {
+    const c = commits[i];
+    const x1 = colX(colOf[i]);
+    const y1 = rowY(i);
+    for (const p of c.parents) {
+      const pr = rowOf.get(p);
+      if (pr === undefined) {
+        edges.push({ d: `M ${x1} ${y1} L ${x1} ${y1 + GRAPH_ROW_H * 0.6}`, color: colorAt(colOf[i]) });
+        continue;
+      }
+      const x2 = colX(colOf[pr]);
+      const y2 = rowY(pr);
+      const color = colorAt(colOf[pr]);
+      const d =
+        x1 === x2
+          ? `M ${x1} ${y1} L ${x2} ${y2}`
+          : `M ${x1} ${y1} C ${x1} ${(y1 + y2) / 2}, ${x2} ${(y1 + y2) / 2}, ${x2} ${y2}`;
+      edges.push({ d, color });
+    }
+  }
+
+  return {
+    nodes,
+    edges,
+    width: colX(maxCol) + GRAPH_PAD_X,
+    height: Math.max(n * GRAPH_ROW_H, GRAPH_ROW_H),
+    rowH: GRAPH_ROW_H,
+  };
+});
+
+function refLabel(r: string) {
+  return r.replace("HEAD -> ", "").replace("tag: ", "");
+}
+function refClass(r: string) {
+  if (r.startsWith("HEAD")) return "bg-emerald-100 text-emerald-700";
+  if (r.startsWith("tag:")) return "bg-amber-100 text-amber-700";
+  if (r.includes("/")) return "bg-sky-100 text-sky-700";
+  return "bg-slate-100 text-slate-600";
+}
+
 // === Context menu trên history ===
 const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
 const ctxItem =
@@ -785,6 +889,13 @@ onUnmounted(closeCommitMenu);
 
         <div class="ml-auto flex items-center gap-0.5">
           <template v-if="git.activeRepo.value">
+            <button
+              class="flex h-7 items-center gap-1 rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Visualization — đồ thị commit"
+              @click="openGraphDialog"
+            >
+              <i class="pi pi-sitemap text-[11px]" /> Graph
+            </button>
             <button
               class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
               title="Mở terminal tại repo"
@@ -2090,6 +2201,71 @@ onUnmounted(closeCommitMenu);
           @click="doFinishConflict"
         >
           <i class="pi pi-check mr-1.5" /> Hoàn tất
+        </Button>
+      </template>
+    </Dialog>
+
+    <!-- Visualization / graph dialog -->
+    <Dialog v-model:visible="graphDialog" modal header="Visualization — đồ thị commit" :style="{ width: '1000px' }">
+      <div class="h-[520px] overflow-auto rounded-md border border-divider">
+        <div v-if="git.graphLoading.value" class="p-8 text-center text-sm text-muted">
+          <i class="pi pi-spinner pi-spin mr-1.5" /> Đang tải…
+        </div>
+        <div v-else-if="!git.graphCommits.value.length" class="p-8 text-center text-sm text-muted">
+          Không có commit.
+        </div>
+        <div v-else class="relative" :style="{ height: graphLayout.height + 'px' }">
+          <svg
+            :width="graphLayout.width"
+            :height="graphLayout.height"
+            class="absolute left-0 top-0"
+          >
+            <path
+              v-for="(e, i) in graphLayout.edges"
+              :key="'e' + i"
+              :d="e.d"
+              :stroke="e.color"
+              fill="none"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <circle
+              v-for="(nd, i) in graphLayout.nodes"
+              :key="'n' + i"
+              :cx="nd.x"
+              :cy="nd.y"
+              r="4.5"
+              :fill="nd.color"
+              stroke-width="2"
+              :style="{ stroke: 'rgb(var(--color-panel))' }"
+            />
+          </svg>
+          <div
+            v-for="(c, i) in git.graphCommits.value"
+            :key="c.hash"
+            class="absolute flex items-center gap-2 pr-3 transition-colors hover:bg-canvas"
+            :style="{ top: i * graphLayout.rowH + 'px', left: graphLayout.width + 'px', right: '0', height: graphLayout.rowH + 'px' }"
+          >
+            <span
+              v-for="r in c.refs"
+              :key="r"
+              class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              :class="refClass(r)"
+            >
+              {{ refLabel(r) }}
+            </span>
+            <span class="min-w-0 flex-1 truncate text-sm text-ink">{{ c.subject }}</span>
+            <span class="w-28 shrink-0 truncate text-[11px] text-muted">{{ c.author_name }}</span>
+            <span class="w-20 shrink-0 truncate text-right text-[11px] text-muted">{{ c.relative_date }}</span>
+            <span class="w-16 shrink-0 font-mono text-[11px] text-muted">{{ c.short_hash }}</span>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <span class="mr-auto text-xs text-muted">{{ git.graphCommits.value.length }} commit (tất cả branch)</span>
+        <Button size="small" outlined severity="secondary" @click="graphDialog = false">Đóng</Button>
+        <Button size="small" outlined severity="secondary" :disabled="git.graphLoading.value" @click="git.loadGraph(300)">
+          <i class="pi pi-refresh mr-1.5" /> Làm mới
         </Button>
       </template>
     </Dialog>

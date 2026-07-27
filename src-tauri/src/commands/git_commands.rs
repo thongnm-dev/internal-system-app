@@ -10,8 +10,8 @@
 use crate::app::error::log_err;
 use crate::database::git_repo_store::{self, GitRepoData};
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitProgress, GitPullRequest,
-    GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
+    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitGraphCommit, GitProgress,
+    GitPullRequest, GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 use crate::services::git_service;
 
@@ -116,6 +116,14 @@ pub fn git_commit_file_diff(
 #[tauri::command]
 pub fn git_log(path: String, limit: u32) -> Result<Vec<GitCommit>, String> {
     git_service::log(&path, limit).map_err(log_err)
+}
+
+#[tauri::command]
+pub async fn git_graph(path: String, limit: u32) -> Result<Vec<GitGraphCommit>, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::graph(&path, limit))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
 }
 
 #[tauri::command]

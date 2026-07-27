@@ -56,6 +56,20 @@ pub struct GitTag {
     pub date: String,
 }
 
+/// Một commit dùng cho đồ thị (visualization): kèm parents + refs để dựng lane.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitGraphCommit {
+    pub hash: String,
+    pub short_hash: String,
+    pub subject: String,
+    pub author_name: String,
+    pub relative_date: String,
+    /// Hash các commit cha (parent). Nhiều cha = merge commit.
+    pub parents: Vec<String>,
+    /// Nhãn tham chiếu (branch/tag), vd. "HEAD -> main", "origin/main", "tag: v1".
+    pub refs: Vec<String>,
+}
+
 /// Một mốc tiến trình của thao tác mạng (fetch/pull/push/clone), parse từ stderr git.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GitProgress {

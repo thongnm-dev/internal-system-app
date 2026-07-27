@@ -17,6 +17,7 @@ import {
   gitCompare,
   gitCompareFileDiff,
   gitCreatePullRequest,
+  gitGraph,
   gitListConflicts,
   gitListPullRequests,
   gitMerge,
@@ -67,6 +68,7 @@ import type {
   GitComparison,
   GitDiff,
   GitFileChange,
+  GitGraphCommit,
   GitProgress,
   GitPullRequest,
   GitRepo,
@@ -111,6 +113,9 @@ export function useGit() {
   const pullRequestsLoading = ref(false);
 
   const conflicts = ref<string[]>([]);
+
+  const graphCommits = ref<GitGraphCommit[]>([]);
+  const graphLoading = ref(false);
 
   // Commit browser (dialog duyệt commit + copy SHA).
   const browserCommits = ref<GitCommit[]>([]);
@@ -1049,6 +1054,21 @@ export function useGit() {
     }
   }
 
+  // === Visualization (đồ thị commit) ===
+
+  async function loadGraph(limit = 300) {
+    const path = repoPath();
+    if (!path) return;
+    graphLoading.value = true;
+    try {
+      graphCommits.value = await gitGraph(path, limit);
+    } catch (e) {
+      reportError("Không tải được đồ thị commit", e);
+    } finally {
+      graphLoading.value = false;
+    }
+  }
+
   // === Commit browser ===
 
   async function loadBrowserCommits() {
@@ -1152,6 +1172,8 @@ export function useGit() {
     browserFiles,
     browserDiff,
     browserLoading,
+    graphCommits,
+    graphLoading,
     selectedFile,
     diff,
     diffLoading,
@@ -1226,6 +1248,7 @@ export function useGit() {
     loadBrowserCommits,
     focusBrowserCommit,
     selectBrowserFile,
+    loadGraph,
     loadConflicts,
     resolveConflict,
     markResolved,
