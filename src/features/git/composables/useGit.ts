@@ -1261,3 +1261,5 @@ export function useGit() {
     openPathAsRepo,
   };
 }
+
+export type GitApi = ReturnType<typeof useGit>;
