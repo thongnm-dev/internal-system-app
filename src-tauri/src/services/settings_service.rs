@@ -30,21 +30,26 @@ pub async fn get_settings(user_id: i32) -> AppResult<AppSettings> {
 
     let prefs_row = client
         .query_opt(
-            "SELECT theme, language FROM user_settings WHERE user_id = $1",
+            "SELECT theme, language, tab_mode FROM user_settings WHERE user_id = $1",
             &[&user_id],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to load user settings: {e}")))?;
 
-    let (theme, language) = match prefs_row {
-        Some(row) => (row.get::<_, String>("theme"), row.get::<_, String>("language")),
-        None => ("light".to_string(), "vi".to_string()),
+    let (theme, language, tab_mode) = match prefs_row {
+        Some(row) => (
+            row.get::<_, String>("theme"),
+            row.get::<_, String>("language"),
+            row.get::<_, bool>("tab_mode"),
+        ),
+        None => ("light".to_string(), "vi".to_string(), false),
     };
 
     Ok(AppSettings {
         user,
         theme,
         language,
+        tab_mode,
     })
 }
 
@@ -85,10 +90,10 @@ pub async fn save_settings(request: SaveSettingsRequest) -> AppResult<AppSetting
 
     client
         .execute(
-            "INSERT INTO user_settings (user_id, theme, language)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (user_id) DO UPDATE SET theme = $2, language = $3, updated_at = NOW()",
-            &[&user_id, &theme, &language],
+            "INSERT INTO user_settings (user_id, theme, language, tab_mode)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (user_id) DO UPDATE SET theme = $2, language = $3, tab_mode = $4, updated_at = NOW()",
+            &[&user_id, &theme, &language, &request.tab_mode],
         )
         .await
         .map_err(|e| AppError::new(format!("Failed to save user settings: {e}")))?;

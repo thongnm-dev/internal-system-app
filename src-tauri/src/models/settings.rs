@@ -44,6 +44,8 @@ pub struct AppSettings {
     pub theme: String,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default)]
+    pub tab_mode: bool,
 }
 
 fn default_theme() -> String {
@@ -60,6 +62,7 @@ impl Default for AppSettings {
             user: UserProfile::default(),
             theme: default_theme(),
             language: default_language(),
+            tab_mode: false,
         }
     }
 }
@@ -71,4 +74,6 @@ pub struct SaveSettingsRequest {
     pub user: UserProfile,
     pub theme: String,
     pub language: String,
+    #[serde(default)]
+    pub tab_mode: bool,
 }

@@ -4,7 +4,7 @@ import InputText from "primevue/inputtext";
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
-const { settings, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage } =
+const { settings, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage, updateTabMode } =
   useSettings();
 
 const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string; disabled?: boolean }[] = [
@@ -40,7 +40,7 @@ const themeOptions = [
     </p>
     <template v-if="!loading">
     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
+      <section class="flex flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-user text-xl text-brand" />
           <h3 class="font-bold">User profile</h3>
@@ -60,15 +60,30 @@ const themeOptions = [
             />
           </label>
         </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2 border-t border-divider pt-3">
+          <template v-if="isDirty">
+            <span class="mr-auto text-sm font-semibold text-brand">You have unsaved changes.</span>
+            <Button label="Discard" severity="secondary" outlined @click="discard" />
+          </template>
+          <Button
+            :icon="loading ? 'pi pi-spinner pi-spin' : undefined"
+            :label="loading ? 'Saving...' : 'Save changes'"
+            :disabled="!isDirty || loading"
+            @click="save"
+          />
+        </div>
       </section>
 
-      <div class="space-y-4">
-        <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-          <div class="flex items-center gap-2">
-            <i :class="`pi ${settings.theme === 'dark' ? 'pi-moon' : 'pi-sun'} text-xl text-brand`" />
-            <h3 class="font-bold">Theme</h3>
-          </div>
-          <div class="mt-4 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
+      <section class="space-y-5 rounded-lg border border-divider bg-panel p-4 shadow-sm">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-cog text-xl text-brand" />
+          <h3 class="font-bold">Preferences</h3>
+        </div>
+
+        <div>
+          <span class="text-xs font-bold text-muted">Theme</span>
+          <div class="mt-1.5 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
             <Button
               v-for="opt in themeOptions"
               :key="opt.value"
@@ -82,37 +97,48 @@ const themeOptions = [
               @click="updateTheme(opt.value)"
             />
           </div>
-        </section>
+        </div>
 
-        <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-          <div class="flex items-center gap-2">
-            <i class="pi pi-language text-xl text-brand" />
-            <h3 class="font-bold">Language</h3>
-          </div>
+        <div>
+          <span class="text-xs font-bold text-muted">Language</span>
           <select
-            class="mt-4 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1.5 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
             :value="settings.language"
             @change="updateLanguage(($event.target as HTMLSelectElement).value as any)"
           >
             <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
-        </section>
-      </div>
-    </div>
+        </div>
 
-    <div
-      class="sticky bottom-0 mt-4 flex items-center justify-end gap-2 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm"
-    >
-      <template v-if="isDirty">
-        <span class="mr-auto text-sm font-semibold text-brand">You have unsaved changes.</span>
-        <Button label="Discard" severity="secondary" outlined @click="discard" />
-      </template>
-      <Button
-        :icon="loading ? 'pi pi-spinner pi-spin' : undefined"
-        :label="loading ? 'Saving...' : 'Save changes'"
-        :disabled="!isDirty || loading"
-        @click="save"
-      />
+        <div>
+          <span class="text-xs font-bold text-muted">Navigation</span>
+          <div class="mt-1.5 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
+            <Button
+              icon="pi pi-file"
+              label="Single"
+              :class="[
+                'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
+                !settings.tabMode ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
+              ]"
+              unstyled
+              @click="updateTabMode(false)"
+            />
+            <Button
+              icon="pi pi-clone"
+              label="Tabs"
+              :class="[
+                'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
+                settings.tabMode ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
+              ]"
+              unstyled
+              @click="updateTabMode(true)"
+            />
+          </div>
+          <p class="mt-1.5 text-[11px] text-muted">
+            Open pages in tabs to switch between them without losing state.
+          </p>
+        </div>
+      </section>
     </div>
     </template>
   </section>

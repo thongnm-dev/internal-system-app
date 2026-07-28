@@ -12,6 +12,7 @@ export type AppSettings = {
   user: UserProfile;
   theme: string;
   language: string;
+  tab_mode: boolean;
 };
 
 export type SaveSettingsRequest = {
@@ -19,4 +20,5 @@ export type SaveSettingsRequest = {
   user: UserProfile;
   theme: string;
   language: string;
+  tab_mode: boolean;
 };
