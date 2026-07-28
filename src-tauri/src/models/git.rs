@@ -216,6 +216,29 @@ pub struct GitBranch {
     pub last_commit_subject: String,
 }
 
+/// Một dòng trong kết quả `git blame` (ai sửa dòng này lần cuối).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitBlameLine {
+    /// Số thứ tự dòng trong file hiện tại (1-based).
+    pub line_no: u32,
+    pub hash: String,
+    pub short_hash: String,
+    pub author_name: String,
+    /// Ngày commit (ISO string).
+    pub date: String,
+    /// Ngày commit dạng tương đối (vd. "2 hours ago").
+    pub relative_date: String,
+    /// Nội dung dòng.
+    pub content: String,
+}
+
+/// Kết quả `git blame` của một file.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GitBlame {
+    pub path: String,
+    pub lines: Vec<GitBlameLine>,
+}
+
 /// Một mục trong danh sách stash.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GitStash {

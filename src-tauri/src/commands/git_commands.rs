@@ -10,8 +10,8 @@
 use crate::app::error::log_err;
 use crate::database::git_repo_store::{self, GitRepoData};
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitGraphCommit, GitProgress,
-    GitPullRequest, GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
+    GitBlame, GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitGraphCommit,
+    GitProgress, GitPullRequest, GitRepo, GitRepoInfo, GitStash, GitStatus, GitTag, GitWorktree,
 };
 use crate::services::git_service;
 use crate::services::git_watch_service;
@@ -155,6 +155,11 @@ pub fn git_list_conflicts(path: String) -> Result<Vec<String>, String> {
 #[tauri::command]
 pub fn git_tag_list(path: String) -> Result<Vec<GitTag>, String> {
     git_service::tag_list(&path).map_err(log_err)
+}
+
+#[tauri::command]
+pub fn git_blame(path: String, file: String, rev: String) -> Result<GitBlame, String> {
+    git_service::blame(&path, &file, &rev).map_err(log_err)
 }
 
 #[tauri::command]

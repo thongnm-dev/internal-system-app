@@ -6,6 +6,7 @@ import { explorerOpen } from "@/tauri/commands/explorer";
 import { onGitRepoChanged } from "@/tauri/events";
 import {
   gitAddRepo,
+  gitBlame,
   gitBranches,
   gitCheckoutBranch,
   gitCherryPick,
@@ -66,6 +67,7 @@ import {
   gitWorktreeRemove,
 } from "@/tauri/commands/git";
 import type {
+  GitBlameLine,
   GitBranch,
   GitCommit,
   GitCommitDetail,
@@ -126,6 +128,13 @@ export function useGit() {
   const browserFiles = ref<GitFileChange[]>([]);
   const browserDiff = ref<GitDiff | null>(null);
   const browserLoading = ref(false);
+
+  // Git blame (ai sửa dòng nào lần cuối).
+  const blameFile = ref("");
+  const blameLines = ref<GitBlameLine[]>([]);
+  const blameLoading = ref(false);
+  const blameSelectedHash = ref("");
+  const blameDetail = ref<GitCommitDetail | null>(null);
 
   const selectedFile = ref<SelectedFile | null>(null);
   const diff = ref<GitDiff | null>(null);
@@ -1159,6 +1168,39 @@ export function useGit() {
     }
   }
 
+  // === Blame ===
+
+  /** Tải `git blame` cho một file (rev rỗng = HEAD + working tree). */
+  async function loadBlame(file: string, rev = "") {
+    const path = repoPath();
+    if (!path) return;
+    blameFile.value = file;
+    blameLines.value = [];
+    blameSelectedHash.value = "";
+    blameDetail.value = null;
+    blameLoading.value = true;
+    try {
+      const result = await gitBlame(path, file, rev);
+      blameLines.value = result.lines;
+    } catch (e) {
+      reportError("Không đọc được git blame", e);
+    } finally {
+      blameLoading.value = false;
+    }
+  }
+
+  /** Chọn một dòng blame để xem chi tiết commit tương ứng. */
+  async function selectBlameLine(hash: string) {
+    const path = repoPath();
+    if (!path || !hash) return;
+    blameSelectedHash.value = hash;
+    try {
+      blameDetail.value = await gitCommitDetail(path, hash);
+    } catch (e) {
+      reportError("Không đọc được commit", e);
+    }
+  }
+
   // === Clone ===
 
   async function cloneRepo(url: string): Promise<boolean> {
@@ -1223,6 +1265,11 @@ export function useGit() {
     browserFiles,
     browserDiff,
     browserLoading,
+    blameFile,
+    blameLines,
+    blameLoading,
+    blameSelectedHash,
+    blameDetail,
     graphCommits,
     graphLoading,
     selectedFile,
@@ -1302,6 +1349,8 @@ export function useGit() {
     focusBrowserCommit,
     selectBrowserFile,
     commitChangedFiles,
+    loadBlame,
+    selectBlameLine,
     loadGraph,
     loadConflicts,
     resolveConflict,

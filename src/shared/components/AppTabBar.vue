@@ -15,7 +15,7 @@ const emit = defineEmits<{
 <template>
   <div
     v-if="tabs.length > 0"
-    class="flex items-center gap-1 overflow-x-auto border-b border-divider-light pb-2"
+    class="flex items-center gap-1 border-b border-divider-light pb-2"
   >
     <div
       v-for="tab in tabs"

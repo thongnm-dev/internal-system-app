@@ -1,6 +1,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { safeInvoke } from "./_base";
 import type {
+  GitBlame,
   GitBranch,
   GitCommit,
   GitCommitDetail,
@@ -90,6 +91,10 @@ export function gitTagList(path: string) {
 
 export function gitCompareFileDiff(path: string, base: string, head: string, file: string) {
   return safeInvoke<GitDiff>("git_compare_file_diff", { path, base, head, file });
+}
+
+export function gitBlame(path: string, file: string, rev = "") {
+  return safeInvoke<GitBlame>("git_blame", { path, file, rev });
 }
 
 // === Thao tác ghi / mạng ===

@@ -1,10 +1,18 @@
-import { ref, shallowRef } from "vue";
+import { ref } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { terminalKill, terminalResize, terminalSpawn, terminalWrite } from "@/tauri/commands/terminal";
+import { gitRepoInfo, gitStatus } from "@/tauri/commands/git";
+
+/** Thông tin Git rút gọn cho toolbar (repo/branch/số file thay đổi) của một tab. */
+export interface TerminalGitInfo {
+  repoName: string;
+  branch: string;
+  diffCount: number;
+}
 
 /** Một tab terminal hiển thị trên UI (phần reactive, nhẹ). */
 export interface TerminalTab {
@@ -18,6 +26,19 @@ export interface TerminalTab {
   exited: boolean;
   /** Mã thoát của tiến trình (nếu có). */
   exitCode: number | null;
+  /** Thư mục làm việc riêng của tab này (rỗng = thư mục home). */
+  startDir: string;
+  /** Thông tin Git của `startDir` (null nếu không phải Git repo hoặc chưa kiểm tra). */
+  git: TerminalGitInfo | null;
+  /** Lệnh CLI agent (claude/codex/copilot) sẽ tự gõ vào shell ngay sau khi spawn lần đầu. */
+  autoCommand?: string;
+}
+
+/** Tùy chọn khi tạo tab mới: tiêu đề tùy chỉnh, lệnh agent tự chạy, thư mục làm việc ban đầu. */
+export interface AddTabOptions {
+  title?: string;
+  autoCommand?: string;
+  startDir?: string;
 }
 
 /**
@@ -65,7 +86,6 @@ export function useTerminal() {
 
   // Map instance xterm theo key tab (không reactive).
   const entries = new Map<string, TermEntry>();
-  const startDir = shallowRef<string>("");
 
   let counter = 0;
 
@@ -74,15 +94,31 @@ export function useTerminal() {
     return `tab-${Date.now()}-${counter}`;
   }
 
-  /** Thêm một tab mới (chưa spawn — spawn diễn ra khi container được bind). */
-  function addTab() {
+  /**
+   * Thêm một tab mới (chưa spawn — spawn diễn ra khi container được bind). Mỗi tab bắt đầu
+   * ở thư mục home, có thể đổi riêng sau. Truyền `autoCommand` để tự động gõ lệnh (vd. khởi
+   * chạy một CLI agent) ngay khi shell của tab sẵn sàng.
+   */
+  function addTab(opts?: AddTabOptions) {
     if (!canUseTauriRuntime()) {
       toast.error(tauriRuntimeMessage);
       return;
     }
     const key = nextKey();
-    tabs.value.push({ key, sessionId: null, title: `Terminal ${tabs.value.length + 1}`, exited: false, exitCode: null });
+    const startDir = opts?.startDir ?? "";
+    const tab: TerminalTab = {
+      key,
+      sessionId: null,
+      title: opts?.title ?? `Terminal ${tabs.value.length + 1}`,
+      exited: false,
+      exitCode: null,
+      startDir,
+      git: null,
+      autoCommand: opts?.autoCommand,
+    };
+    tabs.value.push(tab);
     activeKey.value = key;
+    if (startDir) void refreshGitInfo(tab);
   }
 
   function setActive(key: string) {
@@ -133,6 +169,26 @@ export function useTerminal() {
     ro.observe(el);
     entry.ro = ro;
 
+    const tab = tabs.value.find((t) => t.key === key);
+    await spawnSession(key, tab?.startDir || undefined);
+
+    // Lệnh agent (nếu có) chỉ tự chạy một lần, ngay sau khi shell của tab spawn lần đầu.
+    const autoCommand = tab?.autoCommand;
+    if (autoCommand && tab) {
+      tab.autoCommand = undefined;
+      const spawnedEntry = entries.get(key);
+      if (spawnedEntry?.sessionId) {
+        void terminalWrite(spawnedEntry.sessionId, `${autoCommand}\r`).catch(() => undefined);
+      }
+    }
+  }
+
+  /** Spawn phiên PTY cho một tab đã có sẵn xterm entry, gắn callback output/exit. */
+  async function spawnSession(key: string, dir: string | undefined) {
+    const entry = entries.get(key);
+    if (!entry) return;
+    const { term } = entry;
+
     try {
       const sessionId = await terminalSpawn(
         term.rows,
@@ -147,11 +203,15 @@ export function useTerminal() {
           }
           term.writeln(`\r\n\x1b[90m[process exited${code === null ? "" : ` with code ${code}`}]\x1b[0m`);
         },
-        startDir.value || undefined,
+        dir,
       );
       entry.sessionId = sessionId;
       const tab = tabs.value.find((t) => t.key === key);
-      if (tab) tab.sessionId = sessionId;
+      if (tab) {
+        tab.sessionId = sessionId;
+        tab.exited = false;
+        tab.exitCode = null;
+      }
       // Container có thể đã fit lại (đúng kích thước) trong lúc chờ spawn — lúc đó
       // sessionId còn null nên onResize không kịp báo cho backend. Đồng bộ lại ngay
       // để PTY khớp với kích thước xterm hiện tại, tránh app con vẽ theo cols cũ (hẹp).
@@ -169,6 +229,21 @@ export function useTerminal() {
       entry.fit.fit();
     } catch {
       // Container có thể đang ẩn (kích thước 0) — bỏ qua, sẽ fit lại khi hiện.
+    }
+  }
+
+  /**
+   * Gõ một lệnh vào shell của tab đang hoạt động (vd. khởi chạy CLI agent). Nếu shell chưa
+   * kịp spawn xong (đang khởi tạo), lệnh được xếp hàng vào `autoCommand` để tự chạy sau.
+   */
+  function runCommand(key: string, command: string) {
+    const tab = tabs.value.find((t) => t.key === key);
+    if (!tab) return;
+    const entry = entries.get(key);
+    if (entry?.sessionId) {
+      void terminalWrite(entry.sessionId, `${command}\r`).catch(() => undefined);
+    } else {
+      tab.autoCommand = command;
     }
   }
 
@@ -192,9 +267,44 @@ export function useTerminal() {
     }
   }
 
-  /** Đặt thư mục làm việc mặc định cho các tab mở sau. */
-  function setStartDir(dir: string) {
-    startDir.value = dir;
+  /**
+   * Đổi thư mục làm việc riêng của một tab. Nếu tab đã có phiên PTY đang chạy,
+   * kill phiên cũ và spawn lại shell mới ngay trong tab đó (giữ nguyên xterm/buffer).
+   */
+  async function changeTabDir(key: string, dir: string) {
+    const tab = tabs.value.find((t) => t.key === key);
+    if (!tab) return;
+    tab.startDir = dir;
+    void refreshGitInfo(tab);
+
+    const entry = entries.get(key);
+    if (!entry) return; // Chưa bind container — sẽ dùng startDir khi spawn lần đầu.
+
+    if (entry.sessionId) await terminalKill(entry.sessionId).catch(() => undefined);
+    entry.sessionId = null;
+    tab.sessionId = null;
+    entry.term.writeln(`\x1b[90m[restarting shell in ${dir}]\x1b[0m`);
+    await spawnSession(key, dir || undefined);
+  }
+
+  /** Kiểm tra `tab.startDir` có phải Git repo không; nếu có, nạp branch + số file thay đổi. */
+  async function refreshGitInfo(tab: TerminalTab) {
+    if (!tab.startDir) {
+      tab.git = null;
+      return;
+    }
+    try {
+      const [info, status] = await Promise.all([gitRepoInfo(tab.startDir), gitStatus(tab.startDir)]);
+      const repoName = info.path.split(/[\\/]/).filter(Boolean).pop() ?? info.path;
+      tab.git = {
+        repoName,
+        branch: info.current_branch || (info.detached ? "detached HEAD" : "HEAD"),
+        diffCount: status.staged.length + status.unstaged.length,
+      };
+    } catch {
+      // Không phải Git repo (hoặc `git` không dùng được) — bỏ qua, không phải lỗi cần báo.
+      tab.git = null;
+    }
   }
 
   /** Mở sẵn 1 tab đầu tiên nếu đang chạy trong Tauri runtime. */
@@ -222,8 +332,8 @@ export function useTerminal() {
     setActive,
     bindContainer,
     closeTab,
-    setStartDir,
-    startDir,
+    changeTabDir,
+    runCommand,
     fit,
     init,
     dispose,

@@ -18,9 +18,9 @@ use reqwest::Client;
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::git::{
-    GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff, GitDiffLine, GitFileChange,
-    GitGraphCommit, GitProgress, GitPullRequest, GitRepoInfo, GitStash, GitStatus, GitTag,
-    GitWorktree,
+    GitBlame, GitBlameLine, GitBranch, GitCommit, GitCommitDetail, GitComparison, GitDiff,
+    GitDiffLine, GitFileChange, GitGraphCommit, GitProgress, GitPullRequest, GitRepoInfo,
+    GitStash, GitStatus, GitTag, GitWorktree,
 };
 
 /// Giới hạn số dòng diff trả về để tránh treo UI với file cực lớn.
@@ -410,6 +410,111 @@ pub fn commit_file_diff(repo_path: &str, hash: &str, file: &str) -> AppResult<Gi
         &["show", "--no-color", "--format=", hash, "--", file],
     )?;
     Ok(parse_diff(file, &raw))
+}
+
+/// `git blame` một file: ai sửa từng dòng lần cuối. `rev` rỗng → HEAD + working tree.
+pub fn blame(repo_path: &str, file: &str, rev: &str) -> AppResult<GitBlame> {
+    let mut args: Vec<&str> = vec!["blame", "--line-porcelain"];
+    if !rev.trim().is_empty() {
+        args.push(rev);
+    }
+    args.push("--");
+    args.push(file);
+    let raw = run(repo_path, &args)?;
+    let mut lines = parse_blame(&raw);
+    attach_relative_dates(repo_path, &mut lines);
+    Ok(GitBlame {
+        path: file.to_string(),
+        lines,
+    })
+}
+
+/// Parse output `git blame --line-porcelain`.
+fn parse_blame(raw: &str) -> Vec<GitBlameLine> {
+    let mut result = Vec::new();
+    let mut cur_hash = String::new();
+    let mut cur_author = String::new();
+    let mut cur_time: i64 = 0;
+    let mut cur_final_line: u32 = 0;
+
+    for line in raw.split('\n') {
+        if let Some(content) = line.strip_prefix('\t') {
+            result.push(GitBlameLine {
+                line_no: cur_final_line,
+                hash: cur_hash.clone(),
+                short_hash: cur_hash.chars().take(7).collect(),
+                author_name: cur_author.clone(),
+                date: format_epoch(cur_time),
+                relative_date: String::new(),
+                content: content.to_string(),
+            });
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("author ") {
+            cur_author = rest.to_string();
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("author-time ") {
+            cur_time = rest.trim().parse().unwrap_or(0);
+            continue;
+        }
+        // Header dòng nhóm: "<sha40> <orig-line> <final-line> [<num-lines>]".
+        let mut parts = line.split_whitespace();
+        if let Some(first) = parts.next() {
+            if first.len() == 40 && first.chars().all(|c| c.is_ascii_hexdigit()) {
+                cur_hash = first.to_string();
+                let _orig_line = parts.next();
+                if let Some(final_line) = parts.next() {
+                    cur_final_line = final_line.parse().unwrap_or(cur_final_line);
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Chuyển epoch giây thành ISO string theo giờ local.
+fn format_epoch(ts: i64) -> String {
+    use chrono::{Local, TimeZone};
+    Local
+        .timestamp_opt(ts, 0)
+        .single()
+        .map(|dt| dt.to_rfc3339())
+        .unwrap_or_default()
+}
+
+/// Điền `relative_date` cho các dòng blame bằng một lệnh `git log --no-walk` duy nhất
+/// (tránh gọi git riêng cho từng dòng).
+fn attach_relative_dates(repo_path: &str, lines: &mut [GitBlameLine]) {
+    let mut seen = std::collections::HashSet::new();
+    let mut uniq: Vec<&str> = Vec::new();
+    for l in lines.iter() {
+        if !l.hash.is_empty() && seen.insert(l.hash.as_str()) {
+            uniq.push(l.hash.as_str());
+        }
+    }
+    if uniq.is_empty() {
+        return;
+    }
+    let format = format!("--pretty=format:%H{FS}%ar{RS}");
+    let mut args: Vec<&str> = vec!["log", "--no-walk", &format];
+    args.extend(uniq.iter().copied());
+    let raw = match run(repo_path, &args) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+    let mut rel_map = std::collections::HashMap::new();
+    for record in raw.split(RS).map(|r| r.trim_matches(['\n', '\r'])).filter(|r| !r.is_empty()) {
+        let mut parts = record.split(FS);
+        if let (Some(h), Some(ar)) = (parts.next(), parts.next()) {
+            rel_map.insert(h.to_string(), ar.to_string());
+        }
+    }
+    for l in lines.iter_mut() {
+        if let Some(ar) = rel_map.get(&l.hash) {
+            l.relative_date = ar.clone();
+        }
+    }
 }
 
 // === Staging ===

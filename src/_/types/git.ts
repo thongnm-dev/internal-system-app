@@ -144,6 +144,23 @@ export interface GitBranch {
   last_commit_subject: string;
 }
 
+/** Một dòng trong kết quả `git blame`. */
+export interface GitBlameLine {
+  line_no: number;
+  hash: string;
+  short_hash: string;
+  author_name: string;
+  date: string;
+  relative_date: string;
+  content: string;
+}
+
+/** Kết quả `git blame` của một file. */
+export interface GitBlame {
+  path: string;
+  lines: GitBlameLine[];
+}
+
 /** Một mục stash. */
 export interface GitStash {
   index: number;

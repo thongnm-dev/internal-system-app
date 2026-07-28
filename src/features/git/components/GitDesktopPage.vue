@@ -32,6 +32,7 @@ import GitResetHardDialog from "./GitResetHardDialog.vue";
 import GitBranchFromCommitDialog from "./GitBranchFromCommitDialog.vue";
 import GitGraphDialog from "./GitGraphDialog.vue";
 import GitCommitBrowserDialog from "./GitCommitBrowserDialog.vue";
+import GitBlameDialog from "./GitBlameDialog.vue";
 
 const git = useGit();
 
@@ -318,6 +319,31 @@ function closeFileMenu() {
   window.removeEventListener("scroll", closeFileMenu, true);
 }
 onUnmounted(closeFileMenu);
+
+// === Git blame ===
+const blameDialogVisible = ref(false);
+const blameDialogFile = ref("");
+function openBlameDialog(rel: string) {
+  blameDialogFile.value = rel;
+  blameDialogVisible.value = true;
+  closeFileMenu();
+}
+async function openBlameFromHistory(hash: string) {
+  git.switchTab("history");
+  if (!git.commits.value.length) await git.loadHistory();
+  const found = git.commits.value.find((c) => c.hash === hash);
+  await git.selectCommit(
+    found ?? {
+      hash,
+      short_hash: hash.slice(0, 7),
+      subject: "",
+      author_name: "",
+      author_email: "",
+      date: "",
+      relative_date: "",
+    },
+  );
+}
 
 // === Commit browser (duyệt commit + copy nhiều SHA) ===
 const browserDialogVisible = ref(false);
@@ -1231,6 +1257,12 @@ onUnmounted(closeCommitMenu);
     <GitBranchFromCommitDialog v-model:visible="branchFromDialogVisible" :git="git" :target="branchFromCommit" />
     <GitGraphDialog v-model:visible="graphDialogVisible" :git="git" :on-file-context="openFileMenu" />
     <GitCommitBrowserDialog v-model:visible="browserDialogVisible" :git="git" :on-file-context="openFileMenu" />
+    <GitBlameDialog
+      v-model:visible="blameDialogVisible"
+      :git="git"
+      :file="blameDialogFile"
+      @open-in-history="openBlameFromHistory"
+    />
 
     <!-- File context menu (copy path / show in folder) -->
     <div
@@ -1247,6 +1279,10 @@ onUnmounted(closeCommitMenu);
       </button>
       <button :class="ctxItem" @click="git.showInFolder(absPath(fileMenu.rel)); closeFileMenu()">
         <i class="pi pi-folder-open text-xs" /> Show in folder
+      </button>
+      <div class="my-1 border-t border-divider" />
+      <button :class="ctxItem" @click="openBlameDialog(fileMenu.rel)">
+        <i class="pi pi-user-edit text-xs" /> Xem Git blame
       </button>
     </div>
 
