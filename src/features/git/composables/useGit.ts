@@ -14,6 +14,7 @@ import {
   gitCleanupDelete,
   gitCleanupScan,
   gitClone,
+  gitAmendCommit,
   gitCommitNoEdit,
   gitCompare,
   gitCompareFileDiff,
@@ -459,6 +460,21 @@ export function useGit() {
       toast.success("Đã undo commit gần nhất (thay đổi giữ ở staged).");
     } catch (e) {
       reportError("Không undo được commit", e);
+    } finally {
+      busyMessage.value = "";
+    }
+  }
+
+  async function amendCommit(message: string) {
+    const path = repoPath();
+    if (!path || !message.trim()) return;
+    busyMessage.value = "Đang amend commit…";
+    try {
+      await gitAmendCommit(path, message.trim());
+      await refreshAfterHistoryChange();
+      toast.success("Đã amend commit gần nhất.");
+    } catch (e) {
+      reportError("Không amend được commit", e);
     } finally {
       busyMessage.value = "";
     }
@@ -1257,6 +1273,7 @@ export function useGit() {
     stashDrop,
     cloneRepo,
     undoLastCommit,
+    amendCommit,
     resetTo,
     checkoutCommit,
     createBranchAt,

@@ -378,6 +378,12 @@ function askBranchFrom(c: GitCommit) {
   branchFromDialogVisible.value = true;
 }
 
+async function handleAmendCommit(c: GitCommit) {
+  git.commitMessage.value = c.subject;
+  await git.undoLastCommit();
+  git.switchTab("changes");
+}
+
 onUnmounted(closeCommitMenu);
 </script>
 
@@ -533,7 +539,7 @@ onUnmounted(closeCommitMenu);
           :disabled="git.syncing.value"
           @click="git.fetch()"
         >
-          <i class="pi text-[11px]" :class="git.syncing.value ? 'pi-spinner pi-spin' : 'pi-refresh'" /> Fetch
+          <i class="pi text-[11px]" :class="git.syncing.value ? 'pi-spinner pi-spin' : 'pi-refresh'" />
         </button>
 
         <!-- Trạng thái bận / tiến trình -->
@@ -581,7 +587,7 @@ onUnmounted(closeCommitMenu);
               :disabled="git.syncing.value"
               @click="git.pull()"
             >
-              <i class="pi pi-arrow-down text-[11px]" /> Pull
+              <i class="pi pi-arrow-down text-[11px]" />
               <span v-if="git.info.value?.behind" class="rounded-full bg-sky-100 px-1 text-[9px] font-bold text-sky-700">{{ git.info.value.behind }}</span>
             </button>
             <button
@@ -589,7 +595,7 @@ onUnmounted(closeCommitMenu);
               :disabled="git.syncing.value"
               @click="git.push()"
             >
-              <i class="pi pi-arrow-up text-[11px]" /> Push
+              <i class="pi pi-arrow-up text-[11px]" />
               <span v-if="git.info.value?.ahead" class="rounded-full bg-white/25 px-1 text-[9px] font-bold">{{ git.info.value.ahead }}</span>
             </button>
 
@@ -607,7 +613,7 @@ onUnmounted(closeCommitMenu);
                 class="absolute bottom-full right-0 z-30 mb-2 w-60 rounded-lg border border-divider bg-panel p-1.5 shadow-float"
               >
                 <button :class="ctxItem" @click="openRebaseDialog">
-                  <i class="pi pi-arrows-v text-xs" /> Rebase branch hiện tại…
+                  <i class="pi pi-arrows-v text-xs" /> Rebase current branch…
                 </button>
                 <button :class="ctxItem" @click="openWorktreeCreate">
                   <i class="pi pi-clone text-xs" /> Tạo worktree…
@@ -1241,31 +1247,34 @@ onUnmounted(closeCommitMenu);
       :style="{ left: commitMenu.x + 'px', top: commitMenu.y + 'px' }"
       @click.stop
     >
-      <button v-if="isTopCommit(commitMenu.commit)" :class="ctxItem" @click="git.undoLastCommit(); closeCommitMenu()">
-        <i class="pi pi-replay text-xs" /> Undo commit này
+      <button v-if="isTopCommit(commitMenu.commit)" :class="ctxItem" @click="handleAmendCommit(commitMenu.commit); closeCommitMenu()">
+        <i class="pi pi-pencil text-xs" /> Amend commit
+      </button>
+      <button v-if="isTopCommit(commitMenu.commit) && (git.info.value?.ahead ?? 0) > 0" :class="ctxItem" @click="git.undoLastCommit(); closeCommitMenu()">
+        <i class="pi pi-replay text-xs" /> Undo commit
       </button>
       <button :class="ctxItem" @click="askRevert(commitMenu.commit); closeCommitMenu()">
-        <i class="pi pi-undo text-xs" /> Revert commit…
+        <i class="pi pi-undo text-xs" /> Revert commit
       </button>
       <button :class="ctxItem" @click="git.cherryPick(commitMenu.commit.hash); closeCommitMenu()">
-        <i class="pi pi-share-alt text-xs" /> Cherry-pick vào branch hiện tại
+        <i class="pi pi-share-alt text-xs" /> Cherry-pick commit
       </button>
       <div class="my-1 border-t border-divider" />
       <button :class="ctxItem" @click="askBranchFrom(commitMenu.commit); closeCommitMenu()">
-        <i class="pi pi-sitemap text-xs" /> Tạo branch từ đây…
+        <i class="pi pi-sitemap text-xs" /> Tạo branch from commit
       </button>
       <button :class="ctxItem" @click="git.checkoutCommit(commitMenu.commit.hash); closeCommitMenu()">
-        <i class="pi pi-arrow-right text-xs" /> Checkout commit (detached)
+        <i class="pi pi-arrow-right text-xs" /> Checkout commit
       </button>
       <button :class="ctxItem" @click="openTagDialog({ hash: commitMenu.commit.hash, label: commitMenu.commit.short_hash + ' — ' + commitMenu.commit.subject })">
-        <i class="pi pi-tag text-xs" /> Tạo tag tại đây…
+        <i class="pi pi-tag text-xs" /> Tạo tag
       </button>
       <div class="my-1 border-t border-divider" />
       <button :class="ctxItem" @click="git.resetTo(commitMenu.commit.hash, 'mixed'); closeCommitMenu()">
-        <i class="pi pi-history text-xs" /> Reset về đây (giữ thay đổi)
+        <i class="pi pi-history text-xs" /> Reset commit
       </button>
       <button :class="ctxDanger" @click="askResetHard(commitMenu.commit); closeCommitMenu()">
-        <i class="pi pi-exclamation-triangle text-xs" /> Reset về đây (xóa thay đổi)…
+        <i class="pi pi-exclamation-triangle text-xs" /> Reset hard (xóa commit)
       </button>
       <div class="my-1 border-t border-divider" />
       <button :class="ctxItem" @click="git.copyText(commitMenu.commit.hash, 'SHA'); closeCommitMenu()">

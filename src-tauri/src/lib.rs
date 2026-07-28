@@ -54,7 +54,7 @@ use commands::explorer_commands::{
 };
 use commands::git_commands::{
     git_add_repo, git_branches, git_checkout_branch, git_cherry_pick, git_cherry_pick_abort,
-    git_cherry_pick_continue, git_cleanup_delete, git_cleanup_scan, git_clone, git_commit,
+    git_cherry_pick_continue, git_cleanup_delete, git_cleanup_scan, git_clone, git_amend_commit, git_commit,
     git_commit_detail, git_commit_file_diff, git_commit_no_edit, git_compare, git_compare_file_diff,
     git_create_branch, git_create_pull_request, git_delete_branch, git_discard, git_fetch,
     git_file_diff, git_graph, git_list_conflicts, git_list_pull_requests, git_list_repos, git_log,
@@ -335,6 +335,7 @@ pub fn run() {
             git_unstage,
             git_discard,
             git_commit,
+            git_amend_commit,
             git_checkout_branch,
             git_create_branch,
             git_delete_branch,

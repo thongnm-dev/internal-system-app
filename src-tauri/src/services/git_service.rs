@@ -472,6 +472,14 @@ pub fn commit(repo_path: &str, message: &str) -> AppResult<String> {
     run(repo_path, &["commit", "-m", message])
 }
 
+/// Amend commit gần nhất với message mới.
+pub fn amend_commit(repo_path: &str, message: &str) -> AppResult<String> {
+    if message.trim().is_empty() {
+        return Err(AppError::new("Commit message không được để trống."));
+    }
+    run(repo_path, &["commit", "--amend", "-m", message])
+}
+
 /// Hoàn tác commit gần nhất, giữ lại thay đổi ở staged (`reset --soft HEAD~1`).
 pub fn undo_last_commit(repo_path: &str) -> AppResult<String> {
     run(repo_path, &["reset", "--soft", "HEAD~1"])

@@ -202,6 +202,14 @@ pub async fn git_commit(path: String, message: String) -> Result<String, String>
 }
 
 #[tauri::command]
+pub async fn git_amend_commit(path: String, message: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git_service::amend_commit(&path, &message))
+        .await
+        .map_err(log_err)?
+        .map_err(log_err)
+}
+
+#[tauri::command]
 pub async fn git_checkout_branch(path: String, name: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::checkout_branch(&path, &name))
         .await

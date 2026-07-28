@@ -110,6 +110,10 @@ export function gitCommit(path: string, message: string) {
   return safeInvoke<string>("git_commit", { path, message });
 }
 
+export function gitAmendCommit(path: string, message: string) {
+  return safeInvoke<string>("git_amend_commit", { path, message });
+}
+
 export function gitCheckoutBranch(path: string, name: string) {
   return safeInvoke<string>("git_checkout_branch", { path, name });
 }
