@@ -275,9 +275,14 @@ function sourceLabel(source: AiUsageSource): string {
   }
 }
 
-function usageBarClass(percent: number): string {
-  if (percent <= 10) return "bg-red-500";
-  if (percent <= 30) return "bg-amber-500";
+/** `percent` truyền vào đây là % còn lại từ backend → đổi sang % đã dùng để bar tăng dần 0→100%. */
+function usedPercent(remainingPercent: number): number {
+  return Math.min(100, Math.max(0, 100 - remainingPercent));
+}
+
+function usageBarClass(usedPercentValue: number): string {
+  if (usedPercentValue >= 90) return "bg-red-500";
+  if (usedPercentValue >= 70) return "bg-amber-500";
   return "bg-brand";
 }
 
@@ -398,16 +403,16 @@ function resetHint(resetAt: string): string {
               <span class="text-muted">source: {{ sourceLabel(account.usage_source) }}</span>
             </div>
 
-            <!-- Usage remaining (API / Codex — số liệu tổng hợp) -->
+            <!-- Usage used (API / Codex — số liệu tổng hợp) -->
             <div v-if="account.account_type !== 'subscription'" class="mt-3">
               <div class="flex items-center justify-between text-xs">
-                <span class="font-bold text-muted">Usage remaining</span>
-                <span class="font-bold text-ink">{{ Math.round(account.usage_percent) }}%</span>
+                <span class="font-bold text-muted">Usage used</span>
+                <span class="font-bold text-ink">{{ Math.round(usedPercent(account.usage_percent)) }}%</span>
               </div>
               <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
                 <div
-                  :class="['h-full rounded-full transition-all', usageBarClass(account.usage_percent)]"
-                  :style="{ width: `${Math.min(100, Math.max(0, account.usage_percent))}%` }"
+                  :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account.usage_percent))]"
+                  :style="{ width: `${usedPercent(account.usage_percent)}%` }"
                 />
               </div>
             </div>
@@ -418,12 +423,12 @@ function resetHint(resetAt: string): string {
               <div>
                 <div class="flex items-center justify-between text-xs">
                   <span class="font-bold text-muted">Current session</span>
-                  <span class="font-bold text-ink">{{ Math.round(account.session_percent) }}%</span>
+                  <span class="font-bold text-ink">{{ Math.round(usedPercent(account.session_percent)) }}%</span>
                 </div>
                 <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
                   <div
-                    :class="['h-full rounded-full transition-all', usageBarClass(account.session_percent)]"
-                    :style="{ width: `${Math.min(100, Math.max(0, account.session_percent))}%` }"
+                    :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account.session_percent))]"
+                    :style="{ width: `${usedPercent(account.session_percent)}%` }"
                   />
                 </div>
                 <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
@@ -435,12 +440,12 @@ function resetHint(resetAt: string): string {
               <div>
                 <div class="flex items-center justify-between text-xs">
                   <span class="font-bold text-muted">Weekly limit</span>
-                  <span class="font-bold text-ink">{{ Math.round(account.weekly_percent) }}%</span>
+                  <span class="font-bold text-ink">{{ Math.round(usedPercent(account.weekly_percent)) }}%</span>
                 </div>
                 <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
                   <div
-                    :class="['h-full rounded-full transition-all', usageBarClass(account.weekly_percent)]"
-                    :style="{ width: `${Math.min(100, Math.max(0, account.weekly_percent))}%` }"
+                    :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account.weekly_percent))]"
+                    :style="{ width: `${usedPercent(account.weekly_percent)}%` }"
                   />
                 </div>
                 <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">

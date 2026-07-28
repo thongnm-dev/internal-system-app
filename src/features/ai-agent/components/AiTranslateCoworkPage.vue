@@ -387,8 +387,20 @@ function statusClass(status: AiAccountStatus): string {
   }
 }
 
+/** account.usage_percent là % còn lại "xấu nhất" (min của session/weekly với subscription) — backend đã tính sẵn, dùng chung cho mọi loại account để màu bar khớp với status badge. */
 function usagePercent(account: AiAccount): number {
-  return account.account_type === "subscription" ? account.session_percent : account.usage_percent;
+  return account.usage_percent;
+}
+
+/** usagePercent() là % còn lại (backend) → đổi sang % đã dùng để hiển thị bar tăng dần 0→100%. */
+function usedPercent(account: AiAccount): number {
+  return Math.min(100, Math.max(0, 100 - usagePercent(account)));
+}
+
+function usageBarClass(usedPercentValue: number): string {
+  if (usedPercentValue >= 90) return "bg-red-500";
+  if (usedPercentValue >= 70) return "bg-amber-500";
+  return "bg-brand";
 }
 
 function hasUsage(account: AiAccount): boolean {
@@ -550,15 +562,13 @@ function isTextResult(entry: FileEntry): boolean {
               {{ providerLabel(account.provider) }}<span v-if="account.subscription_type"> · {{ account.subscription_type }}</span>
             </p>
             <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="font-bold text-muted">
-                {{ account.account_type === "subscription" ? "Current session" : "Usage remaining" }}
-              </span>
-              <span class="font-bold text-ink">{{ Math.round(usagePercent(account)) }}%</span>
+              <span class="font-bold text-muted">Usage used</span>
+              <span class="font-bold text-ink">{{ Math.round(usedPercent(account)) }}%</span>
             </div>
             <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-canvas">
               <div
-                class="h-full rounded-full bg-brand transition-all"
-                :style="{ width: `${Math.min(100, Math.max(0, usagePercent(account)))}%` }"
+                :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account))]"
+                :style="{ width: `${usedPercent(account)}%` }"
               />
             </div>
             <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">

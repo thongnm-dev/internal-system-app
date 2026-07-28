@@ -218,7 +218,7 @@ pub async fn download_objects(
             let folder_prefix = all_keys.remove(i);
             match list_all_objects_recursive(&client, &bucket, &folder_prefix).await {
                 Ok(child_keys) => {
-                    for k in child_keys.into_iter().rev() {
+                    for k in child_keys.into_iter().filter(|k| !k.ends_with('/')).rev() {
                         all_keys.insert(i, k);
                     }
                 }
@@ -317,9 +317,7 @@ async fn list_all_objects_recursive(
 
         for obj in output.contents() {
             if let Some(key) = obj.key() {
-                if !key.ends_with('/') {
-                    keys.push(key.to_string());
-                }
+                keys.push(key.to_string());
             }
         }
 
@@ -450,7 +448,9 @@ pub async fn delete_objects(
             match list_all_objects_recursive(&client, &bucket, key).await {
                 Ok(child_keys) => {
                     all_keys.extend(child_keys);
-                    all_keys.push(key.clone());
+                    if !all_keys.contains(key) {
+                        all_keys.push(key.clone());
+                    }
                 }
                 Err(e) => {
                     failed += 1;
@@ -1004,7 +1004,7 @@ pub async fn download_by_storage(
         let prefix = format!("{}{}/", base_prefix, bug);
         match list_all_objects_recursive(&client, &bucket, &prefix).await {
             Ok(keys) => {
-                for key in &keys {
+                for key in keys.iter().filter(|k| !k.ends_with('/')) {
                     let relative = key.strip_prefix(base_prefix.as_str()).unwrap_or(key.as_str());
                     let local_file = dest.join(relative);
 
