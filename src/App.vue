@@ -5,6 +5,7 @@ import { useAppShell } from "@/shared/composables/useAppShell";
 import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
 import { useDatabaseStatus } from "@/shared/composables/useDatabaseStatus";
 import { installNavigationHistory, markMenuNavigation } from "@/shared/composables/useNavigationHistory";
+import { useTabNavigation } from "@/shared/composables/useTabNavigation";
 import { useAuthStore } from "@/app/stores/auth";
 import { appRoutes, loginRoute, routeByPath } from "@/app/router/routes";
 import type { MenuKey } from "@/_/types/app";
@@ -15,6 +16,7 @@ import DatabaseConfigScreen from "@/shared/components/DatabaseConfigScreen.vue";
 import NetworkStatusBanner from "@/shared/components/NetworkStatusBanner.vue";
 import AppSidebar from "@/shared/components/AppSidebar.vue";
 import AppHeader from "@/shared/components/AppHeader.vue";
+import AppTabBar from "@/shared/components/AppTabBar.vue";
 import AppBottomBar from "@/shared/components/AppBottomBar.vue";
 import AppToast from "@/shared/components/AppToast.vue";
 import GlobalLoading from "@/shared/components/GlobalLoading.vue";
@@ -25,8 +27,10 @@ const auth = useAuthStore();
 const shell = useAppShell();
 const network = useNetworkStatus();
 const database = useDatabaseStatus();
+const tabNav = useTabNavigation();
 
 installNavigationHistory(router);
+tabNav.init(router);
 
 const activeMenu = computed<MenuKey>(() => (route.meta.key as MenuKey) ?? "overview");
 
@@ -36,8 +40,13 @@ const currentAppRoute = computed(() => {
 
 function handleMenuChange(key: MenuKey) {
   const target = appRoutes.find((r) => r.key === key);
-  if (target) {
-    markMenuNavigation();
+  if (!target) return;
+
+  markMenuNavigation();
+
+  if (tabNav.tabMode.value) {
+    tabNav.openTab(key);
+  } else {
     router.push(target.path);
   }
 }
@@ -59,6 +68,16 @@ watch(
       router.push(loginRoute.path);
     }
   },
+);
+
+watch(
+  [() => route.fullPath, tabNav.tabMode],
+  () => {
+    if (tabNav.tabMode.value && route.meta.key && !isAuthPage.value) {
+      tabNav.syncRoute(route.meta.key as string, route.fullPath);
+    }
+  },
+  { immediate: true },
 );
 </script>
 
@@ -112,7 +131,20 @@ watch(
             @logout="handleLogout"
           />
 
-          <router-view />
+          <AppTabBar
+            v-if="tabNav.tabMode.value && tabNav.tabs.value.length > 0"
+            :tabs="tabNav.tabs.value"
+            :active-key="tabNav.activeTabKey.value"
+            class="-mt-1 -mb-1"
+            @activate="tabNav.activateTab"
+            @close="tabNav.closeTab"
+          />
+
+          <router-view v-slot="{ Component }">
+            <keep-alive :max="tabNav.tabMode.value ? 20 : 1">
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
         </div>
       </section>
     </section>

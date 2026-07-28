@@ -54,8 +54,11 @@ CREATE TABLE IF NOT EXISTS user_settings (
         CHECK (theme IN ('light', 'dark')),
     language   VARCHAR(5)  NOT NULL DEFAULT 'vi'
         CHECK (language IN ('vi', 'en', 'ja')),
+    tab_mode   BOOLEAN     NOT NULL DEFAULT false,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS tab_mode BOOLEAN NOT NULL DEFAULT false;
 
 -- ============================================================================
 -- PROJECTS

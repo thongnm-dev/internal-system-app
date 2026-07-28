@@ -3,6 +3,7 @@ import type { AppRoute } from "@/app/router/routes";
 import Button from "primevue/button";
 import { useSettings } from "@/features/settings/composables/useSettings";
 import { useNavigationHistory } from "@/shared/composables/useNavigationHistory";
+import { useTabNavigation } from "@/shared/composables/useTabNavigation";
 
 defineProps<{
   route: AppRoute;
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 
 const { settings, updateTheme } = useSettings();
 const { canGoBack, backTitle, goBack } = useNavigationHistory();
+const { tabMode } = useTabNavigation();
 
 function toggleTheme() {
   updateTheme(settings.value.theme === "dark" ? "light" : "dark");
@@ -40,7 +42,7 @@ function toggleTheme() {
         </template>
       </nav>
       <Button
-        v-if="canGoBack"
+        v-if="canGoBack && !tabMode"
         icon="pi pi-arrow-left"
         :label="backTitle ? `Back to ${backTitle}` : 'Back'"
         severity="secondary"

@@ -4,6 +4,7 @@ import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { getSettings, saveSettings } from "@/tauri/commands/settings";
 import { useAuthStore } from "@/app/stores/auth";
 import { useToast } from "@/shared/composables/useToast";
+import { useTabNavigation } from "@/shared/composables/useTabNavigation";
 import type { AppSettings as TauriAppSettings } from "@/_/types/settings";
 
 export type ThemeMode = "light" | "dark";
@@ -22,6 +23,7 @@ export type UserSettings = {
 type StoredSettings = {
   language: LanguageCode;
   theme: ThemeMode;
+  tabMode: boolean;
   user: UserSettings;
 };
 
@@ -39,6 +41,7 @@ const defaultSettings: StoredSettings = {
   },
   theme: "light",
   language: "vi",
+  tabMode: false,
 };
 
 function fromTauri(ts: TauriAppSettings): StoredSettings {
@@ -54,6 +57,7 @@ function fromTauri(ts: TauriAppSettings): StoredSettings {
     },
     theme: ts.theme === "dark" ? "dark" : "light",
     language: isLanguageCode(ts.language) ? ts.language : "vi",
+    tabMode: ts.tab_mode ?? false,
   };
 }
 
@@ -71,6 +75,7 @@ function toTauriRequest(s: StoredSettings, userId: number) {
     },
     theme: s.theme,
     language: s.language,
+    tab_mode: s.tabMode,
   };
 }
 
@@ -83,6 +88,7 @@ function loadSettingsFromLocal(): StoredSettings {
       user: { ...defaultSettings.user, ...parsed.user },
       theme: parsed.theme === "dark" ? "dark" : "light",
       language: isLanguageCode(parsed.language) ? parsed.language : defaultSettings.language,
+      tabMode: parsed.tabMode === true,
     };
   } catch {
     return { ...defaultSettings };
@@ -100,6 +106,7 @@ function cloneSettings(s: StoredSettings): StoredSettings {
 export function useSettings() {
   const authStore = useAuthStore();
   const toast = useToast();
+  const tabNav = useTabNavigation();
   const savedSnapshot = ref<StoredSettings>(loadSettingsFromLocal());
   const settings = ref<StoredSettings>(cloneSettings(savedSnapshot.value));
   const loading = ref(false);
@@ -112,6 +119,11 @@ export function useSettings() {
   watch(
     () => settings.value.theme,
     (theme) => applyTheme(theme),
+  );
+
+  watch(
+    () => settings.value.tabMode,
+    (enabled) => tabNav.setTabMode(enabled),
   );
 
   async function loadFromBackend() {
@@ -170,6 +182,10 @@ export function useSettings() {
     settings.value.language = language;
   }
 
+  function updateTabMode(enabled: boolean) {
+    settings.value.tabMode = enabled;
+  }
+
   return {
     settings,
     isDirty,
@@ -180,5 +196,6 @@ export function useSettings() {
     updateUser,
     updateTheme,
     updateLanguage,
+    updateTabMode,
   };
 }
