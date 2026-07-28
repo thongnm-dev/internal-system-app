@@ -11,6 +11,7 @@ import Fieldset from "primevue/fieldset";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useAiCowork } from "../composables/useAiCowork";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import AiTaskDialog from "./AiTaskDialog.vue";
 import type { TaskDialogPayload } from "./AiTaskDialog.vue";
 import { STEP_TYPE_META } from "@/_/types/ai-workflow";
@@ -37,6 +38,7 @@ function formatPickerDate(value: string): string {
 }
 
 const ctrl = useAiCowork();
+const { paginationCompact } = useDataTablePagination();
 
 const showCreateTaskDialog = ref(false);
 const isCreatingTaskViaDialog = ref(false);
@@ -785,9 +787,10 @@ function isMarkdown(entry: FileEntry): boolean {
             :table-style="{ minWidth: '600px' }"
             :value="ctrl.taskSearchResults.value"
             paginator
-            :rows="10"
-            :rows-per-page-options="[10, 20, 50]"
-            paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+            :rows="paginationCompact.rows"
+            :rows-per-page-options="paginationCompact.rowsPerPageOptions"
+            :paginator-template="paginationCompact.paginatorTemplate"
+            :current-page-report-template="paginationCompact.currentPageReportTemplate"
           >
             <Column header-class="w-12 text-center" body-class="w-12 text-center">
               <template #body="{ data }">

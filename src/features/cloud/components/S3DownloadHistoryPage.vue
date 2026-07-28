@@ -8,9 +8,11 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
 import { useS3DownloadHistory } from "../composables/useS3DownloadHistory";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 
 const { storages, results, isSearching, params, search, clearSearch } =
   useS3DownloadHistory();
+const { pagination } = useDataTablePagination();
 
 function formatDateForParam(date: Date | null): string {
   if (!date) return "";
@@ -144,10 +146,10 @@ function formatDate(ymd: string): string {
         scroll-height="flex"
         :table-style="{ minWidth: '700px' }"
         paginator
-        :rows="20"
-        :rows-per-page-options="[20, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows="pagination.rows"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
       >
         <Column header="Ngày tải">
           <template #body="{ data }">

@@ -75,6 +75,8 @@ mod commands {
     pub mod terminal_commands;
     /// Commands cho màn hình Git Desktop (thao tác git + quản lý danh sách repo).
     pub mod git_commands;
+    /// Commands cho cấu hình phân trang DataTable (đọc từ config.ini).
+    pub mod pagination_commands;
 }
 
 /// Tầng truy cập dữ liệu — đọc/ghi database và file.
@@ -255,6 +257,8 @@ mod services {
     pub mod ai_translate_cowork_service;
     /// Service cho state màn hình AI Cowork (lịch sử làm việc gần nhất).
     pub mod ai_cowork_service;
+    /// Service đọc cấu hình phân trang DataTable từ config.ini.
+    pub mod pagination_service;
     /// Service quản lý phiên terminal nhúng (PTY): spawn/write/resize/kill.
     pub mod terminal_service;
     /// Service cho màn hình Git Desktop — gọi `git` CLI cho mọi thao tác.

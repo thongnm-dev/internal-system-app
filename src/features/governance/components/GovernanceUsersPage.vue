@@ -8,10 +8,12 @@ import Button from "primevue/button";
 import Password from "primevue/password";
 import InputText from "primevue/inputtext";
 import { useGovernanceUsers } from "../composables/useGovernanceUsers";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import { useToast } from "@/shared/composables/useToast";
 
 const ctrl = useGovernanceUsers();
 const toast = useToast();
+const { pagination } = useDataTablePagination();
 const isDialogOpen = ref(false);
 const confirmDeleteId = ref<number | null>(null);
 const resetPwUserId = ref<number | null>(null);
@@ -175,10 +177,10 @@ onMounted(() => ctrl.init());
         :table-style="{ minWidth: '860px' }"
         :value="ctrl.filteredUsers.value"
         paginator
-        :rows="20"
-        :rows-per-page-options="[20, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows="pagination.rows"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
         @row-click="(e: any) => openEdit(e.data.id)"
       >
         <Column field="id" header="ID" body-class="font-mono text-xs text-muted" :style="{ width: '60px' }" />

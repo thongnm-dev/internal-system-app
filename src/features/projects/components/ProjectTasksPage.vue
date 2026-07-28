@@ -11,6 +11,7 @@ import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useAuthStore } from "@/app/stores/auth";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import { friendlyError } from "@/tauri/commands/_base";
 import {
   emptyProjectTaskInput,
@@ -24,6 +25,7 @@ const auth = useAuthStore();
 const projectId = (route.params.id as string) || "";
 
 const ctrl = useProjectTasks(projectId);
+const { pagination } = useDataTablePagination();
 
 // Chỉ cho phép liên kết Issue Backlog khi dự án đã thiết lập Backlog key.
 const hasBacklog = computed(() => Boolean(ctrl.project.value?.backlog_key));
@@ -124,10 +126,10 @@ async function saveTask() {
         :table-style="{ minWidth: '980px' }"
         :value="ctrl.tasks.value"
         paginator
-        :rows="20"
-        :rows-per-page-options="[20, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows="pagination.rows"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
       >
         <Column field="shortName" header="Short name" body-class="font-bold text-ink" />
         <Column header="Category">

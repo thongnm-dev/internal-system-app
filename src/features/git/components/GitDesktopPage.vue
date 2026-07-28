@@ -8,6 +8,7 @@ import Textarea from "primevue/textarea";
 import { useGit } from "../composables/useGit";
 import type { GitBranch, GitCommit, GitFileChange, GitRepo } from "@/_/types/git";
 import { statusMeta, baseName, dirName } from "../utils/fileStatus";
+import { guessBase } from "../utils/gitRefs";
 
 import GitCloneRepoDialog from "./GitCloneRepoDialog.vue";
 import GitNewBranchDialog from "./GitNewBranchDialog.vue";
@@ -19,6 +20,7 @@ import GitWorktreeListDialog from "./GitWorktreeListDialog.vue";
 import GitStashListDialog from "./GitStashListDialog.vue";
 import GitStashSaveDialog from "./GitStashSaveDialog.vue";
 import GitTagDialog from "./GitTagDialog.vue";
+import GitTagListDialog from "./GitTagListDialog.vue";
 import GitMergeDialog from "./GitMergeDialog.vue";
 import GitPullRequestsDialog from "./GitPullRequestsDialog.vue";
 import GitCompareDialog from "./GitCompareDialog.vue";
@@ -104,6 +106,17 @@ const displayDiff = computed(() =>
   git.tab.value === "history" ? git.commitFileDiff.value : git.diff.value,
 );
 
+const isOnBaseBranch = computed(() => {
+  const cur = git.info.value?.current_branch;
+  if (!cur) return false;
+  const base = guessBase(
+    git.branches.value.map((b) => b.name),
+    "",
+    git.info.value?.upstream,
+  );
+  return cur === base || cur === base.replace(/^origin\//, "");
+});
+
 // Thu gọn/mở rộng vùng commit detail (collapse chỉ hiện tiêu đề + metadata author).
 const detailExpanded = ref(true);
 
@@ -179,7 +192,6 @@ onUnmounted(() => {
 // === Rebase ===
 const rebaseDialogVisible = ref(false);
 function openRebaseDialog() {
-  closeMenus();
   rebaseDialogVisible.value = true;
 }
 
@@ -195,11 +207,9 @@ function askRevert(c: GitCommit) {
 const worktreeCreateDialogVisible = ref(false);
 const worktreeListDialogVisible = ref(false);
 function openWorktreeCreate() {
-  closeMenus();
   worktreeCreateDialogVisible.value = true;
 }
 function openWorktreeList() {
-  closeMenus();
   worktreeListDialogVisible.value = true;
 }
 
@@ -207,28 +217,28 @@ function openWorktreeList() {
 const stashListDialogVisible = ref(false);
 const stashSaveDialogVisible = ref(false);
 function openStashList() {
-  closeMenus();
   stashListDialogVisible.value = true;
 }
 function openStashSave() {
-  closeMenus();
   stashSaveDialogVisible.value = true;
 }
 
 // === Tag ===
 const tagDialogVisible = ref(false);
+const tagListDialogVisible = ref(false);
 const tagTarget = ref<{ hash: string; label: string }>({ hash: "", label: "HEAD" });
 function openTagDialog(target?: { hash: string; label: string }) {
-  closeMenus();
   closeCommitMenu();
   tagTarget.value = target ?? { hash: "", label: "HEAD (branch hiện tại)" };
   tagDialogVisible.value = true;
+}
+function openTagListDialog() {
+  tagListDialogVisible.value = true;
 }
 
 // === Merge ===
 const mergeDialogVisible = ref(false);
 function openMergeDialog() {
-  closeMenus();
   mergeDialogVisible.value = true;
 }
 
@@ -236,7 +246,6 @@ function openMergeDialog() {
 const compareDialogVisible = ref(false);
 const comparePr = ref<{ base: string; head: string } | null>(null);
 function openCompareDialog() {
-  closeMenus();
   comparePr.value = null;
   compareDialogVisible.value = true;
 }
@@ -248,35 +257,30 @@ function handleOpenCompare(pr: { base: string; head: string } | null) {
 // === Danh sách Pull Request ===
 const prDialogVisible = ref(false);
 function openPrDialog() {
-  closeMenus();
   prDialogVisible.value = true;
 }
 
 // === Reset HEAD ===
 const resetHeadDialogVisible = ref(false);
 function openResetHeadDialog() {
-  closeMenus();
   resetHeadDialogVisible.value = true;
 }
 
 // === Cleanup branch đã merge ===
 const cleanupDialogVisible = ref(false);
 function openCleanupDialog() {
-  closeMenus();
   cleanupDialogVisible.value = true;
 }
 
 // === Resolve conflict ===
 const conflictDialogVisible = ref(false);
 function openConflictDialog() {
-  closeMenus();
   conflictDialogVisible.value = true;
 }
 
 // === Update from main/master ===
 const updateDialogVisible = ref(false);
 function openUpdateDialog() {
-  closeMenus();
   updateDialogVisible.value = true;
 }
 
@@ -318,14 +322,12 @@ onUnmounted(closeFileMenu);
 // === Commit browser (duyệt commit + copy nhiều SHA) ===
 const browserDialogVisible = ref(false);
 function openCommitBrowser() {
-  closeMenus();
   browserDialogVisible.value = true;
 }
 
 // === Visualization (đồ thị commit) ===
 const graphDialogVisible = ref(false);
 function openGraphDialog() {
-  closeMenus();
   graphDialogVisible.value = true;
 }
 
@@ -630,6 +632,9 @@ onUnmounted(closeCommitMenu);
                 <button :class="ctxItem" @click="openTagDialog()">
                   <i class="pi pi-tag text-xs" /> Tạo tag…
                 </button>
+                <button :class="ctxItem" @click="openTagListDialog">
+                  <i class="pi pi-tags text-xs" /> Quản lý tags…
+                </button>
                 <button :class="ctxItem" @click="openMergeDialog">
                   <i class="pi pi-code-branch text-xs" /> Merge branch…
                 </button>
@@ -640,7 +645,7 @@ onUnmounted(closeCommitMenu);
                   <i class="pi pi-flag text-xs" /> Xem Pull Requests…
                 </button>
                 <div class="my-1 border-t border-divider" />
-                <button :class="ctxItem" @click="openUpdateDialog">
+                <button v-if="!isOnBaseBranch" :class="ctxItem" @click="openUpdateDialog">
                   <i class="pi pi-arrow-circle-down text-xs" /> Cập nhật từ main/master…
                 </button>
                 <button :class="ctxItem" @click="openResetHeadDialog">
@@ -1201,6 +1206,11 @@ onUnmounted(closeCommitMenu);
     <GitStashListDialog v-model:visible="stashListDialogVisible" :git="git" />
     <GitStashSaveDialog v-model:visible="stashSaveDialogVisible" :git="git" />
     <GitTagDialog v-model:visible="tagDialogVisible" :git="git" :target="tagTarget" />
+    <GitTagListDialog
+      v-model:visible="tagListDialogVisible"
+      :git="git"
+      @create-tag="tagListDialogVisible = false; openTagDialog()"
+    />
     <GitMergeDialog v-model:visible="mergeDialogVisible" :git="git" />
     <GitPullRequestsDialog
       v-model:visible="prDialogVisible"

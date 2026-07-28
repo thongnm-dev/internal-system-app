@@ -38,3 +38,11 @@ FROM_EMAIL=
 
 [IPADRESS]
 IPADRESS_LIST=115.77.184.52, 14.161.21.113
+
+[pagination]
+ROWS=20
+ROWS_PER_PAGE_OPTIONS=20, 50, 100
+ROWS_COMPACT=10
+ROWS_PER_PAGE_OPTIONS_COMPACT=10, 20, 50
+PAGINATOR_TEMPLATE=FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport
+CURRENT_PAGE_REPORT_TEMPLATE=Showing {first} to {last} of {totalRecords}

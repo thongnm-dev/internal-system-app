@@ -6,12 +6,14 @@ import DataTable from "primevue/datatable";
 import Fieldset from "primevue/fieldset";
 import InputText from "primevue/inputtext";
 import { useAiTasks } from "../composables/useAiTasks";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import { TASK_CATEGORY_META, STEP_STATUS_META } from "@/_/types/ai-task";
 import type { AiTaskCategory, AiTaskResult, WfProcStepStatus } from "@/tauri/commands/ai-task";
 import AiTaskDialog from "./AiTaskDialog.vue";
 import type { TaskDialogPayload } from "./AiTaskDialog.vue";
 
 const ctrl = useAiTasks();
+const { pagination } = useDataTablePagination();
 
 const showTaskDialog = ref(false);
 const dialogTask = ref<AiTaskResult | null>(null);
@@ -104,10 +106,10 @@ function formatDate(value: string): string {
         :table-style="{ minWidth: '980px' }"
         :value="ctrl.tasks.value"
         paginator
-        :rows="20"
-        :rows-per-page-options="[20, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows="pagination.rows"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
         @row-click="(e: any) => openEditDialog(e.data)"
       >
         <Column field="task_cd" header="Task Code" body-class="font-bold text-ink" />

@@ -24,9 +24,11 @@ import {
 import { canUseTauriRuntime } from "@/tauri/commands/_base";
 import { backlogGetBaseUrl } from "@/tauri/commands/backlog";
 import { useToast } from "@/shared/composables/useToast";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 
 const route = useRoute();
 const toast = useToast();
+const { pagination } = useDataTablePagination();
 const initialProject = (route.query.project as string) || "";
 const ctrl = useIssueBacklog(initialProject);
 
@@ -317,9 +319,9 @@ const importDialogVisible = ref(false);
         :first="ctrl.first.value"
         :rows="ctrl.pageSize.value"
         :total-records="ctrl.totalCount.value"
-        :rows-per-page-options="[20, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
         @page="ctrl.onPage($event)"
       >
         <Column field="issueType" header="Issue Type" body-class="whitespace-nowrap" />

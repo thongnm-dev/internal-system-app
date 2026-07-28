@@ -11,6 +11,7 @@ import { friendlyError } from "@/tauri/commands/_base";
 import { createProject, updateProject, getBacklogProjectByKey, getProjectDetail } from "@/tauri/commands/project";
 import { useToast } from "@/shared/composables/useToast";
 import { useMembersStore } from "@/app/stores/members";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import type { ProjectMember } from "@/_/types/project";
 
 type ProjectForm = {
@@ -23,6 +24,7 @@ type ProjectForm = {
   backlogName: string;
 };
 
+const { paginationCompact } = useDataTablePagination();
 const emptyForm: ProjectForm = { id: null, code: "", name: "", client: "", backlogKey: "", backlogCode: "", backlogName: "" };
 
 /** Giới hạn ký tự khớp với độ dài cột trong bảng `projects` (docs/database/schema.sql). */
@@ -349,10 +351,10 @@ function reloadBacklogProject() {
             :value="filteredMembers"
             :loading="membersStore.loading"
             paginator
-            :rows="5"
-            :rows-per-page-options="[5, 10, 20]"
-            paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-            current-page-report-template="Showing {first} to {last} of {totalRecords}"
+            :rows="paginationCompact.rows"
+            :rows-per-page-options="paginationCompact.rowsPerPageOptions"
+            :paginator-template="paginationCompact.paginatorTemplate"
+            :current-page-report-template="paginationCompact.currentPageReportTemplate"
             empty-message="No members match the search conditions."
             :table-style="{ minWidth: '520px' }"
           >

@@ -9,12 +9,14 @@ import Dialog from "primevue/dialog";
 import Select from "primevue/select";
 import { ref } from "vue";
 import { useStoreProcedure } from "../composables/useStoreProcedure";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import { useToast } from "@/shared/composables/useToast";
 
 import { highlightSql } from "@/features/tools/utils/highlightSql";
 
 const ctrl = useStoreProcedure();
 const toast = useToast();
+const { pagination } = useDataTablePagination();
 const confirmExecute = ref(false);
 
 function openConfirm() {
@@ -118,10 +120,10 @@ onMounted(() => ctrl.init());
         :table-style="{ minWidth: '640px' }"
         :value="ctrl.filteredResults.value"
         paginator
-        :rows="50"
-        :rows-per-page-options="[30, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows="pagination.rows"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
       >
         <Column header="#" body-class="font-mono text-xs text-muted" :style="{ width: '60px' }">
           <template #body="{ index }">

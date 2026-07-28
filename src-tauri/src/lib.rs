@@ -108,6 +108,7 @@ use commands::app_config_commands::{
     execute_single_stored_procedure, execute_stored_procedures, get_app_config,
     get_stored_procedure_content, list_stored_procedures, save_app_config,
 };
+use commands::pagination_commands::get_pagination_config;
 use commands::s3_commands::{
     s3_check_config, s3_check_download_available, s3_create_folder, s3_delete_by_storage,
     s3_get_local_sync_workdir, s3_list_bug_folder_tabs,
@@ -450,7 +451,9 @@ pub fn run() {
             list_stored_procedures,
             get_stored_procedure_content,
             execute_single_stored_procedure,
-            execute_stored_procedures
+            execute_stored_procedures,
+            // === Pagination config command ===
+            get_pagination_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

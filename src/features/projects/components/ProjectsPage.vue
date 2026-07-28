@@ -7,10 +7,12 @@ import Fieldset from "primevue/fieldset";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import { useProjectRegistry } from "../composables/useProjectRegistry";
+import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import type { ProjectSummaryResult } from "@/_/types/project";
 
 const router = useRouter();
 const ctrl = useProjectRegistry();
+const { pagination } = useDataTablePagination();
 const contextMenu = ref<{ project: ProjectSummaryResult; x: number; y: number } | null>(null);
 
 function openContextMenu(event: { originalEvent: Event; data: ProjectSummaryResult }) {
@@ -95,10 +97,10 @@ function formatDate(value: string) {
         :table-style="{ minWidth: '980px' }"
         :value="ctrl.filteredProjects.value"
         paginator
-        :rows="20"
-        :rows-per-page-options="[20, 50, 100]"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        :rows="pagination.rows"
+        :rows-per-page-options="pagination.rowsPerPageOptions"
+        :paginator-template="pagination.paginatorTemplate"
+        :current-page-report-template="pagination.currentPageReportTemplate"
         @row-click="(e: any) => router.push(`/projects/${e.data.id}`)"
         @row-contextmenu="openContextMenu"
       >
