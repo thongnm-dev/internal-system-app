@@ -43,7 +43,7 @@ use commands::backlog_commands::{
     backlog_save_config,
 };
 use commands::excel2md_commands::excel2md;
-use commands::evidence_resize_commands::resize_evidence_images;
+use commands::evidence_resize_commands::{list_excel_sheet_names, resize_evidence_images};
 use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
@@ -194,6 +194,7 @@ pub fn run() {
             // === Excel → Markdown command ===
             excel2md,
             // === Resize evidence images command ===
+            list_excel_sheet_names,
             resize_evidence_images,
             // === Project CRUD commands ===
             create_project,

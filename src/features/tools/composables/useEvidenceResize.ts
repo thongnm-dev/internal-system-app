@@ -2,7 +2,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { resizeEvidenceImages } from "@/tauri/commands/evidence-resize";
+import { listExcelSheetNames, resizeEvidenceImages } from "@/tauri/commands/evidence-resize";
 import type { MessageMode } from "@/_/types/app";
 import type { EvidenceResizeOptions, EvidenceResizeResult } from "@/_/types/evidence-resize";
 
@@ -24,6 +24,9 @@ export function useEvidenceResize() {
   const fontName = ref("");
   const fontSize = ref<number | null>(null);
   const avoidCoveringContent = ref(true);
+  const availableSheets = ref<string[]>([]);
+  const selectedSheets = ref<string[]>([]);
+  const isLoadingSheets = ref(false);
   const result = ref<EvidenceResizeResult | null>(null);
   const message = ref("Select an Excel workbook, optionally set Width/Height, then resize.");
   const messageMode = ref<MessageMode>("info");
@@ -33,10 +36,29 @@ export function useEvidenceResize() {
     inputPath.value = value;
     if (!outputPath.value) outputPath.value = defaultResizedPath(value);
     result.value = null;
+    availableSheets.value = [];
+    selectedSheets.value = [];
   }
 
   function setOutputPath(value: string) {
     outputPath.value = value;
+  }
+
+  async function loadSheetNames(path: string) {
+    if (!canUseTauriRuntime()) return;
+    isLoadingSheets.value = true;
+    try {
+      const sheets = await listExcelSheetNames(path);
+      availableSheets.value = sheets;
+      selectedSheets.value = [...sheets];
+    } catch (e) {
+      availableSheets.value = [];
+      selectedSheets.value = [];
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+    } finally {
+      isLoadingSheets.value = false;
+    }
   }
 
   async function pickInputFile() {
@@ -53,6 +75,7 @@ export function useEvidenceResize() {
         result.value = null;
         message.value = "Excel file selected. Confirm the output path and sizes, then resize.";
         messageMode.value = "info";
+        await loadSheetNames(selected);
       }
     } catch (e) {
       message.value = friendlyError(e);
@@ -108,6 +131,11 @@ export function useEvidenceResize() {
       messageMode.value = "error";
       return;
     }
+    if (availableSheets.value.length > 0 && selectedSheets.value.length === 0) {
+      message.value = "Please select at least one sheet to process.";
+      messageMode.value = "error";
+      return;
+    }
 
     const options: EvidenceResizeOptions = {
       pageBreakPreview: pageBreakPreview.value,
@@ -128,6 +156,7 @@ export function useEvidenceResize() {
         widthCm.value && widthCm.value > 0 ? widthCm.value : null,
         heightCm.value && heightCm.value > 0 ? heightCm.value : null,
         options,
+        selectedSheets.value.length ? selectedSheets.value : null,
       );
       result.value = resized;
       message.value = `${resized.images_resized} image(s) resized across ${resized.drawings_processed} sheet(s): ${resized.output_file_name}`;
@@ -153,6 +182,9 @@ export function useEvidenceResize() {
     fontName,
     fontSize,
     avoidCoveringContent,
+    availableSheets,
+    selectedSheets,
+    isLoadingSheets,
     result,
     message,
     messageMode,

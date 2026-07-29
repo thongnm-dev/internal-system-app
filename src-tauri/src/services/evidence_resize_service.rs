@@ -26,6 +26,38 @@ const EMU_PER_POINT: f64 = 12_700.0;
 /// Chiều cao dòng mặc định của Excel khi sheet không khai báo `defaultRowHeight` (đơn vị: point).
 const DEFAULT_ROW_HEIGHT_PT: f64 = 15.0;
 
+/// Liệt kê tên hiển thị của mọi sheet trong workbook, theo đúng thứ tự khai báo trong
+/// `xl/workbook.xml` — dùng để hiển thị lựa chọn sheet trên UI trước khi resize.
+pub fn list_sheet_names(input_path: String) -> AppResult<Vec<String>> {
+    let input = PathBuf::from(input_path.trim());
+    if input.as_os_str().is_empty() {
+        return Err(AppError::new("Please select an Excel workbook."));
+    }
+    if !input.exists() {
+        return Err(AppError::new(format!(
+            "Excel workbook not found: {}",
+            input.display()
+        )));
+    }
+    if !matches!(input.extension().and_then(|v| v.to_str()), Some("xlsx")) {
+        return Err(AppError::new("Only .xlsx workbooks are supported."));
+    }
+
+    let file = File::open(&input)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::new(format!("Could not open workbook as a zip archive: {e}")))?;
+    let xml = read_entry_to_string(&mut archive, "xl/workbook.xml")
+        .map_err(|_| AppError::new("Could not find xl/workbook.xml in this workbook."))?;
+    let doc = Document::parse(&xml)
+        .map_err(|e| AppError::new(format!("Could not parse xl/workbook.xml: {e}")))?;
+
+    Ok(doc
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "sheet")
+        .filter_map(|n| n.attribute("name").map(str::to_string))
+        .collect())
+}
+
 /// Resize toàn bộ ảnh (picture) trong workbook, giữ nguyên shape/textbox.
 ///
 /// `width_cm`/`height_cm` đều optional: chỉ có Width → Height tự tính theo tỉ lệ khung hình
@@ -41,6 +73,7 @@ pub fn resize_evidence_images(
     width_cm: Option<f64>,
     height_cm: Option<f64>,
     options: EvidenceResizeOptions,
+    selected_sheets: Option<Vec<String>>,
 ) -> AppResult<EvidenceResizeResult> {
     let input = PathBuf::from(input_path.trim());
     let output = PathBuf::from(output_path.trim());
@@ -125,6 +158,34 @@ pub fn resize_evidence_images(
     let mut warnings: Vec<String> = Vec::new();
     let mut replaced_parts: HashMap<String, Vec<u8>> = HashMap::new();
 
+    // Danh sách sheet (theo TÊN HIỂN THỊ) được chọn để giới hạn phạm vi resize/zoom/page break
+    // preview — rỗng hoặc không truyền = không giới hạn, áp dụng cho mọi sheet (như trước).
+    // Font mặc định (xl/styles.xml) không thể giới hạn theo sheet nên luôn áp dụng toàn workbook.
+    let sheet_names_filter: Option<Vec<String>> = selected_sheets.filter(|v| !v.is_empty());
+    let sheet_display_names: HashMap<String, String> = if sheet_names_filter.is_some() {
+        let workbook_name = "xl/workbook.xml";
+        let rels_name = "xl/_rels/workbook.xml.rels";
+        if entry_names.iter().any(|n| n == workbook_name) && entry_names.iter().any(|n| n == rels_name) {
+            let wb_xml = read_entry_to_string(&mut archive, workbook_name)?;
+            let rels_xml = read_entry_to_string(&mut archive, rels_name)?;
+            build_sheet_display_names(&wb_xml, &rels_xml)
+        } else {
+            HashMap::new()
+        }
+    } else {
+        HashMap::new()
+    };
+    // Không resolve được tên hiển thị của 1 sheet thì vẫn xử lý sheet đó (an toàn hơn bỏ sót).
+    let should_process_sheet = |sheet_file: &str| -> bool {
+        match &sheet_names_filter {
+            None => true,
+            Some(selected) => sheet_display_names
+                .get(sheet_file)
+                .map(|display| selected.iter().any(|s| s == display))
+                .unwrap_or(true),
+        }
+    };
+
     // Chỉ quét toàn bộ workbook tìm formula/table/chart/pivot table nếu thật sự cần (tính năng
     // tránh đè content đang bật) — quét 1 lần duy nhất, dùng chung cho mọi sheet.
     let row_insertion_safe = if options.avoid_covering_content {
@@ -138,6 +199,13 @@ pub fn resize_evidence_images(
 
     if resize_requested {
         for drawing_name in &drawing_names {
+            let owning_sheet = find_owning_sheet_name(drawing_name, &entry_names, &mut archive)?;
+            if let Some(sheet_name) = &owning_sheet {
+                if !should_process_sheet(sheet_name) {
+                    continue;
+                }
+            }
+
             let xml = read_entry_to_string(&mut archive, drawing_name)?;
             let rels_name = drawing_rels_name(drawing_name);
             let rels_map = if entry_names.iter().any(|n| n == &rels_name) {
@@ -147,7 +215,6 @@ pub fn resize_evidence_images(
                 HashMap::new()
             };
 
-            let owning_sheet = find_owning_sheet_name(drawing_name, &entry_names, &mut archive)?;
             let sheet_xml = match &owning_sheet {
                 Some(name) => Some(read_entry_to_string(&mut archive, name)?),
                 None => None,
@@ -240,6 +307,7 @@ pub fn resize_evidence_images(
         for sheet_name in entry_names
             .iter()
             .filter(|n| n.starts_with("xl/worksheets/sheet") && n.ends_with(".xml") && !n.contains("_rels"))
+            .filter(|n| should_process_sheet(n))
         {
             let xml = match replaced_parts.get(sheet_name) {
                 Some(bytes) => String::from_utf8(bytes.clone())
@@ -1303,6 +1371,36 @@ fn shift_untouched_anchors(
 /// Tìm tên hiển thị (ví dụ "修正後") của 1 sheet, dựa trên tên part của nó (ví dụ
 /// `xl/worksheets/sheet3.xml`) — qua `xl/workbook.xml` (`<sheets><sheet name r:id>`) đối chiếu
 /// với `xl/_rels/workbook.xml.rels` (`r:id -> Target`).
+/// Dựng map `tên part sheet (ví dụ "xl/worksheets/sheet3.xml") -> tên hiển thị` cho TOÀN BỘ
+/// sheet trong workbook, qua `xl/workbook.xml` (`<sheets><sheet name r:id>`) đối chiếu với
+/// `xl/_rels/workbook.xml.rels` (`r:id -> Target`). Bỏ qua (không có trong map) nếu 1 sheet
+/// không đối chiếu được — không parse được thì trả về map rỗng.
+fn build_sheet_display_names(workbook_xml: &str, rels_xml: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let Ok(rels_map) = parse_rels(rels_xml) else {
+        return map;
+    };
+    let Ok(doc) = Document::parse(workbook_xml) else {
+        return map;
+    };
+    for sheet_node in doc
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "sheet")
+    {
+        let Some(rid) = sheet_node.attributes().find(|a| a.name() == "id") else {
+            continue;
+        };
+        let Some(target) = rels_map.get(rid.value()) else {
+            continue;
+        };
+        let resolved = join_relative(&["xl"], target);
+        if let Some(name) = sheet_node.attribute("name") {
+            map.insert(resolved, name.to_string());
+        }
+    }
+    map
+}
+
 fn resolve_sheet_display_name(workbook_xml: &str, rels_xml: &str, sheet_file_name: &str) -> Option<String> {
     let rels_map = parse_rels(rels_xml).ok()?;
     let doc = Document::parse(workbook_xml).ok()?;

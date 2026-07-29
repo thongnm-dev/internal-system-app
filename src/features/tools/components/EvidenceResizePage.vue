@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
+import MultiSelect from "primevue/multiselect";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { useToast } from "@/shared/composables/useToast";
 import { useEvidenceResize } from "../composables/useEvidenceResize";
@@ -138,6 +139,28 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
+        <section v-if="ctrl.inputPath.value && ctrl.availableSheets.value.length" class="rounded-lg border border-divider bg-canvas p-4">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-arrows-alt text-lg text-brand" />
+            <h4 class="font-bold">Sheets</h4>
+          </div>
+          <label class="mt-3 grid gap-1.5">
+            <span class="text-xs font-bold uppercase tracking-wide text-muted">Sheets to process</span>
+            <MultiSelect
+              class="w-full"
+              :model-value="ctrl.selectedSheets.value"
+              :options="ctrl.availableSheets.value"
+              :loading="ctrl.isLoadingSheets.value"
+              display="chip"
+              :max-selected-labels="2"
+              selected-items-label="{0} sheets selected"
+              placeholder="Select sheets..."
+              filter
+              :show-toggle-all="true"
+              @update:model-value="ctrl.selectedSheets.value = $event as string[]"
+            />
+          </label>
+        </section>
         <section class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
             <i class="pi pi-arrows-alt text-lg text-brand" />
