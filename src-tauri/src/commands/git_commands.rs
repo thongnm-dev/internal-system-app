@@ -120,6 +120,21 @@ pub fn git_log(path: String, limit: u32) -> Result<Vec<GitCommit>, String> {
 }
 
 #[tauri::command]
+pub fn git_log_search(
+    path: String,
+    after: String,
+    before: String,
+    author: String,
+    message: String,
+    file: String,
+    skip: u32,
+    limit: u32,
+) -> Result<Vec<GitCommit>, String> {
+    git_service::log_search(&path, &after, &before, &author, &message, &file, skip, limit)
+        .map_err(log_err)
+}
+
+#[tauri::command]
 pub async fn git_graph(path: String, limit: u32) -> Result<Vec<GitGraphCommit>, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::graph(&path, limit))
         .await

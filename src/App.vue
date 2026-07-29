@@ -107,7 +107,7 @@ watch(
     <router-view />
   </template>
 
-  <main v-else class="grid h-screen grid-rows-[minmax(0,1fr)_auto] overflow-hidden bg-canvas text-ink">
+  <main v-else class="relative grid h-screen grid-rows-[minmax(0,1fr)_auto] overflow-hidden bg-canvas text-ink">
     <section
       :class="[
         'grid min-h-0 overflow-hidden transition-[grid-template-columns] duration-200',
@@ -150,6 +150,22 @@ watch(
     </section>
 
     <AppBottomBar :info="shell.systemInfo.value" />
+
+    <!-- Floating toggle bubble -->
+    <button
+      :style="{
+        position: 'fixed',
+        left: shell.isSidebarCollapsed.value ? '72px' : '240px',
+        top: shell.isSidebarCollapsed.value ? '10px' : '20px',
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
+      }"
+      class="flex p-4 h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-text shadow-md transition-all duration-200 hover:bg-sidebar-hover hover:text-sidebar-text-active"
+      :title="shell.isSidebarCollapsed.value ? 'Expand sidebar' : 'Collapse sidebar'"
+      @click="shell.toggleSidebar()"
+    >
+      <i :class="['pi text-md p-10', shell.isSidebarCollapsed.value ? 'pi-chevron-right' : 'pi-chevron-left']" />
+    </button>
 
     <div
       v-if="!network.isOnline.value"

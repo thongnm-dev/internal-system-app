@@ -4,6 +4,7 @@ export type MenuKey =
   | "projectSkills"
   | "issueBacklog"
   | "excel2md"
+  | "resizeEvidence"
   | "sqlEditor"
   | "exploreFaster"
   | "terminal"

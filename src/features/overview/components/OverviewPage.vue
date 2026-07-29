@@ -1,17 +1,9 @@
 <script setup lang="ts">
+import welcomeBg from "@/assets/welcome.png";
 </script>
 
 <template>
-  <section class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-4 overflow-hidden">
-    <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
-    </section>
-    <aside class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-gauge text-xl text-brand" />
-        <h3 class="font-bold">Top projects</h3>
-      </div>
-      <div class="mt-4 space-y-3">
-      </div>
-    </aside>
+  <section class="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-divider shadow-sm">
+    <img :src="welcomeBg" alt="" class="absolute inset-0 h-full w-full object-cover" aria-hidden="true" />
   </section>
 </template>

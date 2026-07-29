@@ -42,6 +42,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Convert uploaded Excel screen specs into Markdown files.",
   },
   {
+    key: "resizeEvidence",
+    path: "/resize-evidence",
+    title: "Resize Evidence",
+    subtitle: "Resize every evidence picture across an Excel workbook, keeping shapes untouched.",
+  },
+  {
     key: "copyTools",
     path: "/copy-tools",
     title: "Copy Tools",
@@ -315,6 +321,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/excel2md",
     component: () => import("@/features/tools/components/Excel2mdPage.vue"),
     meta: { key: "excel2md" as MenuKey },
+  },
+  {
+    path: "/resize-evidence",
+    component: () => import("@/features/tools/components/EvidenceResizePage.vue"),
+    meta: { key: "resizeEvidence" as MenuKey },
   },
   {
     path: "/copy-tools",

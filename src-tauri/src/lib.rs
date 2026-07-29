@@ -43,6 +43,7 @@ use commands::backlog_commands::{
     backlog_save_config,
 };
 use commands::excel2md_commands::excel2md;
+use commands::evidence_resize_commands::resize_evidence_images;
 use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
@@ -57,7 +58,7 @@ use commands::git_commands::{
     git_cherry_pick_continue, git_cleanup_delete, git_cleanup_scan, git_clone, git_amend_commit, git_commit,
     git_commit_detail, git_commit_file_diff, git_commit_no_edit, git_compare, git_compare_file_diff,
     git_create_branch, git_create_pull_request, git_delete_branch, git_discard, git_fetch,
-    git_file_diff, git_graph, git_list_conflicts, git_list_pull_requests, git_list_repos, git_log,
+    git_file_diff, git_graph, git_list_conflicts, git_list_pull_requests, git_list_repos, git_log, git_log_search,
     git_merge,
     git_merge_abort, git_open_terminal, git_open_url, git_pull, git_push, git_rebase, git_rebase_abort,
     git_rebase_continue, git_remove_repo, git_repo_info, git_reset, git_resolve_conflict,
@@ -192,6 +193,8 @@ pub fn run() {
             parse_issue_csv,
             // === Excel → Markdown command ===
             excel2md,
+            // === Resize evidence images command ===
+            resize_evidence_images,
             // === Project CRUD commands ===
             create_project,
             update_project,
@@ -328,6 +331,7 @@ pub fn run() {
             git_file_diff,
             git_commit_file_diff,
             git_log,
+            git_log_search,
             git_graph,
             git_commit_detail,
             git_branches,

@@ -63,6 +63,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('sqlEditor',       'SQL Editor',        '/sql-editor',        'pi-server',     'Tools',      TRUE, 8),
     ('exploreFaster',   'Explore Faster',    '/explore-faster',    'pi-compass',    'Tools',      TRUE, 9),
     ('terminal',        'Terminal',          '/terminal',          'pi-desktop',    'Tools',      TRUE, 31),
+    ('resizeEvidence',  'Resize Evidence',   '/resize-evidence',   'pi-images',     'Tools',      TRUE, 32),
     ('git',             'Git Desktop',       '/git',               'pi-github',     'Tools',      TRUE, 10),
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),

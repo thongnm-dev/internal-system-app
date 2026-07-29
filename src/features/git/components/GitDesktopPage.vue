@@ -33,6 +33,7 @@ import GitBranchFromCommitDialog from "./GitBranchFromCommitDialog.vue";
 import GitGraphDialog from "./GitGraphDialog.vue";
 import GitCommitBrowserDialog from "./GitCommitBrowserDialog.vue";
 import GitBlameDialog from "./GitBlameDialog.vue";
+import GitLogDialog from "./GitLogDialog.vue";
 
 const git = useGit();
 
@@ -349,6 +350,12 @@ async function openBlameFromHistory(hash: string) {
 const browserDialogVisible = ref(false);
 function openCommitBrowser() {
   browserDialogVisible.value = true;
+}
+
+// === Show Log ===
+const logDialogVisible = ref(false);
+function openLogDialog() {
+  logDialogVisible.value = true;
 }
 
 // === Visualization (đồ thị commit) ===
@@ -682,6 +689,9 @@ onUnmounted(closeCommitMenu);
                 </button>
                 <button :class="ctxItem" @click="openCommitBrowser">
                   <i class="pi pi-copy text-xs" /> Duyệt commit / copy SHA…
+                </button>
+                <button :class="ctxItem" @click="logDialogVisible = true;">
+                  <i class="pi pi-list-check text-xs" /> Show log…
                 </button>
               </div>
             </div>
@@ -1257,6 +1267,7 @@ onUnmounted(closeCommitMenu);
     <GitBranchFromCommitDialog v-model:visible="branchFromDialogVisible" :git="git" :target="branchFromCommit" />
     <GitGraphDialog v-model:visible="graphDialogVisible" :git="git" :on-file-context="openFileMenu" />
     <GitCommitBrowserDialog v-model:visible="browserDialogVisible" :git="git" :on-file-context="openFileMenu" />
+    <GitLogDialog v-model:visible="logDialogVisible" :git="git" />
     <GitBlameDialog
       v-model:visible="blameDialogVisible"
       :git="git"

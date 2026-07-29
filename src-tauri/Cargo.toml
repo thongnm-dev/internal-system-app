@@ -43,6 +43,9 @@ lettre = { version = "0.11", features = ["tokio1-native-tls", "builder", "smtp-t
 rand = "0.8"
 portable-pty = "0.8"
 notify = "8"
+zip = "2"
+roxmltree = "0.20"
+image = "0.25"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"

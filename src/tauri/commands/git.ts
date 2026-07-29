@@ -69,6 +69,19 @@ export function gitGraph(path: string, limit: number) {
   return safeInvoke<GitGraphCommit[]>("git_graph", { path, limit });
 }
 
+export function gitLogSearch(
+  path: string,
+  after: string,
+  before: string,
+  author: string,
+  message: string,
+  file: string,
+  skip: number,
+  limit: number,
+) {
+  return safeInvoke<GitCommit[]>("git_log_search", { path, after, before, author, message, file, skip, limit });
+}
+
 export function gitCommitDetail(path: string, hash: string) {
   return safeInvoke<GitCommitDetail>("git_commit_detail", { path, hash });
 }

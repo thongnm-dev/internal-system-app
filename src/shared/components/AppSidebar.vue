@@ -50,33 +50,12 @@ function tooltipOpts(label: string) {
 
 <template>
   <aside class="flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-text">
+    <!-- Header -->
     <div :class="['border-b border-sidebar-border', isCollapsed ? 'p-3' : 'p-5']">
-      <div :class="['flex items-center gap-3', isCollapsed ? 'justify-center' : 'justify-between']">
-        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand font-bold text-white">PJ</div>
-        <Button
-          v-if="!isCollapsed"
-          icon="pi pi-chevron-left"
-          text
-          rounded
-          size="small"
-          class="shrink-0 text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
-          title="Collapse sidebar"
-          @click="emit('toggleCollapse')"
-        />
+      <div :class="['flex items-center', isCollapsed ? 'justify-center' : 'gap-2']">
+        <img src="@/assets/icon.ico" alt="Logo" class="h-8 w-8 shrink-0" />
+        <span v-if="!isCollapsed" class="text-lg font-bold text-sidebar-title">Manager System</span>
       </div>
-
-      <template v-if="isCollapsed">
-        <Button
-          icon="pi pi-chevron-right"
-          text
-          class="mt-3 w-full text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active"
-          title="Expand sidebar"
-          @click="emit('toggleCollapse')"
-        />
-      </template>
-      <template v-else>
-        <h1 class="mt-4 text-xl font-bold leading-tight text-sidebar-title">Manager System</h1>
-      </template>
     </div>
 
     <nav :class="['flex-1 space-y-1 overflow-y-auto overflow-x-hidden', isCollapsed ? 'p-2' : 'p-3']">

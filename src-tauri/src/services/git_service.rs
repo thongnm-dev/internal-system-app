@@ -622,6 +622,55 @@ pub fn log_range(repo_path: &str, range: &str, limit: u32) -> AppResult<Vec<GitC
     Ok(parse_commits(&raw))
 }
 
+pub fn log_search(
+    repo_path: &str,
+    after: &str,
+    before: &str,
+    author: &str,
+    message: &str,
+    file: &str,
+    skip: u32,
+    limit: u32,
+) -> AppResult<Vec<GitCommit>> {
+    let format = format!("--pretty=format:%H{FS}%h{FS}%s{FS}%an{FS}%ae{FS}%aI{FS}%ar{RS}");
+    let limit_arg = format!("-{limit}");
+    let skip_arg = format!("--skip={skip}");
+    let mut args: Vec<&str> = vec!["log", "--date-order", &limit_arg, &skip_arg, &format];
+
+    let after_arg;
+    if !after.trim().is_empty() {
+        after_arg = format!("--after={}", after.trim());
+        args.push(&after_arg);
+    }
+    let before_arg;
+    if !before.trim().is_empty() {
+        before_arg = format!("--before={}", before.trim());
+        args.push(&before_arg);
+    }
+    let author_arg;
+    if !author.trim().is_empty() {
+        author_arg = format!("--author={}", author.trim());
+        args.push(&author_arg);
+    }
+    let message_arg;
+    if !message.trim().is_empty() {
+        message_arg = format!("--grep={}", message.trim());
+        args.push("-i");
+        args.push(&message_arg);
+    }
+
+    let separator = "--";
+    let file_trimmed;
+    if !file.trim().is_empty() {
+        file_trimmed = file.trim().to_string();
+        args.push(separator);
+        args.push(&file_trimmed);
+    }
+
+    let raw = run(repo_path, &args)?;
+    Ok(parse_commits(&raw))
+}
+
 /// Parse output `--name-status -z` (kèm rename `-M`) thành danh sách file thay đổi.
 fn parse_name_status_z(raw: &str) -> Vec<GitFileChange> {
     let tokens: Vec<&str> = raw.split('\0').filter(|s| !s.is_empty()).collect();

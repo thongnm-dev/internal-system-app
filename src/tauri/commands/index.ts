@@ -5,6 +5,7 @@ export * from "./database-config";
 export * from "./settings";
 export * from "./check-monthly-report";
 export * from "./excel2md";
+export * from "./evidence-resize";
 export * from "./project";
 export * from "./daily-note";
 export * from "./daily-report";

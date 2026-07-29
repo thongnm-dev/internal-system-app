@@ -10,6 +10,7 @@ import { useMenuStore } from "@/app/stores/menu";
 import { defaultRoute } from "@/app/router/routes";
 import { friendlyError } from "@/tauri/commands/_base";
 import { login as tauriLogin } from "@/tauri/commands/auth";
+import loginCover from "@/assets/logincover.jpg";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -47,8 +48,10 @@ async function submitLogin() {
 </script>
 
 <template>
-  <main class="force-light grid min-h-screen place-items-center bg-canvas px-6 text-ink" data-theme="light">
-    <section class="w-full max-w-[420px] rounded-lg border border-divider bg-panel p-6 shadow-sm">
+  <main class="force-light relative grid min-h-screen place-items-center px-6 text-ink" data-theme="light">
+    <img :src="loginCover" alt="" class="absolute inset-0 h-full w-full object-cover" aria-hidden="true" />
+    <div class="absolute inset-0 bg-black/40" />
+    <section class="relative z-10 w-full max-w-[420px] rounded-lg border border-white/10 bg-white/90 p-6 shadow-lg backdrop-blur-md">
       <div class="flex items-center gap-3">
         <div class="flex h-11 w-11 items-center justify-center rounded-md bg-brand text-white">
           <i class="pi pi-lock text-xl" />
@@ -106,7 +109,7 @@ async function submitLogin() {
           :disabled="loading"
           :icon="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sign-in'"
           :label="loading ? 'Đang đăng nhập...' : 'Login'"
-          class="w-full"
+          class="w-full !text-white"
           type="submit"
         />
       </form>
