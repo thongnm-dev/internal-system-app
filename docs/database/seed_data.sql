@@ -50,6 +50,12 @@ VALUES
     ('40', 'Other',            'OTHER' ,false, 7)
 ON CONFLICT (process_code) DO NOTHING;
 
+-- Migration: đổi route key/path 'resizeEvidence' -> 'excelHelper' (rename EvidenceResizePage
+-- -> ExcelHelperPage). Cập nhật bảng quyền trước để không vi phạm FK khi đổi key ở menu_configs.
+UPDATE role_menu_permissions SET menu_key = 'excelHelper' WHERE menu_key = 'resizeEvidence';
+UPDATE user_menu_permissions SET menu_key = 'excelHelper' WHERE menu_key = 'resizeEvidence';
+UPDATE menu_configs SET key = 'excelHelper', path = '/excel-helper' WHERE key = 'resizeEvidence';
+
 -- Menu configuration
 INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, display_order) VALUES
     ('overview',        'Overview',          '/overview',          'pi-home',       '—',          TRUE, 0),
@@ -63,7 +69,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('sqlEditor',       'SQL Editor',        '/sql-editor',        'pi-server',     'Tools',      TRUE, 8),
     ('exploreFaster',   'Explore Faster',    '/explore-faster',    'pi-compass',    'Tools',      TRUE, 9),
     ('terminal',        'Terminal',          '/terminal',          'pi-desktop',    'Tools',      TRUE, 31),
-    ('resizeEvidence',  'Resize Evidence',   '/resize-evidence',   'pi-images',     'Tools',      TRUE, 32),
+    ('excelHelper',     'Excel Helper',      '/excel-helper',      'pi-images',     'Tools',      TRUE, 32),
     ('git',             'Git Desktop',       '/git',               'pi-github',     'Tools',      TRUE, 10),
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),

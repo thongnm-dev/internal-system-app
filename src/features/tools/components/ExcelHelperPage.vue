@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
+import InputGroup from "primevue/inputgroup";
+import InputGroupAddon from "primevue/inputgroupaddon";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import MultiSelect from "primevue/multiselect";
+import ProgressSpinner from "primevue/progressspinner";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { useToast } from "@/shared/composables/useToast";
-import { useEvidenceResize } from "../composables/useEvidenceResize";
+import { useExcelHelper } from "../composables/useExcelHelper";
+import { useExcelPreview } from "../composables/useExcelPreview";
 
 const toast = useToast();
 const loading = useGlobalLoading();
-const ctrl = useEvidenceResize();
+const ctrl = useExcelHelper();
+const preview = useExcelPreview();
+
+watch(
+  () => ctrl.inputPath.value,
+  (path) => {
+    if (path.trim()) void preview.loadWorkbook(path);
+  },
+  { immediate: true },
+);
 
 async function run() {
   await loading.run(() => ctrl.run());
@@ -20,9 +33,19 @@ async function run() {
   else toast.info(ctrl.message.value);
 }
 
+function resetSettings() {
+  ctrl.reset();
+  preview.clear();
+}
+
+function clearInputFile() {
+  ctrl.updateInputPath("");
+  preview.clear();
+}
+
 // === Cột cài đặt: collapse/expand + drag-to-resize (nhớ trạng thái vào localStorage) ===
-const SETTINGS_WIDTH_KEY = "evidenceResize.width.settings";
-const SETTINGS_COLLAPSED_KEY = "evidenceResize.collapsed.settings";
+const SETTINGS_WIDTH_KEY = "excelHelper.width.settings";
+const SETTINGS_COLLAPSED_KEY = "excelHelper.collapsed.settings";
 
 function loadSettingsWidth() {
   const raw = Number(localStorage.getItem(SETTINGS_WIDTH_KEY) ?? "");
@@ -68,10 +91,20 @@ onBeforeUnmount(() => {
 
 <template>
   <section ref="layoutRowRef" class="relative flex h-full min-h-0 flex-1 overflow-hidden" :class="isResizingSettings ? 'select-none' : ''">
-    <!-- Cột trái: preview Excel (chưa triển khai — chỗ dành sẵn) -->
-    <div class="flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-lg border border-divider bg-panel p-6">
-      <i class="pi pi-table text-3xl text-muted" />
-      <p class="mt-2 text-sm text-muted">Excel preview will appear here.</p>
+    <!-- Cột trái: preview Excel (Univer + Luckyexcel) -->
+    <div class="relative min-w-0 flex-1 overflow-hidden rounded-lg border border-divider bg-panel">
+      <div v-if="!ctrl.inputPath.value" class="flex h-full flex-col items-center justify-center p-6">
+        <i class="pi pi-table text-3xl text-muted" />
+        <p class="mt-2 text-sm text-muted">Excel preview will appear here.</p>
+      </div>
+      <div v-else-if="preview.errorMessage.value" class="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+        <i class="pi pi-exclamation-triangle text-3xl text-red-500" />
+        <p class="text-sm text-muted">{{ preview.errorMessage.value }}</p>
+      </div>
+      <div v-show="ctrl.inputPath.value && !preview.errorMessage.value" :ref="(el) => (preview.containerRef.value = el as HTMLElement | null)" class="h-full w-full" />
+      <div v-if="preview.isLoading.value" class="absolute inset-0 flex items-center justify-center bg-panel/70">
+        <ProgressSpinner style="width: 3rem; height: 3rem" stroke-width="4" />
+      </div>
     </div>
 
     <template v-if="!isSettingsCollapsed">
@@ -87,65 +120,78 @@ onBeforeUnmount(() => {
       <!-- Cột phải: cài đặt -->
       <aside
         :style="{ width: settingsWidth + 'px' }"
-        class="flex shrink-0 flex-col gap-4 overflow-y-auto rounded-lg border border-divider bg-panel p-4 shadow-sm"
+        class="flex shrink-0 flex-col gap-4 overflow-y-auto rounded-lg border border-divider bg-panel p-4 shadow-sm text-[11px]"
       >
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <i class="pi pi-sliders-h text-xl text-brand" />
-            <h3 class="font-bold">Settings</h3>
+            <i class="pi pi-sliders-h text-[17px] text-brand" />
+            <h3 class="text-[13px] font-bold">Settings</h3>
           </div>
-          <Button
-            icon="pi pi-angle-right"
-            severity="secondary"
-            text
-            rounded
-            title="Collapse settings"
-            @click="toggleSettingsCollapsed()"
-          />
+          <div class="flex items-center gap-1">
+            <Button
+              icon="pi pi-refresh"
+              severity="danger"
+              label="Reset"
+              rounded
+              title="Reset to defaults"
+              @click="resetSettings()"
+            />
+            <Button
+              icon="pi pi-angle-right"
+              severity="secondary"
+              text
+              rounded
+              title="Collapse settings"
+              @click="toggleSettingsCollapsed()"
+            />
+          </div>
         </div>
 
         <section class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
-            <i class="pi pi-file-excel text-lg text-brand" />
+            <i class="pi pi-file-excel text-brand" />
             <h4 class="font-bold">Excel workbook</h4>
           </div>
 
           <div class="mt-4 grid gap-3">
             <label class="grid gap-1.5">
-              <span class="text-xs font-bold uppercase tracking-wide text-muted">Input .xlsx</span>
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <span class="font-bold uppercase tracking-wide text-muted">Input .xlsx</span>
+              <InputGroup class="h-8">
                 <InputText
-                  class="h-10 min-w-0"
+                  readonly
                   placeholder="Select Excel workbook..."
                   :model-value="ctrl.inputPath.value"
                   @update:model-value="ctrl.updateInputPath($event as string)"
                 />
+                <InputGroupAddon v-if="ctrl.inputPath.value" class="p-0">
+                  <Button icon="pi pi-times" severity="danger" text title="Clear selected file" @click="clearInputFile()" />
+                </InputGroupAddon>
                 <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel workbook" @click="ctrl.pickInputFile()" />
-              </div>
+              </InputGroup>
             </label>
 
             <label class="grid gap-1.5">
-              <span class="text-xs font-bold uppercase tracking-wide text-muted">Output .xlsx</span>
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <span class="font-bold uppercase tracking-wide text-muted">Output .xlsx</span>
+              <InputGroup class="h-8">
                 <InputText
-                  class="h-10 min-w-0"
+                  readonly
                   placeholder="Resized workbook output path..."
                   :model-value="ctrl.outputPath.value"
                   @update:model-value="ctrl.setOutputPath($event as string)"
                 />
                 <Button icon="pi pi-save" severity="secondary" outlined title="Choose output path" @click="ctrl.pickOutputFile()" />
-              </div>
+              </InputGroup>
             </label>
           </div>
         </section>
 
         <section v-if="ctrl.inputPath.value && ctrl.availableSheets.value.length" class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
-            <i class="pi pi-arrows-alt text-lg text-brand" />
+            <i class="pi pi-arrows-alt text-[15px] text-brand" />
             <h4 class="font-bold">Sheets</h4>
           </div>
           <label class="mt-3 grid gap-1.5">
-            <span class="text-xs font-bold uppercase tracking-wide text-muted">Sheets to process</span>
+            <span class="text-[10px] font-bold uppercase tracking-wide text-muted">Sheets to process</span>
             <MultiSelect
               class="w-full"
               :model-value="ctrl.selectedSheets.value"
@@ -163,65 +209,64 @@ onBeforeUnmount(() => {
         </section>
         <section class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
-            <i class="pi pi-arrows-alt text-lg text-brand" />
-            <h4 class="font-bold">Evidence size (cm)</h4>
+            <i class="pi pi-sliders-h text-[15px] text-brand" />
+            <h4 class="font-bold">Settings</h4>
           </div>
 
-          <div class="mt-4 grid grid-cols-2 gap-3">
-            <label class="grid gap-1.5">
-              <span class="text-xs font-bold uppercase tracking-wide text-muted">Width (optional)</span>
-              <InputNumber
-                class="h-10 w-full"
-                input-class="w-full"
-                :min="0.01"
-                :max-fraction-digits="2"
-                placeholder="auto"
-                suffix=" cm"
-                :model-value="ctrl.widthCm.value"
-                @update:model-value="ctrl.widthCm.value = $event as number | null"
-              />
+          <div class="mt-4 grid gap-1.5">
+            <div class="grid grid-cols-2 gap-3">
+              <label class="grid gap-1.5">
+                <span class="font-bold tracking-wide text-muted">Width</span>
+                <InputNumber
+                  class="h-8 w-full"
+                  input-class="w-full"
+                  :min="0.01"
+                  :max-fraction-digits="2"
+                  placeholder="auto"
+                  suffix=" cm"
+                  :model-value="ctrl.widthCm.value"
+                  @update:model-value="ctrl.widthCm.value = $event as number | null"
+                />
+              </label>
+
+              <label class="grid gap-1.5">
+                <span class="font-bold tracking-wide text-muted">Height</span>
+                <InputNumber
+                  class="h-8 w-full"
+                  input-class="w-full"
+                  :min="0.01"
+                  :max-fraction-digits="2"
+                  placeholder="auto"
+                  suffix=" cm"
+                  :model-value="ctrl.heightCm.value"
+                  @update:model-value="ctrl.heightCm.value = $event as number | null"
+                />
+              </label>
+            </div>
+
+            <label class="mt-1 flex items-center gap-2">
+              <Checkbox v-model="ctrl.avoidCoveringContent.value" binary />
+              <span>Avoid covering cell content (may insert rows)</span>
             </label>
-
-            <label class="grid gap-1.5">
-              <span class="text-xs font-bold uppercase tracking-wide text-muted">Height (optional)</span>
-              <InputNumber
-                class="h-10 w-full"
-                input-class="w-full"
-                :min="0.01"
-                :max-fraction-digits="2"
-                placeholder="auto"
-                suffix=" cm"
-                :model-value="ctrl.heightCm.value"
-                @update:model-value="ctrl.heightCm.value = $event as number | null"
-              />
-            </label>
           </div>
 
-          <label class="mt-3 flex items-center gap-2">
-            <Checkbox v-model="ctrl.avoidCoveringContent.value" binary />
-            <span class="text-sm">Avoid covering cell content (may insert rows)</span>
-          </label>
-        </section>
-
-        <section class="rounded-lg border border-divider bg-canvas p-4">
-          <div class="flex items-center gap-2">
-            <i class="pi pi-desktop text-lg text-brand" />
-            <h4 class="font-bold">Print settings</h4>
-          </div>
-
-          <div class="mt-4 grid gap-3">
+          <div class="mt-4 grid gap-3 pt-4">
+            <div class="flex items-center gap-2">
+              <span class="shrink-0 font-bold uppercase tracking-wide text-muted">Print settings</span>
+              <div class="h-px flex-1 border-t border-divider"></div>
+            </div>
             <label class="flex items-center gap-2">
               <Checkbox v-model="ctrl.pageBreakPreview.value" binary />
-              <span class="text-sm">Page Break Preview</span>
+              <span class="text-[11px]">Page Break Preview</span>
             </label>
 
             <div class="flex items-center gap-2">
               <label class="flex shrink-0 items-center gap-2">
                 <Checkbox v-model="ctrl.zoomEnabled.value" binary />
-                <span class="text-sm">Zoom level</span>
+                <span class="text-[11px]">Zoom level</span>
               </label>
               <InputNumber
-                class="h-10 w-28"
+                class="h-8 w-28"
                 input-class="w-full"
                 :disabled="!ctrl.zoomEnabled.value"
                 :min="10"
@@ -233,33 +278,16 @@ onBeforeUnmount(() => {
               />
             </div>
           </div>
-        </section>
 
-        <section class="rounded-lg border border-divider bg-canvas p-4">
-          <div class="flex items-center gap-2">
-            <i class="pi pi-table text-lg text-brand" />
-            <h4 class="font-bold">Image placement &amp; font</h4>
-          </div>
-
-          <div class="mt-4 grid gap-3">
-            <div class="grid gap-1.5">
-              <label class="flex items-center gap-2">
-                <Checkbox v-model="ctrl.startColumnEnabled.value" binary />
-                <span class="text-sm">Custom start column for pasted images</span>
-              </label>
-              <InputText
-                class="h-10"
-                :disabled="!ctrl.startColumnEnabled.value"
-                placeholder="e.g. B2"
-                :model-value="ctrl.startColumn.value"
-                @update:model-value="ctrl.startColumn.value = ($event as string).toUpperCase()"
-              />
+          <div class="mt-4 grid gap-3 pt-3">
+            <div class="flex items-center gap-2">
+              <span class="shrink-0 font-bold uppercase tracking-wide text-muted">Font</span>
+              <div class="h-px flex-1 border-t border-divider"></div>
             </div>
-
             <label class="grid gap-1.5">
-              <span class="text-xs font-bold uppercase tracking-wide text-muted">Font name</span>
+              <span class="font-bold uppercase tracking-wide text-muted">Font name</span>
               <InputText
-                class="h-10"
+                class="h-8"
                 placeholder="e.g. Calibri"
                 :model-value="ctrl.fontName.value"
                 @update:model-value="ctrl.fontName.value = $event as string"
@@ -267,9 +295,9 @@ onBeforeUnmount(() => {
             </label>
 
             <label class="grid gap-1.5">
-              <span class="text-xs font-bold uppercase tracking-wide text-muted">Font size</span>
+              <span class="font-bold uppercase tracking-wide text-muted">Font size</span>
               <InputNumber
-                class="h-10"
+                class="h-8"
                 :min="1"
                 :max="409"
                 placeholder="e.g. 11"
@@ -278,14 +306,39 @@ onBeforeUnmount(() => {
               />
             </label>
           </div>
+          <div class="mt-4 grid gap-3 pt-3">
+            <div class="flex items-center gap-2">
+              <span class="shrink-0 font-bold uppercase tracking-wide text-muted">Mixed</span>
+              <div class="h-px flex-1 border-t border-divider"></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="flex shrink-0 items-center gap-2">
+                <Checkbox v-model="ctrl.startColumnEnabled.value" binary />
+                <span class="text-[11px]">Column start</span>
+              </label>
+              <InputText
+                class="h-8 w-28"
+                input-class="w-full"
+                :disabled="!ctrl.startColumnEnabled.value"
+                placeholder="e.g. B2"
+                :model-value="ctrl.startColumn.value"
+                @update:model-value="ctrl.startColumn.value = ($event as string).toUpperCase()"
+              />
+            </div>
+
+            <label class="flex items-center gap-2">
+              <Checkbox v-model="ctrl.resetActiveCell.value" binary />
+              <span class="text-[11px]">Reset to first cell (A1) on every sheet</span>
+            </label>
+          </div>
         </section>
 
         <section v-if="ctrl.result.value" class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
-            <i class="pi pi-check-circle text-lg text-brand" />
+            <i class="pi pi-check-circle text-[15px] text-brand" />
             <h4 class="font-bold">Result</h4>
           </div>
-          <div class="mt-3 grid grid-cols-1 gap-2 text-sm">
+          <div class="mt-3 grid grid-cols-1 gap-2 text-[11px]">
             <div>
               <span class="font-semibold text-muted">Output file:</span>
               {{ ctrl.result.value.output_file_name }}
@@ -299,19 +352,16 @@ onBeforeUnmount(() => {
               {{ ctrl.result.value.drawings_processed }}
             </div>
           </div>
-          <ul v-if="ctrl.result.value.warnings.length" class="mt-3 list-disc space-y-1 pl-5 text-xs text-muted">
-            <li v-for="(warning, index) in ctrl.result.value.warnings" :key="index">{{ warning }}</li>
-          </ul>
         </section>
 
         <section class="rounded-lg p-4">
-        <Button
-          class="h-10 w-full"
-          icon="pi pi-images"
-          :label="ctrl.isProcessing.value ? 'Resizing...' : 'Resize Images'"
-          :disabled="ctrl.isProcessing.value"
-          @click="run()"
-        />
+          <Button
+            class="h-8 w-full"
+            icon="pi pi-images"
+            :label="ctrl.isProcessing.value ? 'Resizing...' : 'Resize Images'"
+            :disabled="ctrl.isProcessing.value"
+            @click="run()"
+          />
         </section>
       </aside>
     </template>
@@ -320,7 +370,7 @@ onBeforeUnmount(() => {
     <button
       v-else
       type="button"
-      class="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-divider bg-panel text-brand shadow-md transition-colors hover:bg-canvas"
+      class="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-divider bg-panel text-brand shadow-md transition-colors hover:bg-canvas"
       title="Show settings"
       @click="toggleSettingsCollapsed()"
     >

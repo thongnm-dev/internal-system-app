@@ -1,12 +1,12 @@
 //! Tauri command handler cho chức năng resize ảnh evidence (hardcopy) trong Excel.
 
-use crate::models::evidence_resize::{EvidenceResizeOptions, EvidenceResizeResult};
-use crate::services::evidence_resize_service;
+use crate::models::excel_helper::{ExcelHelperOptions, ExcelHelperResult};
+use crate::services::excel_helper_service;
 
 /// Liệt kê tên hiển thị của mọi sheet trong workbook, theo đúng thứ tự khai báo.
 #[tauri::command]
 pub fn list_excel_sheet_names(input_path: String) -> Result<Vec<String>, String> {
-    evidence_resize_service::list_sheet_names(input_path).map_err(crate::app::error::log_err)
+    excel_helper_service::list_sheet_names(input_path).map_err(crate::app::error::log_err)
 }
 
 /// Resize toàn bộ ảnh (picture) trong workbook Excel, giữ nguyên shape/textbox.
@@ -17,15 +17,15 @@ pub fn list_excel_sheet_names(input_path: String) -> Result<Vec<String>, String>
 /// ảnh, và font mặc định của workbook. `selected_sheets` (nếu có, không rỗng) giới hạn resize
 /// + zoom/page break preview chỉ trên các sheet có tên khớp; rỗng/`None` = áp dụng mọi sheet.
 #[tauri::command]
-pub fn resize_evidence_images(
+pub fn resize_excel_images(
     input_path: String,
     output_path: String,
     width_cm: Option<f64>,
     height_cm: Option<f64>,
-    options: EvidenceResizeOptions,
+    options: ExcelHelperOptions,
     selected_sheets: Option<Vec<String>>,
-) -> Result<EvidenceResizeResult, String> {
-    evidence_resize_service::resize_evidence_images(
+) -> Result<ExcelHelperResult, String> {
+    excel_helper_service::resize_excel_images(
         input_path,
         output_path,
         width_cm,

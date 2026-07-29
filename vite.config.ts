@@ -9,6 +9,15 @@ export default defineConfig({
       "@": "/src",
     },
   },
+  optimizeDeps: {
+    include: [
+      "@univerjs/core",
+      "@univerjs/presets",
+      "@univerjs/preset-sheets-core",
+      "@univerjs/preset-sheets-drawing",
+      "@zwight/luckyexcel",
+    ],
+  },
   server: {
     strictPort: true,
     port: 1421,

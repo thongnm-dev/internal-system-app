@@ -8,7 +8,7 @@
 
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::evidence_resize::{EvidenceResizeOptions, EvidenceResizeResult};
+use crate::models::excel_helper::{ExcelHelperOptions, ExcelHelperResult};
 use image::GenericImageView;
 use regex::Regex;
 use roxmltree::{Document, Node};
@@ -67,14 +67,14 @@ pub fn list_sheet_names(input_path: String) -> AppResult<Vec<String>> {
 /// start column bị bỏ qua vì nó cần ghi lại anchor cùng lúc với resize). Các ảnh xếp dọc cùng
 /// cột sẽ được đẩy xuống để không đè lên nhau khi kích thước mới lớn hơn kích thước gốc, giữ
 /// nguyên khoảng cách gốc giữa 2 ảnh liền kề và không đụng vào row height/lưới cột-dòng.
-pub fn resize_evidence_images(
+pub fn resize_excel_images(
     input_path: String,
     output_path: String,
     width_cm: Option<f64>,
     height_cm: Option<f64>,
-    options: EvidenceResizeOptions,
+    options: ExcelHelperOptions,
     selected_sheets: Option<Vec<String>>,
-) -> AppResult<EvidenceResizeResult> {
+) -> AppResult<ExcelHelperResult> {
     let input = PathBuf::from(input_path.trim());
     let output = PathBuf::from(output_path.trim());
 
@@ -303,7 +303,7 @@ pub fn resize_evidence_images(
     // pass trước đó (ví dụ chèn dòng để tránh đè content), phải đọc tiếp từ bản ĐÃ SỬA trong
     // `replaced_parts` chứ không phải đọc lại từ archive gốc — nếu không sẽ vô tình ghi đè mất
     // thay đổi đó.
-    if options.zoom_percent.is_some() || options.page_break_preview {
+    if options.zoom_percent.is_some() || options.page_break_preview || options.reset_active_cell {
         for sheet_name in entry_names
             .iter()
             .filter(|n| n.starts_with("xl/worksheets/sheet") && n.ends_with(".xml") && !n.contains("_rels"))
@@ -314,7 +314,12 @@ pub fn resize_evidence_images(
                     .map_err(|e| AppError::new(format!("Invalid UTF-8 in {sheet_name}: {e}")))?,
                 None => read_entry_to_string(&mut archive, sheet_name)?,
             };
-            match patch_sheet_view(&xml, options.zoom_percent, options.page_break_preview) {
+            match patch_sheet_view(
+                &xml,
+                options.zoom_percent,
+                options.page_break_preview,
+                options.reset_active_cell,
+            ) {
                 Some(new_xml) => {
                     replaced_parts.insert(sheet_name.clone(), new_xml.into_bytes());
                 }
@@ -345,7 +350,7 @@ pub fn resize_evidence_images(
 
     write_output_archive(archive, &entry_names, &replaced_parts, &output)?;
 
-    Ok(EvidenceResizeResult {
+    Ok(ExcelHelperResult {
         source_path: input.display().to_string(),
         output_path: output.display().to_string(),
         source_file_name: file_name(&input),
@@ -874,10 +879,17 @@ fn patch_attr_value(xml_fragment: &str, attr: &str, new_value: &str) -> String {
         .into_owned()
 }
 
-/// Set zoom (%) và/hoặc chế độ Page Break Preview trên `<sheetView>` đầu tiên của 1 worksheet.
-/// Chỉ sửa phần opening tag (attributes), không đụng vào `<pane>`/`<selection>` bên trong nếu có.
+/// Set zoom (%) và/hoặc chế độ Page Break Preview trên `<sheetView>` đầu tiên của 1 worksheet,
+/// và/hoặc đưa ô đang chọn + vị trí cuộn về A1 (`reset_active_cell`). Chỉ sửa phần opening tag
+/// (attributes) và (nếu `reset_active_cell`) phần tử con `<selection>` trực tiếp — không đụng
+/// vào `<pane>` nếu có (freeze pane vẫn được giữ nguyên).
 /// Trả về `None` nếu không tìm thấy `<sheetView>` nào.
-fn patch_sheet_view(xml: &str, zoom_percent: Option<u32>, page_break_preview: bool) -> Option<String> {
+fn patch_sheet_view(
+    xml: &str,
+    zoom_percent: Option<u32>,
+    page_break_preview: bool,
+    reset_active_cell: bool,
+) -> Option<String> {
     let doc = Document::parse(xml).ok()?;
     let node = doc
         .descendants()
@@ -899,6 +911,9 @@ fn patch_sheet_view(xml: &str, zoom_percent: Option<u32>, page_break_preview: bo
     if page_break_preview {
         upsert_attr(&mut attrs, "view", "pageBreakPreview".to_string());
     }
+    if reset_active_cell {
+        upsert_attr(&mut attrs, "topLeftCell", "A1".to_string());
+    }
 
     let attrs_str = attrs
         .iter()
@@ -913,7 +928,76 @@ fn patch_sheet_view(xml: &str, zoom_percent: Option<u32>, page_break_preview: bo
 
     let mut result = xml.to_string();
     result.replace_range(range.start..range.start + head_end_rel, &new_head);
+
+    if reset_active_cell {
+        result = reset_sheet_view_selection(&result, range.start, new_head.len(), is_self_closing);
+    }
+
     Some(result)
+}
+
+/// Thay mọi `<selection>` con trực tiếp của `<sheetView>` (đã patch xong opening tag, nằm ở
+/// `[sheet_view_start, sheet_view_start + new_head_len)`) bằng đúng 1 `<selection activeCell="A1"
+/// sqref="A1"/>` — dùng để đưa ô đang chọn về A1 khi `reset_active_cell` bật. Nếu `<sheetView>`
+/// tự đóng (không có `<selection>` nào), chèn thêm 1 phần tử `<selection>` và mở tag.
+fn reset_sheet_view_selection(
+    xml: &str,
+    sheet_view_start: usize,
+    new_head_len: usize,
+    was_self_closing: bool,
+) -> String {
+    const RESET_SELECTION: &str = r#"<selection activeCell="A1" sqref="A1"/>"#;
+
+    if was_self_closing {
+        let head_end = sheet_view_start + new_head_len;
+        let mut result = xml.to_string();
+        let opening = &result[sheet_view_start..head_end];
+        let opening = opening.trim_end_matches("/>").to_string() + ">";
+        result.replace_range(
+            sheet_view_start..head_end,
+            &format!("{opening}{RESET_SELECTION}</sheetView>"),
+        );
+        return result;
+    }
+
+    let doc = match Document::parse(xml) {
+        Ok(d) => d,
+        Err(_) => return xml.to_string(),
+    };
+    let Some(sheet_view) = doc
+        .descendants()
+        .find(|n| n.is_element() && n.tag_name().name() == "sheetView" && n.range().start == sheet_view_start)
+    else {
+        return xml.to_string();
+    };
+
+    let existing: Vec<Node> = sheet_view
+        .children()
+        .filter(|c| c.is_element() && c.tag_name().name() == "selection")
+        .collect();
+
+    let mut edits: Vec<Edit> = Vec::new();
+    match existing.split_first() {
+        Some((first, rest)) => {
+            for extra in rest {
+                let r = extra.range();
+                edits.push(Edit { start: r.start, end: r.end, replacement: String::new() });
+            }
+            let r = first.range();
+            edits.push(Edit { start: r.start, end: r.end, replacement: RESET_SELECTION.to_string() });
+        }
+        None => {
+            // Theo schema OOXML, <selection> phải đứng sau <pane> (nếu freeze pane có tồn tại)
+            // trong <sheetView> — chèn ngay sau <pane> nếu có, ngược lại chèn làm con đầu tiên.
+            let insert_at = sheet_view
+                .children()
+                .find(|c| c.is_element() && c.tag_name().name() == "pane")
+                .map(|pane| pane.range().end)
+                .unwrap_or(sheet_view_start + new_head_len);
+            edits.push(Edit { start: insert_at, end: insert_at, replacement: RESET_SELECTION.to_string() });
+        }
+    }
+    apply_edits(xml, edits)
 }
 
 fn upsert_attr(attrs: &mut Vec<(String, String)>, name: &str, value: String) {
@@ -1549,7 +1633,7 @@ fn write_output_archive(
         output
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("evidence_resize")
+            .unwrap_or("excel_helper")
     );
     let temp_path = output_dir.join(temp_file_name);
 

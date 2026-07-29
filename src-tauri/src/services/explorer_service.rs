@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -179,6 +180,24 @@ pub fn read_text_file(path: &str) -> Result<String, String> {
         return Err("File too large to preview (> 2MB).".to_string());
     }
     fs::read_to_string(p).map_err(|e| format!("Cannot read file: {e}"))
+}
+
+/// Workbook kèm nhiều ảnh evidence có thể khá lớn, cao hơn nhiều so với giới hạn text preview.
+const MAX_BINARY_FILE_SIZE: u64 = 50 * 1024 * 1024;
+
+/// Đọc toàn bộ 1 file nhị phân và mã hoá base64 — dùng để chuyển bytes thô qua ranh giới IPC
+/// sang frontend (ví dụ nạp file .xlsx vào thư viện xử lý phía JS).
+pub fn read_file_base64(path: &str) -> Result<String, String> {
+    let p = Path::new(path);
+    if !p.is_file() {
+        return Err(format!("Not a file: {path}"));
+    }
+    let size = fs::metadata(p).map_err(|e| format!("Cannot read file metadata: {e}"))?.len();
+    if size > MAX_BINARY_FILE_SIZE {
+        return Err("File too large to load (> 50MB).".to_string());
+    }
+    let bytes = fs::read(p).map_err(|e| format!("Cannot read file: {e}"))?;
+    Ok(STANDARD.encode(bytes))
 }
 
 pub fn open_in_explorer(path: &str) -> Result<(), String> {

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// vị trí ngang của ảnh, và font mặc định của workbook.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EvidenceResizeOptions {
+pub struct ExcelHelperOptions {
     /// Mở mọi sheet ở chế độ Page Break Preview.
     pub page_break_preview: bool,
     /// Zoom (%) áp dụng cho mọi sheet, nếu có.
@@ -17,6 +17,8 @@ pub struct EvidenceResizeOptions {
     pub font_name: Option<String>,
     /// Cỡ chữ mặc định của workbook, nếu có.
     pub font_size: Option<f64>,
+    /// Đưa ô đang chọn (active cell) và vị trí cuộn về A1 trên mọi sheet.
+    pub reset_active_cell: bool,
     /// Khi ảnh phình to sẽ đè lên 1 dòng có nội dung, cố gắng chèn thêm 1 dòng để tránh đè lên
     /// (nếu workbook không có formula/table/chart/pivot table — an toàn để đánh số lại dòng).
     /// Nếu không an toàn hoặc bị tắt, ảnh sẽ bị giới hạn chiều cao để không đè lên nội dung.
@@ -25,7 +27,7 @@ pub struct EvidenceResizeOptions {
 
 /// Kết quả sau khi resize toàn bộ ảnh (picture) trong workbook.
 #[derive(Serialize)]
-pub struct EvidenceResizeResult {
+pub struct ExcelHelperResult {
     /// Đường dẫn đầy đủ tới file Excel nguồn.
     pub source_path: String,
     /// Đường dẫn đầy đủ tới file Excel đầu ra.

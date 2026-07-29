@@ -42,6 +42,11 @@ export function explorerReadTextFile(path: string) {
   return safeInvoke<string>("explorer_read_text_file", { path });
 }
 
+/** Đọc toàn bộ 1 file nhị phân, trả về nội dung mã hoá base64 (tối đa 50MB). */
+export function explorerReadFileBase64(path: string) {
+  return safeInvoke<string>("explorer_read_file_base64", { path });
+}
+
 export function explorerGetDrives() {
   return safeInvoke<string[]>("explorer_get_drives");
 }

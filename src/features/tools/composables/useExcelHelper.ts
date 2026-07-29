@@ -2,16 +2,18 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { listExcelSheetNames, resizeEvidenceImages } from "@/tauri/commands/evidence-resize";
+import { listExcelSheetNames, resizeExcelImages } from "@/tauri/commands/excel-helper";
 import type { MessageMode } from "@/_/types/app";
-import type { EvidenceResizeOptions, EvidenceResizeResult } from "@/_/types/evidence-resize";
+import type { ExcelHelperOptions, ExcelHelperResult } from "@/_/types/excel-helper";
 
 function defaultResizedPath(path: string) {
   if (!path.trim()) return "";
   return path.replace(/(\.[^.\\/]+)?$/i, (ext) => `_resized${ext || ".xlsx"}`);
 }
 
-export function useEvidenceResize() {
+const DEFAULT_MESSAGE = "Select an Excel workbook, optionally set Width/Height, then resize.";
+
+export function useExcelHelper() {
   const inputPath = ref("");
   const outputPath = ref("");
   const widthCm = ref<number | null>(null);
@@ -23,14 +25,37 @@ export function useEvidenceResize() {
   const startColumn = ref("");
   const fontName = ref("");
   const fontSize = ref<number | null>(null);
+  const resetActiveCell = ref(false);
   const avoidCoveringContent = ref(true);
   const availableSheets = ref<string[]>([]);
   const selectedSheets = ref<string[]>([]);
   const isLoadingSheets = ref(false);
-  const result = ref<EvidenceResizeResult | null>(null);
-  const message = ref("Select an Excel workbook, optionally set Width/Height, then resize.");
+  const result = ref<ExcelHelperResult | null>(null);
+  const message = ref(DEFAULT_MESSAGE);
   const messageMode = ref<MessageMode>("info");
   const isProcessing = ref(false);
+
+  function reset() {
+    inputPath.value = "";
+    outputPath.value = "";
+    widthCm.value = null;
+    heightCm.value = null;
+    pageBreakPreview.value = false;
+    zoomEnabled.value = false;
+    zoomPercent.value = 100;
+    startColumnEnabled.value = false;
+    startColumn.value = "";
+    fontName.value = "";
+    fontSize.value = null;
+    resetActiveCell.value = false;
+    avoidCoveringContent.value = true;
+    availableSheets.value = [];
+    selectedSheets.value = [];
+    isLoadingSheets.value = false;
+    result.value = null;
+    message.value = DEFAULT_MESSAGE;
+    messageMode.value = "info";
+  }
 
   function updateInputPath(value: string) {
     inputPath.value = value;
@@ -137,12 +162,13 @@ export function useEvidenceResize() {
       return;
     }
 
-    const options: EvidenceResizeOptions = {
+    const options: ExcelHelperOptions = {
       pageBreakPreview: pageBreakPreview.value,
       zoomPercent: zoomEnabled.value ? zoomPercent.value : null,
       startColumn: startColumnEnabled.value ? startColumn.value.trim() : null,
       fontName: fontName.value.trim() ? fontName.value.trim() : null,
       fontSize: fontSize.value,
+      resetActiveCell: resetActiveCell.value,
       avoidCoveringContent: avoidCoveringContent.value,
     };
 
@@ -150,7 +176,7 @@ export function useEvidenceResize() {
     message.value = "Resizing evidence images...";
     messageMode.value = "info";
     try {
-      const resized = await resizeEvidenceImages(
+      const resized = await resizeExcelImages(
         inputPath.value,
         outputPath.value,
         widthCm.value && widthCm.value > 0 ? widthCm.value : null,
@@ -181,6 +207,7 @@ export function useEvidenceResize() {
     startColumn,
     fontName,
     fontSize,
+    resetActiveCell,
     avoidCoveringContent,
     availableSheets,
     selectedSheets,
@@ -194,5 +221,6 @@ export function useEvidenceResize() {
     pickInputFile,
     pickOutputFile,
     run,
+    reset,
   };
 }

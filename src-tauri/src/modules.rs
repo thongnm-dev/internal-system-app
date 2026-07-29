@@ -26,7 +26,7 @@ mod commands {
     /// Command chuyển đổi Excel → Markdown.
     pub mod excel2md_commands;
     /// Commands cho resize ảnh evidence (hardcopy) trong Excel.
-    pub mod evidence_resize_commands;
+    pub mod excel_helper_commands;
     /// Commands cho import CSV báo cáo tháng.
     pub mod monthly_report_commands;
     /// Commands cho module quản lý dự án.
@@ -138,7 +138,7 @@ mod models {
     /// Model kết quả chuyển đổi Excel → Markdown.
     pub mod excel2md;
     /// Model kết quả resize ảnh evidence (hardcopy) trong Excel.
-    pub mod evidence_resize;
+    pub mod excel_helper;
     /// Model cho import CSV (preview row, minute totals, work record).
     pub mod import_csv;
     /// Model cho lịch sử import báo cáo tháng.
@@ -200,7 +200,7 @@ mod services {
     /// Service chuyển đổi Excel → Markdown (gọi script Python).
     pub mod excel2md_service;
     /// Service resize ảnh evidence (hardcopy) trong Excel (XML splicing trực tiếp).
-    pub mod evidence_resize_service;
+    pub mod excel_helper_service;
     /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.
     pub mod csv_reader_service;
     /// Service preview và so sánh dữ liệu CSV báo cáo tháng.

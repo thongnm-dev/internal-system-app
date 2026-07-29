@@ -43,15 +43,15 @@ use commands::backlog_commands::{
     backlog_save_config,
 };
 use commands::excel2md_commands::excel2md;
-use commands::evidence_resize_commands::{list_excel_sheet_names, resize_evidence_images};
+use commands::excel_helper_commands::{list_excel_sheet_names, resize_excel_images};
 use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
 use commands::explorer_commands::{
     explorer_copy_bugs, explorer_create_file, explorer_create_folder, explorer_delete,
     explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_open_file, explorer_paste,
-    explorer_paste_from_os_clipboard, explorer_read_dir, explorer_read_text_file, explorer_rename,
-    explorer_search,
+    explorer_paste_from_os_clipboard, explorer_read_dir, explorer_read_file_base64,
+    explorer_read_text_file, explorer_rename, explorer_search,
 };
 use commands::git_commands::{
     git_add_repo, git_blame, git_branches, git_checkout_branch, git_cherry_pick, git_cherry_pick_abort,
@@ -195,7 +195,7 @@ pub fn run() {
             excel2md,
             // === Resize evidence images command ===
             list_excel_sheet_names,
-            resize_evidence_images,
+            resize_excel_images,
             // === Project CRUD commands ===
             create_project,
             update_project,
@@ -313,6 +313,7 @@ pub fn run() {
             explorer_open,
             explorer_open_file,
             explorer_read_text_file,
+            explorer_read_file_base64,
             explorer_get_drives,
             explorer_rename,
             explorer_delete,

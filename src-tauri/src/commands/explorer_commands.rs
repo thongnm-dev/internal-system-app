@@ -28,6 +28,15 @@ pub fn explorer_read_text_file(path: String) -> Result<String, String> {
     explorer_service::read_text_file(&path)
 }
 
+/// Đọc toàn bộ 1 file nhị phân, mã hoá base64 — dùng để nạp bytes thô sang frontend (ví dụ
+/// nạp file .xlsx vào thư viện xử lý phía JS). Chạy nền vì file có thể khá lớn (tới 50MB).
+#[tauri::command]
+pub async fn explorer_read_file_base64(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || explorer_service::read_file_base64(&path))
+        .await
+        .map_err(crate::app::error::log_err)?
+}
+
 #[tauri::command]
 pub fn explorer_get_drives() -> Vec<String> {
     explorer_service::get_drives()
