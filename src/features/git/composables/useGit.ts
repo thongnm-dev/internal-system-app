@@ -27,6 +27,7 @@ import {
   gitMergeAbort,
   gitOpenTerminal,
   gitOpenUrl,
+  gitOpenVscode,
   gitResolveConflict,
   gitTagCreate,
   gitTagDelete,
@@ -1092,6 +1093,17 @@ export function useGit() {
     }
   }
 
+  /** Mở repo hiện tại bằng VS Code. */
+  async function openVscode() {
+    const path = repoPath();
+    if (!path) return;
+    try {
+      await gitOpenVscode(path);
+    } catch (e) {
+      reportError("Không mở được VS Code", e);
+    }
+  }
+
   /** Hiện một file/thư mục trong file explorer của hệ điều hành. */
   async function showInFolder(absolutePath: string) {
     try {
@@ -1344,6 +1356,7 @@ export function useGit() {
     loadPullRequests,
     openUrl,
     openTerminal,
+    openVscode,
     showInFolder,
     loadBrowserCommits,
     focusBrowserCommit,

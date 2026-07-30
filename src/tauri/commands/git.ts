@@ -259,6 +259,10 @@ export function gitOpenTerminal(path: string) {
   return safeInvoke<void>("git_open_terminal", { path });
 }
 
+export function gitOpenVscode(path: string) {
+  return safeInvoke<void>("git_open_vscode", { path });
+}
+
 export function gitCreatePullRequest(path: string, base: string, head: string) {
   return safeInvoke<string>("git_create_pull_request", { path, base, head });
 }

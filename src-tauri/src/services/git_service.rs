@@ -1447,6 +1447,31 @@ pub fn open_terminal(dir: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Mở thư mục repo bằng VS Code (`code <dir>`).
+pub fn open_vscode(dir: &str) -> AppResult<()> {
+    let p = Path::new(dir);
+    if !p.is_dir() {
+        return Err(AppError::new(format!("Không phải thư mục: {dir}")));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = Command::new("cmd");
+        configure(&mut cmd);
+        cmd.args(["/C", "code", dir])
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được VS Code: {e}")))?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut cmd = Command::new("code");
+        configure(&mut cmd);
+        cmd.arg(dir)
+            .spawn()
+            .map_err(|e| AppError::new(format!("Không mở được VS Code: {e}")))?;
+    }
+    Ok(())
+}
+
 /// Tạo Pull Request: mở trang tạo PR trên host (GitHub Desktop cũng mở trình duyệt).
 /// Trả về URL đã mở.
 pub fn create_pull_request(repo_path: &str, base: &str, head: &str) -> AppResult<String> {

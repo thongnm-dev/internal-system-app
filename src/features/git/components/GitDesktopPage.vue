@@ -605,6 +605,13 @@ onUnmounted(closeCommitMenu);
             </button>
             <button
               class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
+              title="Mở repo bằng VS Code"
+              @click="git.openVscode()"
+            >
+              <i class="pi pi-code text-[11px]" />
+            </button>
+            <button
+              class="flex h-7 items-center rounded-md px-2 text-secondary transition-colors hover:bg-canvas hover:text-brand"
               title="Mở terminal tại repo"
               @click="git.openTerminal()"
             >

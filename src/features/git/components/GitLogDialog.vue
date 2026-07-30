@@ -69,6 +69,9 @@ const selectedCommit = ref<GitCommit | null>(null);
 const detail = ref<GitCommitDetail | null>(null);
 const detailLoading = ref(false);
 
+// Thu gọn/mở rộng vùng commit message (collapse chỉ hiện tiêu đề + metadata author).
+const detailExpanded = ref(true);
+
 function fmtDate(d: Date | null): string {
   if (!d) return "";
   const y = d.getFullYear();
@@ -127,6 +130,7 @@ function clearFilters() {
 async function selectCommit(c: GitCommit) {
   selectedCommit.value = c;
   detail.value = null;
+  detailExpanded.value = true;
   if (!repoPath.value) return;
   detailLoading.value = true;
   try {
@@ -293,8 +297,18 @@ watch(visible, (v) => {
           <template v-if="selectedCommit">
             <!-- Header -->
             <div class="border-b border-divider bg-canvas px-4 py-2.5">
-              <p class="text-sm font-semibold text-ink">{{ selectedCommit.subject }}</p>
-              <p v-if="detail?.body" class="mt-1 whitespace-pre-wrap text-xs text-secondary">{{ detail.body }}</p>
+              <div class="flex items-start gap-2">
+                <p class="min-w-0 flex-1 text-sm font-semibold text-ink">{{ selectedCommit.subject }}</p>
+                <button
+                  v-if="detail?.body"
+                  class="shrink-0 rounded p-1 text-muted transition-colors hover:bg-panel hover:text-brand"
+                  :title="detailExpanded ? 'Thu gọn' : 'Mở rộng'"
+                  @click="detailExpanded = !detailExpanded"
+                >
+                  <i class="pi text-xs" :class="detailExpanded ? 'pi-chevron-up' : 'pi-chevron-down'" />
+                </button>
+              </div>
+              <p v-if="detail?.body && detailExpanded" class="mt-1 whitespace-pre-wrap text-xs text-secondary">{{ detail.body }}</p>
               <p class="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted">
                 <span>{{ selectedCommit.author_name }}</span>
                 <span>&lt;{{ selectedCommit.author_email }}&gt;</span>
