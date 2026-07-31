@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import InputGroup from "primevue/inputgroup";
 import Select from "primevue/select";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { GitApi } from "../composables/useGit";
@@ -73,12 +74,11 @@ async function doWorktreeCreate() {
     <div class="flex flex-col gap-3">
       <div>
         <label class="mb-1 block text-sm font-medium text-ink">Thư mục cha</label>
-        <div class="flex gap-2">
-          <InputText :model-value="wtParent" readonly placeholder="Chọn thư mục…" class="min-w-0 flex-1" />
-          <Button size="small" outlined severity="secondary" @click="pickWorktreeParent">
-            <i class="pi pi-folder-open mr-1.5" /> Chọn
-          </Button>
-        </div>
+        <InputGroup class="h-8">
+          <InputText :model-value="wtParent" readonly placeholder="Chọn thư mục…" />
+          <Button icon="pi pi-folder-open" severity="secondary" outlined title="Chọn thư mục cha" @click="pickWorktreeParent" />
+          <Button v-if="wtParent" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="wtParent = ''" />
+        </InputGroup>
       </div>
       <div>
         <label class="mb-1 block text-sm font-medium text-ink">Tên thư mục worktree</label>

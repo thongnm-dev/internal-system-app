@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from "primevue/button";
+import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
 import { useExcel2md } from "../composables/useExcel2md";
 
@@ -18,28 +19,30 @@ const ctrl = useExcel2md();
         <div class="mt-4 grid gap-3">
           <label class="grid gap-1.5">
             <span class="text-xs font-bold uppercase tracking-wide text-muted">Input .xlsx</span>
-            <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <InputGroup class="h-8">
               <InputText
-                class="h-10 min-w-0"
+                readonly
                 placeholder="Select Excel workbook..."
                 :model-value="ctrl.inputPath.value"
                 @update:model-value="ctrl.updateInputPath($event as string)"
               />
               <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel workbook" @click="ctrl.pickInputFile()" />
-            </div>
+              <Button v-if="ctrl.inputPath.value" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="ctrl.updateInputPath('')" />
+            </InputGroup>
           </label>
 
           <label class="grid gap-1.5">
             <span class="text-xs font-bold uppercase tracking-wide text-muted">Output .md</span>
-            <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <InputGroup class="h-8">
               <InputText
-                class="h-10 min-w-0"
+                readonly
                 placeholder="Markdown output path..."
                 :model-value="ctrl.outputPath.value"
                 @update:model-value="ctrl.setOutputPath($event as string)"
               />
               <Button icon="pi pi-save" severity="secondary" outlined title="Choose Markdown output" @click="ctrl.pickOutputFile()" />
-            </div>
+              <Button v-if="ctrl.outputPath.value" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="ctrl.setOutputPath('')" />
+            </InputGroup>
           </label>
 
           <Button

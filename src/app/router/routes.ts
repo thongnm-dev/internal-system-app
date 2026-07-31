@@ -96,6 +96,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Import exported system CSV data for monthly report checking.",
   },
   {
+    key: "fileSplit",
+    path: "/file-split",
+    title: "File Split",
+    subtitle: "Compress files/folders to a password-protected ZIP and split into email-friendly parts.",
+  },
+  {
     key: "cloudS3",
     path: "/cloud/s3",
     title: "S3 Browser",
@@ -366,6 +372,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/check-monthly-report",
     component: () => import("@/features/tools/components/CheckMonthlyReportPage.vue"),
     meta: { key: "checkMonthlyReport" as MenuKey },
+  },
+  {
+    path: "/file-split",
+    component: () => import("@/features/tools/components/FileSplitPage.vue"),
+    meta: { key: "fileSplit" as MenuKey },
   },
   {
     path: "/cloud/s3",

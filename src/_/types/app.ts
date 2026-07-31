@@ -12,6 +12,7 @@ export type MenuKey =
   | "dailyWorkNotes"
   | "dailyReport"
   | "checkMonthlyReport"
+  | "fileSplit"
   | "cloudS3"
   | "cloudS3Upload"
   | "cloudS3Download"

@@ -44,6 +44,7 @@ use commands::backlog_commands::{
 };
 use commands::excel2md_commands::excel2md;
 use commands::excel_helper_commands::{list_excel_sheet_names, resize_excel_images};
+use commands::file_split_commands::file_split_run;
 use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
 use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
@@ -144,6 +145,10 @@ pub fn run() {
                 let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.ico"))
                     .expect("failed to load app icon");
                 let _ = window.set_icon(icon);
+
+                // Trên macOS cờ `maximized` trong tauri.conf.json không áp dụng ổn định,
+                // nên chủ động maximize cửa sổ khi khởi động.
+                let _ = window.maximize();
             }
 
             // Khởi tạo database chạy nền (chỉ dev — production dùng bảng/SP có sẵn)
@@ -193,6 +198,8 @@ pub fn run() {
             parse_issue_csv,
             // === Excel → Markdown command ===
             excel2md,
+            // === File split (zip AES-256 + cắt .001) command ===
+            file_split_run,
             // === Resize evidence images command ===
             list_excel_sheet_names,
             resize_excel_images,

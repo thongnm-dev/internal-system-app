@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from "primevue/button";
+import InputGroup from "primevue/inputgroup";
 import InputSwitch from "primevue/inputswitch";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
@@ -61,15 +62,16 @@ const HELP: Record<string, string> = {
                 Input (FOLDER_ROOT)
                 <i v-tooltip.top="HELP.input" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
               </span>
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <InputGroup class="h-8">
                 <InputText
-                  class="h-10 min-w-0"
+                  readonly
                   placeholder="D:\OUTPUT"
                   :model-value="ctrl.config.value.input"
                   @update:model-value="ctrl.set('input', $event as string)"
                 />
                 <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse input folder" @click="ctrl.pickFolder('input')" />
-              </div>
+                <Button v-if="ctrl.config.value.input" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="ctrl.set('input', '')" />
+              </InputGroup>
             </label>
 
             <label class="grid gap-1.5">
@@ -77,15 +79,16 @@ const HELP: Record<string, string> = {
                 Output
                 <i v-tooltip.top="HELP.output" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
               </span>
-              <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <InputGroup class="h-8">
                 <InputText
-                  class="h-10 min-w-0"
+                  readonly
                   placeholder="D:\OUTPUT_VN"
                   :model-value="ctrl.config.value.output"
                   @update:model-value="ctrl.set('output', $event as string)"
                 />
                 <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse output folder" @click="ctrl.pickFolder('output')" />
-              </div>
+                <Button v-if="ctrl.config.value.output" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="ctrl.set('output', '')" />
+              </InputGroup>
             </label>
 
             <label class="grid gap-1.5">

@@ -6,6 +6,7 @@ import Checkbox from "primevue/checkbox";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
+import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
 import Button from "primevue/button";
 import RadioButton from "primevue/radiobutton";
@@ -330,21 +331,25 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <div class="grid grid-cols-1 gap-4">
       <div class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
-        <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
-          <InputText class="min-w-0 flex-1" placeholder="Select CSV file..."
-          :model-value="ctrl.csvPath.value"
-          @update:model-value="ctrl.updateCsvPath($event as string)"
-          readonly
+        <InputGroup class="mt-4 h-8">
+          <InputText
+            readonly
+            placeholder="Select CSV file..."
+            :model-value="ctrl.csvPath.value"
+            @update:model-value="ctrl.updateCsvPath($event as string)"
           />
           <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse CSV" @click="ctrl.pickCsvFile()" />
-        </div>
-        <div class="mt-4 grid grid-cols-[1fr_auto] gap-2">
-          <InputText class="min-w-0 flex-1" placeholder="Select schedule Excel file..."
-          :model-value="ctrl.schedulePath.value"
-          readonly
+          <Button v-if="ctrl.csvPath.value" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="ctrl.updateCsvPath('')" />
+        </InputGroup>
+        <InputGroup class="mt-4 h-8">
+          <InputText
+            readonly
+            placeholder="Select schedule Excel file..."
+            :model-value="ctrl.schedulePath.value"
           />
           <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel" @click="pickScheduleFile()" />
-        </div>
+          <Button v-if="ctrl.schedulePath.value" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="ctrl.schedulePath.value = ''" />
+        </InputGroup>
         <div class="mt-2 flex items-center gap-2">
           <span class="w-24 shrink-0 text-sm font-medium text-muted">Target month</span>
           <Calendar v-model="ctrl.targetMonth.value" view="month" date-format="yy/mm" show-icon icon-display="input" class="w-44" />

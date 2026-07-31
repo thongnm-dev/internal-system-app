@@ -3,7 +3,6 @@ import { onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import InputGroup from "primevue/inputgroup";
-import InputGroupAddon from "primevue/inputgroupaddon";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import MultiSelect from "primevue/multiselect";
@@ -163,10 +162,8 @@ onBeforeUnmount(() => {
                   :model-value="ctrl.inputPath.value"
                   @update:model-value="ctrl.updateInputPath($event as string)"
                 />
-                <InputGroupAddon v-if="ctrl.inputPath.value" class="p-0">
-                  <Button icon="pi pi-times" severity="danger" text title="Clear selected file" @click="clearInputFile()" />
-                </InputGroupAddon>
                 <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse Excel workbook" @click="ctrl.pickInputFile()" />
+                <Button v-if="ctrl.inputPath.value" icon="pi pi-times" severity="danger" text title="Clear selected file" @click="clearInputFile()" />
               </InputGroup>
             </label>
 
@@ -180,6 +177,7 @@ onBeforeUnmount(() => {
                   @update:model-value="ctrl.setOutputPath($event as string)"
                 />
                 <Button icon="pi pi-save" severity="secondary" outlined title="Choose output path" @click="ctrl.pickOutputFile()" />
+                <Button v-if="ctrl.outputPath.value" icon="pi pi-times" severity="danger" text title="Clear output path" @click="ctrl.setOutputPath('')" />
               </InputGroup>
             </label>
           </div>

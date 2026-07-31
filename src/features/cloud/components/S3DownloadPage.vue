@@ -3,6 +3,7 @@ import { ref } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import InputGroup from "primevue/inputgroup";
 import ProgressSpinner from "primevue/progressspinner";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
@@ -398,19 +399,28 @@ function formatTime(hms: string): string {
           <h4 class="mb-2 text-sm font-semibold text-surface-700 dark:text-surface-200">
             Đường dẫn đích nơi lưu:
           </h4>
-          <div class="flex items-center gap-2">
+          <InputGroup class="h-8">
             <InputText
               v-model="copyDestPath"
-              class="flex-1 font-mono text-sm"
               placeholder="Chưa chọn thư mục đích"
               readonly
             />
             <Button
               icon="pi pi-folder-open"
               severity="secondary"
+              outlined
+              title="Chọn thư mục đích"
               @click="chooseCopyDest"
             />
-          </div>
+            <Button
+              v-if="copyDestPath"
+              icon="pi pi-times"
+              severity="danger"
+              text
+              title="Xoá đường dẫn"
+              @click="copyDestPath = ''"
+            />
+          </InputGroup>
         </div>
       </div>
       <template #footer>

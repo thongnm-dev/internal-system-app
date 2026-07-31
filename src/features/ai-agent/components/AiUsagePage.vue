@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import InputGroup from "primevue/inputgroup";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAiUsage } from "../composables/useAiUsage";
 import type {
@@ -72,6 +73,12 @@ async function browseConfigDir() {
     configDir.value = selected;
     await onConfigDirInput();
   }
+}
+
+/** Xoá đường dẫn config dir đã chọn + reset preview đọc được. */
+function clearConfigDir() {
+  configDir.value = "";
+  ctrl.configDirPreview.value = null;
 }
 
 /** Preview login tại config dir + prefill tên. */
@@ -601,20 +608,28 @@ function resetHint(resetAt: string): string {
           <!-- Config dir input (đăng ký account thứ 2 đã login ở dir riêng) -->
           <label v-if="subMode === 'dir'" class="block">
             <span class="text-xs font-bold text-muted">CLAUDE_CONFIG_DIR <span class="text-red-500">*</span></span>
-            <div class="mt-1 flex gap-1.5">
+            <InputGroup class="h-8">
               <InputText
-                v-model="configDir"
-                class="min-w-0 flex-1 font-mono"
+                readonly
                 placeholder="~/.claude-work"
-                @input="onConfigDirInput"
+                :model-value="configDir"
               />
               <Button
                 icon="pi pi-folder-open"
                 severity="secondary"
+                outlined
                 title="Chọn folder"
                 @click="browseConfigDir"
               />
-            </div>
+              <Button
+                v-if="configDir"
+                icon="pi pi-times"
+                severity="danger"
+                text
+                title="Xoá đường dẫn"
+                @click="clearConfigDir"
+              />
+            </InputGroup>
             <span class="text-xs text-muted">
               Login trước 1 lần: <code class="rounded bg-canvas px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code>
             </span>
@@ -854,21 +869,28 @@ function resetHint(resetAt: string): string {
       <div class="space-y-4">
         <label class="block">
           <span class="text-xs font-bold text-muted">Working directory <span class="text-red-500">*</span></span>
-          <div class="mt-1 flex gap-1.5">
-            <input
-              :value="terminalWorkDir"
-              type="text"
+          <InputGroup class="h-8">
+            <InputText
               readonly
               placeholder="Chọn thư mục project..."
-              class="min-w-0 flex-1 rounded border border-divider bg-canvas px-3 py-2 font-mono text-sm text-ink"
+              :model-value="terminalWorkDir"
             />
             <Button
               icon="pi pi-folder-open"
               severity="secondary"
+              outlined
               title="Chọn folder"
               @click="browseTerminalWorkDir"
             />
-          </div>
+            <Button
+              v-if="terminalWorkDir"
+              icon="pi pi-times"
+              severity="danger"
+              text
+              title="Xoá đường dẫn"
+              @click="terminalWorkDir = ''"
+            />
+          </InputGroup>
           <span class="text-xs text-muted">Thư mục project nơi terminal sẽ mở.</span>
         </label>
       </div>

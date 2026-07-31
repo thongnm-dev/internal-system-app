@@ -8,6 +8,7 @@ import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
+import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useAiCowork } from "../composables/useAiCowork";
@@ -238,15 +239,13 @@ function isMarkdown(entry: FileEntry): boolean {
 
       <label class="block">
         <span class="text-xs font-bold text-muted">Project Directory</span>
-        <div class="mt-1 flex gap-1.5">
-          <input
-            :value="ctrl.projectDir.value"
-            type="text"
+        <InputGroup class="h-8">
+          <InputText
             readonly
             placeholder="Chọn thư mục project..."
-            class="min-w-0 flex-1 rounded border border-divider bg-canvas px-3 py-2 font-mono text-sm text-ink"
+            :model-value="ctrl.projectDir.value"
           />
-          <Button icon="pi pi-folder-open" label="Browse" severity="secondary" @click="ctrl.pickProjectDir" />
+          <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse" @click="ctrl.pickProjectDir" />
           <Button
             icon="pi pi-refresh"
             severity="secondary"
@@ -257,14 +256,14 @@ function isMarkdown(entry: FileEntry): boolean {
             @click="ctrl.loadDirectory"
           />
           <Button
+            v-if="ctrl.projectDir.value"
             icon="pi pi-times"
-            severity="secondary"
-            outlined
-            :disabled="!ctrl.projectDir.value"
+            severity="danger"
+            text
             title="Clear"
             @click="ctrl.clearProjectDir"
           />
-        </div>
+        </InputGroup>
       </label>
     </Fieldset>
 

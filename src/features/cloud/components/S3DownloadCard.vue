@@ -5,6 +5,7 @@ import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import InputGroup from "primevue/inputgroup";
 import type { AwsStorage } from "@/_/types/s3";
 import { s3GetLocalSyncWorkdir } from "@/tauri/commands/s3";
 
@@ -275,15 +276,15 @@ onMounted(() => {
     :closable="true"
   >
     <div class="flex flex-col gap-4">
-      <div class="flex items-center gap-2">
+      <InputGroup class="h-8">
         <InputText
           v-model="destinationPath"
-          class="flex-1 font-mono text-sm"
           placeholder="No directory selected"
           readonly
         />
-        <Button icon="pi pi-folder-open" severity="secondary" @click="chooseDestinationFolder" />
-      </div>
+        <Button icon="pi pi-folder-open" severity="secondary" outlined title="Chọn thư mục" @click="chooseDestinationFolder" />
+        <Button v-if="destinationPath" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="destinationPath = ''" />
+      </InputGroup>
       <small v-if="errorCheck" class="text-red-500">{{ errorCheck }}</small>
     </div>
     <template #footer>
