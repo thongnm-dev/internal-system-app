@@ -15,7 +15,6 @@ export interface FileSplitOptions {
   limitMb: number | null;
   /** Mật khẩu zip; "" = không mã hoá. */
   password: string;
-  singleArchive: boolean;
 }
 
 /** Một file kết quả (zip nguyên hoặc một phần `.001`). */

@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { computed, reactive, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { fileSplitRun } from "@/tauri/commands/file-split";
+import { fileSplitCalcSize, fileSplitRun } from "@/tauri/commands/file-split";
 import type { MessageMode } from "@/_/types/app";
 
 /** Một mục nguồn được chọn để nén (file hoặc folder). */
@@ -18,8 +18,8 @@ export interface FileSplitConfig {
   archiveName: string;
   limitMb: number | null;
   password: string;
-  useAes: boolean;
-  singleArchive: boolean;
+  /** true = không tách, chấp nhận 1 file zip dung lượng lớn. */
+  noSplit: boolean;
 }
 
 /** Một phần file được tạo ra sau khi tách (kết quả). */
@@ -42,8 +42,7 @@ export function useFileSplit() {
     archiveName: "attachment",
     limitMb: null,
     password: "",
-    useAes: true,
-    singleArchive: true,
+    noSplit: true,
   });
 
   const message = ref("Chọn file/folder, thiết lập thông số rồi nhấn Nén & Tách.");
@@ -51,58 +50,47 @@ export function useFileSplit() {
   const running = ref(false);
   const parts = ref<FileSplitPart[]>([]);
   const showResult = ref(false);
-  /** Kết quả đang hiển thị là bản xem trước hay kết quả chạy thật. */
   const resultMode = ref<"preview" | "run" | null>(null);
 
-  /** Danh sách file zip dự kiến tạo ra (không kèm phần .001/.002 vì cần backend tính dung lượng). */
   const previewArchives = ref<string[]>([]);
+  const previewSizeBytes = ref<number | null>(null);
 
   const canRun = computed(
     () =>
       sources.value.length > 0 &&
-      (config.singleArchive || (config.limitMb ?? 0) > 0) &&
+      (config.noSplit || (config.limitMb ?? 0) > 0) &&
       !running.value,
   );
 
-  /** Tên file zip cơ sở (bỏ đuôi .zip nếu người dùng gõ sẵn), fallback "attachment". */
   function normalizedArchiveName(): string {
     const name = config.archiveName.trim().replace(/\.zip$/i, "");
     return name || "attachment";
   }
 
-  /** Dựng danh sách file zip dự kiến để xem trước (không có phần .001/.002). */
-  function preview() {
+  async function preview() {
     if (!sources.value.length) {
       setMessage("Chưa có nguồn để xem trước.", "error");
       return;
     }
-    if (config.singleArchive) {
-      previewArchives.value = [`${normalizedArchiveName()}.zip`];
-    } else {
-      const used = new Map<string, number>();
-      previewArchives.value = sources.value.map((s) => {
-        const base = s.name.replace(/\.[^.\\/]+$/i, "") || s.name;
-        const seen = used.get(base) ?? 0;
-        used.set(base, seen + 1);
-        return seen === 0 ? `${base}.zip` : `${base}_${seen + 1}.zip`;
-      });
-    }
+    previewArchives.value = [`${normalizedArchiveName()}.zip`];
     parts.value = [];
     resultMode.value = "preview";
     showResult.value = true;
-    const encNote = config.password ? " · AES-256" : "";
-    const splitNote = config.singleArchive
-      ? " · không tách (1 file)"
-      : ` · tách theo ${config.limitMb ?? 0} MB (số phần .001… tính khi chạy)`;
-    setMessage(`Dự kiến ${previewArchives.value.length} file zip${encNote}${splitNote}.`);
-  }
 
-  /** Bật single-archive thì không còn tách → xoá trống & khoá ô giới hạn. */
-  function setSingleArchive(value: boolean) {
-    config.singleArchive = value;
-    showResult.value = false;
-    resultMode.value = null;
-    if (value) config.limitMb = null;
+    previewSizeBytes.value = null;
+    if (canUseTauriRuntime()) {
+      try {
+        previewSizeBytes.value = await fileSplitCalcSize(sources.value.map((s) => s.path));
+      } catch {
+        // ignore
+      }
+    }
+
+    const encNote = config.password ? " · AES-256" : "";
+    const splitNote = config.noSplit
+      ? " · không tách"
+      : ` · tách theo ${config.limitMb ?? 0} MB (số phần .001… tính khi chạy)`;
+    setMessage(`Dự kiến 1 file zip${encNote}${splitNote}.`);
   }
 
   function setMessage(text: string, mode: MessageMode = "info") {
@@ -161,6 +149,7 @@ export function useFileSplit() {
     showResult.value = false;
     resultMode.value = null;
     previewArchives.value = [];
+    previewSizeBytes.value = null;
   }
 
   function reset() {
@@ -169,14 +158,13 @@ export function useFileSplit() {
     config.archiveName = "attachment";
     config.limitMb = null;
     config.password = "";
-    config.useAes = true;
-    config.singleArchive = true;
+    config.noSplit = true;
     setMessage("Đã đặt lại thông số.");
   }
 
   async function run() {
     if (!canRun.value) {
-      setMessage("Cần ít nhất 1 nguồn và giới hạn dung lượng > 0.", "error");
+      setMessage("Cần ít nhất 1 nguồn.", "error");
       return;
     }
     if (!canUseTauriRuntime()) {
@@ -195,11 +183,11 @@ export function useFileSplit() {
         sources: sources.value.map((s) => ({ path: s.path, name: s.name })),
         outputDir: config.outputDir.trim(),
         archiveName: config.archiveName,
-        limitMb: config.singleArchive ? null : config.limitMb,
+        limitMb: config.noSplit ? null : config.limitMb,
         password: config.password,
-        singleArchive: config.singleArchive,
       });
       previewArchives.value = [];
+      previewSizeBytes.value = null;
       parts.value = result.files;
       resultMode.value = "run";
       showResult.value = true;
@@ -208,7 +196,7 @@ export function useFileSplit() {
       const enc = result.encrypted ? " · AES-256" : "";
       const splitNote =
         result.splitCount > 0
-          ? ` · đã cắt ${result.splitCount}/${result.archiveCount} file`
+          ? ` · đã cắt thành ${result.files.length} phần`
           : " · không cần tách (dưới giới hạn)";
       setMessage(`Tạo ${result.files.length} file (${mb} MB)${enc}${splitNote}.`);
     } catch (e) {
@@ -228,6 +216,7 @@ export function useFileSplit() {
     showResult,
     resultMode,
     previewArchives,
+    previewSizeBytes,
     canRun,
     pickFiles,
     pickFolders,
@@ -237,6 +226,5 @@ export function useFileSplit() {
     reset,
     run,
     preview,
-    setSingleArchive,
   };
 }

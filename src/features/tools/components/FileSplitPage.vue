@@ -58,7 +58,7 @@ function formatBytes(bytes: number): string {
               <span>Chưa chọn nguồn. Dùng “Thêm file” hoặc “Thêm folder”.</span>
             </div>
 
-            <ul v-else class="flex flex-col divide-y divide-divider rounded-md border border-divider">
+            <ul v-else class="flex max-h-[312px] flex-col divide-y divide-divider overflow-y-auto rounded-md border border-divider">
               <li
                 v-for="item in ctrl.sources.value"
                 :key="item.path"
@@ -137,17 +137,21 @@ function formatBytes(bytes: number): string {
               </label>
             </div>
 
-            <!-- Single archive + limit (cùng dòng) -->
             <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
-              <!-- Single archive -->
+              <!-- No-split checkbox -->
               <div class="grid gap-1.5">
-                <span class="text-xs font-bold uppercase tracking-wide text-muted">Chế độ nén</span>
+                <span class="text-xs font-bold uppercase tracking-wide text-muted">Chế độ tách</span>
                 <div class="flex h-10 items-center gap-2 rounded-md border border-divider bg-canvas px-3">
-                  <Checkbox input-id="single" binary :model-value="ctrl.config.singleArchive" @update:model-value="ctrl.setSingleArchive($event)" />
-                  <label for="single" class="cursor-pointer text-sm font-medium">Chỉ nén 1 file zip duy nhất</label>
+                  <Checkbox
+                    input-id="noSplit"
+                    binary
+                    :model-value="ctrl.config.noSplit"
+                    @update:model-value="ctrl.config.noSplit = $event as boolean"
+                  />
+                  <label for="noSplit" class="cursor-pointer text-sm font-medium">Không tách file</label>
                 </div>
                 <span class="text-[11px] text-muted">
-                  Bật: gộp tất cả nguồn vào 1 file zip. Tắt: mỗi file/folder thành 1 file zip riêng.
+                  Bật: giữ nguyên 1 file zip (chấp nhận dung lượng lớn). Tắt: tách theo giới hạn MB.
                 </span>
               </div>
 
@@ -159,8 +163,8 @@ function formatBytes(bytes: number): string {
                   :min="1"
                   :useGrouping="false"
                   suffix=" MB"
-                  :disabled="ctrl.config.singleArchive"
-                  :placeholder="ctrl.config.singleArchive ? 'Không tách' : ''"
+                  :disabled="ctrl.config.noSplit"
+                  :placeholder="ctrl.config.noSplit ? 'Không tách' : ''"
                   :model-value="ctrl.config.limitMb"
                   @update:model-value="ctrl.config.limitMb = $event ?? null"
                 />
@@ -188,16 +192,33 @@ function formatBytes(bytes: number): string {
           <div class="p-4">
             <!-- Preview mode -->
             <template v-if="ctrl.resultMode.value === 'preview'">
-              <ul class="flex flex-col divide-y divide-divider rounded-md border border-divider">
-                <li v-for="name in ctrl.previewArchives.value" :key="name" class="flex items-center gap-2 px-3 py-2 text-sm">
-                  <i class="pi pi-box text-muted" />
-                  <span class="truncate">{{ name }}</span>
+              <div class="rounded-md border border-divider">
+                <!-- Header: tên zip + dung lượng nguồn -->
+                <div class="flex items-center gap-2 border-b border-divider bg-canvas px-3 py-2 text-sm font-semibold">
+                  <i class="pi pi-box text-brand" />
+                  <span class="truncate">{{ ctrl.previewArchives.value[0] }}</span>
+                  <span v-if="ctrl.previewSizeBytes.value != null" class="ml-auto whitespace-nowrap text-xs font-semibold text-muted">
+                    {{ formatBytes(ctrl.previewSizeBytes.value) }}
+                  </span>
                   <i v-if="ctrl.config.password" v-tooltip.top="'Mã hoá AES-256'" class="pi pi-lock text-amber-500" style="font-size: 0.75rem" />
-                </li>
-              </ul>
+                </div>
+                <!-- Danh sách nguồn bên trong zip -->
+                <ul class="flex flex-col divide-y divide-divider">
+                  <li
+                    v-for="item in ctrl.sources.value"
+                    :key="item.path"
+                    class="flex items-center gap-2 px-3 py-1.5 pl-7 text-sm text-muted"
+                  >
+                    <i :class="item.kind === 'folder' ? 'pi pi-folder text-amber-500' : 'pi pi-file text-brand'" style="font-size: 0.75rem" />
+                    <span class="truncate">{{ item.name }}</span>
+                  </li>
+                </ul>
+              </div>
+
               <p class="mt-3 text-[11px] leading-5 text-muted">
-                Đây là các file zip dự kiến. Nếu bật tách, mỗi file có thể được cắt thành
-                <code>.001</code>, <code>.002</code>… — số phần được tính khi chạy thật (cần backend đo dung lượng).
+                Dung lượng hiển thị là tổng nguồn trước khi nén — file zip thực tế sẽ nhỏ hơn.
+                Nếu bật tách, mỗi file có thể được cắt thành
+                <code>.001</code>, <code>.002</code>… — số phần được tính khi chạy thật.
               </p>
             </template>
 

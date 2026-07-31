@@ -11,7 +11,7 @@ import InputText from "primevue/inputtext";
 import RadioButton from "primevue/radiobutton";
 import Select from "primevue/select";
 import { useAiTranslateCowork } from "../composables/useAiTranslateCowork";
-import type { AiAccount, AiAccountStatus, AiProvider } from "@/_/types/ai-usage";
+import type { AiAccount, AiAccountStatus, AiAccountType, AiProvider } from "@/_/types/ai-usage";
 import type { AiModelResult } from "@/tauri/commands/ai-workflow";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
@@ -359,6 +359,36 @@ function providerLabel(p: AiProvider): string {
   return p === "codex" ? "Codex" : "Claude";
 }
 
+function typeLabel(type: AiAccountType): string {
+  switch (type) {
+    case "api":
+      return "API";
+    case "admin":
+      return "Admin";
+    case "oauth":
+      return "OAuth";
+    case "subscription":
+      return "Subscription";
+    default:
+      return "Unknown";
+  }
+}
+
+function typeBadgeClass(type: AiAccountType): string {
+  switch (type) {
+    case "api":
+      return "bg-brand/10 text-brand";
+    case "admin":
+      return "bg-amber-100 text-amber-700";
+    case "oauth":
+      return "bg-violet-100 text-violet-700";
+    case "subscription":
+      return "bg-sky-100 text-sky-700";
+    default:
+      return "bg-canvas text-muted";
+  }
+}
+
 function statusLabel(status: AiAccountStatus): string {
   switch (status) {
     case "healthy":
@@ -480,48 +510,7 @@ function isTextResult(entry: FileEntry): boolean {
 
 <template>
   <div class="flex flex-1 flex-col gap-4 overflow-hidden">
-    <!-- Row 1: project directory -->
-    <Fieldset class="shrink-0 rounded-lg border border-divider bg-panel p-5 shadow-sm fieldset-nested"
-      legend="Project Directory"
-      toggleable>
-      <div class="flex flex-wrap items-center gap-3">
-        <i class="pi pi-language text-2xl text-muted" />
-        <div class="min-w-0">
-          <p class="text-[12px] text-muted">Chọn thư mục project, quản lý account AI, chuẩn bị input và chạy skill dịch thuật.</p>
-        </div>
-      </div>
-
-      <label class="block">
-        <span class="text-xs font-bold text-muted">Project Directory</span>
-        <InputGroup class="h-8">
-          <InputText
-            readonly
-            placeholder="Chọn thư mục project..."
-            :model-value="ctrl.projectDir.value"
-          />
-          <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse" @click="ctrl.pickProjectDir" />
-          <Button
-            icon="pi pi-refresh"
-            severity="secondary"
-            outlined
-            :disabled="!ctrl.projectDir.value"
-            :loading="ctrl.isLoadingDir.value"
-            title="Reload directory"
-            @click="ctrl.loadDirectory"
-          />
-          <Button
-            v-if="ctrl.projectDir.value"
-            icon="pi pi-times"
-            severity="danger"
-            text
-            title="Clear"
-            @click="ctrl.clearProjectDir"
-          />
-        </InputGroup>
-      </label>
-    </Fieldset>
-
-    <!-- Row 2: Account AI -->
+    <!-- Account AI -->
     <Fieldset
       class="shrink-0 rounded-lg border border-divider bg-panel p-4 shadow-sm fieldset-nested"
       legend="Account AI"
@@ -553,13 +542,19 @@ function isTextResult(entry: FileEntry): boolean {
               />
               <i v-if="ctrl.settingActiveId.value === account.id" class="pi pi-spinner pi-spin shrink-0 text-xs text-brand" />
               <span class="truncate font-semibold text-ink" :title="account.name">{{ account.name }}</span>
+              <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]">
+                {{ typeLabel(account.account_type) }}
+              </span>
+              <span
+                v-if="account.subscription_type"
+                class="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
+              >
+                {{ account.subscription_type }}
+              </span>
               <span :class="['ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', statusClass(account.status)]">
                 {{ statusLabel(account.status) }}
               </span>
             </div>
-            <p class="mt-0.5 text-[11px] text-muted">
-              {{ providerLabel(account.provider) }}<span v-if="account.subscription_type"> · {{ account.subscription_type }}</span>
-            </p>
             <div class="mt-2 flex items-center justify-between text-[11px]">
               <span class="font-bold text-muted">Usage used</span>
               <span class="font-bold text-ink">{{ Math.round(usedPercent(account)) }}%</span>
@@ -595,7 +590,7 @@ function isTextResult(entry: FileEntry): boolean {
     <!-- Row 3: 3 columns (chỉ hiển thị khi đã chọn Project Directory) -->
     <div v-if="ctrl.projectDir.value" class="flex min-h-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden">
       <!-- Column 1: input folder (top) + drag handle + output folder (bottom) -->
-      <div ref="col1Container" class="flex min-h-0 shrink-0 flex-col" :style="{ width: col1Width + 'px' }">
+      <div ref="col1Container" class="flex min-h-0 shrink-0 flex-col overflow-y-auto" :style="{ width: col1Width + 'px' }">
 
         <!-- Input panel (top) -->
         <div
@@ -767,19 +762,38 @@ function isTextResult(entry: FileEntry): boolean {
 
       <!-- Column 3: project directory listing -->
       <div class="flex min-h-0 flex-1 flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm" style="min-width: 260px">
-        <h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
-          <i class="pi pi-folder-open" />Project Directory
+        <div class="mb-2 flex items-center gap-1.5">
+          <h3 class="shrink-0 text-sm font-bold uppercase tracking-wide text-muted">
+            <i class="pi pi-folder-open mr-1" />Project Directory
+          </h3>
+          <InputGroup class="ml-auto !h-7 !w-auto">
+            <InputText
+              readonly
+              class="!h-7 !text-xs"
+              :style="{ width: Math.max(12, (ctrl.projectDir.value || '').length + 4) + 'ch' }"
+              placeholder="Chọn thư mục..."
+              :model-value="ctrl.projectDir.value"
+            />
+            <Button icon="pi pi-folder-open" severity="secondary" outlined title="Browse" @click="ctrl.pickProjectDir" />
+            <Button
+              v-if="ctrl.projectDir.value"
+              icon="pi pi-times"
+              severity="danger"
+              text
+              title="Clear"
+              @click="ctrl.clearProjectDir"
+            />
+          </InputGroup>
           <Button
             icon="pi pi-refresh"
             text
             rounded
             size="small"
-            class="ml-auto"
             :loading="ctrl.isLoadingDir.value"
             title="Reload"
             @click="ctrl.loadDirectory"
           />
-        </h3>
+        </div>
 
         <div class="min-h-0 flex-1 overflow-auto">
           <p v-if="ctrl.isLoadingDir.value" class="p-6 text-center text-xs text-muted">Loading...</p>
@@ -820,17 +834,15 @@ function isTextResult(entry: FileEntry): boolean {
       </div>
     </div>
 
-    <!-- Row 3 placeholder: chưa chọn Project Directory -->
+    <!-- Placeholder: chưa chọn Project Directory -->
     <div
       v-else
-      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-divider bg-panel/50 p-12 text-center"
+      class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-divider bg-panel/50 p-12 text-center"
     >
-      <i class="pi pi-language text-3xl text-muted" />
-      <h3 class="text-sm font-semibold text-ink">Chưa chọn Project Directory</h3>
-      <p class="max-w-md text-sm text-muted">
-        Bấm <span class="font-semibold text-ink">Browse</span> ở panel phía trên để chọn thư mục project, sau đó
-        chuẩn bị input, chạy skill dịch, và xem nội dung thư mục ở đây.
-      </p>
+      <i class="pi pi-folder-open text-4xl text-muted" />
+      <h3 class="text-sm font-semibold text-ink">Bạn chưa thiết lập workspace làm việc</h3>
+      <p class="max-w-md text-sm text-muted">Vui lòng chọn workspace để tiếp tục.</p>
+      <Button label="Chọn Project Directory" icon="pi pi-folder-open" @click="ctrl.pickProjectDir" />
     </div>
 
     <!-- Markdown preview dialog -->

@@ -30,8 +30,6 @@ pub struct FileSplitOptions {
     pub limit_mb: Option<f64>,
     /// Mật khẩu zip. Chuỗi rỗng = không mã hoá.
     pub password: String,
-    /// `true` = gộp tất cả nguồn vào 1 file zip; `false` = mỗi nguồn 1 file zip.
-    pub single_archive: bool,
 }
 
 /// Một file kết quả được ghi ra đĩa (file zip nguyên hoặc một phần `.001`).

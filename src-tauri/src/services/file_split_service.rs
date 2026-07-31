@@ -7,7 +7,6 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::file_split::{FileSplitOptions, FileSplitPart, FileSplitResult, FileSplitSource};
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -39,31 +38,15 @@ pub fn compress_and_split(options: FileSplitOptions) -> AppResult<FileSplitResul
 
     let encrypted = !options.password.trim().is_empty();
 
-    // Xác định giới hạn cắt (byte). Khi gộp 1 file thì không cần giới hạn.
-    let part_bytes: Option<u64> = if options.single_archive {
-        None
-    } else {
-        match options.limit_mb {
-            Some(mb) if mb > 0.0 => Some((mb * 1024.0 * 1024.0).round() as u64),
-            _ => {
-                return Err(AppError::new(
-                    "Vui lòng nhập giới hạn dung lượng mỗi phần (MB) khi không gộp 1 file.",
-                ))
-            }
-        }
+    // Giới hạn cắt (byte). None = không tách.
+    let part_bytes: Option<u64> = match options.limit_mb {
+        Some(mb) if mb > 0.0 => Some((mb * 1024.0 * 1024.0).round() as u64),
+        _ => None,
     };
 
-    // Gom nguồn thành các nhóm: 1 nhóm (gộp) hoặc mỗi nguồn 1 nhóm.
-    let groups: Vec<(String, Vec<&FileSplitSource>)> = if options.single_archive {
-        vec![(normalized_archive_name(&options.archive_name), options.sources.iter().collect())]
-    } else {
-        let mut used: HashMap<String, u32> = HashMap::new();
-        options
-            .sources
-            .iter()
-            .map(|s| (dedup_base_name(&s.name, &mut used), vec![s]))
-            .collect()
-    };
+    // Luôn gộp tất cả nguồn vào 1 file zip duy nhất.
+    let groups: Vec<(String, Vec<&FileSplitSource>)> =
+        vec![(normalized_archive_name(&options.archive_name), options.sources.iter().collect())];
 
     let mut files: Vec<FileSplitPart> = Vec::new();
     let mut total_bytes: u64 = 0;
@@ -105,6 +88,36 @@ pub fn compress_and_split(options: FileSplitOptions) -> AppResult<FileSplitResul
     })
 }
 
+/// Tính tổng dung lượng (byte) của danh sách đường dẫn file/folder (đệ quy).
+pub fn calc_source_size(paths: Vec<String>) -> AppResult<u64> {
+    let mut total: u64 = 0;
+    for p in &paths {
+        let path = Path::new(p);
+        if !path.exists() {
+            return Err(AppError::new(format!("Không tìm thấy nguồn: {p}")));
+        }
+        total += dir_size(path)?;
+    }
+    Ok(total)
+}
+
+fn dir_size(path: &Path) -> AppResult<u64> {
+    if path.is_file() {
+        return Ok(std::fs::metadata(path)?.len());
+    }
+    let mut total: u64 = 0;
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let p = entry.path();
+        if p.is_dir() {
+            total += dir_size(&p)?;
+        } else {
+            total += std::fs::metadata(&p)?.len();
+        }
+    }
+    Ok(total)
+}
+
 /// Chuẩn hoá tên file zip: bỏ đuôi `.zip` nếu có, fallback `attachment`.
 fn normalized_archive_name(name: &str) -> String {
     let trimmed = name.trim().trim_end_matches(".zip").trim_end_matches(".ZIP");
@@ -112,23 +125,6 @@ fn normalized_archive_name(name: &str) -> String {
         "attachment".to_string()
     } else {
         trimmed.to_string()
-    }
-}
-
-/// Sinh tên cơ sở (không đuôi) cho chế độ mỗi-nguồn-1-zip, tránh trùng (`_2`, `_3`).
-fn dedup_base_name(source_name: &str, used: &mut HashMap<String, u32>) -> String {
-    let base = Path::new(source_name)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .filter(|s| !s.is_empty())
-        .unwrap_or(source_name)
-        .to_string();
-    let count = used.entry(base.clone()).or_insert(0);
-    *count += 1;
-    if *count == 1 {
-        base
-    } else {
-        format!("{base}_{}", *count)
     }
 }
 
