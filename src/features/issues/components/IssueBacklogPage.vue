@@ -113,7 +113,7 @@ const importDialogVisible = ref(false);
           <label class="block min-w-0">
             <span class="text-xs font-bold text-muted">Project</span>
             <select
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               :value="ctrl.criteria.value.project"
               @change="ctrl.setField('project', ($event.target as HTMLSelectElement).value)"
             >
@@ -168,7 +168,7 @@ const importDialogVisible = ref(false);
           <label class="block min-w-0">
             <span class="text-xs font-bold text-muted">Issue Type</span>
             <select
-              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+              class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
               :disabled="searchDisabled"
               :value="ctrl.criteria.value.issueType"
               @change="ctrl.setField('issueType', ($event.target as HTMLSelectElement).value)"
@@ -181,7 +181,7 @@ const importDialogVisible = ref(false);
             <label class="block min-w-0">
               <span class="text-xs font-bold text-muted">Category</span>
               <select
-                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 :disabled="searchDisabled"
                 :value="ctrl.criteria.value.category"
                 @change="ctrl.setField('category', ($event.target as HTMLSelectElement).value)"
@@ -193,7 +193,7 @@ const importDialogVisible = ref(false);
             <label class="block min-w-0">
               <span class="text-xs font-bold text-muted">Assignee</span>
               <select
-                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 :disabled="searchDisabled"
                 :value="ctrl.criteria.value.assignee"
                 @change="ctrl.setField('assignee', ($event.target as HTMLSelectElement).value)"
@@ -258,7 +258,7 @@ const importDialogVisible = ref(false);
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Create user</span>
                 <select
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   :disabled="searchDisabled"
                   :value="ctrl.criteria.value.createUser"
                   @change="ctrl.setField('createUser', ($event.target as HTMLSelectElement).value)"
@@ -270,7 +270,7 @@ const importDialogVisible = ref(false);
               <label class="block min-w-0">
                 <span class="text-xs font-bold text-muted">Priority</span>
                 <select
-                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   :disabled="searchDisabled"
                   :value="ctrl.criteria.value.priorityFilter"
                   @change="ctrl.setField('priorityFilter', ($event.target as HTMLSelectElement).value)"
@@ -297,13 +297,13 @@ const importDialogVisible = ref(false);
       </div>
     </Fieldset>
 
-    <div v-if="ctrl.searchError.value" class="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+    <div v-if="ctrl.searchError.value" class="banner-danger">
       {{ ctrl.searchError.value }}
     </div>
 
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">Issue backlog list</h3>
+        <h3 class="section-title">Issue backlog list</h3>
         <span class="text-xs text-muted">{{ ctrl.totalCount.value.toLocaleString("en-US") }} issues</span>
       </div>
 
@@ -330,7 +330,7 @@ const importDialogVisible = ref(false);
         <Column field="assignee" header="Assignee" body-class="whitespace-nowrap" />
         <Column header="Status" body-class="whitespace-nowrap">
           <template #body="{ data }">
-            <span :class="['rounded px-2 py-1 text-xs font-bold', statusTone(data.status)]">{{ data.status }}</span>
+            <span :class="statusTone(data.status)">{{ data.status }}</span>
           </template>
         </Column>
         <Column header="Hours" body-class="num" header-class="num">
@@ -338,7 +338,7 @@ const importDialogVisible = ref(false);
         </Column>
         <Column header="Priority" body-class="whitespace-nowrap">
           <template #body="{ data }">
-            <span :class="['rounded px-2 py-1 text-xs font-bold', priorityTone(data.priority)]">{{ data.priority }}</span>
+            <span :class="priorityTone(data.priority)">{{ data.priority }}</span>
           </template>
         </Column>
         <Column field="createDate" header="Create Date" body-class="whitespace-nowrap" />

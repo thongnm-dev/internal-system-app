@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
             <i class="pi pi-sliders-h text-[17px] text-brand" />
-            <h3 class="text-[13px] font-bold">Settings</h3>
+            <h3 class="section-title">Settings</h3>
           </div>
           <div class="flex items-center gap-1">
             <Button
@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
         <section class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
             <i class="pi pi-file-excel text-brand" />
-            <h4 class="font-bold">Excel workbook</h4>
+            <h4 class="section-title">Excel workbook</h4>
           </div>
 
           <div class="mt-4 grid gap-3">
@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
         <section v-if="ctrl.inputPath.value && ctrl.availableSheets.value.length" class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
             <i class="pi pi-arrows-alt text-[15px] text-brand" />
-            <h4 class="font-bold">Sheets</h4>
+            <h4 class="section-title">Sheets</h4>
           </div>
           <label class="mt-3 grid gap-1.5">
             <span class="text-[10px] font-bold uppercase tracking-wide text-muted">Sheets to process</span>
@@ -208,7 +208,7 @@ onBeforeUnmount(() => {
         <section class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
             <i class="pi pi-sliders-h text-[15px] text-brand" />
-            <h4 class="font-bold">Settings</h4>
+            <h4 class="section-title">Settings</h4>
           </div>
 
           <div class="mt-4 grid gap-1.5">
@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
         <section v-if="ctrl.result.value" class="rounded-lg border border-divider bg-canvas p-4">
           <div class="flex items-center gap-2">
             <i class="pi pi-check-circle text-[15px] text-brand" />
-            <h4 class="font-bold">Result</h4>
+            <h4 class="section-title">Result</h4>
           </div>
           <div class="mt-3 grid grid-cols-1 gap-2 text-[11px]">
             <div>

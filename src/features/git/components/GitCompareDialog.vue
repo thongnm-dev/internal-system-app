@@ -98,10 +98,10 @@ async function doCreatePR() {
       </p>
 
       <div v-if="git.comparison.value" class="flex flex-wrap items-center gap-2 text-xs">
-        <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
+        <span class="badge-success">
           {{ git.comparison.value.ahead }} commit sẽ vào PR
         </span>
-        <span v-if="git.comparison.value.behind" class="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-700">
+        <span v-if="git.comparison.value.behind" class="badge-info">
           base đi trước {{ git.comparison.value.behind }}
         </span>
         <span class="text-muted">{{ git.comparison.value.files.length }} file thay đổi</span>

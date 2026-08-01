@@ -500,7 +500,7 @@ const selectPt = {
           <div class="flex flex-wrap items-center gap-3">
             <i class="pi pi-sitemap text-2xl text-muted" />
             <div class="min-w-0">
-              <h2 class="text-lg font-semibold text-ink">{{ ctrl.activeWorkflow.value.name }}</h2>
+              <h2 class="page-title">{{ ctrl.activeWorkflow.value.name }}</h2>
               <p class="text-sm text-muted">{{ ctrl.activeWorkflow.value.description || "No description" }}</p>
             </div>
             <div class="ml-auto flex shrink-0 items-center gap-2">
@@ -560,7 +560,7 @@ const selectPt = {
                     {{ index + 1 }}
                   </span>
                   <i :class="[step.icon, 'text-muted']" />
-                  <h4 class="min-w-0 flex-1 break-words text-sm font-semibold text-ink">{{ step.name }}</h4>
+                  <h4 class="section-title min-w-0 flex-1 break-words">{{ step.name }}</h4>
                   <button
                     class="shrink-0 text-muted opacity-0 transition-opacity hover:text-red-500"
                     :class="{ 'opacity-100': step.id === ctrl.selectedStepId.value }"
@@ -576,7 +576,7 @@ const selectPt = {
                   </span>
                   <span
                     v-if="step.isLatestStep"
-                    class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700"
+                    class="badge-success"
                     title="Bước cuối cùng của workflow"
                   >
                     <i class="pi pi-flag-fill text-[9px]" />Latest
@@ -633,7 +633,7 @@ const selectPt = {
       @update:visible="showWorkflowDialog = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">{{ editingWorkflowId ? "Edit Workflow" : "New Workflow" }}</h3>
+        <h3 class="section-title">{{ editingWorkflowId ? "Edit Workflow" : "New Workflow" }}</h3>
       </template>
 
       <div class="space-y-4">
@@ -664,7 +664,7 @@ const selectPt = {
       @update:visible="showStepDialog = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">{{ editingStepId ? "Edit Step" : "Add Step" }}</h3>
+        <h3 class="section-title">{{ editingStepId ? "Edit Step" : "Add Step" }}</h3>
       </template>
 
       <div class="space-y-4">
@@ -767,7 +767,7 @@ const selectPt = {
       @update:visible="showDeleteDialog = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Confirm Delete</h3>
+        <h3 class="section-title">Confirm Delete</h3>
       </template>
 
       <p class="text-sm text-ink">

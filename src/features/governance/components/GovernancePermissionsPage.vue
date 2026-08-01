@@ -24,10 +24,10 @@ const subjectLabel = computed(() =>
 
 const groupBadgeClass = (group: string) =>
   group === "—"
-    ? "bg-canvas text-muted"
+    ? "badge-neutral"
     : group === "Tools"
-      ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
-      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300";
+      ? "badge-info"
+      : "badge-success";
 
 function accessButtonClass(key: string, option: UserMenuAccess) {
   const active = ctrl.accessOf(key) === option;
@@ -66,7 +66,7 @@ function groupCheckboxIcon(group: MenuGroup) {
       </div>
 
       <label class="block min-w-0 flex-1">
-        <span class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+        <span class="flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
           <i class="pi pi-search shrink-0 text-muted" />
           <InputText
             class="embedded-input min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
@@ -96,10 +96,10 @@ function groupCheckboxIcon(group: MenuGroup) {
     </section>
 
     <!-- Feedback -->
-    <p v-if="ctrl.error.value" class="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
+    <p v-if="ctrl.error.value" class="banner-danger">
       {{ ctrl.error.value }}
     </p>
-    <p v-else-if="ctrl.savedMessage.value" class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300">
+    <p v-else-if="ctrl.savedMessage.value" class="banner-success">
       {{ ctrl.savedMessage.value }}
     </p>
 
@@ -159,7 +159,7 @@ function groupCheckboxIcon(group: MenuGroup) {
       <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <header class="flex flex-wrap items-center gap-3 border-b border-divider px-4 py-3">
           <div class="min-w-0 flex-1">
-            <h3 class="truncate text-sm font-bold text-ink">
+            <h3 class="truncate section-title">
               {{ subjectLabel || "Select a " + (ctrl.tab.value === "roles" ? "role" : "user") }}
             </h3>
             <p class="text-xs text-muted">
@@ -204,13 +204,13 @@ function groupCheckboxIcon(group: MenuGroup) {
                 @click="ctrl.toggleGroup(group, ctrl.groupState(group) !== 'all')"
               >
                 <i :class="['pi text-sm', groupCheckboxIcon(group), ctrl.groupState(group) === 'none' ? 'text-muted' : 'text-brand']" />
-                <span :class="['rounded-md px-2 py-0.5 text-[11px] font-bold', groupBadgeClass(group.name)]">
+                <span :class="groupBadgeClass(group.name)">
                   {{ group.name }}
                 </span>
               </button>
               <span
                 v-else
-                :class="['rounded-md px-2 py-0.5 text-[11px] font-bold', groupBadgeClass(group.name)]"
+                :class="groupBadgeClass(group.name)"
               >
                 {{ group.name }}
               </span>

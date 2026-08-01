@@ -31,6 +31,26 @@ export const LIGHT_THEME: ThemeTokens = {
 
     border: "229 231 235",
     "border-light": "243 244 246",
+
+    // Trạng thái (danger/warning/success/info) — fg / nền nhạt / viền
+    danger: "185 28 28",
+    "danger-soft": "254 242 242",
+    "danger-border": "254 202 202",
+    warning: "146 64 14",
+    "warning-soft": "255 251 235",
+    "warning-border": "253 230 138",
+    success: "4 120 87",
+    "success-soft": "236 253 245",
+    "success-border": "167 243 208",
+    info: "29 78 216",
+    "info-soft": "239 246 255",
+    "info-border": "191 219 254",
+
+    // Chữ trên nền brand (thay text-white)
+    "on-brand": "255 255 255",
+    // Vùng code/terminal — cố định tối ở cả 2 theme
+    "code-bg": "11 15 25",
+    "code-fg": "241 245 249",
   },
   shadows: {
     card: "0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
@@ -65,6 +85,26 @@ export const DARK_THEME: ThemeTokens = {
 
     border: "51 65 85",
     "border-light": "30 41 59",
+
+    // Trạng thái (danger/warning/success/info) — fg / nền nhạt / viền
+    danger: "252 165 165",
+    "danger-soft": "69 10 10",
+    "danger-border": "153 27 27",
+    warning: "252 211 77",
+    "warning-soft": "69 26 3",
+    "warning-border": "146 64 14",
+    success: "134 239 172",
+    "success-soft": "6 78 59",
+    "success-border": "6 95 70",
+    info: "147 197 253",
+    "info-soft": "23 37 84",
+    "info-border": "30 64 175",
+
+    // Chữ trên nền brand (thay text-white)
+    "on-brand": "255 255 255",
+    // Vùng code/terminal — cố định tối ở cả 2 theme
+    "code-bg": "11 15 25",
+    "code-fg": "241 245 249",
   },
   shadows: {
     card: "0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.25)",
@@ -86,6 +126,26 @@ export function applyTheme(mode: ThemeMode) {
   for (const [key, value] of Object.entries(tokens.shadows)) {
     root.style.setProperty(`--shadow-${key}`, value);
   }
+}
+
+/**
+ * Sinh CSS cho `.force-light` từ chính LIGHT_THEME để không phải chép lại
+ * giá trị màu trong styles.css. Nguồn sự thật duy nhất là LIGHT_THEME/DARK_THEME.
+ * Idempotent — gọi nhiều lần chỉ tạo 1 thẻ <style>.
+ */
+export function injectForceLightStyle() {
+  const STYLE_ID = "force-light-tokens";
+  if (document.getElementById(STYLE_ID)) return;
+
+  const decls = [
+    ...Object.entries(LIGHT_THEME.colors).map(([key, value]) => `--color-${key}: ${value};`),
+    ...Object.entries(LIGHT_THEME.shadows).map(([key, value]) => `--shadow-${key}: ${value};`),
+  ].join("");
+
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `.force-light{${decls}}`;
+  document.head.appendChild(style);
 }
 
 export function applyStoredTheme() {

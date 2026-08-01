@@ -123,7 +123,7 @@ watch(
         @toggle-collapse="shell.toggleSidebar()"
       />
 
-      <section class="min-h-0 overflow-hidden p-6">
+      <section class="min-h-0 overflow-hidden px-6 py-2">
         <div class="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
           <AppHeader
             :route="currentAppRoute"

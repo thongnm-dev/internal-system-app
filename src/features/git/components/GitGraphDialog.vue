@@ -174,10 +174,10 @@ function refLabel(r: string) {
   return r.replace("HEAD -> ", "").replace("tag: ", "");
 }
 function refClass(r: string) {
-  if (r.startsWith("HEAD")) return "bg-emerald-100 text-emerald-700";
-  if (r.startsWith("tag:")) return "bg-amber-100 text-amber-700";
-  if (r.includes("/")) return "bg-sky-100 text-sky-700";
-  return "bg-slate-100 text-slate-600";
+  if (r.startsWith("HEAD")) return "badge-success";
+  if (r.startsWith("tag:")) return "badge-warning";
+  if (r.includes("/")) return "badge-info";
+  return "badge-neutral";
 }
 </script>
 
@@ -261,7 +261,7 @@ function refClass(r: string) {
               <span
                 v-for="r in c.refs"
                 :key="r"
-                class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                class="shrink-0"
                 :class="refClass(r)"
               >
                 {{ refLabel(r) }}

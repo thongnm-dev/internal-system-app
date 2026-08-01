@@ -630,7 +630,7 @@ onUnmounted(closeCommitMenu);
               @click="git.pull()"
             >
               <i class="pi pi-arrow-down text-[11px]" />
-              <span v-if="git.info.value?.behind" class="rounded-full bg-sky-100 px-1 text-[9px] font-bold text-sky-700">{{ git.info.value.behind }}</span>
+              <span v-if="git.info.value?.behind" class="badge-info">{{ git.info.value.behind }}</span>
             </button>
             <button
               class="flex h-7 items-center gap-1 rounded-md bg-brand px-2.5 font-medium text-white transition-colors hover:brightness-110 disabled:opacity-50"
@@ -709,7 +709,7 @@ onUnmounted(closeCommitMenu);
       <!-- Rebase in progress banner -->
       <div
         v-if="git.info.value?.rebase_in_progress"
-        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm"
+        class="banner-warning flex-wrap"
       >
         <i class="pi pi-exclamation-triangle text-amber-600" />
         <span class="font-semibold text-amber-800">Đang có một rebase dở dang.</span>
@@ -730,7 +730,7 @@ onUnmounted(closeCommitMenu);
       <!-- Cherry-pick in progress banner -->
       <div
         v-if="git.info.value?.cherry_pick_in_progress"
-        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm"
+        class="banner-warning flex-wrap"
       >
         <i class="pi pi-exclamation-triangle text-amber-600" />
         <span class="font-semibold text-amber-800">Đang có một cherry-pick dở dang.</span>
@@ -751,7 +751,7 @@ onUnmounted(closeCommitMenu);
       <!-- Merge in progress banner -->
       <div
         v-if="git.info.value?.merge_in_progress"
-        class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm"
+        class="banner-warning flex-wrap"
       >
         <i class="pi pi-exclamation-triangle text-amber-600" />
         <span class="font-semibold text-amber-800">Đang có một merge dở dang.</span>

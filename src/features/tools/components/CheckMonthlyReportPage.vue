@@ -375,7 +375,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
       <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <div class="flex items-start justify-between gap-3 border-b border-divider px-4 py-3">
           <div class="min-w-0">
-            <h3 class="font-bold">Preview</h3>
+            <h3 class="section-title">Preview</h3>
             <p class="mt-1 truncate text-xs text-muted">
               {{ ctrl.compareResult.value
                 ? `CSV ${ctrl.compareTotals.value.csv.toFixed(1)}h vs Schedule ${ctrl.compareTotals.value.schedule.toFixed(1)}h — ${ctrl.compareTotals.value.mismatches} dòng lệch` + (ctrl.compareTotals.value.warnings > 0 ? ` — ${ctrl.compareTotals.value.warnings} warning` : '')
@@ -390,7 +390,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <Column header="Phase" style="width: 170px">
             <template #body="{ data }">
               <template v-if="data.kind === 'phase'">
-                <span v-if="data.process_code" class="mr-1.5 inline-block min-w-7 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">{{ data.process_code }}</span>
+                <span v-if="data.process_code" class="mr-1.5 min-w-7 justify-center badge-info">{{ data.process_code }}</span>
                 <span>{{ data.phase }}</span>
               </template>
             </template>
@@ -427,11 +427,11 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
           <Column header="Status" style="width: 120px">
             <template #body="{ data }">
               <template v-if="data.kind === 'phase'">
-                <span v-if="data.status === 'match'" class="inline-block rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Match</span>
-                <span v-else-if="data.status === 'mismatch'" class="inline-block rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">Mismatch</span>
-                <span v-else-if="data.status === 'csv-only'" class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">CSV only</span>
-                <span v-else-if="data.status === 'csv-only-warning'" class="inline-block rounded bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-800">⚠ CSV only</span>
-                <span v-else class="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Schedule only</span>
+                <span v-if="data.status === 'match'" class="badge-success">Match</span>
+                <span v-else-if="data.status === 'mismatch'" class="badge-danger">Mismatch</span>
+                <span v-else-if="data.status === 'csv-only'" class="badge-warning">CSV only</span>
+                <span v-else-if="data.status === 'csv-only-warning'" class="badge-warning">⚠ CSV only</span>
+                <span v-else class="badge-warning">Schedule only</span>
               </template>
             </template>
           </Column>
@@ -446,7 +446,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
     <Dialog :visible="isScheduleDialogOpen" modal class="w-full max-w-6xl overflow-hidden rounded-lg bg-panel shadow-2xl" :style="{ maxHeight: '86vh' }" @update:visible="isScheduleDialogOpen = $event">
       <template #header>
         <div class="min-w-0">
-          <h3 class="truncate text-lg font-bold text-ink">Schedule data</h3>
+          <h3 class="truncate section-title">Schedule data</h3>
           <p class="mt-1 truncate text-sm text-muted">
             {{ scheduleData ? `${scheduleData.target_month} — ${scheduleRows.length} rows — Total: ${scheduleTotalHours.toFixed(1)}h` : '' }}
           </p>
@@ -490,7 +490,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
       <template #header>
         <div class="flex w-full items-center justify-between gap-3 pr-8">
           <div class="min-w-0">
-            <h3 class="truncate text-lg font-bold text-ink">{{ previewDialogView === 'summary' ? 'Preview' : 'CSV detail' }}</h3>
+            <h3 class="truncate section-title">{{ previewDialogView === 'summary' ? 'Preview' : 'CSV detail' }}</h3>
             <p class="mt-1 truncate text-sm text-muted">{{ ctrl.previewResult.value.source_file_name }}{{ ctrl.result.value ? ` - saved batch #${ctrl.result.value.batch_id}` : '' }}</p>
           </div>
           <Button
@@ -509,7 +509,7 @@ function onOpenDetail(detail: SelectedPhaseDetail) {
         <Column header="Phase">
           <template #body="{ data }">
             <template v-if="data.kind === 'project'">All phases</template>
-            <template v-else><span class="mr-2 inline-block min-w-8 rounded bg-blue-100 px-1.5 py-0.5 text-center text-xs font-extrabold text-blue-800">{{ data.phase.process_code }}</span>{{ data.phase.phase_name }}</template>
+            <template v-else><span class="mr-2 min-w-8 justify-center badge-info">{{ data.phase.process_code }}</span>{{ data.phase.phase_name }}</template>
           </template>
         </Column>
         <Column header="Rows" body-class="num" header-class="num"><template #body="{ data }">{{ data.rowCount.toLocaleString("en-US") }}</template></Column>

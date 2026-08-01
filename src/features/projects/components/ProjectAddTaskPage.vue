@@ -383,7 +383,7 @@ async function importSelected() {
     <!-- Header -->
     <section class="flex items-center justify-between gap-4 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="min-w-0">
-        <h3 class="truncate font-bold text-ink">Import Tasks</h3>
+        <h3 class="section-title truncate">Import Tasks</h3>
         <p class="mt-1 truncate text-sm text-muted">
           {{ ctrl.projectLabel.value }}
         </p>
@@ -425,7 +425,7 @@ async function importSelected() {
           <code class="rounded bg-canvas px-1 text-xs">issue key</code>
         </span>
       </div>
-      <p v-if="importError" class="mt-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+      <p v-if="importError" class="banner-danger mt-3">
         {{ importError }}
       </p>
     </section>
@@ -458,7 +458,7 @@ async function importSelected() {
                 <span
                   v-for="cat in data.categories"
                   :key="cat"
-                  class="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-brand"
+                  class="badge-success"
                 >{{ cat }}</span>
                 <span v-if="!data.categories.length" class="text-muted">-</span>
               </div>
@@ -504,7 +504,7 @@ async function importSelected() {
       <template v-else>
         <!-- Error -->
         <div v-if="backlogError && !backlogSearching" class="px-4 pt-4">
-          <p class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+          <p class="banner-danger">
             {{ backlogError }}
           </p>
         </div>
@@ -550,7 +550,7 @@ async function importSelected() {
                 <span class="text-xs font-bold text-muted">Issue Type</span>
                 <select
                   v-model="blSelectedIssueType"
-                  class="mt-1 h-9 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 h-9 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 >
                   <option value="">All types</option>
                   <option v-for="t in blIssueTypeOptions" :key="t.id" :value="t.name">{{ t.name }}</option>
@@ -560,7 +560,7 @@ async function importSelected() {
                 <span class="text-xs font-bold text-muted">Category</span>
                 <select
                   v-model="blSelectedCategory"
-                  class="mt-1 h-9 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 h-9 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 >
                   <option value="">All categories</option>
                   <option v-for="c in blCategoryOptions" :key="c.id" :value="c.name">{{ c.name }}</option>
@@ -626,7 +626,7 @@ async function importSelected() {
               <Column field="issueType" header="Type" header-class="w-24" body-class="whitespace-nowrap text-xs" />
               <Column field="status" header="Status" header-class="w-28">
                 <template #body="{ data }">
-                  <span class="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">{{ data.status }}</span>
+                  <span class="badge-info">{{ data.status }}</span>
                 </template>
               </Column>
               <Column header="Est." header-class="w-16 num" body-class="num">

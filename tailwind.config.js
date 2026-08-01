@@ -32,6 +32,26 @@ export default {
         muted: "rgb(var(--color-text-muted) / <alpha-value>)",
         divider: "rgb(var(--color-border) / <alpha-value>)",
         "divider-light": "rgb(var(--color-border-light) / <alpha-value>)",
+
+        danger: "rgb(var(--color-danger) / <alpha-value>)",
+        "danger-soft": "rgb(var(--color-danger-soft) / <alpha-value>)",
+        "danger-border": "rgb(var(--color-danger-border) / <alpha-value>)",
+        warning: "rgb(var(--color-warning) / <alpha-value>)",
+        "warning-soft": "rgb(var(--color-warning-soft) / <alpha-value>)",
+        "warning-border": "rgb(var(--color-warning-border) / <alpha-value>)",
+        success: "rgb(var(--color-success) / <alpha-value>)",
+        "success-soft": "rgb(var(--color-success-soft) / <alpha-value>)",
+        "success-border": "rgb(var(--color-success-border) / <alpha-value>)",
+        info: "rgb(var(--color-info) / <alpha-value>)",
+        "info-soft": "rgb(var(--color-info-soft) / <alpha-value>)",
+        "info-border": "rgb(var(--color-info-border) / <alpha-value>)",
+
+        "on-brand": "rgb(var(--color-on-brand) / <alpha-value>)",
+        code: "rgb(var(--color-code-bg) / <alpha-value>)",
+        "code-fg": "rgb(var(--color-code-fg) / <alpha-value>)",
+      },
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "1rem" }], // 11px
       },
       boxShadow: {
         card: "var(--shadow-card)",

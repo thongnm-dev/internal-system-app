@@ -60,7 +60,7 @@ function overflowCount(tab: BugFolderTab) {
       <!-- Header -->
       <div class="flex items-center justify-between rounded-lg bg-panel px-4 py-3 shadow-card">
         <div class="flex items-center gap-3">
-          <i class="pi pi-folder-open text-xl text-orange-500" />
+          <i class="pi pi-folder-open text-xl text-amber-500" />
           <span class="text-sm font-semibold text-ink">
             Tổng cộng
             <span class="text-red-600">{{ totalBugCount }}</span>

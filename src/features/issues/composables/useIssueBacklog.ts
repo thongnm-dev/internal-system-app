@@ -108,20 +108,20 @@ function mapIssue(issue: BacklogIssue): IssueBacklogItem {
 
 export function statusTone(status: string) {
   const s = status.toLocaleLowerCase();
-  if (s.includes("open")) return "bg-blue-100 text-blue-800";
-  if (s.includes("progress") || s.includes("処理中")) return "bg-amber-100 text-amber-800";
-  if (s.includes("review") || s.includes("処理済み")) return "bg-indigo-100 text-indigo-800";
-  if (s.includes("resolved") || s.includes("完了")) return "bg-emerald-100 text-emerald-800";
-  if (s.includes("closed") || s.includes("close")) return "bg-slate-100 text-slate-700";
-  return "bg-slate-100 text-slate-700";
+  if (s.includes("open")) return "badge-info";
+  if (s.includes("progress") || s.includes("処理中")) return "badge-warning";
+  if (s.includes("review") || s.includes("処理済み")) return "badge-info";
+  if (s.includes("resolved") || s.includes("完了")) return "badge-success";
+  if (s.includes("closed") || s.includes("close")) return "badge-neutral";
+  return "badge-neutral";
 }
 
 export function priorityTone(priority: string) {
   const p = priority.toLocaleLowerCase();
-  if (p.includes("critical") || p === "高") return "bg-red-100 text-red-800";
-  if (p.includes("high")) return "bg-orange-100 text-orange-800";
-  if (p.includes("medium") || p === "中") return "bg-sky-100 text-sky-800";
-  return "bg-slate-100 text-slate-700";
+  if (p.includes("critical") || p === "高") return "badge-danger";
+  if (p.includes("high")) return "badge-warning";
+  if (p.includes("medium") || p === "中") return "badge-info";
+  return "badge-neutral";
 }
 
 async function loadProjects() {

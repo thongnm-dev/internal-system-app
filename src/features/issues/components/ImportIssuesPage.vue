@@ -189,7 +189,7 @@ async function executeImport() {
           <code class="rounded bg-canvas px-1">Priority</code>, ...
         </span>
       </div>
-      <p v-if="importError" class="mt-3 whitespace-pre-line rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+      <p v-if="importError" class="banner-danger mt-3 whitespace-pre-line">
         {{ importError }}
       </p>
       <div v-if="importing" class="mt-3">

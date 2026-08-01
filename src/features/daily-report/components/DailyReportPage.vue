@@ -486,7 +486,7 @@ async function executeSyncDailyReport() {
 
       <div class="flex min-w-0 items-center justify-between gap-4 px-4">
         <div class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-brand">
+          <span class="flex h-10 w-10 items-center justify-center rounded-md bg-brand/10 text-brand">
             <i class="pi pi-calendar text-xl" />
           </span>
           <div class="min-w-0">
@@ -494,7 +494,7 @@ async function executeSyncDailyReport() {
               <h3 class="truncate font-bold">{{ ctrl.monthLabel.value }}</h3>
               <span
                 v-if="!ctrl.isEditable.value"
-                class="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700"
+                class="shrink-0 rounded-md bg-warning-soft px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-warning"
               >
                 Read-only
               </span>
@@ -509,7 +509,7 @@ async function executeSyncDailyReport() {
           <Button icon="pi pi-sync" label="Đồng bộ" severity="secondary" outlined size="small" title="Đồng bộ hệ thống nội bộ" :disabled="ctrl.monthValue.value !== ctrl.maxMonthValue.value" @click="openSyncDialog" />
           <Button icon="pi pi-chevron-left" severity="secondary" outlined size="small" title="Previous month" @click="ctrl.previousMonth()" />
           <InputText
-            class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-brand/20"
             type="month"
             :max="ctrl.maxMonthValue.value"
             :model-value="parseMonth(ctrl.monthValue.value)"
@@ -539,12 +539,12 @@ async function executeSyncDailyReport() {
               :key="day.day"
               :class="[
                 'flex w-12 shrink-0 flex-col items-center justify-center border-r border-divider px-1 text-center',
-                day.isToday ? 'bg-brand text-white' : day.isWeekend ? 'bg-canvas' : '',
+                day.isToday ? 'bg-brand text-on-brand' : day.isWeekend ? 'bg-canvas' : '',
               ]"
             >
               <span class="text-sm font-extrabold leading-none">{{ day.label }}</span>
-              <span :class="['mt-1 text-[8px] font-semibold', day.isToday ? 'text-white/60' : 'text-muted']">{{ day.weekday }}</span>
-              <span class="mt-1 text-[11px] font-extrabold leading-none text-red-600">{{ formatHoursDisplay(dayTotal(ctrl.projects.value, ctrl.entries.value, day.day)) }}h</span>
+              <span :class="['mt-1 text-2xs font-semibold', day.isToday ? 'text-on-brand/60' : 'text-muted']">{{ day.weekday }}</span>
+              <span class="mt-1 text-2xs font-extrabold leading-none text-danger">{{ formatHoursDisplay(dayTotal(ctrl.projects.value, ctrl.entries.value, day.day)) }}h</span>
             </div>
           </div>
         </div>
@@ -563,13 +563,13 @@ async function executeSyncDailyReport() {
             <template v-for="project in ctrl.projects.value" :key="project.id">
               <!-- Project row -->
               <div
-                class="flex h-12 items-center border-b border-emerald-200 bg-[#4cbd9b] px-4"
+                class="flex h-12 items-center border-b border-success-border bg-brand px-4"
                 @contextmenu="openContextMenu(project, $event)"
               >
                 <div class="min-w-0 flex-1">
-                  <strong class="block truncate text-sm text-white">{{ project.code }} - {{ project.name }}</strong>
+                  <strong class="block truncate text-sm text-on-brand">{{ project.code }} - {{ project.name }}</strong>
                 </div>
-                <span class="ml-3 shrink-0 rounded-md bg-panel/20 px-2 py-1 text-xs font-bold text-white">
+                <span class="ml-3 shrink-0 rounded-md bg-panel/20 px-2 py-1 text-xs font-bold text-on-brand">
                   {{ formatHoursDisplay(projectTotal(project, ctrl.entries.value)) }}h
                 </span>
               </div>
@@ -585,7 +585,7 @@ async function executeSyncDailyReport() {
                   :class="[
                     'flex !h-6 !w-6 shrink-0 items-center justify-center !rounded-full border transition',
                     task.isCompleted
-                      ? 'border-brand bg-brand text-white hover:opacity-80'
+                      ? 'border-brand bg-brand text-on-brand hover:opacity-80'
                       : 'border-divider bg-panel text-muted hover:border-brand hover:text-brand',
                   ]"
                   unstyled
@@ -600,7 +600,7 @@ async function executeSyncDailyReport() {
                   <div class="mt-1 flex items-center gap-2">
                     <span
                       v-if="task.isCompleted"
-                      class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand"
+                      class="shrink-0 rounded bg-brand/10 px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-brand"
                     >Delivered</span>
                   </div>
                 </div>
@@ -609,7 +609,7 @@ async function executeSyncDailyReport() {
                     {{ formatHoursDisplay(ctrl.totalHours(task.rowId)) }}h
                   </span>
                   <span
-                    class="text-[10px] font-bold tabular-nums"
+                    class="text-2xs font-bold tabular-nums"
                     :class="taskReachedEstimate(task) ? 'text-brand' : 'text-muted'"
                     :title="taskEstimate(task) ? 'Tổng giờ tích luỹ mọi tháng / estimate' : 'Tổng giờ tích luỹ mọi tháng'"
                   >
@@ -627,12 +627,12 @@ async function executeSyncDailyReport() {
           <div class="min-w-max">
             <template v-for="project in ctrl.projects.value" :key="project.id">
               <!-- Project day totals -->
-              <div class="flex h-12 border-b border-emerald-200 bg-[#4cbd9b]">
+              <div class="flex h-12 border-b border-success-border bg-brand">
                 <div
                   v-for="day in ctrl.days.value"
                   :key="`${project.id}-${day.day}`"
                   :class="[
-                    'flex h-12 w-12 shrink-0 items-center justify-center border-r border-white/20 px-1 text-xs font-extrabold tabular-nums text-white',
+                    'flex h-12 w-12 shrink-0 items-center justify-center border-r border-on-brand/20 px-1 text-xs font-extrabold tabular-nums text-on-brand',
                     day.isWeekend ? 'bg-panel/10' : '',
                   ]"
                   :title="`${project.code} total - ${day.label} ${day.weekday}`"
@@ -652,14 +652,14 @@ async function executeSyncDailyReport() {
                 >
                   <Button
                     :class="[
-                      'flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-emerald-100',
+                      'flex h-9 w-10 items-center justify-center rounded-md border text-sm font-bold tabular-nums outline-none transition focus:ring-2 focus:ring-brand/20',
                       entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
-                        ? 'border-brand bg-emerald-50 text-brand'
+                        ? 'border-brand bg-brand/10 text-brand'
                         : 'border-divider bg-panel text-muted',
                       isRowDisabled(task)
                         ? 'cursor-not-allowed opacity-60'
                         : entryHour(ctrl.entries.value[entryKey(task.rowId, day.day)]) > 0
-                          ? 'hover:bg-emerald-100'
+                          ? 'hover:bg-brand/20'
                           : 'hover:border-brand hover:text-brand',
                     ]"
                     unstyled
@@ -723,7 +723,7 @@ async function executeSyncDailyReport() {
           <span class="text-xs font-bold text-muted">Comment</span>
           <textarea
             v-model="editForm.comment"
-            class="mt-1 min-h-24 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 min-h-24 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
         </label>
 
@@ -862,7 +862,7 @@ async function executeSyncDailyReport() {
       <div class="space-y-4">
         <!-- Short name -->
         <label class="block">
-          <span class="text-xs font-bold text-muted">Short name <span class="text-red-500">*</span></span>
+          <span class="text-xs font-bold text-muted">Short name <span class="text-danger">*</span></span>
           <InputText
             v-model="taskForm.shortName"
             class="mt-1 w-full"
@@ -876,7 +876,7 @@ async function executeSyncDailyReport() {
           <span class="text-xs font-bold text-muted">Mô tả</span>
           <textarea
             v-model="taskForm.description"
-            class="mt-1 min-h-24 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 min-h-24 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             placeholder="Task description"
           />
         </label>
@@ -939,7 +939,7 @@ async function executeSyncDailyReport() {
 
       <template #footer>
         <div class="flex flex-col gap-2">
-          <p v-if="taskError" class="text-right text-sm font-semibold text-red-500">{{ taskError }}</p>
+          <p v-if="taskError" class="text-right text-sm font-semibold text-danger">{{ taskError }}</p>
           <div class="flex items-center justify-end gap-2">
             <Button label="Cancel" severity="secondary" @click="isTaskDialogOpen = false" />
             <Button :label="savingTask ? 'Saving…' : isEditingTask ? 'Cập nhật' : 'Add task'" :disabled="!canSaveTask || savingTask" @click="saveTask" />
@@ -1023,10 +1023,10 @@ async function executeSyncDailyReport() {
           />
         </label>
 
-        <div v-if="syncResult" :class="['rounded-md border px-4 py-3', syncResult.success ? 'border-brand/30 bg-brand/10' : 'border-red-500/30 bg-red-500/10']">
+        <div v-if="syncResult" :class="['rounded-md border px-4 py-3', syncResult.success ? 'border-brand/30 bg-brand/10' : 'border-danger/30 bg-danger/10']">
           <div class="flex items-center gap-2">
-            <i :class="['pi text-sm', syncResult.success ? 'pi-check-circle text-brand' : 'pi-times-circle text-red-500']" />
-            <span :class="['text-sm font-bold', syncResult.success ? 'text-brand' : 'text-red-500']">{{ syncResult.message }}</span>
+            <i :class="['pi text-sm', syncResult.success ? 'pi-check-circle text-brand' : 'pi-times-circle text-danger']" />
+            <span :class="['text-sm font-bold', syncResult.success ? 'text-brand' : 'text-danger']">{{ syncResult.message }}</span>
           </div>
         </div>
 

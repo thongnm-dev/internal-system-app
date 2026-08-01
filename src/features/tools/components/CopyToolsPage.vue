@@ -53,7 +53,7 @@ const HELP: Record<string, string> = {
         <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
           <div class="flex items-center gap-2">
             <i class="pi pi-folder-open text-xl text-brand" />
-            <h3 class="font-bold">Paths & Keyword</h3>
+            <h3 class="section-title">Paths & Keyword</h3>
           </div>
 
           <div class="mt-4 grid gap-3">
@@ -97,7 +97,7 @@ const HELP: Record<string, string> = {
                 <i v-tooltip.top="HELP.keyword" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
               </span>
               <textarea
-                class="min-w-0 resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="min-w-0 resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 rows="3"
                 placeholder="Copy: keyword filter (comma separated)&#10;Copy by folder: one folder name per line"
                 :value="ctrl.config.value.keyword"
@@ -111,7 +111,7 @@ const HELP: Record<string, string> = {
         <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
           <div class="flex items-center gap-2">
             <i class="pi pi-cog text-xl text-brand" />
-            <h3 class="font-bold">Settings</h3>
+            <h3 class="section-title">Settings</h3>
           </div>
 
           <div class="mt-4 grid gap-3">
@@ -121,7 +121,7 @@ const HELP: Record<string, string> = {
                 <i v-tooltip.top="HELP.files" class="pi pi-question-circle cursor-help text-brand opacity-70" style="font-size: 0.8rem" />
               </span>
               <textarea
-                class="min-w-0 resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="min-w-0 resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 rows="2"
                 placeholder="login_仕様書.xlsx"
                 :value="ctrl.config.value.files"
@@ -243,7 +243,7 @@ const HELP: Record<string, string> = {
       <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
         <div class="flex items-center gap-2">
           <i class="pi pi-list text-brand" />
-          <h3 class="font-bold">Result</h3>
+          <h3 class="section-title">Result</h3>
         </div>
         <Button label="Hide" text size="small" @click="ctrl.showResult.value = false" />
       </div>

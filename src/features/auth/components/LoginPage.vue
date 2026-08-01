@@ -57,7 +57,7 @@ async function submitLogin() {
           <i class="pi pi-lock text-xl" />
         </div>
         <div>
-          <h1 class="text-xl font-bold leading-tight">Manager System Helps</h1>
+          <h1 class="page-title leading-tight">Manager System Helps</h1>
           <p class="mt-1 text-sm text-muted">Sign in to continue.</p>
         </div>
       </div>
@@ -100,7 +100,7 @@ async function submitLogin() {
 
         <p
           v-if="error"
-          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500"
+          class="banner-danger"
         >
           {{ error }}
         </p>

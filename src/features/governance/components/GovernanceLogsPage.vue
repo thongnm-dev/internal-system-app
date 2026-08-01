@@ -7,7 +7,7 @@
       <div class="flex items-center gap-3">
         <i class="pi pi-history text-2xl text-muted" />
         <div>
-          <h2 class="text-lg font-semibold text-ink">System Logs</h2>
+          <h2 class="page-title">System Logs</h2>
           <p class="text-sm text-muted">View system activity logs and audit trails.</p>
         </div>
       </div>

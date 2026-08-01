@@ -120,15 +120,15 @@ function handleUpload() {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 rounded bg-surface-0 shadow dark:bg-surface-900">
+  <div class="grid grid-cols-1 rounded bg-panel shadow">
     <!-- Header -->
-    <div class="flex flex-col border-b border-surface-200 px-4 py-2 dark:border-surface-700">
+    <div class="flex flex-col border-b border-divider px-4 py-2">
       <div class="flex items-center justify-between">
         <div class="flex flex-1 cursor-pointer items-center gap-2" @click="toggle">
-          <i :class="['pi text-lg text-orange-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
-          <span class="text-lg font-bold text-surface-800 dark:text-surface-100">
+          <i :class="['pi text-lg text-amber-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
+          <span class="text-lg font-bold text-ink">
             {{ awsStorage.nameAlias || awsStorage.name }}
-            <span class="text-red-600">({{ folderCount }})</span>
+            <span class="text-danger">({{ folderCount }})</span>
           </span>
         </div>
         <div class="flex items-center gap-2">
@@ -173,7 +173,7 @@ function handleUpload() {
       />
       <div
         v-else
-        class="flex flex-col items-center justify-center py-8 text-surface-400"
+        class="flex flex-col items-center justify-center py-8 text-muted"
       >
         <i class="pi pi-inbox mb-2 text-3xl" />
         <span class="text-sm">Chưa chọn tập tin nào</span>

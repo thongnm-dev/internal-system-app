@@ -35,7 +35,7 @@ const themeOptions = [
       <i class="pi pi-spinner animate-spin" />
       Loading settings...
     </p>
-    <p v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+    <p v-if="error" class="banner-danger mb-4">
       {{ error }}
     </p>
     <template v-if="!loading">
@@ -43,7 +43,7 @@ const themeOptions = [
       <section class="flex flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-user text-xl text-brand" />
-          <h3 class="font-bold">User profile</h3>
+          <h3 class="section-title">User profile</h3>
         </div>
 
         <div class="mt-4 grid grid-cols-2 gap-3">
@@ -51,7 +51,7 @@ const themeOptions = [
             <span class="text-xs font-bold text-muted">{{ field.label }}</span>
             <InputText
               :class="['mt-1 h-10 w-full rounded-md border border-divider px-3 text-sm outline-none',
-                field.disabled ? 'bg-canvas text-muted cursor-not-allowed' : 'bg-panel text-ink focus:border-brand focus:ring-2 focus:ring-emerald-100']"
+                field.disabled ? 'bg-canvas text-muted cursor-not-allowed' : 'bg-panel text-ink focus:border-brand focus:ring-2 focus:ring-brand/20']"
               :placeholder="field.placeholder"
               :type="field.type ?? 'text'"
               :disabled="field.disabled"
@@ -78,7 +78,7 @@ const themeOptions = [
       <section class="space-y-5 rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-cog text-xl text-brand" />
-          <h3 class="font-bold">Preferences</h3>
+          <h3 class="section-title">Preferences</h3>
         </div>
 
         <div>
@@ -102,7 +102,7 @@ const themeOptions = [
         <div>
           <span class="text-xs font-bold text-muted">Language</span>
           <select
-            class="mt-1.5 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1.5 h-10 w-full rounded-md border border-divider bg-panel px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             :value="settings.language"
             @change="updateLanguage(($event.target as HTMLSelectElement).value as any)"
           >

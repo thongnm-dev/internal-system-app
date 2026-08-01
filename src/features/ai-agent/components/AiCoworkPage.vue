@@ -126,15 +126,15 @@ function typeLabel(type: AiAccountType): string {
 function typeBadgeClass(type: AiAccountType): string {
   switch (type) {
     case "api":
-      return "bg-brand/10 text-brand";
+      return "badge-info";
     case "admin":
-      return "bg-amber-100 text-amber-700";
+      return "badge-warning";
     case "oauth":
-      return "bg-violet-100 text-violet-700";
+      return "badge-info";
     case "subscription":
-      return "bg-sky-100 text-sky-700";
+      return "badge-info";
     default:
-      return "bg-canvas text-muted";
+      return "badge-neutral";
   }
 }
 
@@ -156,14 +156,14 @@ function statusLabel(status: AiAccountStatus): string {
 function statusClass(status: AiAccountStatus): string {
   switch (status) {
     case "healthy":
-      return "bg-emerald-100 text-emerald-700";
+      return "badge-success";
     case "low":
-      return "bg-amber-100 text-amber-700";
+      return "badge-warning";
     case "exhausted":
     case "error":
-      return "bg-red-100 text-red-700";
+      return "badge-danger";
     default:
-      return "bg-canvas text-muted";
+      return "badge-neutral";
   }
 }
 
@@ -276,7 +276,7 @@ function isMarkdown(entry: FileEntry): boolean {
               <span v-if="account.is_active" class="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">
                 ACTIVE
               </span>
-              <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]">
+              <span :class="['shrink-0', typeBadgeClass(account.account_type)]">
                 {{ typeLabel(account.account_type) }}
               </span>
               <span
@@ -285,7 +285,7 @@ function isMarkdown(entry: FileEntry): boolean {
               >
                 {{ account.subscription_type }}
               </span>
-              <span :class="['ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', statusClass(account.status)]">
+              <span :class="['ml-auto shrink-0', statusClass(account.status)]">
                 {{ statusLabel(account.status) }}
               </span>
             </div>
@@ -340,7 +340,7 @@ function isMarkdown(entry: FileEntry): boolean {
         class="flex min-h-0 shrink-0 flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm"
         :style="{ width: col1Width + 'px' }"
       >
-        <h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+        <h3 class="section-eyebrow mb-3 flex items-center gap-2">
           <i class="pi pi-list-check" />Tasks
           <Button
             icon="pi pi-plus"
@@ -411,7 +411,7 @@ function isMarkdown(entry: FileEntry): boolean {
         class="flex min-h-0 shrink-0 flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm"
         :style="{ width: col2Width + 'px' }"
       >
-        <h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+        <h3 class="section-eyebrow mb-3 flex items-center gap-2">
           <i class="pi pi-sitemap" />Workflow
         </h3>
 
@@ -518,7 +518,7 @@ function isMarkdown(entry: FileEntry): boolean {
         style="min-width: 260px"
       >
         <div class="mb-2 flex items-center gap-1.5">
-          <h3 class="shrink-0 text-sm font-bold uppercase tracking-wide text-muted">
+          <h3 class="section-eyebrow shrink-0">
             <i class="pi pi-folder-open mr-1" />Project Directory
           </h3>
           <InputGroup class="ml-auto !h-7 !w-auto">
@@ -604,7 +604,7 @@ function isMarkdown(entry: FileEntry): boolean {
       class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-divider bg-panel/50 p-12 text-center"
     >
       <i class="pi pi-folder-open text-4xl text-muted" />
-      <h3 class="text-sm font-semibold text-ink">Bạn chưa thiết lập workspace làm việc</h3>
+      <h3 class="section-title">Bạn chưa thiết lập workspace làm việc</h3>
       <p class="max-w-md text-sm text-muted">Vui lòng chọn workspace để tiếp tục.</p>
       <Button label="Chọn Project Directory" icon="pi pi-folder-open" @click="ctrl.pickProjectDir" />
     </div>
@@ -622,7 +622,7 @@ function isMarkdown(entry: FileEntry): boolean {
     >
       <template #header>
         <div class="flex flex-1 items-center gap-3">
-          <h3 class="flex min-w-0 items-center gap-2 font-bold text-ink">
+          <h3 class="section-title flex min-w-0 items-center gap-2">
             <i class="pi pi-file shrink-0" /><span class="truncate">{{ ctrl.mdPreviewName.value }}</span>
           </h3>
           <div class="ml-auto flex shrink-0 gap-1">
@@ -669,7 +669,7 @@ function isMarkdown(entry: FileEntry): boolean {
       @update:visible="ctrl.showSkillWarning.value = $event"
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink">
+        <h3 class="section-title flex items-center gap-2">
           <i class="pi pi-exclamation-triangle text-amber-500" />Không tìm thấy skill khớp
         </h3>
       </template>
@@ -694,7 +694,7 @@ function isMarkdown(entry: FileEntry): boolean {
       @update:visible="ctrl.showTaskStepConflict.value = $event"
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink">
+        <h3 class="section-title flex items-center gap-2">
           <i class="pi pi-exclamation-triangle text-amber-500" />Task không cùng bước workflow
         </h3>
       </template>
@@ -739,7 +739,7 @@ function isMarkdown(entry: FileEntry): boolean {
       @update:visible="ctrl.showSkillListDialog.value = $event"
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink">
+        <h3 class="section-title flex items-center gap-2">
           <i class="pi pi-book" />Available Skills
         </h3>
       </template>
@@ -776,7 +776,7 @@ function isMarkdown(entry: FileEntry): boolean {
     >
       <template #header>
         <div class="flex flex-1 items-center justify-between gap-3">
-          <h3 class="flex items-center gap-2 font-bold text-ink">
+          <h3 class="section-title flex items-center gap-2">
             <i class="pi pi-list-check" />Select Tasks
           </h3>
           <Button label="New Task" icon="pi pi-plus" size="small" outlined @click="showCreateTaskDialog = true" />
@@ -873,7 +873,7 @@ function isMarkdown(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink">
+        <h3 class="section-title flex items-center gap-2">
           <i class="pi pi-play text-brand" />Run workflow — {{ ctrl.workflowRun.value?.task.task_cd }}
         </h3>
       </template>

@@ -93,16 +93,16 @@ onMounted(() => ctrl.init());
     <!-- SP table -->
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">Stored Procedure list</h3>
+        <h3 class="section-title">Stored Procedure list</h3>
         <div class="flex items-center gap-3">
           <template v-if="ctrl.hasResults.value && ctrl.summary.value">
-            <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-bold text-green-700 dark:bg-green-950 dark:text-green-400">
+            <span class="badge-success">
               <i class="pi pi-check text-[10px]" />
               {{ ctrl.summary.value.success_count }}
             </span>
             <span
               v-if="ctrl.summary.value.error_count > 0"
-              class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950 dark:text-red-400"
+              class="badge-danger"
             >
               <i class="pi pi-times text-[10px]" />
               {{ ctrl.summary.value.error_count }}
@@ -111,7 +111,7 @@ onMounted(() => ctrl.init());
           <span class="text-xs text-muted">{{ ctrl.filteredResults.value.length.toLocaleString("en-US") }} procedures</span>
         </div>
       </div>
-      <p v-if="ctrl.error.value" class="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{{ ctrl.error.value }}</p>
+      <p v-if="ctrl.error.value" class="banner-danger">{{ ctrl.error.value }}</p>
       <DataTable
         class="app-data-table min-h-0"
         :empty-message="ctrl.loading.value ? 'Loading...' : 'No stored procedures found.'"
@@ -175,7 +175,7 @@ onMounted(() => ctrl.init());
       @update:visible="!$event && ctrl.closeViewer()"
     >
       <template #header>
-        <h3 class="font-mono text-sm font-bold text-ink">{{ ctrl.viewingName.value }}</h3>
+        <h3 class="font-mono section-title">{{ ctrl.viewingName.value }}</h3>
       </template>
       <div v-if="ctrl.viewingLoading.value" class="flex items-center justify-center py-8">
         <i class="pi pi-spin pi-spinner text-xl text-muted" />
@@ -207,7 +207,7 @@ onMounted(() => ctrl.init());
       @update:visible="confirmExecute = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Confirm Execute</h3>
+        <h3 class="section-title">Confirm Execute</h3>
       </template>
       <div class="space-y-3">
         <p class="text-sm text-secondary">
@@ -240,12 +240,8 @@ onMounted(() => ctrl.init());
 </template>
 
 <style scoped>
-.sp-viewer :deep(.sql-kw) { color: #2563eb; font-weight: 600; }
-.sp-viewer :deep(.sql-str) { color: #16a34a; }
-.sp-viewer :deep(.sql-com) { color: #6b7280; font-style: italic; }
-.sp-viewer :deep(.sql-num) { color: #b45309; }
-[data-theme="dark"] .sp-viewer :deep(.sql-kw) { color: #93c5fd; }
-[data-theme="dark"] .sp-viewer :deep(.sql-str) { color: #86efac; }
-[data-theme="dark"] .sp-viewer :deep(.sql-com) { color: #9ca3af; }
-[data-theme="dark"] .sp-viewer :deep(.sql-num) { color: #fcd34d; }
+.sp-viewer :deep(.sql-kw) { color: var(--sql-kw); font-weight: 600; }
+.sp-viewer :deep(.sql-str) { color: var(--sql-str); }
+.sp-viewer :deep(.sql-com) { color: var(--sql-com); font-style: italic; }
+.sp-viewer :deep(.sql-num) { color: var(--sql-num); }
 </style>

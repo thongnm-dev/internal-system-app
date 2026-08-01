@@ -27,10 +27,10 @@ function changePrState(state: "open" | "closed" | "all") {
 }
 
 function prStateBadge(s: string) {
-  if (s === "merged") return "bg-purple-100 text-purple-700";
-  if (s === "closed") return "bg-red-100 text-red-700";
-  if (s === "draft") return "bg-slate-100 text-slate-600";
-  return "bg-emerald-100 text-emerald-700";
+  if (s === "merged") return "badge-info";
+  if (s === "closed") return "badge-danger";
+  if (s === "draft") return "badge-neutral";
+  return "badge-success";
 }
 
 function viewPrDiff(pr: { base: string; head: string }) {
@@ -93,7 +93,7 @@ function createNewPr() {
           :key="pr.number"
           class="group flex items-start gap-3 border-b border-divider-light px-3 py-2.5 transition-colors last:border-0 hover:bg-canvas"
         >
-          <span class="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase" :class="prStateBadge(pr.state)">
+          <span class="mt-0.5 shrink-0 uppercase" :class="prStateBadge(pr.state)">
             {{ pr.state }}
           </span>
           <span class="min-w-0 flex-1">

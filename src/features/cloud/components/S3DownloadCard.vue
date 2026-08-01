@@ -209,15 +209,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 rounded bg-surface-0 shadow dark:bg-surface-900">
+  <div class="grid grid-cols-1 rounded bg-panel shadow">
     <!-- Header -->
-    <div class="border-b border-surface-200 px-4 dark:border-surface-700">
+    <div class="border-b border-divider px-4">
       <div class="flex items-center justify-between gap-3">
         <Button class="flex flex-1 items-center gap-4 bg-transparent py-2" unstyled @click="toggle">
-          <i :class="['pi text-xl text-orange-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
-          <span class="text-lg font-bold text-surface-800 dark:text-surface-100">
+          <i :class="['pi text-xl text-amber-500', expanded ? 'pi-folder-open' : 'pi-folder']" />
+          <span class="text-lg font-bold text-ink">
             {{ awsStorage.nameAlias || awsStorage.name }}
-            <span class="text-red-600">({{ items.length }})</span>
+            <span class="text-danger">({{ items.length }})</span>
           </span>
         </Button>
         <div class="flex items-center gap-2 py-2">
@@ -285,7 +285,7 @@ onMounted(() => {
         <Button icon="pi pi-folder-open" severity="secondary" outlined title="Chọn thư mục" @click="chooseDestinationFolder" />
         <Button v-if="destinationPath" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="destinationPath = ''" />
       </InputGroup>
-      <small v-if="errorCheck" class="text-red-500">{{ errorCheck }}</small>
+      <small v-if="errorCheck" class="text-danger">{{ errorCheck }}</small>
     </div>
     <template #footer>
       <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCancelModal" />
@@ -307,8 +307,8 @@ onMounted(() => {
     :closable="true"
   >
     <div class="flex items-center gap-3">
-      <i class="pi pi-exclamation-triangle text-3xl text-yellow-500" />
-      <span class="text-sm text-surface-600 dark:text-surface-400">
+      <i class="pi pi-exclamation-triangle text-3xl text-warning" />
+      <span class="text-sm text-secondary">
         Bạn đã tải về danh sách phiếu bug rồi. Bạn có muốn tải lại không?
       </span>
     </div>
@@ -333,8 +333,8 @@ onMounted(() => {
     :closable="true"
   >
     <div class="flex items-center gap-3">
-      <i class="pi pi-exclamation-triangle text-3xl text-yellow-500" />
-      <span class="text-sm text-surface-600 dark:text-surface-400">
+      <i class="pi pi-exclamation-triangle text-3xl text-warning" />
+      <span class="text-sm text-secondary">
         Bạn chưa tải về máy. Bạn có chắc chắn muốn thực hiện thao tác này không?
       </span>
     </div>
@@ -360,21 +360,21 @@ onMounted(() => {
   >
     <div class="flex flex-col gap-4">
       <!-- Selected files preview -->
-      <div class="rounded-lg bg-surface-50 p-4 dark:bg-surface-800">
-        <h4 class="mb-2 text-sm font-semibold text-surface-700 dark:text-surface-200">
+      <div class="rounded-lg bg-canvas p-4">
+        <h4 class="mb-2 text-sm font-semibold text-ink">
           Danh sách đã chọn:
         </h4>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
           <div
             v-for="(bug, idx) in selectedBugsList.slice(0, 6)"
             :key="idx"
-            class="truncate rounded bg-surface-100 px-3 py-2 text-sm text-surface-600 dark:bg-surface-700 dark:text-surface-300"
+            class="truncate rounded bg-panel px-3 py-2 text-sm text-secondary"
           >
             {{ bug }}
           </div>
           <div
             v-if="selectedBugsList.length > 6"
-            class="rounded bg-surface-100 px-3 py-2 text-sm text-surface-500 dark:bg-surface-700"
+            class="rounded bg-panel px-3 py-2 text-sm text-muted"
           >
             ... và {{ selectedBugsList.length - 6 }} files.
           </div>
@@ -383,10 +383,10 @@ onMounted(() => {
 
       <!-- S3 path -->
       <div>
-        <h4 class="mb-1 text-sm font-semibold text-surface-700 dark:text-surface-200">
+        <h4 class="mb-1 text-sm font-semibold text-ink">
           Đường dẫn lưu ở S3
         </h4>
-        <div class="rounded-lg border border-red-300 px-3 py-3 font-mono text-sm break-all">
+        <div class="rounded-lg border border-danger-border px-3 py-3 font-mono text-sm break-all">
           {{ awsStorage.name }}
         </div>
       </div>

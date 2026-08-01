@@ -31,7 +31,7 @@ function formatBytes(bytes: number): string {
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2">
               <i class="pi pi-inbox text-xl text-brand" />
-              <h3 class="font-bold">Nguồn cần nén</h3>
+              <h3 class="section-title">Nguồn cần nén</h3>
               <span class="text-xs font-semibold text-muted">({{ ctrl.sources.value.length }} mục)</span>
             </div>
             <div class="flex items-center gap-2">
@@ -82,7 +82,7 @@ function formatBytes(bytes: number): string {
         <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
           <div class="flex items-center gap-2">
             <i class="pi pi-cog text-xl text-brand" />
-            <h3 class="font-bold">Thông số nén &amp; tách</h3>
+            <h3 class="section-title">Thông số nén &amp; tách</h3>
           </div>
 
           <div class="mt-4 grid gap-3">
@@ -181,7 +181,7 @@ function formatBytes(bytes: number): string {
           <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
             <div class="flex items-center gap-2">
               <i :class="ctrl.resultMode.value === 'preview' ? 'pi pi-eye' : 'pi pi-list'" class="text-brand" />
-              <h3 class="font-bold">Kết quả</h3>
+              <h3 class="section-title">Kết quả</h3>
               <span v-if="ctrl.resultMode.value === 'preview'" class="text-xs font-semibold text-muted">
                 (xem trước · {{ ctrl.previewArchives.value.length }} file zip)
               </span>

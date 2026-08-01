@@ -41,13 +41,13 @@ function goBack() {
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
     <section class="flex items-center justify-between gap-4 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="min-w-0">
-        <h3 class="truncate font-bold text-ink">Report</h3>
+        <h3 class="section-title truncate">Report</h3>
         <p class="mt-1 truncate text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
       </div>
       <Button icon="pi pi-arrow-left" label="Back" severity="secondary" outlined size="small" @click="goBack" />
     </section>
 
-    <p v-if="!analysisProject" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+    <p v-if="!analysisProject" class="banner-warning">
       No analysis data found for this project.
     </p>
 
@@ -75,7 +75,7 @@ function goBack() {
       <!-- Phase breakdown -->
       <section class="flex flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-          <h3 class="font-bold">Phase breakdown</h3>
+          <h3 class="section-title">Phase breakdown</h3>
         </div>
         <DataTable
           class="app-data-table"

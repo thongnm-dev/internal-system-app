@@ -56,7 +56,7 @@ onMounted(() => ctrl.init());
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <!-- Error banner -->
-    <p v-if="ctrl.error.value" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+    <p v-if="ctrl.error.value" class="banner-danger">
       {{ ctrl.error.value }}
     </p>
 
@@ -98,7 +98,7 @@ onMounted(() => ctrl.init());
     <!-- Roles table -->
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">Role list</h3>
+        <h3 class="section-title">Role list</h3>
         <span class="text-xs text-muted">{{ ctrl.filteredRoles.value.length.toLocaleString("en-US") }} roles</span>
       </div>
       <DataTable
@@ -165,7 +165,7 @@ onMounted(() => ctrl.init());
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">{{ ctrl.isCreating.value ? "Add Role" : "Edit Role" }}</h3>
+          <h3 class="section-title">{{ ctrl.isCreating.value ? "Add Role" : "Edit Role" }}</h3>
           <p v-if="ctrl.draft.value && !ctrl.isCreating.value" class="mt-1 text-sm text-muted">
             ID: {{ ctrl.draft.value.id }}
           </p>
@@ -214,7 +214,7 @@ onMounted(() => ctrl.init());
       @update:visible="confirmDeleteId = null"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Confirm Delete</h3>
+        <h3 class="section-title">Confirm Delete</h3>
       </template>
       <p class="text-sm text-secondary">Are you sure you want to delete this role? This action cannot be undone.</p>
       <template #footer>

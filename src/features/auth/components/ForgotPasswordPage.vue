@@ -77,7 +77,7 @@ async function resendCode() {
           <i class="pi pi-envelope text-xl" />
         </div>
         <div>
-          <h1 class="text-xl font-bold leading-tight">Quên mật khẩu</h1>
+          <h1 class="page-title leading-tight">Quên mật khẩu</h1>
           <p class="mt-1 text-sm text-muted">
             <template v-if="step === 'username'">Nhập tên đăng nhập để nhận mã xác nhận qua email.</template>
             <template v-else-if="step === 'code'">Nhập mã xác nhận đã gửi đến <strong>{{ maskedEmail }}</strong></template>
@@ -104,7 +104,7 @@ async function resendCode() {
 
         <p
           v-if="error"
-          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500"
+          class="banner-danger"
         >
           {{ error }}
         </p>
@@ -143,7 +143,7 @@ async function resendCode() {
 
         <p
           v-if="error"
-          class="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500"
+          class="banner-danger"
         >
           {{ error }}
         </p>
@@ -159,7 +159,7 @@ async function resendCode() {
 
       <!-- Step 3: Success -->
       <div v-else class="mt-6 space-y-3">
-        <div class="rounded-md border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-700">
+        <div class="banner-success">
           <p class="font-semibold">Mật khẩu đã được đặt lại thành công!</p>
           <p class="mt-1">Vui lòng đăng nhập bằng mật khẩu mới bên dưới và đổi lại mật khẩu sau khi đăng nhập.</p>
         </div>

@@ -81,11 +81,11 @@ function parseDateStr(value: string): Date | null {
     <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex h-[76px] shrink-0 items-center justify-between gap-3 border-b border-divider px-4">
         <div class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-brand">
+          <span class="flex h-10 w-10 items-center justify-center rounded-md bg-brand/10 text-brand">
             <i class="pi pi-calendar text-xl" />
           </span>
           <div class="min-w-0">
-            <h3 class="truncate font-bold capitalize">{{ ctrl.monthLabel.value }}</h3>
+            <h3 class="section-title truncate capitalize">{{ ctrl.monthLabel.value }}</h3>
             <p class="mt-1 truncate text-xs text-muted">
               Tổng {{ ctrl.totalSelectedDateNotes.value }} công việc trong ngày đã chọn
             </p>
@@ -94,7 +94,7 @@ function parseDateStr(value: string): Date | null {
         <div class="flex shrink-0 items-center gap-2">
           <Button icon="pi pi-chevron-left" severity="secondary" outlined size="small" title="Tháng trước" @click="ctrl.previousMonth()" />
           <InputText
-            class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="h-9 w-32 rounded-md border border-divider bg-panel px-3 text-center text-sm font-bold text-secondary outline-none hover:border-brand focus:border-brand focus:ring-2 focus:ring-brand/20"
             type="month"
             :model-value="ctrl.monthValue.value"
             @change="ctrl.selectMonth(($event.target as HTMLInputElement).value)"
@@ -112,7 +112,7 @@ function parseDateStr(value: string): Date | null {
           v-for="day in ctrl.calendarDays.value"
           :key="day.date"
           :class="[
-            'min-h-0 border-b border-r border-divider p-2 text-left outline-none transition focus:ring-2 focus:ring-inset focus:ring-emerald-100',
+            'min-h-0 border-b border-r border-divider p-2 text-left outline-none transition focus:ring-2 focus:ring-inset focus:ring-brand/20',
             day.isSelected
               ? 'bg-emerald-50'
               : day.isCurrentMonth
@@ -145,7 +145,7 @@ function parseDateStr(value: string): Date | null {
       <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">
-            <h3 class="truncate font-bold">Ghi chú công việc hằng ngày</h3>
+            <h3 class="section-title truncate">Ghi chú công việc hằng ngày</h3>
             <p class="mt-1 truncate text-sm text-muted">{{ ctrl.selectedDateLabel.value }}</p>
           </div>
           <Button icon="pi pi-plus" label="Thêm công việc" @click="openAddDialog" />
@@ -230,7 +230,7 @@ function parseDateStr(value: string): Date | null {
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">{{ isEditing ? 'Chỉnh sửa công việc' : 'Thêm công việc' }}</h3>
+          <h3 class="section-title">{{ isEditing ? 'Chỉnh sửa công việc' : 'Thêm công việc' }}</h3>
           <p v-if="!isEditing" class="mt-1 text-sm text-muted">Có thể nhập ngày tương lai tối đa 1 tuần.</p>
         </div>
       </template>
@@ -276,7 +276,7 @@ function parseDateStr(value: string): Date | null {
           <span class="text-xs font-bold text-muted">Nội dung công việc</span>
           <textarea
             v-model="draftContent"
-            class="mt-1 min-h-32 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 min-h-32 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             autofocus
           />
         </label>

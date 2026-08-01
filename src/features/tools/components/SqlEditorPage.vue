@@ -227,7 +227,7 @@ onBeforeUnmount(stopDrag);
       <header class="flex items-center justify-between gap-2 border-b border-divider px-3 py-2.5">
         <div class="flex items-center gap-2">
           <i class="pi pi-database text-brand" />
-          <h3 class="text-sm font-bold">Connections</h3>
+          <h3 class="section-title">Connections</h3>
         </div>
         <div class="flex items-center gap-1">
           <button
@@ -460,13 +460,13 @@ onBeforeUnmount(stopDrag);
       <!-- Messages -->
       <div
         v-if="sql.activeTab.value?.error"
-        class="mx-3 mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600"
+        class="banner-danger mx-3 mt-3"
       >
         {{ sql.activeTab.value.error }}
       </div>
       <div
         v-else-if="sql.notice.value"
-        class="mx-3 mt-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+        class="banner-success mx-3 mt-3"
       >
         {{ sql.notice.value }}
       </div>
@@ -551,7 +551,7 @@ onBeforeUnmount(stopDrag);
       <template #header>
         <div class="flex items-center gap-2">
           <i class="pi pi-database text-brand" />
-          <h3 class="font-bold text-ink">{{ sql.isNew.value ? "Kết nối mới" : "Sửa kết nối" }}</h3>
+          <h3 class="section-title">{{ sql.isNew.value ? "Kết nối mới" : "Sửa kết nối" }}</h3>
         </div>
       </template>
 
@@ -629,13 +629,13 @@ onBeforeUnmount(stopDrag);
 
         <div
           v-if="sql.error.value"
-          class="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600"
+          class="banner-danger"
         >
           {{ sql.error.value }}
         </div>
         <div
           v-else-if="sql.notice.value"
-          class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+          class="banner-success"
         >
           {{ sql.notice.value }}
         </div>
@@ -676,14 +676,9 @@ onBeforeUnmount(stopDrag);
   caret-color: rgb(var(--color-ink));
   tab-size: 4;
 }
-/* Bảng màu syntax — light theme */
-.sql-kw { color: #2563eb; font-weight: 600; }
-.sql-str { color: #16a34a; }
-.sql-com { color: #6b7280; font-style: italic; }
-.sql-num { color: #b45309; }
-/* Dark theme */
-[data-theme="dark"] .sql-kw { color: #93c5fd; }
-[data-theme="dark"] .sql-str { color: #86efac; }
-[data-theme="dark"] .sql-com { color: #9ca3af; }
-[data-theme="dark"] .sql-num { color: #fcd34d; }
+/* Bảng màu syntax — token dùng chung ở styles.css (:root / [data-theme=dark]) */
+.sql-kw { color: var(--sql-kw); font-weight: 600; }
+.sql-str { color: var(--sql-str); }
+.sql-com { color: var(--sql-com); font-style: italic; }
+.sql-num { color: var(--sql-num); }
 </style>

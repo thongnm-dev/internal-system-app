@@ -21,12 +21,12 @@ const resetPwValue = ref("");
 
 const roleBadgeClass = (role: string) => {
   const map: Record<string, string> = {
-    admin: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
-    manager: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-    member: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-    viewer: "bg-canvas text-muted",
+    admin: "badge-danger",
+    manager: "badge-info",
+    member: "badge-success",
+    viewer: "badge-neutral",
   };
-  return map[role] ?? "bg-canvas text-muted";
+  return map[role] ?? "badge-neutral";
 };
 
 function openCreate() {
@@ -81,7 +81,7 @@ onMounted(() => ctrl.init());
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <!-- Error banner -->
-    <p v-if="ctrl.error.value" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+    <p v-if="ctrl.error.value" class="banner-danger">
       {{ ctrl.error.value }}
     </p>
 
@@ -165,7 +165,7 @@ onMounted(() => ctrl.init());
     <!-- Users table -->
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">User list</h3>
+        <h3 class="section-title">User list</h3>
         <span class="text-xs text-muted">{{ ctrl.filteredUsers.value.length.toLocaleString("en-US") }} users</span>
       </div>
       <DataTable
@@ -218,7 +218,7 @@ onMounted(() => ctrl.init());
               <span
                 v-for="role in data.roles"
                 :key="role"
-                :class="['rounded-md px-2 py-0.5 text-[11px] font-bold', roleBadgeClass(role)]"
+                :class="roleBadgeClass(role)"
               >
                 {{ role }}
               </span>
@@ -227,12 +227,7 @@ onMounted(() => ctrl.init());
         </Column>
         <Column field="is_active" header="Status" header-class="text-center" body-class="text-center">
           <template #body="{ data }">
-            <span :class="[
-              'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold',
-              data.is_active
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                : 'bg-canvas text-muted',
-            ]">
+            <span :class="data.is_active ? 'badge-success' : 'badge-neutral'">
               <i :class="['pi text-[10px]', data.is_active ? 'pi-check-circle' : 'pi-minus-circle']" />
               {{ data.is_active ? "active" : "inactive" }}
             </span>
@@ -259,7 +254,7 @@ onMounted(() => ctrl.init());
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">{{ ctrl.isCreating.value ? "Add User" : "Edit User" }}</h3>
+          <h3 class="section-title">{{ ctrl.isCreating.value ? "Add User" : "Edit User" }}</h3>
           <p v-if="ctrl.draft.value && !ctrl.isCreating.value" class="mt-1 text-sm text-muted">
             ID: {{ ctrl.draft.value.id }} &middot; {{ ctrl.draft.value.username }}
           </p>
@@ -401,7 +396,7 @@ onMounted(() => ctrl.init());
       @update:visible="confirmDeleteId = null"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Confirm Delete</h3>
+        <h3 class="section-title">Confirm Delete</h3>
       </template>
       <p class="text-sm text-secondary">Are you sure you want to delete this user? This action cannot be undone.</p>
       <template #footer>
@@ -421,7 +416,7 @@ onMounted(() => ctrl.init());
       @update:visible="resetPwUserId = null"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Reset Password</h3>
+        <h3 class="section-title">Reset Password</h3>
       </template>
       <label class="block">
         <span class="text-xs font-bold text-muted">New Password <span class="text-red-500">*</span></span>

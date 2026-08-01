@@ -25,10 +25,10 @@ const canCreate = computed(() => {
 
 const groupBadgeClass = (group: string) =>
   group === "—"
-    ? "bg-canvas text-muted"
+    ? "badge-neutral"
     : group === "Tools"
-      ? "bg-blue-50 text-blue-700"
-      : "bg-emerald-50 text-emerald-700";
+      ? "badge-info"
+      : "badge-success";
 
 function openEdit(key: string) {
   ctrl.selectItem(key);
@@ -65,7 +65,7 @@ async function createAndClose() {
     <section class="flex flex-wrap items-end gap-3 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <label class="block min-w-0 flex-1">
         <span class="text-xs font-bold text-muted">Search</span>
-        <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+        <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
           <i class="pi pi-search shrink-0 text-muted" />
           <InputText
             class="embedded-input min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink outline-none shadow-none"
@@ -117,7 +117,7 @@ async function createAndClose() {
             </td>
             <td class="px-4 py-2.5 font-mono text-xs text-secondary">{{ item.path }}</td>
             <td class="px-4 py-2.5">
-              <span :class="['rounded-md px-2 py-0.5 text-[11px] font-bold', groupBadgeClass(item.group)]">
+              <span :class="groupBadgeClass(item.group)">
                 {{ item.group }}
               </span>
             </td>
@@ -154,7 +154,7 @@ async function createAndClose() {
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">Edit Menu</h3>
+          <h3 class="section-title">Edit Menu</h3>
           <p v-if="ctrl.draft.value" class="mt-1 text-sm text-muted">{{ ctrl.draft.value.key }}</p>
         </div>
       </template>
@@ -262,7 +262,7 @@ async function createAndClose() {
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">Register Menu</h3>
+          <h3 class="section-title">Register Menu</h3>
           <p class="mt-1 text-sm text-muted">Add a new menu entry to the sidebar.</p>
         </div>
       </template>

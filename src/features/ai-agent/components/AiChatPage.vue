@@ -199,7 +199,7 @@ function formatDate(ts: number) {
 
       <!-- Input group: row 1 message textbox, row 2 provider/model selectors -->
       <div class="border-t border-divider p-4">
-        <div class="rounded-lg border border-divider bg-panel focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+        <div class="rounded-lg border border-divider bg-panel focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
           <!-- Row 1: message textbox -->
           <textarea
             v-model="draft"

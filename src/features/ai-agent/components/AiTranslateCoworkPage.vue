@@ -377,15 +377,15 @@ function typeLabel(type: AiAccountType): string {
 function typeBadgeClass(type: AiAccountType): string {
   switch (type) {
     case "api":
-      return "bg-brand/10 text-brand";
+      return "badge-info";
     case "admin":
-      return "bg-amber-100 text-amber-700";
+      return "badge-warning";
     case "oauth":
-      return "bg-violet-100 text-violet-700";
+      return "badge-info";
     case "subscription":
-      return "bg-sky-100 text-sky-700";
+      return "badge-info";
     default:
-      return "bg-canvas text-muted";
+      return "badge-neutral";
   }
 }
 
@@ -407,14 +407,14 @@ function statusLabel(status: AiAccountStatus): string {
 function statusClass(status: AiAccountStatus): string {
   switch (status) {
     case "healthy":
-      return "bg-emerald-100 text-emerald-700";
+      return "badge-success";
     case "low":
-      return "bg-amber-100 text-amber-700";
+      return "badge-warning";
     case "exhausted":
     case "error":
-      return "bg-red-100 text-red-700";
+      return "badge-danger";
     default:
-      return "bg-canvas text-muted";
+      return "badge-neutral";
   }
 }
 
@@ -542,7 +542,7 @@ function isTextResult(entry: FileEntry): boolean {
               />
               <i v-if="ctrl.settingActiveId.value === account.id" class="pi pi-spinner pi-spin shrink-0 text-xs text-brand" />
               <span class="truncate font-semibold text-ink" :title="account.name">{{ account.name }}</span>
-              <span :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]">
+              <span :class="['shrink-0', typeBadgeClass(account.account_type)]">
                 {{ typeLabel(account.account_type) }}
               </span>
               <span
@@ -551,7 +551,7 @@ function isTextResult(entry: FileEntry): boolean {
               >
                 {{ account.subscription_type }}
               </span>
-              <span :class="['ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', statusClass(account.status)]">
+              <span :class="['ml-auto shrink-0', statusClass(account.status)]">
                 {{ statusLabel(account.status) }}
               </span>
             </div>
@@ -597,7 +597,7 @@ function isTextResult(entry: FileEntry): boolean {
           class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel p-4 shadow-sm"
           :style="col1TopH != null ? { height: col1TopH + 'px', flexShrink: 0 } : { flex: '1 1 50%', minHeight: '100px' }"
         >
-          <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+          <h3 class="section-eyebrow mb-2 flex items-center gap-2">
             <i class="pi pi-inbox" />Input
           </h3>
           <div class="mb-2 flex flex-wrap items-center gap-1.5">
@@ -666,7 +666,7 @@ function isTextResult(entry: FileEntry): boolean {
           class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel p-4 shadow-sm"
           style="min-height: 100px"
         >
-          <h3 class="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+          <h3 class="section-eyebrow mb-2 flex items-center gap-2">
             <i class="pi pi-sparkles" />Output (Skill Result)
           </h3>
           <div class="mb-2 flex flex-wrap items-center gap-1.5">
@@ -706,7 +706,7 @@ function isTextResult(entry: FileEntry): boolean {
         class="flex min-h-0 shrink-0 flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm"
         :style="{ width: col2Width + 'px' }"
       >
-        <h3 class="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+        <h3 class="section-eyebrow mb-3 flex items-center gap-2">
           <i class="pi pi-book" />Skills
           <Button
             icon="pi pi-refresh"
@@ -763,7 +763,7 @@ function isTextResult(entry: FileEntry): boolean {
       <!-- Column 3: project directory listing -->
       <div class="flex min-h-0 flex-1 flex-col rounded-lg border border-divider bg-panel p-4 shadow-sm" style="min-width: 260px">
         <div class="mb-2 flex items-center gap-1.5">
-          <h3 class="shrink-0 text-sm font-bold uppercase tracking-wide text-muted">
+          <h3 class="section-eyebrow shrink-0">
             <i class="pi pi-folder-open mr-1" />Project Directory
           </h3>
           <InputGroup class="ml-auto !h-7 !w-auto">
@@ -840,7 +840,7 @@ function isTextResult(entry: FileEntry): boolean {
       class="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-divider bg-panel/50 p-12 text-center"
     >
       <i class="pi pi-folder-open text-4xl text-muted" />
-      <h3 class="text-sm font-semibold text-ink">Bạn chưa thiết lập workspace làm việc</h3>
+      <h3 class="section-title">Bạn chưa thiết lập workspace làm việc</h3>
       <p class="max-w-md text-sm text-muted">Vui lòng chọn workspace để tiếp tục.</p>
       <Button label="Chọn Project Directory" icon="pi pi-folder-open" @click="ctrl.pickProjectDir" />
     </div>
@@ -858,7 +858,7 @@ function isTextResult(entry: FileEntry): boolean {
     >
       <template #header>
         <div class="flex flex-1 items-center gap-3">
-          <h3 class="flex min-w-0 items-center gap-2 font-bold text-ink">
+          <h3 class="section-title flex min-w-0 items-center gap-2">
             <i class="pi pi-file shrink-0" /><span class="truncate">{{ ctrl.mdPreviewName.value }}</span>
           </h3>
           <div class="ml-auto flex shrink-0 gap-1">
@@ -904,7 +904,7 @@ function isTextResult(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-folder text-amber-500" />{{ folderPeekName }}</h3>
+        <h3 class="section-title flex items-center gap-2"><i class="pi pi-folder text-amber-500" />{{ folderPeekName }}</h3>
       </template>
       <p v-if="isLoadingFolderPeek" class="p-6 text-center text-xs text-muted">Loading...</p>
       <div v-else-if="folderPeekFiles.length" class="max-h-[50vh] space-y-1 overflow-auto">
@@ -953,7 +953,7 @@ function isTextResult(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-exclamation-triangle text-red-500" />Confirm Delete</h3>
+        <h3 class="section-title flex items-center gap-2"><i class="pi pi-exclamation-triangle text-red-500" />Confirm Delete</h3>
       </template>
       <p class="text-sm text-muted">
         Xoá <strong class="text-ink">{{ folderPeekDeleteCount }}</strong> mục đã chọn trong "{{ folderPeekName }}"? Hành động này không thể hoàn tác.
@@ -972,7 +972,7 @@ function isTextResult(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-upload" />Import vào Input</h3>
+        <h3 class="section-title flex items-center gap-2"><i class="pi pi-upload" />Import vào Input</h3>
       </template>
       <p class="text-sm text-muted">
         Bạn muốn chọn file hay folder? Nội dung sẽ được copy vào
@@ -994,7 +994,7 @@ function isTextResult(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-exclamation-triangle text-red-500" />Confirm Delete</h3>
+        <h3 class="section-title flex items-center gap-2"><i class="pi pi-exclamation-triangle text-red-500" />Confirm Delete</h3>
       </template>
       <p class="text-sm text-muted">
         Xoá <strong class="text-ink">{{ deleteCount }}</strong> mục đã chọn? Hành động này không thể hoàn tác.
@@ -1013,7 +1013,7 @@ function isTextResult(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-exclamation-triangle text-yellow-500" />Chưa chọn Input</h3>
+        <h3 class="section-title flex items-center gap-2"><i class="pi pi-exclamation-triangle text-yellow-500" />Chưa chọn Input</h3>
       </template>
       <p class="text-sm text-muted">{{ inputSelectionWarningMessage }}</p>
       <template #footer>
@@ -1029,7 +1029,7 @@ function isTextResult(entry: FileEntry): boolean {
       modal
     >
       <template #header>
-        <h3 class="flex items-center gap-2 font-bold text-ink"><i class="pi pi-folder-open" />Chọn file trong "{{ skillFileDialogFolderName }}"</h3>
+        <h3 class="section-title flex items-center gap-2"><i class="pi pi-folder-open" />Chọn file trong "{{ skillFileDialogFolderName }}"</h3>
       </template>
       <p class="mb-2 text-sm text-muted">Folder này có nhiều file. Chạy skill trên toàn bộ folder hay chỉ những file đã chọn?</p>
       <div class="max-h-[50vh] space-y-1 overflow-auto rounded-lg border border-divider p-2">

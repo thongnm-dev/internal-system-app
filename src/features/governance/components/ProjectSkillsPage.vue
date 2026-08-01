@@ -78,15 +78,15 @@ function updateTags(value: string) {
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "Active") return "bg-emerald-50 text-emerald-700";
-  if (status === "Deprecated") return "bg-red-50 text-red-700";
-  return "bg-amber-50 text-amber-700";
+  if (status === "Active") return "badge-success";
+  if (status === "Deprecated") return "badge-danger";
+  return "badge-warning";
 }
 
 function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillViewMode): string {
   return [
     "w-full rounded-md border bg-panel p-4 text-left transition cursor-pointer",
-    isActive ? "border-brand ring-2 ring-emerald-100" : "border-divider hover:bg-canvas",
+    isActive ? "border-brand ring-2 ring-brand/20" : "border-divider hover:bg-canvas",
     viewMode === "list" ? "flex items-start justify-between gap-4" : "block min-h-52",
   ].join(" ");
 }
@@ -98,7 +98,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
     <section class="flex flex-wrap items-end gap-3 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <label class="block min-w-0 flex-1">
         <span class="text-xs font-bold text-muted">Search Skills</span>
-        <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-emerald-100">
+        <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
           <i class="pi pi-search shrink-0 text-muted" />
           <InputText
             class="w-full min-w-0 flex-1 !border-0 !bg-transparent !p-0 text-sm text-ink !shadow-none !outline-none !ring-0 focus:!border-0 focus:!bg-transparent focus:!shadow-none focus:!outline-none focus:!ring-0"
@@ -164,7 +164,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
               <span class="flex min-w-0 flex-wrap items-center gap-2">
                 <span class="min-w-0 truncate text-base font-extrabold text-ink">{{ skill.name || "Untitled Skill" }}</span>
                 <span class="shrink-0 rounded-md border border-divider px-2 py-0.5 text-[11px] font-bold text-muted">{{ skill.category }}</span>
-                <span :class="['shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold', statusBadgeClass(skill.status)]">{{ skill.status }}</span>
+                <span :class="['shrink-0', statusBadgeClass(skill.status)]">{{ skill.status }}</span>
               </span>
               <span class="mt-2 block text-sm font-normal leading-6 text-secondary">{{ skill.description || "No description" }}</span>
               <span class="mt-3 flex flex-wrap gap-1">
@@ -248,7 +248,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
               <label class="block min-w-0 md:col-span-2">
                 <span class="text-xs font-bold text-muted">Description</span>
                 <textarea
-                  class="mt-1 min-h-20 w-full resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                  class="mt-1 min-h-20 w-full resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                   placeholder="What this skill does"
                   :value="ctrl.draft.value.description"
                   @input="ctrl.updateDraft('description', ($event.target as HTMLTextAreaElement).value)"
@@ -270,7 +270,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             <label class="block min-w-0">
               <span class="text-xs font-bold text-muted">When To Use</span>
               <textarea
-                class="mt-1 min-h-24 w-full resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="mt-1 min-h-24 w-full resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 placeholder="Use when..."
                 :value="ctrl.draft.value.usage"
                 @input="ctrl.updateDraft('usage', ($event.target as HTMLTextAreaElement).value)"
@@ -279,7 +279,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
             <label class="mt-3 block min-w-0">
               <span class="text-xs font-bold text-muted">Operational Guidance</span>
               <textarea
-                class="mt-1 min-h-32 w-full resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+                class="mt-1 min-h-32 w-full resize-y rounded-md border border-divider bg-panel px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 placeholder="Step-by-step behavior, constraints, and verification"
                 :value="ctrl.draft.value.guidance"
                 @input="ctrl.updateDraft('guidance', ($event.target as HTMLTextAreaElement).value)"
@@ -290,7 +290,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
           <!-- Generated Markdown -->
           <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel">
             <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
-              <h3 class="font-bold">Generated Markdown</h3>
+              <h3 class="section-title">Generated Markdown</h3>
               <Button icon="pi pi-copy" label="Copy" severity="secondary" outlined size="small" title="Copy generated markdown" @click="copyMarkdown()" />
             </div>
             <p v-if="copyMessage" class="border-b border-divider px-4 py-2 text-xs text-muted">{{ copyMessage }}</p>

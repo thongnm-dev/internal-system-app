@@ -93,10 +93,10 @@ function formatDate(value: string): string {
     <!-- Results table -->
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">Task list</h3>
+        <h3 class="section-title">Task list</h3>
         <span class="text-xs text-muted">{{ ctrl.tasks.value.length.toLocaleString("en-US") }} tasks</span>
       </div>
-      <p v-if="ctrl.loadError.value" class="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{{ ctrl.loadError.value }}</p>
+      <p v-if="ctrl.loadError.value" class="banner-danger">{{ ctrl.loadError.value }}</p>
       <DataTable
         class="app-data-table min-h-0"
         :empty-message="ctrl.isLoading.value ? 'Loading...' : 'No tasks match the search conditions.'"
@@ -142,8 +142,8 @@ function formatDate(value: string): string {
         </Column>
         <Column header="Status" header-class="text-center" body-class="text-center">
           <template #body="{ data }">
-            <span v-if="data.is_complete" class="inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">Done</span>
-            <span v-else class="inline-block rounded-full bg-canvas px-2.5 py-0.5 text-[11px] font-bold text-muted">Pending</span>
+            <span v-if="data.is_complete" class="badge-success">Done</span>
+            <span v-else class="badge-neutral">Pending</span>
           </template>
         </Column>
         <Column field="created_by" header="Created By" />

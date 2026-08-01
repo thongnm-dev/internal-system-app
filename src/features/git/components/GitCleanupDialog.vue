@@ -56,7 +56,7 @@ async function doCleanup() {
           <Checkbox :model-value="cleanupSelected.has(b)" binary @change="toggleCleanup(b)" />
           <i class="pi pi-sitemap text-xs text-muted" />
           <span class="min-w-0 flex-1 truncate text-sm text-ink">{{ b }}</span>
-          <span class="shrink-0 rounded-full bg-red-100 px-1.5 text-[10px] font-bold text-red-700">gone</span>
+          <span class="shrink-0 badge-danger">gone</span>
         </label>
       </div>
     </div>

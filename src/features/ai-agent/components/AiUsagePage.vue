@@ -225,15 +225,15 @@ function typeLabel(type: AiAccountType): string {
 function typeBadgeClass(type: AiAccountType): string {
   switch (type) {
     case "api":
-      return "bg-brand/10 text-brand";
+      return "badge-info";
     case "admin":
-      return "bg-amber-100 text-amber-700";
+      return "badge-warning";
     case "oauth":
-      return "bg-violet-100 text-violet-700";
+      return "badge-info";
     case "subscription":
-      return "bg-sky-100 text-sky-700";
+      return "badge-info";
     default:
-      return "bg-canvas text-muted";
+      return "badge-neutral";
   }
 }
 
@@ -255,15 +255,15 @@ function statusLabel(status: AiAccountStatus): string {
 function statusClass(status: AiAccountStatus): string {
   switch (status) {
     case "healthy":
-      return "bg-emerald-100 text-emerald-700";
+      return "badge-success";
     case "low":
-      return "bg-amber-100 text-amber-700";
+      return "badge-warning";
     case "exhausted":
-      return "bg-red-100 text-red-700";
+      return "badge-danger";
     case "error":
-      return "bg-red-100 text-red-700";
+      return "badge-danger";
     default:
-      return "bg-canvas text-muted";
+      return "badge-neutral";
   }
 }
 
@@ -325,7 +325,7 @@ function resetHint(resetAt: string): string {
       <div class="flex flex-wrap items-center gap-3">
         <i class="pi pi-chart-bar text-2xl text-muted" />
         <div class="min-w-0">
-          <h2 class="text-lg font-semibold text-ink">AI Usage</h2>
+          <h2 class="page-title">AI Usage</h2>
           <p class="text-sm text-muted">
             Theo dõi usage tài khoản AI và tự động chọn account ưu tiên khi tài khoản đang dùng cạn.
           </p>
@@ -348,7 +348,7 @@ function resetHint(resetAt: string): string {
     <!-- Account groups by provider -->
     <template v-if="ctrl.accounts.value.length">
       <div v-for="[groupProvider, list] in groups" :key="groupProvider" class="space-y-3">
-        <h3 class="px-1 text-sm font-bold uppercase tracking-wide text-muted">
+        <h3 class="section-eyebrow px-1">
           {{ providerLabel(groupProvider) }}
         </h3>
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -364,19 +364,19 @@ function resetHint(resetAt: string): string {
               </div>
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="truncate font-semibold text-ink" :title="account.name">{{ account.name }}</h3>
-                  <span v-if="account.is_active" class="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-white">
+                  <h3 class="section-title truncate" :title="account.name">{{ account.name }}</h3>
+                  <span v-if="account.is_active" class="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-on-brand">
                     ACTIVE
                   </span>
                   <span
                     v-if="account.account_type !== 'subscription'"
-                    :class="['shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold', typeBadgeClass(account.account_type)]"
+                    :class="['shrink-0', typeBadgeClass(account.account_type)]"
                   >
                     {{ typeLabel(account.account_type) }}
                   </span>
                   <span
                     v-if="account.subscription_type"
-                    class="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
+                    class="shrink-0 badge-neutral"
                   >
                     {{ account.subscription_type }}
                   </span>
@@ -404,7 +404,7 @@ function resetHint(resetAt: string): string {
 
             <!-- Status + usage source -->
             <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-              <span :class="['rounded-full px-2 py-0.5 font-bold', statusClass(account.status)]">
+              <span :class="statusClass(account.status)">
                 {{ statusLabel(account.status) }}
               </span>
               <span class="text-muted">source: {{ sourceLabel(account.usage_source) }}</span>
@@ -556,7 +556,7 @@ function resetHint(resetAt: string): string {
       @update:visible="isDialogOpen = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Add Account</h3>
+        <h3 class="section-title">Add Account</h3>
       </template>
 
       <div class="space-y-4">
@@ -647,7 +647,7 @@ function resetHint(resetAt: string): string {
               </span>
               <span
                 v-if="(subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.subscription_type"
-                class="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700"
+                class="shrink-0 badge-info"
               >
                 {{ (subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.subscription_type }}
               </span>
@@ -666,7 +666,7 @@ function resetHint(resetAt: string): string {
             </p>
             <p
               v-if="subMode === 'dir' && ctrl.configDirPreview.value && !ctrl.configDirPreview.value.has_token"
-              class="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-700"
+              class="banner-warning mt-2"
             >
               <i class="pi pi-exclamation-triangle mr-1" />Chưa có token — account sẽ được thêm nhưng chưa dùng được.
               Chạy <code class="rounded bg-amber-100 px-1">CLAUDE_CONFIG_DIR=&lt;dir&gt; claude /login</code> để lấy token.
@@ -674,7 +674,7 @@ function resetHint(resetAt: string): string {
           </div>
           <div
             v-else
-            class="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3 text-xs text-amber-700"
+            class="banner-warning"
           >
             <p>
               {{ subMode === 'current'
@@ -746,7 +746,7 @@ function resetHint(resetAt: string): string {
       @update:visible="showSettings = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Auto-switch settings</h3>
+        <h3 class="section-title">Auto-switch settings</h3>
       </template>
 
       <div class="space-y-4">
@@ -792,7 +792,7 @@ function resetHint(resetAt: string): string {
       @update:visible="showDetect = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Login Claude trên máy</h3>
+        <h3 class="section-title">Login Claude trên máy</h3>
       </template>
 
       <div class="space-y-3">
@@ -811,13 +811,13 @@ function resetHint(resetAt: string): string {
             <span class="truncate font-semibold text-ink" :title="login.email">{{ login.email || "(no email)" }}</span>
             <span
               v-if="login.subscription_type"
-              class="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700"
+              class="shrink-0 badge-info"
             >
               {{ login.subscription_type }}
             </span>
             <span
-              class="ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
-              :class="login.already_added ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+              class="ml-auto shrink-0"
+              :class="login.already_added ? 'badge-success' : 'badge-warning'"
             >
               {{ login.already_added ? "Đã thêm" : "Mới" }}
             </span>
@@ -863,7 +863,7 @@ function resetHint(resetAt: string): string {
       @update:visible="showTerminal = $event"
     >
       <template #header>
-        <h3 class="font-bold text-ink">Open terminal</h3>
+        <h3 class="section-title">Open terminal</h3>
       </template>
 
       <div class="space-y-4">

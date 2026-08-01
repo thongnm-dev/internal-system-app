@@ -84,10 +84,10 @@ function formatDate(value: string) {
 
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">Project list</h3>
+        <h3 class="section-title">Project list</h3>
         <span class="text-xs text-muted">{{ ctrl.filteredProjects.value.length.toLocaleString("en-US") }} projects</span>
       </div>
-      <p v-if="ctrl.loadError.value" class="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{{ ctrl.loadError.value }}</p>
+      <p v-if="ctrl.loadError.value" class="banner-danger">{{ ctrl.loadError.value }}</p>
       <DataTable
         class="app-data-table min-h-0"
         :empty-message="ctrl.isLoading.value ? 'Loading...' : 'No projects match the search conditions.'"

@@ -237,3 +237,18 @@ Hiện folder lúc `text-amber-500` lúc `text-orange-500`, file icon mỗi tran
 6. **Icon file & syntax token:** gom bảng dùng chung.
 
 > Bước 1–2 an toàn tuyệt đối (chỉ gom nguồn + thêm mới, không đổi giao diện). Từ bước 3 nên làm theo từng nhóm màn hình để dễ review.
+
+---
+
+## 9. Trạng thái triển khai (đã hoàn thành)
+
+- ✅ **Bước 1** — Gom nguồn: `injectForceLightStyle()`, bỏ literal `.force-light`, hex PrimeVue → `var(--color-*)`.
+- ✅ **Bước 2** — Token state (`danger/warning/success/info`, `on-brand`, `code`) + `text-2xs` + class `.page-title`/`.section-title`/`.section-eyebrow`/`.banner-*`/`.badge-*`/`.field-ring`.
+- ✅ **Bước 3** — Nhóm lệch nặng: S3Download/Upload (+card) bỏ `surface-*`; DailyReport bỏ hex `#4cbd9b` + `text-[..px]`.
+- ✅ **Bước 4** — Tiêu đề & banner toàn app (~50 heading, ~18 banner).
+- ✅ **Bước 5** — Focus ring `ring-brand/20` (12 file) + badge `.badge-*` (gồm tone/severity functions) toàn app.
+- ✅ **Bước 5b** — Git dialogs: `fileStatus.ts` (`cls`+`badge`) + refClass/prStateBadge + inline badges → token.
+- ✅ **Bước 6** — Folder icon `orange`→`amber` (S3BugFolders); SQL syntax hex → CSS var `--sql-*` (một nguồn ở `styles.css`, dùng chung SqlEditor + StoreProcedure).
+
+### Ngoại lệ cố ý giữ nguyên
+Tint dòng bảng/diff/lịch (`bg-*-50` theo `line.kind`/`isWeekend`); thanh usage/progress (`bg-red-500`); nút danger context-menu (`hover:bg-red-50`); icon archive (`text-orange-500` — đúng bảng chuẩn); `AppToast.vue` `#93c5fd` (component toast, ngoài phạm vi); đoạn code inline `bg-amber-100` trong AiUsage.

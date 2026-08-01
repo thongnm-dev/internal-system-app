@@ -562,7 +562,7 @@ function parentPath(fullPath: string): string {
           <InputText
             ref="pathInputEl"
             v-model="pathInput"
-            class="h-9 w-full rounded-md border border-brand bg-canvas pl-8 pr-3 text-sm outline-none ring-2 ring-emerald-100"
+            class="h-9 w-full rounded-md border border-brand bg-canvas pl-8 pr-3 text-sm outline-none ring-2 ring-brand/20"
             placeholder="Enter path... (e.g. D:\Projects)"
             @keydown="handlePathEditKeydown"
             @blur="commitPath"
@@ -596,7 +596,7 @@ function parentPath(fullPath: string): string {
         <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted" />
         <InputText
           ref="searchInput"
-          class="h-9 w-full rounded-md !border !border-divider !bg-canvas !pl-8 !pr-8 text-sm !shadow-none !outline-none focus:!border-brand focus:!ring-2 focus:!ring-emerald-100"
+          class="h-9 w-full rounded-md !border !border-divider !bg-canvas !pl-8 !pr-8 text-sm !shadow-none !outline-none focus:!border-brand focus:!ring-2 focus:!ring-brand/20"
           placeholder="Search files..."
           @input="onSearchInput"
           @keydown="onSearchKeydown"
@@ -620,7 +620,7 @@ function parentPath(fullPath: string): string {
     <!-- Error message -->
     <div
       v-if="ctrl.error.value"
-      class="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700"
+      class="banner-danger"
     >
       <i class="pi pi-exclamation-triangle" />
       {{ ctrl.error.value }}
@@ -1007,7 +1007,7 @@ function parentPath(fullPath: string): string {
       @click.self="confirmDeleteTarget = null"
     >
       <div class="w-full max-w-sm rounded-lg border border-divider bg-panel p-6 shadow-2xl">
-        <h3 class="mb-3 text-base font-bold text-ink">Confirm Delete</h3>
+        <h3 class="section-title mb-3">Confirm Delete</h3>
         <p class="mb-5 text-sm text-secondary">
           Are you sure you want to delete <strong>{{ confirmDeleteLabel }}</strong>? This action cannot be undone.
         </p>

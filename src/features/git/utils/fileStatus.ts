@@ -1,15 +1,15 @@
 const STATUS_META: Record<string, { label: string; cls: string; badge: string }> = {
-  M: { label: "Modified", cls: "text-amber-600", badge: "bg-amber-100 text-amber-700" },
-  A: { label: "Added", cls: "text-emerald-600", badge: "bg-emerald-100 text-emerald-700" },
-  D: { label: "Deleted", cls: "text-red-600", badge: "bg-red-100 text-red-700" },
-  R: { label: "Renamed", cls: "text-sky-600", badge: "bg-sky-100 text-sky-700" },
-  C: { label: "Copied", cls: "text-sky-600", badge: "bg-sky-100 text-sky-700" },
-  U: { label: "Conflict", cls: "text-red-600", badge: "bg-red-100 text-red-700" },
-  "?": { label: "New", cls: "text-emerald-600", badge: "bg-emerald-100 text-emerald-700" },
+  M: { label: "Modified", cls: "text-warning", badge: "badge-warning" },
+  A: { label: "Added", cls: "text-success", badge: "badge-success" },
+  D: { label: "Deleted", cls: "text-danger", badge: "badge-danger" },
+  R: { label: "Renamed", cls: "text-info", badge: "badge-info" },
+  C: { label: "Copied", cls: "text-info", badge: "badge-info" },
+  U: { label: "Conflict", cls: "text-danger", badge: "badge-danger" },
+  "?": { label: "New", cls: "text-success", badge: "badge-success" },
 };
 
 export function statusMeta(code: string) {
-  return STATUS_META[code] ?? { label: code, cls: "text-muted", badge: "bg-slate-100 text-slate-600" };
+  return STATUS_META[code] ?? { label: code, cls: "text-muted", badge: "badge-neutral" };
 }
 
 export function baseName(path: string) {

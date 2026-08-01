@@ -103,7 +103,7 @@ async function saveTask() {
   <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
     <section class="flex items-center justify-between gap-4 rounded-lg border border-divider bg-panel p-4 shadow-sm">
       <div class="min-w-0">
-        <h3 class="truncate font-bold text-ink">Tasks</h3>
+        <h3 class="section-title truncate">Tasks</h3>
         <p class="mt-1 truncate text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -115,7 +115,7 @@ async function saveTask() {
 
     <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
       <div class="flex items-center justify-between gap-4 border-b border-divider px-4 py-3">
-        <h3 class="font-bold">Task list</h3>
+        <h3 class="section-title">Task list</h3>
         <span class="text-xs text-muted">{{ ctrl.tasks.value.length.toLocaleString("en-US") }} tasks</span>
       </div>
       <DataTable
@@ -138,7 +138,7 @@ async function saveTask() {
               <span
                 v-for="category in data.categories"
                 :key="category"
-                class="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-brand"
+                class="badge-success"
               >
                 {{ categoryName(category) }}
               </span>
@@ -189,7 +189,7 @@ async function saveTask() {
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">{{ isEditing ? "Edit Task" : "New Task" }}</h3>
+          <h3 class="section-title">{{ isEditing ? "Edit Task" : "New Task" }}</h3>
           <p class="mt-1 text-sm text-muted">{{ ctrl.projectLabel.value }}</p>
         </div>
       </template>
@@ -209,7 +209,7 @@ async function saveTask() {
           <span class="text-xs font-bold text-muted">Description</span>
           <textarea
             v-model="form.description"
-            class="mt-1 min-h-20 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-emerald-100"
+            class="mt-1 min-h-20 w-full resize-none rounded-md border border-divider bg-panel px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             placeholder="Task description"
           />
         </label>

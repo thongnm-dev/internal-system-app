@@ -190,9 +190,9 @@ function formatTime(hms: string): string {
       <!-- Sticky panel after download -->
       <div
         v-if="lastDownloadPath"
-        class="sticky bottom-0 flex items-center gap-2 rounded-lg border border-surface-200 bg-surface-0 px-4 py-3 shadow-md dark:border-surface-700 dark:bg-surface-900"
+        class="sticky bottom-0 flex items-center gap-2 rounded-lg border border-divider bg-panel px-4 py-3 shadow-md"
       >
-        <i class="pi pi-folder-open text-lg text-green-500" />
+        <i class="pi pi-folder-open text-lg text-success" />
         <InputText
           :model-value="lastDownloadPath"
           class="flex-1 font-mono text-sm"
@@ -219,10 +219,10 @@ function formatTime(hms: string): string {
     <!-- Empty state -->
     <template v-else>
       <div
-        class="flex h-full flex-col items-center justify-center rounded-lg bg-surface-0 text-lg text-surface-500 dark:bg-surface-900"
+        class="flex h-full flex-col items-center justify-center rounded-lg bg-panel text-lg text-muted"
       >
-        <i class="pi pi-cloud-download mb-4 text-5xl text-surface-300" />
-        <span class="animate-bounce py-4 text-sm text-red-500">
+        <i class="pi pi-cloud-download mb-4 text-5xl text-muted" />
+        <span class="animate-bounce py-4 text-sm text-danger">
           Không có tập tin nào để tải về...
         </span>
         <Button
@@ -239,11 +239,11 @@ function formatTime(hms: string): string {
     <!-- Download History -->
     <div
       v-if="!isLoading && downloadHistory.length > 0"
-      class="rounded-lg bg-surface-0 shadow dark:bg-surface-900"
+      class="rounded-lg bg-panel shadow"
     >
-      <div class="flex items-center gap-2 border-b border-surface-200 px-4 py-3 dark:border-surface-700">
-        <i class="pi pi-history text-lg text-blue-500" />
-        <span class="text-sm font-semibold text-surface-700 dark:text-surface-200">
+      <div class="flex items-center gap-2 border-b border-divider px-4 py-3">
+        <i class="pi pi-history text-lg text-info" />
+        <span class="text-sm font-semibold text-ink">
           Lịch sử tải về ({{ downloadHistory.length }})
         </span>
       </div>
@@ -272,7 +272,7 @@ function formatTime(hms: string): string {
         </Column>
         <Column header="Số lượng" :style="{ width: '80px' }">
           <template #body="{ data }">
-            <span class="font-semibold text-blue-600 dark:text-blue-400">
+            <span class="font-semibold text-info">
               {{ data.downloadCount }}
             </span>
           </template>
@@ -294,7 +294,7 @@ function formatTime(hms: string): string {
                 text
                 @click="openCopyDialogForHistory(data.id, data.syncPath)"
               />
-              <span v-else class="text-xs text-green-600">
+              <span v-else class="text-xs text-success">
                 <i class="pi pi-check mr-1" />Copied
               </span>
               <Button
@@ -320,8 +320,8 @@ function formatTime(hms: string): string {
       :style="{ width: '28rem' }"
     >
       <div class="flex items-center gap-3">
-        <i class="pi pi-wifi text-3xl text-red-500" />
-        <span class="text-sm text-surface-600 dark:text-surface-400">{{ offlineMessage }}</span>
+        <i class="pi pi-wifi text-3xl text-danger" />
+        <span class="text-sm text-secondary">{{ offlineMessage }}</span>
       </div>
       <template #footer>
         <Button label="Đóng" @click="dismissOfflineDialog()" />
@@ -337,8 +337,8 @@ function formatTime(hms: string): string {
       :style="{ width: '28rem' }"
     >
       <div class="flex items-center gap-3">
-        <i class="pi pi-question-circle text-3xl text-blue-500" />
-        <span class="text-sm text-surface-600 dark:text-surface-400">
+        <i class="pi pi-question-circle text-3xl text-info" />
+        <span class="text-sm text-secondary">
           Bạn có muốn mở màn hình để xem trạng thái trên S3 không?
         </span>
       </div>
@@ -362,32 +362,32 @@ function formatTime(hms: string): string {
       <div class="flex flex-col gap-4">
         <!-- File list from download path -->
         <div>
-          <h4 class="mb-2 text-sm font-semibold text-surface-700 dark:text-surface-200">
+          <h4 class="mb-2 text-sm font-semibold text-ink">
             Danh sách file đã tải:
           </h4>
           <div
-            class="max-h-52 overflow-y-auto rounded-lg border border-surface-200 bg-surface-50 dark:border-surface-700 dark:bg-surface-800"
+            class="max-h-52 overflow-y-auto rounded-lg border border-divider bg-canvas"
           >
             <div
               v-for="entry in copyEntries"
               :key="entry.path"
-              class="flex items-center gap-2 border-b border-surface-100 px-3 py-2 last:border-b-0 dark:border-surface-700"
+              class="flex items-center gap-2 border-b border-divider px-3 py-2 last:border-b-0"
             >
               <i
                 :class="[
                   'pi text-sm',
                   entry.is_dir
-                    ? 'pi-folder text-orange-500'
-                    : 'pi-file text-surface-400',
+                    ? 'pi-folder text-amber-500'
+                    : 'pi-file text-muted',
                 ]"
               />
-              <span class="truncate text-sm text-surface-700 dark:text-surface-300">
+              <span class="truncate text-sm text-secondary">
                 {{ entry.name }}
               </span>
             </div>
             <div
               v-if="copyEntries.length === 0"
-              class="px-3 py-4 text-center text-sm text-surface-400"
+              class="px-3 py-4 text-center text-sm text-muted"
             >
               Thư mục trống
             </div>
@@ -396,7 +396,7 @@ function formatTime(hms: string): string {
 
         <!-- Destination path picker -->
         <div>
-          <h4 class="mb-2 text-sm font-semibold text-surface-700 dark:text-surface-200">
+          <h4 class="mb-2 text-sm font-semibold text-ink">
             Đường dẫn đích nơi lưu:
           </h4>
           <InputGroup class="h-8">

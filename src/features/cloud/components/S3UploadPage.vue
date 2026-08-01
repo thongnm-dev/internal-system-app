@@ -139,9 +139,9 @@ function handleCloseModal() {
     </div>
 
     <!-- Empty state -->
-    <div v-else class="flex h-full flex-col items-center justify-center rounded-lg bg-surface-0 py-16 dark:bg-surface-900">
-      <i class="pi pi-cloud-upload mb-4 text-5xl text-surface-300" />
-      <span class="text-surface-500">Chưa có cấu hình nơi tải lên.</span>
+    <div v-else class="flex h-full flex-col items-center justify-center rounded-lg bg-panel py-16">
+      <i class="pi pi-cloud-upload mb-4 text-5xl text-muted" />
+      <span class="text-muted">Chưa có cấu hình nơi tải lên.</span>
     </div>
 
   </div>
@@ -155,7 +155,7 @@ function handleCloseModal() {
     :style="{ width: '28rem' }"
   >
     <div class="flex items-center gap-3">
-      <i class="pi pi-wifi text-3xl text-red-500" />
+      <i class="pi pi-wifi text-3xl text-danger" />
       <span class="text-sm">{{ offlineMessage }}</span>
     </div>
     <template #footer>
@@ -172,9 +172,9 @@ function handleCloseModal() {
     :closable="true"
   >
     <!-- Upload header -->
-    <div class="mb-3 flex items-center gap-2 rounded border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900">
+    <div class="mb-3 flex items-center gap-2 rounded border border-divider bg-canvas p-4">
       <span class="font-bold">Bạn đang thực hiện tải các tập tin lên đường dẫn sau:</span>
-      <span class="font-bold text-red-600">{{ modalHeaderTitle }}</span>
+      <span class="font-bold text-danger">{{ modalHeaderTitle }}</span>
     </div>
 
     <!-- Folder same name checkbox -->
@@ -185,7 +185,7 @@ function handleCloseModal() {
         disabled
         input-id="chkCreateFolderSameName"
       />
-      <label for="chkCreateFolderSameName" class="text-sm font-bold text-red-600">
+      <label for="chkCreateFolderSameName" class="text-sm font-bold text-danger">
         Tạo thư mục tương ứng với tên tập tin
       </label>
     </div>
@@ -202,22 +202,22 @@ function handleCloseModal() {
         <Column field="parentName" header="Thư mục">
           <template #body="{ data }">
             <div class="flex items-center gap-2">
-              <i class="pi pi-folder text-lg text-orange-500" />
-              <span class="font-medium text-surface-900 dark:text-surface-100">{{ data.parentName }}</span>
+              <i class="pi pi-folder text-lg text-amber-500" />
+              <span class="font-medium text-ink">{{ data.parentName }}</span>
             </div>
           </template>
         </Column>
         <Column field="name" header="Tên tập tin">
           <template #body="{ data }">
             <div class="flex items-center gap-2">
-              <i class="pi pi-file text-lg text-blue-500" />
-              <span class="font-medium text-surface-900 dark:text-surface-100">{{ data.name }}</span>
+              <i class="pi pi-file text-lg text-info" />
+              <span class="font-medium text-ink">{{ data.name }}</span>
             </div>
           </template>
         </Column>
         <Column field="size" header="Kích thước" style="width: 120px">
           <template #body="{ data }">
-            <span class="text-surface-600 dark:text-surface-400">{{ formatFileSize(data.size) }}</span>
+            <span class="text-secondary">{{ formatFileSize(data.size) }}</span>
           </template>
         </Column>
       </DataTable>
@@ -243,8 +243,8 @@ function handleCloseModal() {
     :style="{ width: '28rem' }"
   >
     <div class="flex items-center gap-3">
-      <i class="pi pi-question-circle text-3xl text-blue-500" />
-      <span class="text-sm text-surface-600 dark:text-surface-400">
+      <i class="pi pi-question-circle text-3xl text-info" />
+      <span class="text-sm text-secondary">
         Bạn có muốn mở màn hình để xem trạng thái trên S3 không?
       </span>
     </div>
@@ -266,9 +266,9 @@ function handleCloseModal() {
     :closable="true"
     @hide="dismissDeleteDialog"
   >
-    <div v-if="deleteOptions.length === 1" class="mb-3 flex items-center gap-2 rounded border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900">
+    <div v-if="deleteOptions.length === 1" class="mb-3 flex items-center gap-2 rounded border border-divider bg-canvas p-4">
       <span class="font-bold">Bạn đang thực hiện xoá các tập tin ở đường dẫn sau:</span>
-      <span class="font-bold text-red-600">{{ deleteOptions[0].name }}</span>
+      <span class="font-bold text-danger">{{ deleteOptions[0].name }}</span>
     </div>
 
     <div class="rounded-lg shadow">
@@ -295,8 +295,8 @@ function handleCloseModal() {
         <Column header="Đối tượng xoá" style="width: 50%">
           <template #body="{ data }">
             <div class="flex items-center gap-2">
-              <i class="pi pi-folder text-lg text-orange-500" />
-              <span class="font-medium text-surface-900 dark:text-surface-100">{{ data.bugNo }}</span>
+              <i class="pi pi-folder text-lg text-amber-500" />
+              <span class="font-medium text-ink">{{ data.bugNo }}</span>
             </div>
           </template>
         </Column>

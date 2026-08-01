@@ -12,17 +12,9 @@
     font-size: 15px;
   }
 
+  /* Giá trị màu của .force-light được sinh từ LIGHT_THEME qua
+     injectForceLightStyle() (themeTokens.ts) — KHÔNG khai báo literal ở đây. */
   .force-light {
-    --color-canvas: 250 250 249;
-    --color-panel: 255 255 255;
-    --color-ink: 15 23 42;
-    --color-brand: 13 147 115;
-    --color-text-secondary: 71 85 105;
-    --color-text-muted: 148 163 184;
-    --color-border: 229 231 235;
-    --color-border-light: 243 244 246;
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-    --shadow-panel: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.03);
     color: rgb(var(--color-ink));
     background: rgb(var(--color-canvas));
   }
@@ -30,15 +22,15 @@
   .force-light .p-inputtext,
   .force-light .p-password-input,
   .force-light .p-inputnumber-input {
-    background: #ffffff !important;
-    color: #0f172a !important;
-    border-color: #e5e7eb !important;
+    background: rgb(var(--color-panel)) !important;
+    color: rgb(var(--color-ink)) !important;
+    border-color: rgb(var(--color-border)) !important;
   }
 
   .force-light .p-inputtext:enabled:focus,
   .force-light .p-password-input:enabled:focus,
   .force-light .p-inputnumber-input:enabled:focus {
-    border-color: #0d9373 !important;
+    border-color: rgb(var(--color-brand)) !important;
   }
 
   /* Inputs embedded inside a bordered wrapper (icon + field) — keep them
@@ -54,25 +46,25 @@
   }
 
   .force-light .p-checkbox:not(.p-checkbox-checked) .p-checkbox-box {
-    background: #ffffff !important;
-    border-color: #e5e7eb !important;
+    background: rgb(var(--color-panel)) !important;
+    border-color: rgb(var(--color-border)) !important;
   }
 
   .force-light .p-checkbox.p-checkbox-checked .p-checkbox-box {
-    background: #0d9373 !important;
-    border-color: #0d9373 !important;
+    background: rgb(var(--color-brand)) !important;
+    border-color: rgb(var(--color-brand)) !important;
   }
 
   .force-light .p-button {
-    background: #0d9373 !important;
-    border-color: #0d9373 !important;
+    background: rgb(var(--color-brand)) !important;
+    border-color: rgb(var(--color-brand)) !important;
   }
 
   .force-light .p-button.p-button-secondary,
   .force-light .p-button.p-button-outlined {
     background: transparent !important;
-    color: #0f172a !important;
-    border-color: #e5e7eb !important;
+    color: rgb(var(--color-ink)) !important;
+    border-color: rgb(var(--color-border)) !important;
   }
 
   * {
@@ -113,6 +105,74 @@
 }
 
 @layer components {
+  /* ── Tiêu đề & header chuẩn ─────────────────────────────── */
+  .page-title {
+    @apply text-lg font-semibold text-ink;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm text-muted;
+  }
+
+  .section-title {
+    @apply text-sm font-bold text-ink;
+  }
+
+  .section-eyebrow {
+    @apply text-xs font-bold uppercase tracking-wide text-muted;
+  }
+
+  /* ── Banner thông báo ───────────────────────────────────── */
+  .banner {
+    @apply flex items-start gap-2 rounded-lg border px-3 py-2 text-sm;
+  }
+
+  .banner-danger {
+    @apply banner border-danger-border bg-danger-soft text-danger;
+  }
+
+  .banner-warning {
+    @apply banner border-warning-border bg-warning-soft text-warning;
+  }
+
+  .banner-success {
+    @apply banner border-success-border bg-success-soft text-success;
+  }
+
+  .banner-info {
+    @apply banner border-info-border bg-info-soft text-info;
+  }
+
+  /* ── Badge trạng thái ───────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold;
+  }
+
+  .badge-success {
+    @apply badge bg-success-soft text-success;
+  }
+
+  .badge-warning {
+    @apply badge bg-warning-soft text-warning;
+  }
+
+  .badge-danger {
+    @apply badge bg-danger-soft text-danger;
+  }
+
+  .badge-info {
+    @apply badge bg-info-soft text-info;
+  }
+
+  .badge-neutral {
+    @apply badge bg-canvas text-secondary;
+  }
+
+  /* ── Focus ring chuẩn ───────────────────────────────────── */
+  .field-ring {
+    @apply focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+
   .startup-loading-gif {
     @apply inline-flex h-10 w-24 items-center justify-center gap-2 rounded-full bg-panel shadow-sm ring-1 ring-divider;
   }
@@ -371,4 +431,18 @@
   box-shadow:
     0 0 0 3px rgb(var(--color-brand) / 0.12),
     var(--shadow-float) !important;
+}
+
+/* SQL syntax highlight — nguồn màu duy nhất cho SqlEditorPage & StoreProcedurePage */
+:root {
+  --sql-kw: #2563eb;
+  --sql-str: #16a34a;
+  --sql-com: #6b7280;
+  --sql-num: #b45309;
+}
+[data-theme="dark"] {
+  --sql-kw: #93c5fd;
+  --sql-str: #86efac;
+  --sql-com: #9ca3af;
+  --sql-num: #fcd34d;
 }

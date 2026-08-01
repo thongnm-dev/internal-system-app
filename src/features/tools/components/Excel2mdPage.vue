@@ -13,7 +13,7 @@ const ctrl = useExcel2md();
       <section class="rounded-lg border border-divider bg-panel p-4 shadow-sm">
         <div class="flex items-center gap-2">
           <i class="pi pi-file-excel text-xl text-brand" />
-          <h3 class="font-bold">Excel workbook</h3>
+          <h3 class="section-title">Excel workbook</h3>
         </div>
 
         <div class="mt-4 grid gap-3">
@@ -59,7 +59,7 @@ const ctrl = useExcel2md();
       <div class="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
         <div class="flex min-w-0 items-center gap-2">
           <i class="pi pi-code text-brand" />
-          <h3 class="font-bold">Markdown preview</h3>
+          <h3 class="section-title">Markdown preview</h3>
         </div>
         <span class="truncate text-xs font-semibold text-muted">
           {{ ctrl.result.value?.source_file_name ?? "No file selected" }}

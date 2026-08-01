@@ -202,8 +202,8 @@ function reloadBacklogProject() {
     </div>
 
     <p v-if="isLoading" class="mt-4 text-sm text-muted">Loading project information...</p>
-    <p v-if="loadError" class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{{ loadError }}</p>
-    <p v-if="saveError" class="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{{ saveError }}</p>
+    <p v-if="loadError" class="banner-warning mt-4">{{ loadError }}</p>
+    <p v-if="saveError" class="banner-danger mt-4">{{ saveError }}</p>
 
     <div class="mt-4 grid gap-4">
       <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" toggleable legend="Project Information">
@@ -252,7 +252,7 @@ function reloadBacklogProject() {
             <div class="grid gap-3 md:grid-cols-2">
               <div>
                 <span class="text-xs font-bold text-muted">Backlog Key</span>
-                <div class="group/key mt-1 flex rounded-md ring-emerald-100 focus-within:ring-2">
+                <div class="group/key mt-1 flex rounded-md ring-brand/20 focus-within:ring-2">
                   <InputText
                     class="min-w-0 flex-1 !rounded-r-none"
                     :class="{ 'p-invalid': fieldErrors.backlogKey }"
@@ -289,7 +289,7 @@ function reloadBacklogProject() {
 
       <Fieldset class="rounded-lg border border-divider bg-panel p-4 shadow-md fieldset-nested" legend="Members" toggleable>
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="font-bold text-ink">Members</h3>
+          <h3 class="section-title">Members</h3>
           <Button icon="pi pi-plus" label="Add member" @click="openMemberSearch" />
         </div>
         <div class="mt-4 overflow-auto rounded-lg border border-divider">
@@ -316,7 +316,7 @@ function reloadBacklogProject() {
     >
       <template #header>
         <div>
-          <h3 class="font-bold text-ink">{{ isConfirmStage ? "Confirm members" : "Search help members" }}</h3>
+          <h3 class="section-title">{{ isConfirmStage ? "Confirm members" : "Search help members" }}</h3>
           <p class="mt-1 text-sm text-muted">
             {{ isConfirmStage ? "Review the selected members before adding them to the project." : "Search and select members to add to the project." }}
           </p>
@@ -343,7 +343,7 @@ function reloadBacklogProject() {
         </Fieldset>
 
         <div class="rounded-lg border border-divider">
-          <p v-if="membersStore.error" class="border-b border-divider bg-red-50 p-2 text-sm text-red-700">{{ membersStore.error }}</p>
+          <p v-if="membersStore.error" class="banner-danger">{{ membersStore.error }}</p>
           <DataTable
             class="app-data-table"
             v-model:selection="selectedMembers"
