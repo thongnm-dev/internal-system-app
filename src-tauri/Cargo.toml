@@ -47,6 +47,8 @@ zip = { version = "2", features = ["aes-crypto", "deflate"] }
 roxmltree = "0.20"
 image = "0.25"
 base64 = "0.22"
+similar = "2"
+rust_xlsxwriter = "0.97.0"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"

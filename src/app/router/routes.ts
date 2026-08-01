@@ -102,6 +102,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Compress files/folders to a password-protected ZIP and split into email-friendly parts.",
   },
   {
+    key: "fileCompare",
+    path: "/file-compare",
+    title: "File Compare",
+    subtitle: "Compare differences between two files (Markdown, Excel, Word, Text).",
+  },
+  {
     key: "cloudS3",
     path: "/cloud/s3",
     title: "S3 Browser",
@@ -377,6 +383,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/file-split",
     component: () => import("@/features/tools/components/FileSplitPage.vue"),
     meta: { key: "fileSplit" as MenuKey },
+  },
+  {
+    path: "/file-compare",
+    component: () => import("@/features/tools/components/FileComparePage.vue"),
+    meta: { key: "fileCompare" as MenuKey },
   },
   {
     path: "/cloud/s3",

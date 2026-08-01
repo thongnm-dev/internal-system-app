@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct FileSplitSource {
     /// Đường dẫn đầy đủ tới file/folder.
-    pub path: String,
-    /// Tên hiển thị (chỉ tên, không có thư mục cha).
-    pub name: String,
+    pub path: String
 }
 
 /// Thông số cấu hình cho một lần nén + tách.

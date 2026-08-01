@@ -27,6 +27,8 @@ mod commands {
     pub mod excel2md_commands;
     /// Command nén ZIP (AES-256) và cắt file thành các phần `.001`.
     pub mod file_split_commands;
+    /// Commands cho công cụ so sánh khác biệt giữa 2 file.
+    pub mod file_compare_commands;
     /// Commands cho resize ảnh evidence (hardcopy) trong Excel.
     pub mod excel_helper_commands;
     /// Commands cho import CSV báo cáo tháng.
@@ -141,6 +143,8 @@ mod models {
     pub mod excel2md;
     /// Model cho công cụ nén ZIP (AES-256) và cắt file `.001`.
     pub mod file_split;
+    /// Model cho công cụ so sánh khác biệt giữa 2 file.
+    pub mod file_compare;
     /// Model kết quả resize ảnh evidence (hardcopy) trong Excel.
     pub mod excel_helper;
     /// Model cho import CSV (preview row, minute totals, work record).
@@ -205,6 +209,8 @@ mod services {
     pub mod excel2md_service;
     /// Service nén ZIP (AES-256) và cắt file thành các phần `.001`.
     pub mod file_split_service;
+    /// Service so sánh khác biệt giữa 2 file (text/markdown/word/excel).
+    pub mod file_compare_service;
     /// Service resize ảnh evidence (hardcopy) trong Excel (XML splicing trực tiếp).
     pub mod excel_helper_service;
     /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.

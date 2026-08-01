@@ -13,6 +13,7 @@ export type MenuKey =
   | "dailyReport"
   | "checkMonthlyReport"
   | "fileSplit"
+  | "fileCompare"
   | "cloudS3"
   | "cloudS3Upload"
   | "cloudS3Download"

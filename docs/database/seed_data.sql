@@ -71,6 +71,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('terminal',        'Terminal',          '/terminal',          'pi-desktop',    'Tools',      TRUE, 31),
     ('excelHelper',     'Excel Helper',      '/excel-helper',      'pi-images',     'Tools',      TRUE, 32),
     ('fileSplit',       'File Split',        '/file-split',        'pi-file-export','Tools',      TRUE, 33),
+    ('fileCompare',     'File Compare',      '/file-compare',      'pi-arrow-right-arrow-left','Tools', TRUE, 34),
     ('git',             'Git Desktop',       '/git',               'pi-github',     'Tools',      TRUE, 10),
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),

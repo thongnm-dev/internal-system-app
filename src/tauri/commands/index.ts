@@ -7,6 +7,7 @@ export * from "./check-monthly-report";
 export * from "./excel2md";
 export * from "./excel-helper";
 export * from "./file-split";
+export * from "./file-compare";
 export * from "./project";
 export * from "./daily-note";
 export * from "./daily-report";

@@ -44,6 +44,7 @@ use commands::backlog_commands::{
 };
 use commands::excel2md_commands::excel2md;
 use commands::excel_helper_commands::{list_excel_sheet_names, resize_excel_images};
+use commands::file_compare_commands::{file_compare_export, file_compare_run};
 use commands::file_split_commands::{file_split_calc_size, file_split_run};
 use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
@@ -201,6 +202,9 @@ pub fn run() {
             // === File split (zip AES-256 + cắt .001) command ===
             file_split_run,
             file_split_calc_size,
+            // === File compare (text/markdown/word/excel diff) command ===
+            file_compare_run,
+            file_compare_export,
             // === Resize evidence images command ===
             list_excel_sheet_names,
             resize_excel_images,
