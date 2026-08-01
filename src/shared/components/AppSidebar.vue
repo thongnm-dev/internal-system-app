@@ -53,7 +53,7 @@ function tooltipOpts(label: string) {
     <!-- Header -->
     <div :class="['border-b border-sidebar-border', isCollapsed ? 'p-3' : 'p-5']">
       <div :class="['flex items-center', isCollapsed ? 'justify-center' : 'gap-2']">
-        <img src="@/assets/icon.ico" alt="Logo" class="h-8 w-8 shrink-0" />
+        <img src="@/assets/logo.png" alt="Logo" class="h-8 w-8 shrink-0 rounded-lg" />
         <span v-if="!isCollapsed" class="text-lg font-bold text-sidebar-title">Manager System</span>
       </div>
     </div>

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Squircle navy background -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#233247"/>
+      <stop offset="0.55" stop-color="#16233A"/>
+      <stop offset="1" stop-color="#0B1526"/>
+    </linearGradient>
+
+    <!-- Cube top face: amber accent (the glowing "core") -->
+    <linearGradient id="topFace" x1="382" y1="395" x2="642" y2="545" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FCD34D"/>
+      <stop offset="0.5" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#D97706"/>
+    </linearGradient>
+
+    <!-- Cube left face -->
+    <linearGradient id="leftFace" x1="382" y1="470" x2="512" y2="695" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B5578"/>
+      <stop offset="1" stop-color="#243B5A"/>
+    </linearGradient>
+
+    <!-- Cube right face -->
+    <linearGradient id="rightFace" x1="642" y1="470" x2="512" y2="695" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2C466A"/>
+      <stop offset="1" stop-color="#182C46"/>
+    </linearGradient>
+
+    <!-- Node fill -->
+    <radialGradient id="node" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#93B4E0"/>
+      <stop offset="1" stop-color="#4C6C97"/>
+    </radialGradient>
+
+    <!-- Connection line stroke -->
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5A79A6"/>
+      <stop offset="1" stop-color="#3A5580"/>
+    </linearGradient>
+
+    <radialGradient id="coreGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F59E0B" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background squircle -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" ry="230" fill="url(#bg)"/>
+  <!-- Subtle inner top highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="230" ry="230" fill="none" stroke="#4A6488" stroke-opacity="0.25" stroke-width="3"/>
+
+  <!-- Amber core glow behind cube -->
+  <circle cx="512" cy="500" r="330" fill="url(#coreGlow)"/>
+
+  <!-- Connection lines (center -> nodes) -->
+  <g stroke="url(#line)" stroke-width="14" stroke-linecap="round" opacity="0.9">
+    <line x1="512" y1="512" x2="512" y2="222"/>
+    <line x1="512" y1="512" x2="763" y2="367"/>
+    <line x1="512" y1="512" x2="763" y2="657"/>
+    <line x1="512" y1="512" x2="512" y2="802"/>
+    <line x1="512" y1="512" x2="261" y2="657"/>
+    <line x1="512" y1="512" x2="261" y2="367"/>
+  </g>
+
+  <!-- Outer nodes -->
+  <g stroke="#0B1526" stroke-width="6">
+    <circle cx="512" cy="222" r="40" fill="url(#node)"/>
+    <circle cx="763" cy="367" r="40" fill="url(#node)"/>
+    <circle cx="763" cy="657" r="40" fill="url(#node)"/>
+    <circle cx="512" cy="802" r="40" fill="url(#node)"/>
+    <circle cx="261" cy="657" r="40" fill="url(#node)"/>
+    <circle cx="261" cy="367" r="40" fill="url(#node)"/>
+  </g>
+  <!-- Amber accent node (top) -->
+  <circle cx="512" cy="222" r="18" fill="#FCD34D"/>
+
+  <!-- Central cube hub -->
+  <g filter="url(#softShadow)">
+    <!-- right face -->
+    <path d="M642,470 L512,545 L512,695 L642,620 Z" fill="url(#rightFace)"/>
+    <!-- left face -->
+    <path d="M382,470 L512,545 L512,695 L382,620 Z" fill="url(#leftFace)"/>
+    <!-- top face (amber core) -->
+    <path d="M512,395 L642,470 L512,545 L382,470 Z" fill="url(#topFace)"/>
+    <!-- edge highlights -->
+    <path d="M512,395 L512,545" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="4"/>
+    <path d="M382,470 L642,470" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="3"/>
+  </g>
+</svg>
