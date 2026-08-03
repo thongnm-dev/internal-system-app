@@ -83,7 +83,7 @@ pub async fn probe(account: &StoredAccount) -> ProbeOutcome {
 const CLAUDE_OAUTH_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 
 /// Một cửa sổ giới hạn (`five_hour` / `seven_day`) trong response usage.
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 struct UsageWindow {
     /// Phần trăm ĐÃ DÙNG (0–100).
     #[serde(default)]
@@ -93,10 +93,66 @@ struct UsageWindow {
     resets_at: Option<String>,
 }
 
+/// Response từ `/api/oauth/usage`. Trước đây có `five_hour`/`seven_day` ở top-level;
+/// từ khi Anthropic thêm mode (standard / extended_thinking / …) các window có thể nằm
+/// dưới key mode, ví dụ `{ "standard": { "five_hour": … } }`. Parse cả hai layout.
 #[derive(Debug, serde::Deserialize)]
 struct OauthUsageResponse {
     five_hour: Option<UsageWindow>,
     seven_day: Option<UsageWindow>,
+}
+
+/// Nhóm window cho một chế độ (standard, extended_thinking, …).
+#[derive(Debug, serde::Deserialize)]
+struct ModeWindows {
+    five_hour: Option<UsageWindow>,
+    seven_day: Option<UsageWindow>,
+}
+
+/// Trích xuất cặp (five_hour, seven_day) từ JSON response, hỗ trợ cả layout cũ
+/// (flat) lẫn layout mới (mode-based). Với layout mới, lấy window có utilization
+/// CAO NHẤT giữa các mode (phản ánh giới hạn nào bị ép chặt nhất).
+fn extract_usage_windows(body: &str) -> (Option<UsageWindow>, Option<UsageWindow>) {
+    let val: serde_json::Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(_) => return (None, None),
+    };
+
+    // 1) Thử layout cũ (top-level five_hour / seven_day).
+    if let Ok(flat) = serde_json::from_value::<OauthUsageResponse>(val.clone()) {
+        if flat.five_hour.is_some() || flat.seven_day.is_some() {
+            return (flat.five_hour, flat.seven_day);
+        }
+    }
+
+    // 2) Layout mode-based: duyệt mọi key ở top-level là object chứa five_hour/seven_day.
+    //    Lấy window có utilization cao nhất (= sát giới hạn nhất).
+    let obj = match val.as_object() {
+        Some(o) => o,
+        None => return (None, None),
+    };
+
+    let mut best_five: Option<UsageWindow> = None;
+    let mut best_seven: Option<UsageWindow> = None;
+
+    for (_mode_key, mode_val) in obj {
+        if let Ok(mw) = serde_json::from_value::<ModeWindows>(mode_val.clone()) {
+            if let Some(w) = mw.five_hour {
+                best_five = Some(match best_five {
+                    Some(prev) if prev.utilization >= w.utilization => prev,
+                    _ => w,
+                });
+            }
+            if let Some(w) = mw.seven_day {
+                best_seven = Some(match best_seven {
+                    Some(prev) if prev.utilization >= w.utilization => prev,
+                    _ => w,
+                });
+            }
+        }
+    }
+
+    (best_five, best_seven)
 }
 
 /// Probe account subscription qua OAuth usage endpoint.
@@ -116,6 +172,10 @@ async fn probe_subscription(client: &Client, account: &StoredAccount) -> ProbeOu
         ai_usage_detect::read_oauth_token(&account.config_dir)
     };
     let Some(token) = token else {
+        log::debug!(
+            "[probe] id={} email={} — no token found (config_dir={})",
+            account.id, account.email, account.config_dir,
+        );
         return ProbeOutcome::simple(account.id, "unknown", "manual");
     };
 
@@ -128,31 +188,40 @@ async fn probe_subscription(client: &Client, account: &StoredAccount) -> ProbeOu
         .await;
 
     let response = match response {
-        // Lỗi mạng/timeout tạm thời → giữ nguyên số liệu cũ (không coi là account lỗi).
         Ok(resp) => resp,
-        Err(_) => return keep_previous(account),
+        Err(e) => {
+            log::debug!("[probe] id={} email={} — network error: {e}", account.id, account.email);
+            return keep_previous(account);
+        }
     };
 
     let status = response.status();
-    // Chỉ 401/403 mới là lỗi thật (token hết hạn/không hợp lệ → cần login lại).
     if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+        log::debug!("[probe] id={} email={} — auth error {status}", account.id, account.email);
         return ProbeOutcome::simple(account.id, "error", "manual");
     }
-    // 429 (poll quá dày) hoặc lỗi tạm thời khác → giữ nguyên số liệu cũ.
     if !status.is_success() {
+        log::debug!("[probe] id={} email={} — HTTP {status}, keeping previous", account.id, account.email);
         return keep_previous(account);
     }
 
-    let usage = match response.json::<OauthUsageResponse>().await {
-        Ok(usage) => usage,
+    let body = match response.text().await {
+        Ok(text) => text,
         Err(_) => return keep_previous(account),
     };
+    log::debug!(
+        "[probe] id={} email={} — raw response: {}",
+        account.id, account.email,
+        if body.len() > 2000 { &body[..2000] } else { &body },
+    );
 
-    let (session_percent, session_reset_at) = match usage.five_hour.map(window_remaining) {
+    let (five_hour, seven_day) = extract_usage_windows(&body);
+
+    let (session_percent, session_reset_at) = match five_hour.map(window_remaining) {
         Some((p, r)) => (Some(p), r),
         None => (None, None),
     };
-    let (weekly_percent, weekly_reset_at) = match usage.seven_day.map(window_remaining) {
+    let (weekly_percent, weekly_reset_at) = match seven_day.map(window_remaining) {
         Some((p, r)) => (Some(p), r),
         None => (None, None),
     };
@@ -162,6 +231,11 @@ async fn probe_subscription(client: &Client, account: &StoredAccount) -> ProbeOu
         .into_iter()
         .flatten()
         .fold(None, |acc: Option<f64>, p| Some(acc.map_or(p, |a| a.min(p))));
+
+    log::debug!(
+        "[probe] id={} email={} — session={:?}% weekly={:?}% combined={:?}%",
+        account.id, account.email, session_percent, weekly_percent, combined,
+    );
 
     ProbeOutcome {
         id: account.id,

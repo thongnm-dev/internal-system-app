@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import Button from "primevue/button";
+import ToggleSwitch from "primevue/toggleswitch";
 import ProgressSpinner from "primevue/progressspinner";
 import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
@@ -22,32 +21,24 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: "expand"): void; (e: "export"): void }>();
 
 const viewModeOptions = [
-  { label: "2 cột", value: "split" },
-  { label: "1 cột", value: "inline" },
+  { label: "Side by Side", value: "split" },
+  { label: "Inline", value: "inline" },
 ];
 const viewMode = ref<"split" | "inline">("split");
-
-const mdRenderOptions = [
-  { label: "Raw diff", value: "raw" },
-  { label: "Rendered", value: "rendered" },
-];
-const mdRender = ref<"raw" | "rendered">("raw");
+const diffOnly = ref(false);
 
 const result = computed(() => props.result);
 const isExcel = computed(() => result.value?.kind === "excel");
-const isMarkdown = computed(() => result.value?.kind === "markdown");
 const textDiff = computed(() => result.value?.textDiff ?? null);
 
-// Side-by-side: cột trái = equal+delete, cột phải = equal+insert.
-const oldSide = computed(() => textDiff.value?.lines.filter((l) => l.tag !== "insert") ?? []);
-const newSide = computed(() => textDiff.value?.lines.filter((l) => l.tag !== "delete") ?? []);
-
-function renderMarkdown(lines: { content: string }[]): string {
-  const raw = lines.map((l) => l.content).join("\n");
-  return DOMPurify.sanitize(marked.parse(raw, { async: false }) as string);
-}
-const oldRendered = computed(() => renderMarkdown(oldSide.value));
-const newRendered = computed(() => renderMarkdown(newSide.value));
+const allOldSide = computed(() => textDiff.value?.lines.filter((l) => l.tag !== "insert") ?? []);
+const allNewSide = computed(() => textDiff.value?.lines.filter((l) => l.tag !== "delete") ?? []);
+const oldSide = computed(() => diffOnly.value ? allOldSide.value.filter((l) => l.tag !== "equal") : allOldSide.value);
+const newSide = computed(() => diffOnly.value ? allNewSide.value.filter((l) => l.tag !== "equal") : allNewSide.value);
+const inlineLines = computed(() => {
+  const lines = textDiff.value?.lines ?? [];
+  return diffOnly.value ? lines.filter((l) => l.tag !== "equal") : lines;
+});
 
 const sheetOptions = computed(
   () => result.value?.excelDiff?.sheets.map((s) => ({ label: sheetLabel(s), value: s.name })) ?? [],
@@ -59,14 +50,14 @@ function sheetLabel(s: SheetDiff) {
 
 const axisClass: Record<string, string> = {
   equal: "",
-  added: "bg-emerald-50 text-emerald-700",
-  removed: "bg-rose-50 text-rose-700",
+  added: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
+  removed: "bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
 };
 const cellClass: Record<string, string> = {
   equal: "",
-  changed: "bg-amber-100 text-amber-900",
-  added: "bg-emerald-100 text-emerald-900",
-  removed: "bg-rose-100 text-rose-900",
+  changed: "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300",
+  added: "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-300",
+  removed: "bg-rose-100 text-rose-900 dark:bg-rose-500/20 dark:text-rose-300",
 };
 
 const activeSheet = ref<string | null>(null);
@@ -116,15 +107,6 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
 
       <div class="flex items-center gap-2">
         <SelectButton
-          v-if="isMarkdown && result"
-          v-model="mdRender"
-          :options="mdRenderOptions"
-          option-label="label"
-          option-value="value"
-          :allow-empty="false"
-          size="small"
-        />
-        <SelectButton
           v-if="!isExcel && result"
           v-model="viewMode"
           :options="viewModeOptions"
@@ -133,6 +115,10 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
           :allow-empty="false"
           size="small"
         />
+        <label v-if="result && !isExcel" class="flex items-center gap-1.5 text-[11px] font-medium text-muted">
+          <ToggleSwitch v-model="diffOnly" />
+          Chỉ diff
+        </label>
         <div v-if="result && !isExcel" class="flex items-center gap-3 text-[11px] font-medium">
           <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-emerald-200" /> Thêm</span>
           <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-rose-200" /> Xóa</span>
@@ -186,24 +172,8 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
 
     <!-- ── Text / Markdown / Word ── -->
     <template v-else-if="!isExcel && textDiff">
-      <!-- Markdown rendered -->
-      <div
-        v-if="isMarkdown && mdRender === 'rendered'"
-        class="mt-3 grid min-h-0 flex-1 gap-3"
-        :class="viewMode === 'split' ? 'grid-cols-2' : 'grid-cols-1'"
-      >
-        <div class="flex flex-col overflow-hidden rounded-md border border-divider">
-          <div class="border-b border-divider bg-canvas px-3 py-1.5 text-xs font-bold text-muted">File A</div>
-          <div class="markdown-body min-h-0 flex-1 overflow-auto p-4 text-sm" v-html="oldRendered" />
-        </div>
-        <div v-if="viewMode === 'split'" class="flex flex-col overflow-hidden rounded-md border border-divider">
-          <div class="border-b border-divider bg-canvas px-3 py-1.5 text-xs font-bold text-muted">File B</div>
-          <div class="markdown-body min-h-0 flex-1 overflow-auto p-4 text-sm" v-html="newRendered" />
-        </div>
-      </div>
-
       <!-- Raw diff — 2 cột -->
-      <div v-else-if="viewMode === 'split'" class="mt-3 grid min-h-0 flex-1 grid-cols-2 gap-3">
+      <div v-if="viewMode === 'split'" class="mt-3 grid min-h-0 flex-1 grid-cols-2 gap-3">
         <div class="flex flex-col overflow-hidden rounded-md border border-divider">
           <div class="border-b border-divider bg-canvas px-3 py-1.5 text-xs font-bold text-muted">File A</div>
           <div class="min-h-0 flex-1 overflow-auto py-1 font-mono text-xs leading-relaxed">
@@ -211,10 +181,10 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
               v-for="(l, i) in oldSide"
               :key="`a${i}`"
               class="flex px-2"
-              :class="l.tag === 'delete' ? 'bg-rose-100' : ''"
+              :class="l.tag === 'delete' ? 'bg-rose-100 dark:bg-rose-500/20' : ''"
             >
               <span class="mr-3 inline-block w-10 shrink-0 select-none text-right text-muted/60">{{ lineNo(l.oldLine) }}</span>
-              <span class="whitespace-pre-wrap break-all text-ink">{{ l.content }}</span>
+              <span class="whitespace-pre-wrap break-all" :class="l.tag === 'delete' ? 'text-rose-900 dark:text-rose-300' : 'text-ink'">{{ l.content }}</span>
             </div>
           </div>
         </div>
@@ -225,10 +195,10 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
               v-for="(l, i) in newSide"
               :key="`b${i}`"
               class="flex px-2"
-              :class="l.tag === 'insert' ? 'bg-emerald-100' : ''"
+              :class="l.tag === 'insert' ? 'bg-emerald-100 dark:bg-emerald-500/20' : ''"
             >
               <span class="mr-3 inline-block w-10 shrink-0 select-none text-right text-muted/60">{{ lineNo(l.newLine) }}</span>
-              <span class="whitespace-pre-wrap break-all text-ink">{{ l.content }}</span>
+              <span class="whitespace-pre-wrap break-all" :class="l.tag === 'insert' ? 'text-emerald-900 dark:text-emerald-300' : 'text-ink'">{{ l.content }}</span>
             </div>
           </div>
         </div>
@@ -238,16 +208,16 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
       <div v-else class="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-divider">
         <div class="min-h-0 flex-1 overflow-auto py-1 font-mono text-xs leading-relaxed">
           <div
-            v-for="(l, i) in textDiff.lines"
+            v-for="(l, i) in inlineLines"
             :key="`i${i}`"
             class="flex px-2"
-            :class="l.tag === 'insert' ? 'bg-emerald-100' : l.tag === 'delete' ? 'bg-rose-100' : ''"
+            :class="l.tag === 'insert' ? 'bg-emerald-100 dark:bg-emerald-500/20' : l.tag === 'delete' ? 'bg-rose-100 dark:bg-rose-500/20' : ''"
           >
             <span class="mr-2 inline-block w-4 shrink-0 select-none text-center font-bold"
-              :class="l.tag === 'insert' ? 'text-emerald-600' : l.tag === 'delete' ? 'text-rose-600' : 'text-muted/40'">
+              :class="l.tag === 'insert' ? 'text-emerald-600 dark:text-emerald-400' : l.tag === 'delete' ? 'text-rose-600 dark:text-rose-400' : 'text-muted/40'">
               {{ l.tag === "insert" ? "+" : l.tag === "delete" ? "−" : "" }}
             </span>
-            <span class="whitespace-pre-wrap break-all text-ink">{{ l.content }}</span>
+            <span class="whitespace-pre-wrap break-all" :class="l.tag === 'insert' ? 'text-emerald-900 dark:text-emerald-300' : l.tag === 'delete' ? 'text-rose-900 dark:text-rose-300' : 'text-ink'">{{ l.content }}</span>
           </div>
         </div>
       </div>
@@ -282,7 +252,7 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
               <td
                 class="sticky left-0 z-10 border border-divider px-2 py-1 text-center"
                 :class="activeSheetData.rowsMeta[r].strikethrough
-                  ? 'bg-rose-50 text-rose-400 line-through'
+                  ? 'bg-rose-50 text-rose-400 dark:bg-rose-500/20 dark:text-rose-400 line-through'
                   : (axisClass[activeSheetData.rowsMeta[r].tag] || 'bg-canvas text-muted')"
                 :title="activeSheetData.rowsMeta[r].strikethrough ? 'Dòng bị strikethrough (xóa)' : activeSheetData.rowsMeta[r].tag === 'added' ? 'Dòng thêm mới' : activeSheetData.rowsMeta[r].tag === 'removed' ? 'Dòng bị xóa' : ''"
               >
@@ -293,7 +263,7 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
                 :key="`c${r}-${c}`"
                 class="max-w-[220px] truncate border border-divider px-2 py-1"
                 :class="activeSheetData.rowsMeta[r].strikethrough
-                  ? 'bg-rose-50 text-rose-400 line-through'
+                  ? 'bg-rose-50 text-rose-400 dark:bg-rose-500/20 dark:text-rose-400 line-through'
                   : cellClass[cell.tag]"
                 :title="activeSheetData.rowsMeta[r].strikethrough
                   ? (cell.old || cell.new)
