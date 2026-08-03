@@ -53,7 +53,7 @@ const sheetOptions = computed(
   () => result.value?.excelDiff?.sheets.map((s) => ({ label: sheetLabel(s), value: s.name })) ?? [],
 );
 function sheetLabel(s: SheetDiff) {
-  const diff = s.changed + s.added + s.removed;
+  const diff = s.changed + s.added + s.removed + s.rowStrikethrough;
   return diff > 0 ? `${s.name} (${diff})` : s.name;
 }
 
@@ -102,6 +102,9 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
         </span>
         <span v-else-if="activeSheetData" class="text-xs font-semibold text-muted">
           {{ activeSheetData.changed }} đổi · {{ activeSheetData.added }} thêm · {{ activeSheetData.removed }} xóa
+          <template v-if="activeSheetData.rowStrikethrough">
+            · {{ activeSheetData.rowStrikethrough }} strikethrough
+          </template>
           <template v-if="activeSheetData.colRemoved || activeSheetData.colAdded">
             · cột +{{ activeSheetData.colAdded }}/−{{ activeSheetData.colRemoved }}
           </template>
@@ -278,8 +281,10 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
             <tr v-for="(row, r) in activeSheetData.cells" :key="`r${r}`">
               <td
                 class="sticky left-0 z-10 border border-divider px-2 py-1 text-center"
-                :class="axisClass[activeSheetData.rowsMeta[r].tag] || 'bg-canvas text-muted'"
-                :title="activeSheetData.rowsMeta[r].tag === 'added' ? 'Dòng thêm mới' : activeSheetData.rowsMeta[r].tag === 'removed' ? 'Dòng bị xóa' : ''"
+                :class="activeSheetData.rowsMeta[r].strikethrough
+                  ? 'bg-rose-50 text-rose-400 line-through'
+                  : (axisClass[activeSheetData.rowsMeta[r].tag] || 'bg-canvas text-muted')"
+                :title="activeSheetData.rowsMeta[r].strikethrough ? 'Dòng bị strikethrough (xóa)' : activeSheetData.rowsMeta[r].tag === 'added' ? 'Dòng thêm mới' : activeSheetData.rowsMeta[r].tag === 'removed' ? 'Dòng bị xóa' : ''"
               >
                 {{ activeSheetData.rowsMeta[r].label }}
               </td>
@@ -287,10 +292,14 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
                 v-for="(cell, c) in row"
                 :key="`c${r}-${c}`"
                 class="max-w-[220px] truncate border border-divider px-2 py-1"
-                :class="cellClass[cell.tag]"
-                :title="cell.tag === 'changed' ? `${cell.old} → ${cell.new}` : cell.tag === 'removed' ? cell.old : cell.new"
+                :class="activeSheetData.rowsMeta[r].strikethrough
+                  ? 'bg-rose-50 text-rose-400 line-through'
+                  : cellClass[cell.tag]"
+                :title="activeSheetData.rowsMeta[r].strikethrough
+                  ? (cell.old || cell.new)
+                  : cell.tag === 'changed' ? `${cell.old} → ${cell.new}` : cell.tag === 'removed' ? cell.old : cell.new"
               >
-                {{ cell.tag === "removed" ? cell.old : cell.new }}
+                {{ activeSheetData.rowsMeta[r].strikethrough ? (cell.old || cell.new) : (cell.tag === "removed" ? cell.old : cell.new) }}
               </td>
             </tr>
           </tbody>

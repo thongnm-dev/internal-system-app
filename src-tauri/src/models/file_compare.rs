@@ -58,6 +58,9 @@ pub struct AxisMarker {
     pub tag: String,
     /// Nhãn cột gốc (A, B, C…) hoặc số dòng gốc — dùng hiển thị header.
     pub label: String,
+    /// Dòng bị strikethrough toàn bộ (ở file A hoặc B) → xem là đã xóa.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub strikethrough: bool,
 }
 
 /// Kết quả diff của một sheet Excel (đã căn chỉnh cột + dòng bằng LCS).
@@ -86,10 +89,12 @@ pub struct SheetDiff {
     pub row_added: usize,
     /// Số dòng bị xóa.
     pub row_removed: usize,
+    /// Số dòng bị strikethrough (xóa bằng gạch ngang).
+    pub row_strikethrough: usize,
 }
 
 /// Trạng thái một ô sau khi so sánh.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CellDiff {
     /// `"equal" | "changed" | "added" | "removed"`.

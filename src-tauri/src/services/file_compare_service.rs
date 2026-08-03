@@ -5,7 +5,7 @@
 //!   (mỗi paragraph 1 dòng) → diff theo dòng.
 //! - Excel (`.xlsx/.xls`): `calamine` đọc từng sheet → so sánh cell-by-cell.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -179,6 +179,299 @@ fn diff_lines(a: &[String], b: &[String]) -> TextDiff {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Phát hiện strikethrough trong xlsx/xlsm
+// ─────────────────────────────────────────────────────────────────────────
+
+fn read_zip_entry(archive: &mut zip::ZipArchive<File>, name: &str) -> Option<String> {
+    let mut entry = archive.by_name(name).ok()?;
+    let mut buf = String::new();
+    entry.read_to_string(&mut buf).ok()?;
+    Some(buf)
+}
+
+/// Kiểm tra node (hoặc con cháu) có chứa `<strike/>` hay không.
+fn has_strike_element(node: &roxmltree::Node) -> bool {
+    node.descendants().any(|child| {
+        child.tag_name().name() == "strike"
+            && match child.attribute("val") {
+                None | Some("true") | Some("1") => true,
+                _ => false,
+            }
+    })
+}
+
+fn parse_strike_xf_indices(styles_xml: &str) -> HashSet<usize> {
+    let mut result = HashSet::new();
+    let doc = match roxmltree::Document::parse(styles_xml) {
+        Ok(d) => d,
+        Err(_) => return result,
+    };
+
+    let mut strike_fonts: HashSet<usize> = HashSet::new();
+    let mut font_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "font"
+            && node.parent().map(|p| p.tag_name().name()) == Some("fonts")
+        {
+            if has_strike_element(&node) {
+                strike_fonts.insert(font_idx);
+            }
+            font_idx += 1;
+        }
+    }
+
+    if strike_fonts.is_empty() {
+        return result;
+    }
+
+    // Collect fontId for each cellStyleXf (inheritance lookup)
+    let mut style_xf_fonts: Vec<usize> = Vec::new();
+    for node in doc.descendants() {
+        if node.tag_name().name() == "xf"
+            && node.parent().map(|p| p.tag_name().name()) == Some("cellStyleXfs")
+        {
+            let fid = node
+                .attribute("fontId")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+            style_xf_fonts.push(fid);
+        }
+    }
+
+    let mut xf_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "xf"
+            && node.parent().map(|p| p.tag_name().name()) == Some("cellXfs")
+        {
+            let direct = node
+                .attribute("fontId")
+                .and_then(|s| s.parse::<usize>().ok())
+                .map_or(false, |f| strike_fonts.contains(&f));
+            let inherited = node
+                .attribute("xfId")
+                .and_then(|s| s.parse::<usize>().ok())
+                .and_then(|xfid| style_xf_fonts.get(xfid).copied())
+                .map_or(false, |f| strike_fonts.contains(&f));
+
+            if direct || inherited {
+                result.insert(xf_idx);
+            }
+            xf_idx += 1;
+        }
+    }
+
+    result
+}
+
+/// Parse shared strings — tìm index nào có toàn bộ rich-text run bị strikethrough.
+fn parse_strike_shared_strings(sst_xml: &str) -> HashSet<usize> {
+    let mut result = HashSet::new();
+    let doc = match roxmltree::Document::parse(sst_xml) {
+        Ok(d) => d,
+        Err(_) => return result,
+    };
+
+    let mut si_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "si" {
+            let runs: Vec<_> = node
+                .children()
+                .filter(|c| c.tag_name().name() == "r")
+                .collect();
+            if !runs.is_empty() {
+                let all_strike = runs.iter().all(|r| has_strike_element(r));
+                if all_strike {
+                    result.insert(si_idx);
+                }
+            }
+            si_idx += 1;
+        }
+    }
+
+    result
+}
+
+fn resolve_sheet_xml_paths(workbook_xml: &str, rels_xml: &str) -> Vec<(String, String)> {
+    let mut sheet_rids: Vec<(String, String)> = Vec::new();
+    if let Ok(doc) = roxmltree::Document::parse(workbook_xml) {
+        for node in doc.descendants() {
+            if node.tag_name().name() == "sheet" {
+                let name = node.attribute("name").unwrap_or("").to_string();
+                let rid = node
+                    .attribute((
+                        "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+                        "id",
+                    ))
+                    .unwrap_or("")
+                    .to_string();
+                if !name.is_empty() && !rid.is_empty() {
+                    sheet_rids.push((name, rid));
+                }
+            }
+        }
+    }
+
+    let mut rid_to_target: HashMap<String, String> = HashMap::new();
+    if let Ok(doc) = roxmltree::Document::parse(rels_xml) {
+        for node in doc.descendants() {
+            if node.tag_name().name() == "Relationship" {
+                if let (Some(id), Some(target)) =
+                    (node.attribute("Id"), node.attribute("Target"))
+                {
+                    rid_to_target.insert(id.to_string(), target.to_string());
+                }
+            }
+        }
+    }
+
+    sheet_rids
+        .into_iter()
+        .filter_map(|(name, rid)| {
+            rid_to_target.get(&rid).map(|target| {
+                let xml_path = if target.starts_with('/') {
+                    target[1..].to_string()
+                } else {
+                    format!("xl/{target}")
+                };
+                (name, xml_path)
+            })
+        })
+        .collect()
+}
+
+fn parse_cell_ref(cell_ref: &str) -> Option<(usize, usize)> {
+    let bytes = cell_ref.as_bytes();
+    let mut col = 0usize;
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+        col = col * 26 + (bytes[i].to_ascii_uppercase() - b'A') as usize + 1;
+        i += 1;
+    }
+    if col == 0 || i >= bytes.len() {
+        return None;
+    }
+    col -= 1;
+    let row: usize = cell_ref[i..].parse().ok()?;
+    Some((row - 1, col))
+}
+
+fn find_strike_cells(
+    sheet_xml: &str,
+    strike_xf: &HashSet<usize>,
+    strike_ssi: &HashSet<usize>,
+) -> HashSet<(usize, usize)> {
+    let mut result = HashSet::new();
+    let doc = match roxmltree::Document::parse(sheet_xml) {
+        Ok(d) => d,
+        Err(_) => return result,
+    };
+
+    for node in doc.descendants() {
+        if node.tag_name().name() != "c" {
+            continue;
+        }
+        let Some(pos) = node.attribute("r").and_then(parse_cell_ref) else {
+            continue;
+        };
+
+        // 1. Cell style có strikethrough
+        if let Some(si) = node.attribute("s").and_then(|s| s.parse::<usize>().ok()) {
+            if strike_xf.contains(&si) {
+                result.insert(pos);
+                continue;
+            }
+        }
+
+        // 2. Shared string có rich-text strikethrough (t="s")
+        if node.attribute("t") == Some("s") {
+            if let Some(v) = node.descendants().find(|c| c.tag_name().name() == "v") {
+                if let Some(ssi) = v.text().and_then(|t| t.parse::<usize>().ok()) {
+                    if strike_ssi.contains(&ssi) {
+                        result.insert(pos);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // 3. Inline string có rich-text strikethrough (t="inlineStr")
+        if node.attribute("t") == Some("inlineStr") {
+            if let Some(is_node) = node.children().find(|c| c.tag_name().name() == "is") {
+                let runs: Vec<_> = is_node
+                    .children()
+                    .filter(|c| c.tag_name().name() == "r")
+                    .collect();
+                if !runs.is_empty() && runs.iter().all(|r| has_strike_element(r)) {
+                    result.insert(pos);
+                }
+            }
+        }
+    }
+
+    result
+}
+
+/// Nội dung bị strikethrough (Ctrl+5) được xem là đã xóa.
+/// Phát hiện qua 3 kênh: cell style, shared string rich-text, inline string rich-text.
+fn find_strikethrough_cells(path: &str) -> HashMap<String, HashSet<(usize, usize)>> {
+    let ext = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if ext != "xlsx" && ext != "xlsm" {
+        return HashMap::new();
+    }
+
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return HashMap::new(),
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return HashMap::new(),
+    };
+
+    // Cell-style strikethrough (font → xf)
+    let strike_xf = read_zip_entry(&mut archive, "xl/styles.xml")
+        .map(|xml| parse_strike_xf_indices(&xml))
+        .unwrap_or_default();
+
+    // Rich-text strikethrough trong shared strings
+    let strike_ssi = read_zip_entry(&mut archive, "xl/sharedStrings.xml")
+        .map(|xml| parse_strike_shared_strings(&xml))
+        .unwrap_or_default();
+
+    if strike_xf.is_empty() && strike_ssi.is_empty() {
+        return HashMap::new();
+    }
+
+    let workbook_xml = match read_zip_entry(&mut archive, "xl/workbook.xml") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let rels_xml = match read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+
+    let sheet_paths = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
+
+    let mut result = HashMap::new();
+    for (name, xml_path) in sheet_paths {
+        if let Some(sheet_xml) = read_zip_entry(&mut archive, &xml_path) {
+            let cells = find_strike_cells(&sheet_xml, &strike_xf, &strike_ssi);
+            if !cells.is_empty() {
+                result.insert(name, cells);
+            }
+        }
+    }
+
+    result
+}
+
 /// Đọc toàn bộ sheet của 1 workbook thành map: tên sheet → lưới giá trị ô.
 fn read_workbook(path: &str) -> AppResult<Vec<(String, Vec<Vec<String>>)>> {
     let mut workbook = open_workbook_auto(path)
@@ -323,10 +616,43 @@ fn align_columns(
     ops
 }
 
+/// Từ map ô strikethrough + lưới dữ liệu, trả về tập chỉ số dòng có ô bị strikethrough.
+/// Chỉ cần BẤT KỲ ô không rỗng nào bị strikethrough → cả dòng được xem là xóa.
+fn fully_struck_rows(
+    grid: &[Vec<String>],
+    strike_cells: Option<&HashSet<(usize, usize)>>,
+) -> HashSet<usize> {
+    let Some(cells) = strike_cells else {
+        return HashSet::new();
+    };
+    grid.iter()
+        .enumerate()
+        .filter_map(|(r, row)| {
+            let non_empty: Vec<(usize, &String)> = row
+                .iter()
+                .enumerate()
+                .filter(|(_, v)| !v.is_empty())
+                .collect();
+            if non_empty.is_empty() {
+                return None;
+            }
+            let struck = non_empty
+                .iter()
+                .filter(|(c, _)| cells.contains(&(r, *c)))
+                .count();
+            // Majority: more than half of non-empty cells must be strikethrough
+            (struck * 2 >= non_empty.len()).then_some(r)
+        })
+        .collect()
+}
+
 /// So sánh cell-by-cell theo từng sheet (union tên sheet của 2 file).
 fn diff_excel(file_a: &str, file_b: &str) -> AppResult<ExcelDiff> {
     let book_a = read_workbook(file_a)?;
     let book_b = read_workbook(file_b)?;
+
+    let strike_cells_a = find_strikethrough_cells(file_a);
+    let strike_cells_b = find_strikethrough_cells(file_b);
 
     // Giữ thứ tự xuất hiện: sheet của A trước, sheet chỉ có ở B nối sau.
     let mut sheet_order: Vec<String> = book_a.iter().map(|(n, _)| n.clone()).collect();
@@ -349,7 +675,11 @@ fn diff_excel(file_a: &str, file_b: &str) -> AppResult<ExcelDiff> {
             .find(|(n, _)| n == &name)
             .map(|(_, g)| g.clone())
             .unwrap_or_default();
-        sheets.push(diff_sheet(name, &grid_a, &grid_b));
+
+        let strike_a = fully_struck_rows(&grid_a, strike_cells_a.get(&name));
+        let strike_b = fully_struck_rows(&grid_b, strike_cells_b.get(&name));
+
+        sheets.push(diff_sheet(name, &grid_a, &grid_b, &strike_a, &strike_b));
     }
 
     Ok(ExcelDiff { sheets })
@@ -365,12 +695,64 @@ struct Slot {
 /// Ký tự phân tách khi ghép "khóa dòng" (khó xuất hiện trong dữ liệu).
 const KEY_SEP: char = '\u{1}';
 
+/// Tách dòng strikethrough ra khỏi lưới.
+/// Trả về (lưới đã lọc, map filtered→orig index, vec dòng strike (orig_idx, data) đã sắp).
+fn partition_strikes(
+    grid: &[Vec<String>],
+    strike_set: &HashSet<usize>,
+) -> (Vec<Vec<String>>, Vec<usize>, Vec<(usize, Vec<String>)>) {
+    let mut filtered = Vec::new();
+    let mut map = Vec::new();
+    let mut strikes = Vec::new();
+    for (r, row) in grid.iter().enumerate() {
+        if strike_set.contains(&r) {
+            strikes.push((r, row.clone()));
+        } else {
+            map.push(r);
+            filtered.push(row.clone());
+        }
+    }
+    (filtered, map, strikes)
+}
+
+/// Tạo 1 hàng CellDiff cho dòng strikethrough (chỉ có giá trị ở 1 phía).
+fn make_strike_cells(
+    row_data: &[String],
+    col_slots: &[Slot],
+    side_a: bool,
+) -> Vec<CellDiff> {
+    col_slots
+        .iter()
+        .map(|cs| {
+            let col_idx = if side_a { cs.a } else { cs.b };
+            let val = col_idx
+                .and_then(|c| row_data.get(c).cloned())
+                .unwrap_or_default();
+            if side_a {
+                CellDiff { tag: "removed".into(), old: val, new: String::new() }
+            } else {
+                CellDiff { tag: "added".into(), old: String::new(), new: val }
+            }
+        })
+        .collect()
+}
+
 /// So sánh 2 lưới ô của cùng một sheet, có căn chỉnh cột + dòng bằng LCS.
-fn diff_sheet(name: String, a: &[Vec<String>], b: &[Vec<String>]) -> SheetDiff {
+fn diff_sheet(
+    name: String,
+    a: &[Vec<String>],
+    b: &[Vec<String>],
+    strike_rows_a: &HashSet<usize>,
+    strike_rows_b: &HashSet<usize>,
+) -> SheetDiff {
+    // ── 0. Tách dòng strikethrough ra trước khi diff ──
+    let (fa, map_a, strike_a) = partition_strikes(a, strike_rows_a);
+    let (fb, map_b, strike_b) = partition_strikes(b, strike_rows_b);
+
     let cols_a = a.iter().map(|r| r.len()).max().unwrap_or(0);
     let cols_b = b.iter().map(|r| r.len()).max().unwrap_or(0);
 
-    // ── 1. Căn cột (LCS mờ theo multiset giá trị) ──
+    // ── 1. Căn cột (LCS mờ theo multiset giá trị — dùng lưới gốc để giữ đủ cột) ──
     let sets_a = column_multisets(a, cols_a);
     let sets_b = column_multisets(b, cols_b);
     let mut col_slots: Vec<Slot> = Vec::new();
@@ -398,10 +780,11 @@ fn diff_sheet(name: String, a: &[Vec<String>], b: &[Vec<String>]) -> SheetDiff {
             .collect::<Vec<_>>()
             .join(&KEY_SEP.to_string())
     };
-    let keys_a: Vec<String> = (0..a.len()).map(|r| row_key(a, r, &|p| p.0)).collect();
-    let keys_b: Vec<String> = (0..b.len()).map(|r| row_key(b, r, &|p| p.1)).collect();
+    // Dùng lưới đã lọc để dòng strikethrough không ảnh hưởng LCS
+    let keys_a: Vec<String> = (0..fa.len()).map(|r| row_key(&fa, r, &|p| p.0)).collect();
+    let keys_b: Vec<String> = (0..fb.len()).map(|r| row_key(&fb, r, &|p| p.1)).collect();
 
-    // ── 2. Căn dòng (Myers trên khóa dòng) ──
+    // ── 2. Căn dòng (Myers trên khóa dòng — lưới đã lọc) ──
     let mut row_slots: Vec<Slot> = Vec::new();
     for op in capture_diff_slices(Algorithm::Myers, &keys_a, &keys_b) {
         match op {
@@ -420,7 +803,6 @@ fn diff_sheet(name: String, a: &[Vec<String>], b: &[Vec<String>]) -> SheetDiff {
                     row_slots.push(Slot { a: None, b: Some(new_index + k), tag: "added" });
                 }
             }
-            // Replace: ghép theo vị trí trong khối để lộ ô bị sửa (thay vì xóa+thêm cả dòng).
             DiffOp::Replace { old_index, old_len, new_index, new_len } => {
                 let n = old_len.max(new_len);
                 for k in 0..n {
@@ -437,18 +819,18 @@ fn diff_sheet(name: String, a: &[Vec<String>], b: &[Vec<String>]) -> SheetDiff {
         }
     }
 
-    // ── 3. Dựng lưới ô + đếm ──
+    // ── 3. Dựng lưới ô + đếm (dùng lưới đã lọc) ──
     let mut cells: Vec<Vec<CellDiff>> = Vec::with_capacity(row_slots.len());
     let (mut changed, mut added, mut removed) = (0usize, 0usize, 0usize);
     for rs in &row_slots {
         let mut row_cells: Vec<CellDiff> = Vec::with_capacity(col_slots.len());
         for cs in &col_slots {
             let old_v = match (rs.a, cs.a) {
-                (Some(r), Some(c)) => a[r].get(c).cloned().unwrap_or_default(),
+                (Some(r), Some(c)) => fa[r].get(c).cloned().unwrap_or_default(),
                 _ => String::new(),
             };
             let new_v = match (rs.b, cs.b) {
-                (Some(r), Some(c)) => b[r].get(c).cloned().unwrap_or_default(),
+                (Some(r), Some(c)) => fb[r].get(c).cloned().unwrap_or_default(),
                 _ => String::new(),
             };
             let a_present = rs.a.is_some() && cs.a.is_some();
@@ -484,30 +866,79 @@ fn diff_sheet(name: String, a: &[Vec<String>], b: &[Vec<String>]) -> SheetDiff {
         cells.push(row_cells);
     }
 
-    // ── 4. Marker trục + đếm cột/dòng ──
+    // ── 4. Marker trục cột ──
     let columns: Vec<AxisMarker> = col_slots
         .iter()
         .map(|s| AxisMarker {
             tag: s.tag.to_string(),
             label: col_letter(s.a.or(s.b).unwrap_or(0)),
+            strikethrough: false,
         })
         .collect();
-    let rows_meta: Vec<AxisMarker> = row_slots
-        .iter()
-        .enumerate()
-        .map(|(idx, _)| AxisMarker { tag: row_slots[idx].tag.to_string(), label: (idx + 1).to_string() })
-        .collect();
 
+    // ── 5. Chèn dòng strikethrough vào đúng vị trí gốc ──
+    let mut final_cells: Vec<Vec<CellDiff>> = Vec::new();
+    let mut final_meta: Vec<AxisMarker> = Vec::new();
+    let mut ptr_a = 0usize;
+    let mut ptr_b = 0usize;
+
+    for (i, rs) in row_slots.iter().enumerate() {
+        let orig_a = rs.a.map(|idx| map_a[idx]);
+        let orig_b = rs.b.map(|idx| map_b[idx]);
+
+        // Chèn dòng strikethrough A nằm trước dòng A hiện tại
+        if let Some(oa) = orig_a {
+            while ptr_a < strike_a.len() && strike_a[ptr_a].0 < oa {
+                final_cells.push(make_strike_cells(&strike_a[ptr_a].1, &col_slots, true));
+                final_meta.push(AxisMarker { tag: "removed".into(), label: String::new(), strikethrough: true });
+                ptr_a += 1;
+            }
+        }
+        // Chèn dòng strikethrough B nằm trước dòng B hiện tại
+        if let Some(ob) = orig_b {
+            while ptr_b < strike_b.len() && strike_b[ptr_b].0 < ob {
+                final_cells.push(make_strike_cells(&strike_b[ptr_b].1, &col_slots, false));
+                final_meta.push(AxisMarker { tag: "added".into(), label: String::new(), strikethrough: true });
+                ptr_b += 1;
+            }
+        }
+
+        final_cells.push(cells[i].clone());
+        final_meta.push(AxisMarker {
+            tag: rs.tag.to_string(),
+            label: String::new(),
+            strikethrough: false,
+        });
+    }
+    // Dòng strikethrough còn lại (nằm sau tất cả dòng thường)
+    while ptr_a < strike_a.len() {
+        final_cells.push(make_strike_cells(&strike_a[ptr_a].1, &col_slots, true));
+        final_meta.push(AxisMarker { tag: "removed".into(), label: String::new(), strikethrough: true });
+        ptr_a += 1;
+    }
+    while ptr_b < strike_b.len() {
+        final_cells.push(make_strike_cells(&strike_b[ptr_b].1, &col_slots, false));
+        final_meta.push(AxisMarker { tag: "added".into(), label: String::new(), strikethrough: true });
+        ptr_b += 1;
+    }
+
+    // Đánh lại số dòng
+    for (i, meta) in final_meta.iter_mut().enumerate() {
+        meta.label = (i + 1).to_string();
+    }
+
+    // ── 6. Đếm ──
     let col_added = col_slots.iter().filter(|s| s.tag == "added").count();
     let col_removed = col_slots.iter().filter(|s| s.tag == "removed").count();
-    let row_added = row_slots.iter().filter(|s| s.tag == "added").count();
-    let row_removed = row_slots.iter().filter(|s| s.tag == "removed").count();
+    let row_added = final_meta.iter().filter(|m| !m.strikethrough && m.tag == "added").count();
+    let row_removed = final_meta.iter().filter(|m| !m.strikethrough && m.tag == "removed").count();
+    let row_strikethrough = final_meta.iter().filter(|m| m.strikethrough).count();
 
     SheetDiff {
         name,
         columns,
-        rows_meta,
-        cells,
+        rows_meta: final_meta,
+        cells: final_cells,
         changed,
         added,
         removed,
@@ -515,6 +946,7 @@ fn diff_sheet(name: String, a: &[Vec<String>], b: &[Vec<String>]) -> SheetDiff {
         col_removed,
         row_added,
         row_removed,
+        row_strikethrough,
     }
 }
 
@@ -590,9 +1022,20 @@ fn build_sheet_report(sheet: &crate::models::file_compare::SheetDiff, rows: &mut
         }
     }
 
-    // Dòng thêm / xóa (gộp nội dung cả dòng).
+    // Dòng thêm / xóa / strikethrough (gộp nội dung cả dòng).
     for (r, row) in sheet.rows_meta.iter().enumerate() {
-        if row.tag == "removed" {
+        if row.strikethrough {
+            let old = join_row(sheet, r, true);
+            let new = join_row(sheet, r, false);
+            let content = if !old.is_empty() { old } else { new };
+            rows.push(ReportRow {
+                sheet: name.clone(),
+                object: format!("Dòng {}", row.label),
+                change: "Xóa (Strikethrough)".into(),
+                old: content,
+                new: String::new(),
+            });
+        } else if row.tag == "removed" {
             let old = join_row(sheet, r, true);
             rows.push(ReportRow {
                 sheet: name.clone(),
@@ -738,7 +1181,11 @@ fn build_text_report(text: &TextDiff, rows: &mut Vec<ReportRow>) {
 /// Màu nền theo loại thay đổi.
 fn change_format(change: &str) -> Format {
     let base = Format::new().set_border(rust_xlsxwriter::FormatBorder::Thin);
-    if change.contains("Thêm") {
+    if change.contains("Strikethrough") {
+        base.set_background_color(Color::RGB(0xFEE2E2))
+            .set_font_color(Color::RGB(0x991B1B))
+            .set_font_strikethrough()
+    } else if change.contains("Thêm") {
         base.set_background_color(Color::RGB(0xDCFCE7)).set_font_color(Color::RGB(0x166534))
     } else if change.contains("Xóa") {
         base.set_background_color(Color::RGB(0xFEE2E2)).set_font_color(Color::RGB(0x991B1B))
@@ -762,6 +1209,11 @@ fn write_report_xlsx(rows: &[ReportRow], output_path: &str) -> AppResult<()> {
         .set_border(border)
         .set_text_wrap();
     let cell_fmt = Format::new().set_border(border).set_text_wrap();
+    let strike_cell_fmt = Format::new()
+        .set_border(border)
+        .set_text_wrap()
+        .set_font_strikethrough()
+        .set_font_color(Color::RGB(0x991B1B));
     let center_fmt = Format::new()
         .set_border(border)
         .set_align(rust_xlsxwriter::FormatAlign::Center);
@@ -780,6 +1232,8 @@ fn write_report_xlsx(rows: &[ReportRow], output_path: &str) -> AppResult<()> {
 
     for (i, row) in rows.iter().enumerate() {
         let r = (i + 1) as u32;
+        let is_strike = row.change.contains("Strikethrough");
+        let content_fmt = if is_strike { &strike_cell_fmt } else { &cell_fmt };
         let mut w = |col: u16, val: &str, fmt: &Format| -> AppResult<()> {
             sheet
                 .write_string_with_format(r, col, val, fmt)
@@ -787,11 +1241,11 @@ fn write_report_xlsx(rows: &[ReportRow], output_path: &str) -> AppResult<()> {
             Ok(())
         };
         w(0, &(i + 1).to_string(), &center_fmt)?;
-        w(1, &row.sheet, &cell_fmt)?;
-        w(2, &row.object, &cell_fmt)?;
+        w(1, &row.sheet, content_fmt)?;
+        w(2, &row.object, content_fmt)?;
         w(3, &row.change, &change_format(&row.change))?;
-        w(4, &row.old, &cell_fmt)?;
-        w(5, &row.new, &cell_fmt)?;
+        w(4, &row.old, content_fmt)?;
+        w(5, &row.new, content_fmt)?;
     }
 
     sheet

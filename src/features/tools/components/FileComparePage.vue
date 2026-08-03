@@ -3,6 +3,7 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import { ref } from "vue";
 import type { FileCompareKind } from "@/_/types/file-compare";
+import { explorerOpen, explorerOpenFile } from "@/tauri/commands/explorer";
 import { useFileCompare } from "../composables/useFileCompare";
 import FileCompareResult from "./FileCompareResult.vue";
 
@@ -19,36 +20,18 @@ const fullscreen = ref(false);
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
-    <!-- ═══════════ Toolbar ═══════════ -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-arrow-right-arrow-left text-xl text-brand" />
-        <h2 class="text-base font-semibold text-ink">So sánh file</h2>
-        <span class="text-xs text-muted">Markdown · Excel · Word · Text</span>
-      </div>
-
-      <Button
-        icon="pi pi-refresh"
-        label="Đặt lại"
-        size="small"
-        severity="secondary"
-        outlined
-        :disabled="!ctrl.fileA.value && !ctrl.fileB.value"
-        @click="ctrl.reset()"
-      />
-    </div>
-
+  <section class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div class="flex min-h-0 flex-1 flex-col gap-4">
+      <div class="flex min-h-0 flex-1 flex-col gap-2">
         <!-- ═══════════ Section 1: Chọn 2 file ═══════════ -->
-        <section class="shrink-0 rounded-lg border border-divider bg-panel p-4 shadow-sm">
+        <section class="shrink-0 rounded-lg border border-divider bg-panel px-4 py-2 shadow-sm">
           <div class="flex items-center gap-2">
             <i class="pi pi-folder-open text-xl text-brand" />
-            <h3 class="section-title">Chọn 2 file cần so sánh</h3>
+            <h3 class="section-title">So sánh file</h3>
+            <span class="text-xs text-muted">Markdown · Excel · Word · Text</span>
           </div>
 
-          <div class="mt-4 grid gap-3 md:grid-cols-2">
+          <div class="mt-2 grid gap-3 md:grid-cols-2">
             <!-- File A -->
             <div class="grid gap-1.5">
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File gốc (A)</span>
@@ -62,6 +45,8 @@ const fullscreen = ref(false);
                   <span class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
                     {{ kindMeta[ctrl.fileA.value.kind].label }}
                   </span>
+                  <Button icon="pi pi-eye" size="small" text severity="info" v-tooltip.top="'Mở file'" @click="explorerOpenFile(ctrl.fileA.value!.path)" />
+                  <Button icon="pi pi-folder-open" size="small" text severity="secondary" v-tooltip.top="'Show in folder'" @click="explorerOpen(ctrl.fileA.value!.path)" />
                   <Button icon="pi pi-times" size="small" text severity="secondary" @click="ctrl.clearFile('a')" />
                 </template>
                 <template v-else>
@@ -87,6 +72,8 @@ const fullscreen = ref(false);
                   <span class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
                     {{ kindMeta[ctrl.fileB.value.kind].label }}
                   </span>
+                  <Button icon="pi pi-eye" size="small" text severity="info" v-tooltip.top="'Mở file'" @click="explorerOpenFile(ctrl.fileB.value!.path)" />
+                  <Button icon="pi pi-folder-open" size="small" text severity="secondary" v-tooltip.top="'Show in folder'" @click="explorerOpen(ctrl.fileB.value!.path)" />
                   <Button icon="pi pi-times" size="small" text severity="secondary" @click="ctrl.clearFile('b')" />
                 </template>
                 <template v-else>
@@ -109,7 +96,16 @@ const fullscreen = ref(false);
             <span>{{ ctrl.error.value || "2 file phải cùng loại mới so sánh được. Vui lòng chọn lại." }}</span>
           </div>
 
-          <div class="mt-4 flex justify-end">
+          <div class="mt-4 flex justify-end gap-2">
+            <Button
+              icon="pi pi-refresh"
+              label="Đặt lại"
+              size="small"
+              severity="secondary"
+              outlined
+              :disabled="!ctrl.fileA.value && !ctrl.fileB.value"
+              @click="ctrl.reset()"
+            />
             <Button
               icon="pi pi-arrow-right-arrow-left"
               label="So sánh"

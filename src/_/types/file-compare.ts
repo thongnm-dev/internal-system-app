@@ -41,6 +41,8 @@ export interface AxisMarker {
   tag: AxisTag;
   /** Nhãn hiển thị header (chữ cột A/B/C… hoặc số dòng). */
   label: string;
+  /** Dòng bị strikethrough toàn bộ ở file A → xem là đã xóa. */
+  strikethrough?: boolean;
 }
 
 /** Kết quả diff của một sheet Excel (đã căn chỉnh cột + dòng). */
@@ -59,6 +61,7 @@ export interface SheetDiff {
   colRemoved: number;
   rowAdded: number;
   rowRemoved: number;
+  rowStrikethrough: number;
 }
 
 /** Diff theo ô cho Excel (nhiều sheet). */
