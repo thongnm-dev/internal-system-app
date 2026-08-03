@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import Dialog from "primevue/dialog";
 import InputGroup from "primevue/inputgroup";
 import InputSwitch from "primevue/inputswitch";
 import InputNumber from "primevue/inputnumber";
@@ -41,6 +43,9 @@ const HELP: Record<string, string> = {
     "true = KHÔNG dùng nhận diện lịch sử mặc định (TẮT cả từ khóa LẪN pattern ngày yyyyMMdd); chỉ bỏ qua theo skip_dir.\n" +
     "false = dùng nhận diện lịch sử mặc định.",
   dry_run: "true = chỉ in danh sách, KHÔNG copy thật (xem trước).\nfalse = copy thật.",
+  use_newest:
+    "true = tự động chọn file mới nhất (theo Date Modified) khi có file trùng tên.\n" +
+    "false = hiển thị dialog cho phép chọn thủ công file nào sẽ được copy.",
 };
 </script>
 
@@ -195,6 +200,7 @@ const HELP: Record<string, string> = {
                   { key: 'delete_non_vn' as const, label: 'Delete non-VN' },
                   { key: 'no_default_skip' as const, label: 'No default skip' },
                   { key: 'dry_run' as const, label: 'Dry run' },
+                  { key: 'use_newest' as const, label: 'Use newest' },
                 ]"
                 :key="toggle.key"
                 class="flex items-center justify-between gap-2 rounded-md border border-divider bg-panel px-3 py-2"
@@ -249,5 +255,36 @@ const HELP: Record<string, string> = {
       </div>
       <pre class="min-h-0 max-h-80 flex-1 overflow-auto whitespace-pre-wrap break-words bg-slate-950 p-4 text-xs leading-6 text-slate-100">{{ ctrl.log.value.join("\n") }}</pre>
     </section>
+
+    <!-- Duplicate files dialog -->
+    <Dialog v-model:visible="ctrl.showDuplicateDialog.value" modal header="Chọn file trùng tên" :style="{ width: '700px' }">
+      <p class="mb-3 text-sm text-muted">Phát hiện file trùng tên. Chọn file muốn copy cho mỗi nhóm:</p>
+      <div class="max-h-96 overflow-y-auto">
+        <div v-for="group in ctrl.duplicateResult.value?.groups" :key="group.dest" class="mb-4 last:mb-0">
+          <div class="mb-1 text-sm font-bold text-ink">{{ group.file_name }}</div>
+          <div
+            v-for="entry in group.entries"
+            :key="entry.path"
+            class="mb-1 flex cursor-pointer items-center gap-3 rounded-md border border-divider px-3 py-2 transition-colors hover:bg-hover"
+            @click="ctrl.toggleDuplicateSelection(entry.path, group.dest)"
+          >
+            <Checkbox
+              :model-value="ctrl.selectedDuplicates.value.has(entry.path)"
+              binary
+              @change="ctrl.toggleDuplicateSelection(entry.path, group.dest)"
+            />
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-sm font-medium text-ink">{{ group.file_name }}</div>
+              <div class="truncate text-xs text-muted underline">{{ entry.rel_path }}</div>
+            </div>
+            <div class="whitespace-nowrap text-xs text-muted">{{ entry.date_modified }}</div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button size="small" outlined severity="secondary" @click="ctrl.cancelDuplicateDialog()">Cancel</Button>
+        <Button size="small" @click="ctrl.runWithSelectedDuplicates()">Continue</Button>
+      </template>
+    </Dialog>
   </section>
 </template>

@@ -2,11 +2,14 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::time::SystemTime;
 
-use chrono::Local;
+use chrono::{DateTime, Local};
 use regex::Regex;
 
-use crate::models::collect::{CollectConfig, CollectRunResult};
+use crate::models::collect::{
+    CollectConfig, CollectDuplicateResult, CollectRunResult, DuplicateFileEntry, DuplicateGroup,
+};
 
 const VN_SUFFIX: &str = "_VN";
 pub(crate) const DEFAULT_EXTS: &[&str] = &[".xlsx"];
@@ -209,6 +212,17 @@ pub(crate) fn absolutize(p: &str) -> PathBuf {
     }
 }
 
+fn get_modified_str(path: &Path) -> String {
+    fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .map(|t| {
+            let dt: DateTime<Local> = t.into();
+            dt.format("%Y-%m-%d %H:%M:%S").to_string()
+        })
+        .unwrap_or_default()
+}
+
 fn find_repo_root() -> Option<PathBuf> {
     let mut starts: Vec<PathBuf> = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
@@ -320,6 +334,8 @@ pub fn load_ini() -> Result<CollectConfig, String> {
         delete_non_vn: get_bool("delete_non_vn", false),
         report_dir,
         dry_run: get_bool("dry_run", false),
+        use_newest: get_bool("use_newest", false),
+        resolved_duplicates: Vec::new(),
     })
 }
 
@@ -347,6 +363,8 @@ fn collect(
     overwrite: bool,
     delete_non_vn: bool,
     create_history: bool,
+    use_newest: bool,
+    resolved_duplicates: &[String],
     log: &mut Vec<String>,
 ) -> CollectOut {
     let mut copied = 0usize;
@@ -417,6 +435,62 @@ fn collect(
             limit_copy
         ));
         matched.truncate(limit_copy as usize);
+    }
+
+    if (flat || group_by_parens) && (use_newest || !resolved_duplicates.is_empty()) {
+        let mut dest_to_sources: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+        for src in &matched {
+            let name = src.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+            let dest = if group_by_parens {
+                match folder_from_parens(&name) {
+                    Some(folder) => output_dir.join(folder).join(&name),
+                    None => output_dir.join(&name),
+                }
+            } else {
+                output_dir.join(&name)
+            };
+            dest_to_sources.entry(dest).or_default().push(src.clone());
+        }
+
+        let resolved_set: HashSet<PathBuf> =
+            resolved_duplicates.iter().map(PathBuf::from).collect();
+        let mut keep: HashSet<PathBuf> = HashSet::new();
+
+        for (_, sources) in &dest_to_sources {
+            if sources.len() <= 1 {
+                keep.insert(sources[0].clone());
+                continue;
+            }
+            if use_newest {
+                if let Some(newest) = sources.iter().max_by_key(|s| {
+                    fs::metadata(s)
+                        .and_then(|m| m.modified())
+                        .unwrap_or(SystemTime::UNIX_EPOCH)
+                }) {
+                    keep.insert(newest.clone());
+                    for s in sources {
+                        if s != newest {
+                            let rel = s.strip_prefix(input_root).unwrap_or(s);
+                            log.push(format!(
+                                "  ⏭  Bỏ qua (không phải bản mới nhất): {}",
+                                rel.display()
+                            ));
+                        }
+                    }
+                }
+            } else {
+                for s in sources {
+                    if resolved_set.contains(s) {
+                        keep.insert(s.clone());
+                    } else {
+                        let rel = s.strip_prefix(input_root).unwrap_or(s);
+                        log.push(format!("  ⏭  Bỏ qua (không được chọn): {}", rel.display()));
+                    }
+                }
+            }
+        }
+
+        matched.retain(|s| keep.contains(s));
     }
 
     for src in &matched {
@@ -638,6 +712,8 @@ pub fn run(config: CollectConfig) -> Result<CollectRunResult, String> {
         config.overwrite,
         config.delete_non_vn,
         config.create_history,
+        config.use_newest,
+        &config.resolved_duplicates,
         &mut log,
     );
 
@@ -676,4 +752,131 @@ pub fn run(config: CollectConfig) -> Result<CollectRunResult, String> {
     }
 
     Ok(CollectRunResult { ok, log, summary })
+}
+
+pub fn scan_duplicates(config: &CollectConfig) -> Result<CollectDuplicateResult, String> {
+    if config.input.trim().is_empty() || config.output.trim().is_empty() {
+        return Err("Thiếu đường dẫn input/output.".into());
+    }
+    if !config.flat && !config.group_by_parens {
+        return Ok(CollectDuplicateResult {
+            has_duplicates: false,
+            groups: Vec::new(),
+        });
+    }
+
+    let files = ini_list(&config.files);
+    let keywords = ini_list(&config.keyword);
+    let ext_list = ini_list(&config.ext);
+    let skip_dir_extra = ini_list(&config.skip_dir);
+
+    let input_root = fs::canonicalize(&config.input)
+        .ok()
+        .filter(|p| p.is_dir())
+        .ok_or_else(|| {
+            format!(
+                "FOLDER_ROOT không tồn tại hoặc không phải thư mục: {}",
+                config.input
+            )
+        })?;
+    let output_dir = absolutize(&config.output);
+
+    let mut exts: HashSet<String> = if ext_list.is_empty() {
+        DEFAULT_EXTS.iter().map(|s| s.to_string()).collect()
+    } else {
+        ext_list.iter().map(|e| norm_ext(e)).collect()
+    };
+    exts.remove("");
+
+    let mut skip_keywords: Vec<String> = if config.no_default_skip {
+        Vec::new()
+    } else {
+        DEFAULT_SKIP_DIR_KEYWORDS.iter().map(|s| s.to_string()).collect()
+    };
+    skip_keywords.extend(skip_dir_extra);
+    let match_date_history = !config.no_default_skip;
+    let files_set: HashSet<String> = files.iter().map(|f| f.to_lowercase()).collect();
+
+    let mut stack: Vec<PathBuf> = vec![input_root.clone()];
+    let mut matched: Vec<PathBuf> = Vec::new();
+    while let Some(current) = stack.pop() {
+        if let Ok(entries) = fs::read_dir(&current) {
+            let mut paths: Vec<PathBuf> =
+                entries.filter_map(|e| e.ok().map(|x| x.path())).collect();
+            paths.sort();
+            for entry in paths {
+                if entry.is_dir() {
+                    let name = entry
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("");
+                    if !is_skip_dir(name, &skip_keywords, match_date_history) {
+                        stack.push(entry);
+                    }
+                } else if entry.is_file()
+                    && match_file(&entry, &exts, &keywords, &files_set)
+                {
+                    matched.push(entry);
+                }
+            }
+        }
+    }
+    matched.sort();
+
+    if files_set.is_empty() && config.limit_copy > 0 && matched.len() as i64 > config.limit_copy {
+        matched.truncate(config.limit_copy as usize);
+    }
+
+    let mut dest_to_sources: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+    for src in &matched {
+        let name = src
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        let dest = if config.group_by_parens {
+            match folder_from_parens(&name) {
+                Some(folder) => output_dir.join(folder).join(&name),
+                None => output_dir.join(&name),
+            }
+        } else {
+            output_dir.join(&name)
+        };
+        dest_to_sources.entry(dest).or_default().push(src.clone());
+    }
+
+    let mut groups: Vec<DuplicateGroup> = Vec::new();
+    for (dest, sources) in &dest_to_sources {
+        if sources.len() <= 1 {
+            continue;
+        }
+        let file_name = dest
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        let mut entries: Vec<DuplicateFileEntry> = sources
+            .iter()
+            .map(|src| {
+                let rel = src.strip_prefix(&input_root).unwrap_or(src);
+                DuplicateFileEntry {
+                    path: src.to_string_lossy().to_string(),
+                    rel_path: rel.to_string_lossy().to_string(),
+                    date_modified: get_modified_str(src),
+                }
+            })
+            .collect();
+        entries.sort_by(|a, b| b.date_modified.cmp(&a.date_modified));
+        groups.push(DuplicateGroup {
+            file_name,
+            dest: dest.to_string_lossy().to_string(),
+            entries,
+        });
+    }
+    groups.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+
+    Ok(CollectDuplicateResult {
+        has_duplicates: !groups.is_empty(),
+        groups,
+    })
 }

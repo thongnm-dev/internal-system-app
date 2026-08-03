@@ -17,6 +17,10 @@ pub struct CollectConfig {
     pub delete_non_vn: bool,
     pub report_dir: String,
     pub dry_run: bool,
+    #[serde(default)]
+    pub use_newest: bool,
+    #[serde(default)]
+    pub resolved_duplicates: Vec<String>,
 }
 
 impl Default for CollectConfig {
@@ -37,6 +41,8 @@ impl Default for CollectConfig {
             delete_non_vn: false,
             report_dir: "reports".into(),
             dry_run: false,
+            use_newest: false,
+            resolved_duplicates: Vec::new(),
         }
     }
 }
@@ -46,4 +52,24 @@ pub struct CollectRunResult {
     pub ok: bool,
     pub log: Vec<String>,
     pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DuplicateFileEntry {
+    pub path: String,
+    pub rel_path: String,
+    pub date_modified: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DuplicateGroup {
+    pub file_name: String,
+    pub dest: String,
+    pub entries: Vec<DuplicateFileEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CollectDuplicateResult {
+    pub has_duplicates: bool,
+    pub groups: Vec<DuplicateGroup>,
 }

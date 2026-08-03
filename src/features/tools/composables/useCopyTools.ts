@@ -6,8 +6,10 @@ import {
   collectByFolders,
   collectLoadIni,
   collectRun,
+  collectScanDuplicates,
   DEFAULT_COLLECT_CONFIG,
   type CollectConfig,
+  type CollectDuplicateResult,
 } from "@/tauri/commands/collect";
 import type { MessageMode } from "@/_/types/app";
 
@@ -19,6 +21,10 @@ export function useCopyTools() {
   const showResult = ref(false);
   const message = ref("Configure input/output paths, then run Copy or Copy by folder.");
   const messageMode = ref<MessageMode>("info");
+
+  const duplicateResult = ref<CollectDuplicateResult | null>(null);
+  const showDuplicateDialog = ref(false);
+  const selectedDuplicates = ref<Set<string>>(new Set());
 
   function set<K extends keyof CollectConfig>(key: K, value: CollectConfig[K]) {
     config.value = { ...config.value, [key]: value };
@@ -61,13 +67,14 @@ export function useCopyTools() {
     }
   }
 
-  async function run() {
+  async function executeCollectRun(resolvedDuplicates: string[] = []) {
     running.value = true;
     log.value = [];
     message.value = "Running collect...";
     messageMode.value = "info";
     try {
-      const res = await collectRun(config.value);
+      const cfg = { ...config.value, resolved_duplicates: resolvedDuplicates };
+      const res = await collectRun(cfg);
       log.value = res.log;
       showResult.value = true;
       message.value = res.summary;
@@ -80,6 +87,60 @@ export function useCopyTools() {
     } finally {
       running.value = false;
     }
+  }
+
+  async function run() {
+    if (config.value.use_newest) {
+      await executeCollectRun();
+      return;
+    }
+
+    running.value = true;
+    message.value = "Scanning for duplicates...";
+    messageMode.value = "info";
+    try {
+      const scan = await collectScanDuplicates(config.value);
+      if (!scan.has_duplicates) {
+        await executeCollectRun();
+        return;
+      }
+
+      duplicateResult.value = scan;
+      selectedDuplicates.value = new Set(
+        scan.groups.map((g) => g.entries[0].path),
+      );
+      showDuplicateDialog.value = true;
+      running.value = false;
+    } catch (e) {
+      log.value = [`ERROR: ${String(e)}`];
+      showResult.value = true;
+      message.value = friendlyError(e);
+      messageMode.value = "error";
+      running.value = false;
+    }
+  }
+
+  async function runWithSelectedDuplicates() {
+    showDuplicateDialog.value = false;
+    await executeCollectRun(Array.from(selectedDuplicates.value));
+  }
+
+  function cancelDuplicateDialog() {
+    showDuplicateDialog.value = false;
+    duplicateResult.value = null;
+    running.value = false;
+    message.value = "Cancelled.";
+    messageMode.value = "info";
+  }
+
+  function toggleDuplicateSelection(path: string, groupDest: string) {
+    const group = duplicateResult.value?.groups.find((g) => g.dest === groupDest);
+    if (!group) return;
+    for (const entry of group.entries) {
+      selectedDuplicates.value.delete(entry.path);
+    }
+    selectedDuplicates.value.add(path);
+    selectedDuplicates.value = new Set(selectedDuplicates.value);
   }
 
   async function runByFolders() {
@@ -113,10 +174,16 @@ export function useCopyTools() {
     showResult,
     message,
     messageMode,
+    duplicateResult,
+    showDuplicateDialog,
+    selectedDuplicates,
     set,
     loadFromIni,
     pickFolder,
     run,
     runByFolders,
+    runWithSelectedDuplicates,
+    cancelDuplicateDialog,
+    toggleDuplicateSelection,
   };
 }

@@ -40,7 +40,6 @@ const fullscreen = ref(false);
                   <i :class="[kindMeta[ctrl.fileA.value.kind].icon, kindMeta[ctrl.fileA.value.kind].color, 'text-lg']" />
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium">{{ ctrl.fileA.value.name }}</div>
-                    <div class="truncate text-xs text-muted">{{ ctrl.fileA.value.path }}</div>
                   </div>
                   <span class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
                     {{ kindMeta[ctrl.fileA.value.kind].label }}
@@ -67,7 +66,6 @@ const fullscreen = ref(false);
                   <i :class="[kindMeta[ctrl.fileB.value.kind].icon, kindMeta[ctrl.fileB.value.kind].color, 'text-lg']" />
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium">{{ ctrl.fileB.value.name }}</div>
-                    <div class="truncate text-xs text-muted">{{ ctrl.fileB.value.path }}</div>
                   </div>
                   <span class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
                     {{ kindMeta[ctrl.fileB.value.kind].label }}

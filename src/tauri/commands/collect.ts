@@ -16,12 +16,31 @@ export interface CollectConfig {
   delete_non_vn: boolean;
   report_dir: string;
   dry_run: boolean;
+  use_newest: boolean;
+  resolved_duplicates: string[];
 }
 
 export interface CollectRunResult {
   ok: boolean;
   log: string[];
   summary: string;
+}
+
+export interface DuplicateFileEntry {
+  path: string;
+  rel_path: string;
+  date_modified: string;
+}
+
+export interface DuplicateGroup {
+  file_name: string;
+  dest: string;
+  entries: DuplicateFileEntry[];
+}
+
+export interface CollectDuplicateResult {
+  has_duplicates: boolean;
+  groups: DuplicateGroup[];
 }
 
 export const DEFAULT_COLLECT_CONFIG: CollectConfig = {
@@ -40,6 +59,8 @@ export const DEFAULT_COLLECT_CONFIG: CollectConfig = {
   delete_non_vn: false,
   report_dir: "reports",
   dry_run: false,
+  use_newest: false,
+  resolved_duplicates: [],
 };
 
 export function collectLoadIni() {
@@ -52,4 +73,8 @@ export function collectRun(config: CollectConfig) {
 
 export function collectByFolders(config: CollectConfig) {
   return safeInvoke<CollectRunResult>("collect_by_folders", { config });
+}
+
+export function collectScanDuplicates(config: CollectConfig) {
+  return safeInvoke<CollectDuplicateResult>("collect_scan_duplicates", { config });
 }

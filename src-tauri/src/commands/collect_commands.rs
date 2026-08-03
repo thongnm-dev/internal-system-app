@@ -1,4 +1,4 @@
-use crate::models::collect::{CollectConfig, CollectRunResult};
+use crate::models::collect::{CollectConfig, CollectDuplicateResult, CollectRunResult};
 use crate::services::{collect_folders_service, collect_service};
 
 #[tauri::command]
@@ -16,4 +16,9 @@ pub async fn collect_by_folders(config: CollectConfig) -> Result<CollectRunResul
     tauri::async_runtime::spawn_blocking(move || collect_folders_service::run(config))
         .await
         .map_err(crate::app::error::log_err)?
+}
+
+#[tauri::command]
+pub fn collect_scan_duplicates(config: CollectConfig) -> Result<CollectDuplicateResult, String> {
+    collect_service::scan_duplicates(&config)
 }

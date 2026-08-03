@@ -48,7 +48,7 @@ use commands::file_compare_commands::{file_compare_export, file_compare_run};
 use commands::file_split_commands::{file_split_calc_size, file_split_run};
 use commands::issue_csv_commands::parse_issue_csv;
 use commands::sync_commands::sync_daily_report;
-use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run};
+use commands::collect_commands::{collect_by_folders, collect_load_ini, collect_run, collect_scan_duplicates};
 use commands::explorer_commands::{
     explorer_copy_bugs, explorer_create_file, explorer_create_folder, explorer_delete,
     explorer_ensure_dir, explorer_get_drives, explorer_open, explorer_open_file, explorer_paste,
@@ -319,6 +319,7 @@ pub fn run() {
             collect_load_ini,
             collect_run,
             collect_by_folders,
+            collect_scan_duplicates,
             // === Explorer commands ===
             explorer_read_dir,
             explorer_search,
