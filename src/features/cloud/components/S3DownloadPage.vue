@@ -18,6 +18,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { friendlyError } from "@/tauri/commands/_base";
+import s3DownloadImg from "@/assets/s3-download2.webp";
 
 const s3Guard = useS3ConfigGuard();
 s3Guard.checkConfig();
@@ -221,7 +222,11 @@ function formatTime(hms: string): string {
       <div
         class="flex h-full flex-col items-center justify-center rounded-lg bg-panel text-lg text-muted"
       >
-        <i class="pi pi-cloud-download mb-4 text-5xl text-muted" />
+        <img
+          :src="s3DownloadImg"
+          alt="No files to download"
+          class="mb-2 h-60 w-60 rounded-full object-contain"
+        />
         <span class="animate-bounce py-4 text-sm text-danger">
           Không có tập tin nào để tải về...
         </span>
