@@ -249,12 +249,30 @@ mod services {
     pub mod explorer_service;
     /// Service cho module AI Usage — quản lý account AI, priority, auto-switch.
     pub mod ai_usage_service;
+    /// API công khai CRUD account + settings AI Usage (dùng chung mọi provider).
+    pub mod ai_acc_service;
+    /// Nghiệp vụ AI Usage riêng cho provider Claude (dò/import/capture login local).
+    /// Các provider khác (vd Codex) sẽ có service riêng tương tự trong tương lai.
+    pub mod claude_service;
     /// Probe tình trạng usage cho từng account AI (rate-limit header, v.v.).
     pub mod ai_usage_probe;
+    /// Probe usage riêng cho provider Claude (subscription OAuth usage + anthropic ratelimit).
+    pub mod claude_probe;
+    /// Probe usage riêng cho provider Codex/OpenAI (x-ratelimit header).
+    pub mod codex_probe;
     /// Dò các login Claude đã tồn tại trên máy (đọc `.claude.json` + Keychain).
-    pub mod ai_usage_detect;
+    pub mod claude_detected;
+    /// Xử lý AI Usage riêng cho Windows (credential store + mở terminal); cũng cover Linux
+    /// ở phần đọc credential (dùng chung cơ chế file).
+    #[cfg(not(target_os = "macos"))]
+    pub mod claude_usage_windows;
+    /// Xử lý AI Usage riêng cho macOS (credential Keychain + mở Terminal.app).
+    #[cfg(target_os = "macos")]
+    pub mod claude_usage_macos;
+    /// Mở terminal desktop chạy `claude` — tách biệt khỏi nghiệp vụ quản lý account AI Usage.
+    pub mod claude_terminal;
     /// Capture login Claude đang active → lưu token vào profile (app data dir).
-    pub mod ai_usage_capture;
+    pub mod claude_capture;
     /// Service cho module AI Chat — gọi API các nhà cung cấp LLM.
     pub mod ai_chat_service;
     /// Service đọc file schedule Excel và trích xuất dữ liệu giờ công.

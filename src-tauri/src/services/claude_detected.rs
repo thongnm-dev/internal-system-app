@@ -11,20 +11,12 @@
 //! - Custom `CLAUDE_CONFIG_DIR=X`: config = `X/.claude.json`, credential service có hậu tố hash.
 
 use std::path::{Path, PathBuf};
-#[cfg(target_os = "macos")]
-use std::process::Command;
 
 use chrono::{Local, TimeZone};
 use serde::Deserialize;
-#[cfg(target_os = "macos")]
-use sha2::{Digest, Sha256};
 
 use crate::database::ai_account_store::StoredAccount;
 use crate::models::ai_usage::DetectedLogin;
-
-/// Keychain service cho config dir mặc định (macOS).
-#[cfg(target_os = "macos")]
-const DEFAULT_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
 /// Phần `oauthAccount` trong `.claude.json`.
 #[derive(Debug, Deserialize)]
@@ -151,78 +143,52 @@ fn read_claude_json(path: &Path) -> Option<OauthAccount> {
     parsed.oauth_account
 }
 
+/// Đọc credential store theo từng platform.
+///
+/// `read_blob` là phần khác nhau giữa các OS (bắt buộc override — xem struct implement ở
+/// [`crate::services::claude_usage_windows::WindowsCredentials`] /
+/// [`crate::services::claude_usage_macos::MacosCredentials`]); các method còn lại
+/// (`read_keychain_meta`, `read_oauth_token`) xử lý chung trên blob JSON trả về, viết
+/// một lần rồi cả 2 platform kế thừa gọi lại — không phải cài đặt lại ở từng struct.
+pub(crate) trait CredentialPlatform {
+    /// Đọc blob credential thô (JSON string chứa `claudeAiOauth`) cho một `config_dir`.
+    fn read_blob(config_dir: &str) -> Option<String>;
+
+    /// Đọc `subscriptionType` + `expiresAt` từ blob credential. Dùng chung mọi platform.
+    fn read_keychain_meta(config_dir: &str) -> (Option<String>, Option<i64>) {
+        Self::read_blob(config_dir)
+            .and_then(|text| serde_json::from_str::<KeychainBlob>(&text).ok())
+            .and_then(|blob| blob.claude_ai_oauth)
+            .map(|oauth| (oauth.subscription_type, oauth.expires_at))
+            .unwrap_or((None, None))
+    }
+
+    /// Đọc OAuth access token từ blob credential. Dùng chung mọi platform.
+    fn read_oauth_token(config_dir: &str) -> Option<String> {
+        Self::read_blob(config_dir)
+            .and_then(|text| serde_json::from_str::<KeychainBlob>(&text).ok())
+            .and_then(|blob| blob.claude_ai_oauth)
+            .and_then(|oauth| oauth.access_token)
+            .map(|token| token.trim().to_string())
+            .filter(|token| !token.is_empty())
+    }
+}
+
+#[cfg(target_os = "macos")]
+type CurrentCredentials = crate::services::claude_usage_macos::MacosCredentials;
+#[cfg(not(target_os = "macos"))]
+type CurrentCredentials = crate::services::claude_usage_windows::WindowsCredentials;
+
 /// Đọc `subscriptionType` + `expiresAt` từ credential store cho một `config_dir`.
 /// Best-effort: macOS dùng Keychain, Windows/Linux đọc file `.credentials.json`.
 fn read_keychain_meta(config_dir: &str) -> (Option<String>, Option<i64>) {
-    read_credential_blob(config_dir)
-        .and_then(|text| serde_json::from_str::<KeychainBlob>(&text).ok())
-        .and_then(|blob| blob.claude_ai_oauth)
-        .map(|oauth| (oauth.subscription_type, oauth.expires_at))
-        .unwrap_or((None, None))
+    CurrentCredentials::read_keychain_meta(config_dir)
 }
 
 /// Đọc blob credential (dạng String) cho một `config_dir`.
 /// macOS: Keychain service. Windows/Linux: đọc file `.credentials.json` trong config dir.
 pub(crate) fn read_credential_blob(config_dir: &str) -> Option<String> {
-    #[cfg(target_os = "macos")]
-    {
-        keychain_services_for(config_dir)
-            .into_iter()
-            .find_map(|service| {
-                let output = Command::new("security")
-                    .args(["find-generic-password", "-s", &service, "-w"])
-                    .output()
-                    .ok()?;
-                if !output.status.success() {
-                    return None;
-                }
-                String::from_utf8(output.stdout)
-                    .ok()
-                    .map(|s| s.trim().to_string())
-            })
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let dir = if is_default_config_dir(config_dir) {
-            home_dir()?.join(".claude")
-        } else {
-            expand_tilde(config_dir)
-        };
-        std::fs::read_to_string(dir.join(".credentials.json")).ok()
-    }
-}
-
-/// Các tên Keychain service khả dĩ ứng với một `config_dir`, xếp theo độ ưu tiên (macOS).
-#[cfg(target_os = "macos")]
-fn keychain_services_for(config_dir: &str) -> Vec<String> {
-    let dir = config_dir.trim();
-    if is_default_config_dir(dir) {
-        return vec![DEFAULT_KEYCHAIN_SERVICE.to_string()];
-    }
-
-    // Sinh các biến thể chuỗi ứng viên để hash.
-    let expanded = expand_tilde(dir).to_string_lossy().to_string();
-    let mut inputs: Vec<String> = Vec::new();
-    for base in [dir.to_string(), expanded] {
-        let trimmed = base.trim_end_matches('/').to_string();
-        for candidate in [base, trimmed] {
-            if !candidate.is_empty() && !inputs.contains(&candidate) {
-                inputs.push(candidate);
-            }
-        }
-    }
-
-    inputs
-        .iter()
-        .map(|input| format!("{DEFAULT_KEYCHAIN_SERVICE}-{}", sha256_hex8(input)))
-        .collect()
-}
-
-/// 8 ký tự hex đầu của SHA-256 chuỗi (macOS Keychain hash).
-#[cfg(target_os = "macos")]
-fn sha256_hex8(input: &str) -> String {
-    let digest = Sha256::digest(input.as_bytes());
-    digest.iter().take(4).map(|b| format!("{b:02x}")).collect()
+    CurrentCredentials::read_blob(config_dir)
 }
 
 /// `true` nếu `config_dir` là login mặc định (rỗng hoặc `~/.claude`).
@@ -240,12 +206,7 @@ pub fn is_default_config_dir(config_dir: &str) -> bool {
 /// Đọc OAuth access token của một account subscription từ credential store.
 /// macOS: Keychain, Windows/Linux: `.credentials.json`. `None` nếu không có.
 pub fn read_oauth_token(config_dir: &str) -> Option<String> {
-    read_credential_blob(config_dir)
-        .and_then(|text| serde_json::from_str::<KeychainBlob>(&text).ok())
-        .and_then(|blob| blob.claude_ai_oauth)
-        .and_then(|oauth| oauth.access_token)
-        .map(|token| token.trim().to_string())
-        .filter(|token| !token.is_empty())
+    CurrentCredentials::read_oauth_token(config_dir)
 }
 
 /// Epoch millis → `YYYY-MM-DD HH:MM:SS` theo timezone local.
@@ -259,14 +220,14 @@ fn format_epoch_ms(ms: i64) -> String {
 }
 
 /// Thư mục home của user (`$HOME` trên macOS/Linux, `USERPROFILE` trên Windows).
-fn home_dir() -> Option<PathBuf> {
+pub(crate) fn home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
 }
 
 /// Mở rộng `~` đầu đường dẫn thành thư mục home.
-fn expand_tilde(path: &str) -> PathBuf {
+pub(crate) fn expand_tilde(path: &str) -> PathBuf {
     if path == "~" {
         return home_dir().unwrap_or_else(|| PathBuf::from(path));
     }

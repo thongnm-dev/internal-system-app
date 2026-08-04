@@ -67,7 +67,7 @@ pub fn preview() -> Option<CapturedLogin> {
 
 /// Đọc blob `claudeAiOauth` (dạng JSON Value) từ credential store mặc định.
 fn read_default_keychain_oauth() -> Option<Value> {
-    let text = crate::services::ai_usage_detect::read_credential_blob("")?;
+    let text = crate::services::claude_detected::read_credential_blob("")?;
     let blob: Value = serde_json::from_str(&text).ok()?;
     blob.get("claudeAiOauth").cloned()
 }
@@ -107,7 +107,7 @@ pub fn read_login_at(config_dir: &str) -> Option<CapturedLogin> {
     if email.trim().is_empty() {
         return None;
     }
-    let has_token = crate::services::ai_usage_detect::read_oauth_token(config_dir).is_some();
+    let has_token = crate::services::claude_detected::read_oauth_token(config_dir).is_some();
     Some(CapturedLogin {
         email,
         display_name,
