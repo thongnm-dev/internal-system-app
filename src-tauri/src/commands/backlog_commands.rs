@@ -51,9 +51,7 @@ pub async fn backlog_list_statuses(project_key: String) -> Result<Vec<BacklogSta
 }
 
 #[tauri::command]
-pub async fn backlog_list_categories(
-    project_key: String,
-) -> Result<Vec<BacklogCategory>, String> {
+pub async fn backlog_list_categories(project_key: String) -> Result<Vec<BacklogCategory>, String> {
     backlog_service::list_categories(&project_key)
         .await
         .map_err(crate::app::error::log_err)
@@ -67,9 +65,7 @@ pub async fn backlog_list_priorities() -> Result<Vec<BacklogPriority>, String> {
 }
 
 #[tauri::command]
-pub async fn backlog_list_project_users(
-    project_key: String,
-) -> Result<Vec<BacklogUser>, String> {
+pub async fn backlog_list_project_users(project_key: String) -> Result<Vec<BacklogUser>, String> {
     backlog_service::list_project_users(&project_key)
         .await
         .map_err(crate::app::error::log_err)

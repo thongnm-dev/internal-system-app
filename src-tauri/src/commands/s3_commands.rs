@@ -1,6 +1,11 @@
-use crate::models::s3::{AwsStorage, BugFolderTab, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult, DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry, S3Config, S3ListResult, S3OperationResult, ScannedFile, StorageBugFolders, UploadFileRequest, UploadHistorySearchItem, UploadHistorySearchParams};
-use std::collections::HashMap;
+use crate::models::s3::{
+    AwsStorage, BugFolderTab, DeleteUploadedItem, DownloadAvailability, DownloadByStorageResult,
+    DownloadHistoryItem, DownloadHistorySearchItem, DownloadHistorySearchParams, LocalFileEntry,
+    S3Config, S3ListResult, S3OperationResult, ScannedFile, StorageBugFolders, UploadFileRequest,
+    UploadHistorySearchItem, UploadHistorySearchParams,
+};
 use crate::services::s3_service;
+use std::collections::HashMap;
 
 #[tauri::command]
 pub fn s3_get_local_sync_workdir() -> Result<String, String> {
@@ -58,9 +63,7 @@ pub async fn s3_upload_file(
 }
 
 #[tauri::command]
-pub async fn s3_delete_objects(
-    keys: Vec<String>,
-) -> Result<S3OperationResult, String> {
+pub async fn s3_delete_objects(keys: Vec<String>) -> Result<S3OperationResult, String> {
     s3_service::delete_objects(keys)
         .await
         .map_err(crate::app::error::log_err)
@@ -120,9 +123,16 @@ pub async fn s3_upload_files(
     aws_cd: String,
     user_id: String,
 ) -> Result<S3OperationResult, String> {
-    s3_service::upload_files(files, storage_name, subscribe, create_folder_same_name, aws_cd, user_id)
-        .await
-        .map_err(crate::app::error::log_err)
+    s3_service::upload_files(
+        files,
+        storage_name,
+        subscribe,
+        create_folder_same_name,
+        aws_cd,
+        user_id,
+    )
+    .await
+    .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
@@ -214,19 +224,14 @@ pub async fn s3_download_by_storage(
 }
 
 #[tauri::command]
-pub async fn s3_get_download_history(
-    user_id: String,
-) -> Result<Vec<DownloadHistoryItem>, String> {
+pub async fn s3_get_download_history(user_id: String) -> Result<Vec<DownloadHistoryItem>, String> {
     s3_service::get_download_history(user_id)
         .await
         .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
-pub async fn s3_update_download_moved_local(
-    id: i32,
-    path_copied: String,
-) -> Result<(), String> {
+pub async fn s3_update_download_moved_local(id: i32, path_copied: String) -> Result<(), String> {
     s3_service::update_download_moved_local(id, path_copied)
         .await
         .map_err(crate::app::error::log_err)

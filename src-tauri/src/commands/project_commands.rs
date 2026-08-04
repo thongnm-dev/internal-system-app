@@ -4,8 +4,7 @@
 //! qua IPC invoke, gọi service tương ứng và trả kết quả về frontend.
 
 use crate::models::project::{
-    CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail,
-    ProjectSummary, ProjectTask,
+    CreateProjectRequest, CreateProjectTaskRequest, ProjectDetail, ProjectSummary, ProjectTask,
 };
 use crate::services::project_service;
 

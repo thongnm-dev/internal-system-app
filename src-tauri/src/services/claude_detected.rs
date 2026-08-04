@@ -13,48 +13,9 @@
 use std::path::{Path, PathBuf};
 
 use chrono::{Local, TimeZone};
-use serde::Deserialize;
 
 use crate::database::ai_account_store::StoredAccount;
-use crate::models::ai_usage::DetectedLogin;
-
-/// Phần `oauthAccount` trong `.claude.json`.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OauthAccount {
-    #[serde(default)]
-    email_address: String,
-    #[serde(default)]
-    display_name: String,
-    #[serde(default)]
-    organization_type: String,
-    #[serde(default)]
-    billing_type: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct ClaudeJson {
-    #[serde(rename = "oauthAccount")]
-    oauth_account: Option<OauthAccount>,
-}
-
-/// Phần `claudeAiOauth` trong blob Keychain.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KeychainClaudeOauth {
-    #[serde(default)]
-    subscription_type: Option<String>,
-    #[serde(default)]
-    expires_at: Option<i64>,
-    #[serde(default)]
-    access_token: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KeychainBlob {
-    claude_ai_oauth: Option<KeychainClaudeOauth>,
-}
+use crate::models::ai_usage::{ClaudeJson, DetectedLogin, KeychainBlob, OauthAccount};
 
 /// Dò tất cả login Claude phát hiện được: login mặc định (`~/.claude.json`) +
 /// các config dir custom đã đăng ký trong danh sách account.
@@ -146,8 +107,8 @@ fn read_claude_json(path: &Path) -> Option<OauthAccount> {
 /// Đọc credential store theo từng platform.
 ///
 /// `read_blob` là phần khác nhau giữa các OS (bắt buộc override — xem struct implement ở
-/// [`crate::services::claude_usage_windows::WindowsCredentials`] /
-/// [`crate::services::claude_usage_macos::MacosCredentials`]); các method còn lại
+/// [`crate::services::claude_credentials_windows::WindowsCredentials`] /
+/// [`crate::services::claude_credentials_macos::MacosCredentials`]); các method còn lại
 /// (`read_keychain_meta`, `read_oauth_token`) xử lý chung trên blob JSON trả về, viết
 /// một lần rồi cả 2 platform kế thừa gọi lại — không phải cài đặt lại ở từng struct.
 pub(crate) trait CredentialPlatform {
@@ -175,9 +136,9 @@ pub(crate) trait CredentialPlatform {
 }
 
 #[cfg(target_os = "macos")]
-type CurrentCredentials = crate::services::claude_usage_macos::MacosCredentials;
+type CurrentCredentials = crate::services::claude_credentials_macos::MacosCredentials;
 #[cfg(not(target_os = "macos"))]
-type CurrentCredentials = crate::services::claude_usage_windows::WindowsCredentials;
+type CurrentCredentials = crate::services::claude_credentials_windows::WindowsCredentials;
 
 /// Đọc `subscriptionType` + `expiresAt` từ credential store cho một `config_dir`.
 /// Best-effort: macOS dùng Keychain, Windows/Linux đọc file `.credentials.json`.

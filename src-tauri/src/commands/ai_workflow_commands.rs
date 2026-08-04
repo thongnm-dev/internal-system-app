@@ -22,9 +22,7 @@ pub async fn ai_workflow_create(
 }
 
 #[tauri::command]
-pub async fn ai_workflow_list(
-    username: String,
-) -> Result<Vec<AiWorkflow>, String> {
+pub async fn ai_workflow_list(username: String) -> Result<Vec<AiWorkflow>, String> {
     ai_workflow_service::list_workflows(&username)
         .await
         .map_err(crate::app::error::log_err)
@@ -42,19 +40,14 @@ pub async fn ai_workflow_update(
 }
 
 #[tauri::command]
-pub async fn ai_workflow_delete(
-    id: i32,
-    username: String,
-) -> Result<(), String> {
+pub async fn ai_workflow_delete(id: i32, username: String) -> Result<(), String> {
     ai_workflow_service::delete_workflow(id, &username)
         .await
         .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
-pub async fn ai_workflow_step_list(
-    workflow_id: i32,
-) -> Result<Vec<AiWorkflowStep>, String> {
+pub async fn ai_workflow_step_list(workflow_id: i32) -> Result<Vec<AiWorkflowStep>, String> {
     ai_workflow_service::list_steps(workflow_id)
         .await
         .map_err(crate::app::error::log_err)
@@ -81,19 +74,14 @@ pub async fn ai_workflow_step_update(
 }
 
 #[tauri::command]
-pub async fn ai_workflow_step_delete(
-    id: i32,
-) -> Result<(), String> {
+pub async fn ai_workflow_step_delete(id: i32) -> Result<(), String> {
     ai_workflow_service::delete_step(id)
         .await
         .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]
-pub async fn ai_workflow_step_reorder(
-    workflow_id: i32,
-    step_ids: Vec<i32>,
-) -> Result<(), String> {
+pub async fn ai_workflow_step_reorder(workflow_id: i32, step_ids: Vec<i32>) -> Result<(), String> {
     ai_workflow_service::reorder_steps(workflow_id, step_ids)
         .await
         .map_err(crate::app::error::log_err)

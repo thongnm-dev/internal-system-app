@@ -7,18 +7,7 @@
 use chrono::{Local, TimeZone};
 use serde_json::Value;
 
-use crate::models::ai_usage::CapturedLogin;
-
-/// Dữ liệu capture đầy đủ (kèm blob token) — chỉ dùng nội bộ backend.
-pub struct Captured {
-    pub email: String,
-    pub display_name: String,
-    pub subscription_type: String,
-    pub billing_type: String,
-    pub expires_at_ms: Option<i64>,
-    /// Blob `claudeAiOauth` nguyên vẹn (accessToken, refreshToken, expiresAt, scopes…).
-    pub claude_ai_oauth: Value,
-}
+use crate::models::ai_usage::{Captured, CapturedLogin};
 
 /// Capture login Claude đang active. `None` nếu không có login (chưa `claude /login`).
 pub fn capture_current() -> Option<Captured> {

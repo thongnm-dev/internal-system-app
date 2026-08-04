@@ -11,10 +11,7 @@ pub async fn create_user(request: CreateUserRequest) -> Result<UserDetail, Strin
 }
 
 #[tauri::command]
-pub async fn update_user(
-    user_id: i32,
-    request: UpdateUserRequest,
-) -> Result<UserDetail, String> {
+pub async fn update_user(user_id: i32, request: UpdateUserRequest) -> Result<UserDetail, String> {
     user_service::update_user(user_id, request)
         .await
         .map_err(crate::app::error::log_err)

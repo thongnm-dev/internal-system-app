@@ -18,9 +18,7 @@ pub fn get_database_config() -> Option<DatabaseConfig> {
 
 /// Chỉ thử kết nối với cấu hình cho trước, không ghi file (nút "Kiểm tra").
 #[tauri::command]
-pub async fn test_database_config(
-    request: SaveDatabaseConfigRequest,
-) -> Result<(), String> {
+pub async fn test_database_config(request: SaveDatabaseConfigRequest) -> Result<(), String> {
     db_config_service::test_config(request)
         .await
         .map_err(crate::app::error::log_err)

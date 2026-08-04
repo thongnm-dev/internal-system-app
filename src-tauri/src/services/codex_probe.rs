@@ -8,7 +8,8 @@
 use reqwest::{Client, StatusCode};
 
 use crate::database::ai_account_store::StoredAccount;
-use crate::services::ai_usage_probe::{header_f64, header_string, status_from_percent, ProbeOutcome};
+use crate::models::ai_usage::ProbeOutcome;
+use crate::services::ai_usage_probe::{header_f64, header_string, status_from_percent};
 
 /// Probe account OpenAI (Codex) qua header `x-ratelimit-*`.
 pub(crate) async fn probe(client: &Client, account: &StoredAccount) -> ProbeOutcome {

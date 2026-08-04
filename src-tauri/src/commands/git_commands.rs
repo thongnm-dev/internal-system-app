@@ -106,11 +106,7 @@ pub fn git_file_diff(
 }
 
 #[tauri::command]
-pub fn git_commit_file_diff(
-    path: String,
-    hash: String,
-    file: String,
-) -> Result<GitDiff, String> {
+pub fn git_commit_file_diff(path: String, hash: String, file: String) -> Result<GitDiff, String> {
     git_service::commit_file_diff(&path, &hash, &file).map_err(log_err)
 }
 
@@ -130,8 +126,10 @@ pub fn git_log_search(
     skip: u32,
     limit: u32,
 ) -> Result<Vec<GitCommit>, String> {
-    git_service::log_search(&path, &after, &before, &author, &message, &file, skip, limit)
-        .map_err(log_err)
+    git_service::log_search(
+        &path, &after, &before, &author, &message, &file, skip, limit,
+    )
+    .map_err(log_err)
 }
 
 #[tauri::command]
@@ -238,11 +236,7 @@ pub async fn git_checkout_branch(path: String, name: String) -> Result<String, S
 }
 
 #[tauri::command]
-pub async fn git_create_branch(
-    path: String,
-    name: String,
-    from: String,
-) -> Result<String, String> {
+pub async fn git_create_branch(path: String, name: String, from: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::create_branch(&path, &name, &from))
         .await
         .map_err(log_err)?
@@ -250,11 +244,7 @@ pub async fn git_create_branch(
 }
 
 #[tauri::command]
-pub async fn git_delete_branch(
-    path: String,
-    name: String,
-    force: bool,
-) -> Result<String, String> {
+pub async fn git_delete_branch(path: String, name: String, force: bool) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::delete_branch(&path, &name, force))
         .await
         .map_err(log_err)?
@@ -315,11 +305,7 @@ pub async fn git_stash_save(path: String, message: String) -> Result<String, Str
 }
 
 #[tauri::command]
-pub async fn git_stash_apply(
-    path: String,
-    reference: String,
-    pop: bool,
-) -> Result<String, String> {
+pub async fn git_stash_apply(path: String, reference: String, pop: bool) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || git_service::stash_apply(&path, &reference, pop))
         .await
         .map_err(log_err)?
@@ -438,10 +424,12 @@ pub async fn git_merge(
     squash: bool,
     message: String,
 ) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || git_service::merge(&path, &branch, squash, &message))
-        .await
-        .map_err(log_err)?
-        .map_err(log_err)
+    tauri::async_runtime::spawn_blocking(move || {
+        git_service::merge(&path, &branch, squash, &message)
+    })
+    .await
+    .map_err(log_err)?
+    .map_err(log_err)
 }
 
 #[tauri::command]
@@ -461,11 +449,7 @@ pub async fn git_commit_no_edit(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn git_resolve_conflict(
-    path: String,
-    file: String,
-    side: String,
-) -> Result<(), String> {
+pub async fn git_resolve_conflict(path: String, file: String, side: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git_service::resolve_conflict(&path, &file, &side))
         .await
         .map_err(log_err)?

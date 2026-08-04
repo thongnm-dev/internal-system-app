@@ -16,7 +16,7 @@ use tauri::{AppHandle, Emitter};
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::database::ai_account_store::{self, AiAccountData, StoredAccount};
-use crate::models::ai_usage::AiAccount;
+use crate::models::ai_usage::{AiAccount, ProbeOutcome};
 use crate::services::ai_acc_service;
 use crate::services::ai_usage_probe;
 use crate::utils::time::current_timestamp;
@@ -187,7 +187,7 @@ fn snapshot() -> Vec<StoredAccount> {
 }
 
 /// Áp dụng kết quả probe vào dữ liệu + auto-switch, rồi lưu file.
-fn apply_probe_results(outcomes: Vec<ai_usage_probe::ProbeOutcome>) -> AppResult<()> {
+fn apply_probe_results(outcomes: Vec<ProbeOutcome>) -> AppResult<()> {
     with_data(|data| {
         let threshold = data.settings.switch_threshold_percent;
         for outcome in &outcomes {

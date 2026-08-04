@@ -82,10 +82,7 @@ pub async fn update_daily_note_status(
 
 /// Xóa ghi chú theo `id`. Kiểm tra `username` để đảm bảo quyền sở hữu.
 #[tauri::command]
-pub async fn delete_daily_note(
-    id: i32,
-    username: String,
-) -> Result<(), String> {
+pub async fn delete_daily_note(id: i32, username: String) -> Result<(), String> {
     daily_note_service::delete_note(id, &username)
         .await
         .map_err(crate::app::error::log_err)

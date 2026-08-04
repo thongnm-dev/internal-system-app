@@ -1,6 +1,7 @@
 //! Model cho module AI Usage (quản lý account AI + theo dõi usage + auto-switch).
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Một account AI được đăng ký — bản trả về frontend (API key đã che).
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -139,6 +140,88 @@ impl Default for AiUsageSettings {
         Self {
             switch_threshold_percent: 10.0,
             poll_interval_secs: 300,
+        }
+    }
+}
+
+/// Dữ liệu capture đầy đủ (kèm blob token) — chỉ dùng nội bộ backend.
+pub struct Captured {
+    pub email: String,
+    pub display_name: String,
+    pub subscription_type: String,
+    pub billing_type: String,
+    pub expires_at_ms: Option<i64>,
+    /// Blob `claudeAiOauth` nguyên vẹn (accessToken, refreshToken, expiresAt, scopes…).
+    pub claude_ai_oauth: Value,
+}
+
+/// Phần `oauthAccount` trong `.claude.json`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct OauthAccount {
+    #[serde(default)]
+    pub email_address: String,
+    #[serde(default)]
+    pub display_name: String,
+    #[serde(default)]
+    pub organization_type: String,
+    #[serde(default)]
+    pub billing_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ClaudeJson {
+    #[serde(rename = "oauthAccount")]
+    pub oauth_account: Option<OauthAccount>,
+}
+
+/// Phần `claudeAiOauth` trong blob Keychain.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KeychainClaudeOauth {
+    #[serde(default)]
+    pub subscription_type: Option<String>,
+    #[serde(default)]
+    pub expires_at: Option<i64>,
+    #[serde(default)]
+    pub access_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KeychainBlob {
+    pub claude_ai_oauth: Option<KeychainClaudeOauth>,
+}
+
+/// Kết quả probe cho một account. `usage_percent`/`reset_at` là `None` nghĩa là
+/// "không có số liệu mới" → service giữ nguyên giá trị cũ.
+pub struct ProbeOutcome {
+    pub id: i64,
+    pub status: String,
+    pub usage_percent: Option<f64>,
+    pub reset_at: Option<String>,
+    pub usage_source: String,
+    /// Session hiện tại (5h) — phần trăm CÒN LẠI. `None` = giữ giá trị cũ.
+    pub session_percent: Option<f64>,
+    pub session_reset_at: Option<String>,
+    /// Weekly limit (7 ngày) — phần trăm CÒN LẠI. `None` = giữ giá trị cũ.
+    pub weekly_percent: Option<f64>,
+    pub weekly_reset_at: Option<String>,
+}
+
+impl ProbeOutcome {
+    /// `pub(crate)` — dùng chung bởi probe riêng theo provider (vd `claude_probe`).
+    pub(crate) fn simple(id: i64, status: &str, usage_source: &str) -> Self {
+        Self {
+            id,
+            status: status.to_string(),
+            usage_percent: None,
+            reset_at: None,
+            usage_source: usage_source.to_string(),
+            session_percent: None,
+            session_reset_at: None,
+            weekly_percent: None,
+            weekly_reset_at: None,
         }
     }
 }

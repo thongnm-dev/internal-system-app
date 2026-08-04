@@ -2,8 +2,8 @@
 //! nghiệp vụ quản lý account ở [`crate::services::ai_usage_service`].
 //!
 //! `TerminalPlatform` là trait dùng chung cho các struct platform-specific — xem
-//! [`crate::services::claude_usage_windows::WindowsTerminal`] /
-//! [`crate::services::claude_usage_macos::MacosTerminal`].
+//! [`crate::services::claude_terminal_windows::WindowsTerminal`] /
+//! [`crate::services::claude_terminal_macos::MacosTerminal`].
 
 use std::path::Path;
 
@@ -51,8 +51,8 @@ pub fn open_login_terminal(config_dir: &str, work_dir: &str) -> AppResult<()> {
 ///
 /// `script_extension`/`script_content`/`launch` là phần khác nhau giữa các OS (bắt buộc
 /// override — xem struct implement ở
-/// [`crate::services::claude_usage_windows::WindowsTerminal`] /
-/// [`crate::services::claude_usage_macos::MacosTerminal`]); `spawn` xử lý chung — ghi
+/// [`crate::services::claude_terminal_windows::WindowsTerminal`] /
+/// [`crate::services::claude_terminal_macos::MacosTerminal`]); `spawn` xử lý chung — ghi
 /// script ra file tạm rồi launch — viết một lần rồi Windows/macOS kế thừa gọi lại thay vì
 /// lặp lại logic ghi file ở mỗi platform.
 pub(crate) trait TerminalPlatform {
@@ -101,7 +101,7 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
 
     #[cfg(target_os = "windows")]
     {
-        crate::services::claude_usage_windows::WindowsTerminal::spawn(
+        crate::services::claude_terminal_windows::WindowsTerminal::spawn(
             &expanded_wd,
             is_default,
             &expanded_dir,
@@ -110,7 +110,7 @@ fn spawn_terminal(config_dir: &str, work_dir: &str, command: Option<&str>) -> Ap
     }
     #[cfg(target_os = "macos")]
     {
-        crate::services::claude_usage_macos::MacosTerminal::spawn(
+        crate::services::claude_terminal_macos::MacosTerminal::spawn(
             &expanded_wd,
             is_default,
             &expanded_dir,

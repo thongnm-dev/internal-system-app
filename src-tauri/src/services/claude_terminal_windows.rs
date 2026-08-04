@@ -1,42 +1,15 @@
-//! Xử lý AI Usage riêng cho Windows: đọc credential store (`.credentials.json`) +
-//! mở terminal (`cmd /k`). Phần đọc credential dùng chung cơ chế với Linux (không có
-//! Keychain), nên struct đó không bị `cfg` giới hạn riêng target_os `windows`.
-//!
-//! Phần xử lý chung (parse blob JSON, ghi script tạm rồi launch) nằm ở default method
-//! của [`crate::services::claude_detected::CredentialPlatform`] /
-//! [`crate::services::claude_terminal::TerminalPlatform`] — struct ở đây chỉ override
-//! phần khác nhau theo OS. Xem [`crate::services::claude_usage_macos`] cho phía macOS.
+//! Mở terminal Windows — ghi ra file `.bat` tạm rồi mở bằng `cmd /k`.
+//! Xem [`crate::services::claude_terminal`] cho phần logic dùng chung mọi platform,
+//! [`crate::services::claude_terminal_macos`] cho phía macOS.
 
-#[cfg(target_os = "windows")]
 use std::path::Path;
 
-#[cfg(target_os = "windows")]
 use crate::app::error::AppError;
-#[cfg(target_os = "windows")]
 use crate::app::result::AppResult;
-use crate::services::claude_detected::{self, CredentialPlatform};
-#[cfg(target_os = "windows")]
 use crate::services::claude_terminal::TerminalPlatform;
 
-/// Đọc credential store trên Windows (và Linux) — file `.credentials.json` trong config dir.
-pub(crate) struct WindowsCredentials;
-
-impl CredentialPlatform for WindowsCredentials {
-    fn read_blob(config_dir: &str) -> Option<String> {
-        let dir = if claude_detected::is_default_config_dir(config_dir) {
-            claude_detected::home_dir()?.join(".claude")
-        } else {
-            claude_detected::expand_tilde(config_dir)
-        };
-        std::fs::read_to_string(dir.join(".credentials.json")).ok()
-    }
-}
-
-/// Mở terminal Windows — ghi ra file `.bat` tạm rồi mở bằng `cmd /k`.
-#[cfg(target_os = "windows")]
 pub(crate) struct WindowsTerminal;
 
-#[cfg(target_os = "windows")]
 impl TerminalPlatform for WindowsTerminal {
     fn script_extension() -> &'static str {
         "bat"

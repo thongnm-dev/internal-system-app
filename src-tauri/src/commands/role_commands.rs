@@ -3,7 +3,9 @@ use crate::services::role_service;
 
 #[tauri::command]
 pub async fn list_role_details() -> Result<Vec<RoleSummary>, String> {
-    role_service::list_roles().await.map_err(crate::app::error::log_err)
+    role_service::list_roles()
+        .await
+        .map_err(crate::app::error::log_err)
 }
 
 #[tauri::command]

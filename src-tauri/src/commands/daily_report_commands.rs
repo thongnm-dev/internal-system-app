@@ -144,10 +144,7 @@ pub async fn get_daily_report_projects(
 
 /// Xóa một task người dùng tự thêm. Kiểm tra `username` để đảm bảo quyền sở hữu.
 #[tauri::command]
-pub async fn delete_daily_report_task(
-    username: String,
-    task_id: i32,
-) -> Result<(), String> {
+pub async fn delete_daily_report_task(username: String, task_id: i32) -> Result<(), String> {
     daily_report_service::delete_task(&username, task_id)
         .await
         .map_err(crate::app::error::log_err)
