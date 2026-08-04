@@ -1,21 +1,32 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
-import { listExcelSheetNames, resizeExcelImages } from "@/tauri/commands/excel-helper";
+import { resizeExcelImages } from "@/tauri/commands/excel-helper";
 import type { MessageMode } from "@/_/types/app";
 import type { ExcelHelperOptions, ExcelHelperResult } from "@/_/types/excel-helper";
 
-function defaultResizedPath(path: string) {
-  if (!path.trim()) return "";
-  return path.replace(/(\.[^.\\/]+)?$/i, (ext) => `_resized${ext || ".xlsx"}`);
+export function fileNameFromPath(path: string) {
+  return path.split(/[\\/]/).pop() || path;
 }
 
-const DEFAULT_MESSAGE = "Select an Excel workbook, optionally set Width/Height, then resize.";
+function baseNameWithoutExt(fileName: string) {
+  return fileName.replace(/\.[^./\\]+$/, "");
+}
+
+function joinPath(dir: string, file: string) {
+  return `${dir.replace(/[\\/]+$/, "")}/${file}`;
+}
+
+function isXlsxPath(path: string) {
+  return /\.xlsx$/i.test(path);
+}
+
+const DEFAULT_MESSAGE = "Drag & drop one or more .xlsx files, choose an output folder, then resize.";
 
 export function useExcelHelper() {
-  const inputPath = ref("");
-  const outputPath = ref("");
+  const inputPaths = ref<string[]>([]);
+  const outputFolder = ref("");
   const widthCm = ref<number | null>(null);
   const heightCm = ref<number | null>(null);
   const pageBreakPreview = ref(false);
@@ -27,17 +38,15 @@ export function useExcelHelper() {
   const fontSize = ref<number | null>(null);
   const resetActiveCell = ref(false);
   const avoidCoveringContent = ref(true);
-  const availableSheets = ref<string[]>([]);
-  const selectedSheets = ref<string[]>([]);
-  const isLoadingSheets = ref(false);
-  const result = ref<ExcelHelperResult | null>(null);
+  const results = ref<ExcelHelperResult[]>([]);
   const message = ref(DEFAULT_MESSAGE);
   const messageMode = ref<MessageMode>("info");
   const isProcessing = ref(false);
+  const processedCount = ref(0);
 
   function reset() {
-    inputPath.value = "";
-    outputPath.value = "";
+    inputPaths.value = [];
+    outputFolder.value = "";
     widthCm.value = null;
     heightCm.value = null;
     pageBreakPreview.value = false;
@@ -49,79 +58,67 @@ export function useExcelHelper() {
     fontSize.value = null;
     resetActiveCell.value = false;
     avoidCoveringContent.value = true;
-    availableSheets.value = [];
-    selectedSheets.value = [];
-    isLoadingSheets.value = false;
-    result.value = null;
+    results.value = [];
+    processedCount.value = 0;
     message.value = DEFAULT_MESSAGE;
     messageMode.value = "info";
   }
 
-  function updateInputPath(value: string) {
-    inputPath.value = value;
-    if (!outputPath.value) outputPath.value = defaultResizedPath(value);
-    result.value = null;
-    availableSheets.value = [];
-    selectedSheets.value = [];
-  }
-
-  function setOutputPath(value: string) {
-    outputPath.value = value;
-  }
-
-  async function loadSheetNames(path: string) {
-    if (!canUseTauriRuntime()) return;
-    isLoadingSheets.value = true;
-    try {
-      const sheets = await listExcelSheetNames(path);
-      availableSheets.value = sheets;
-      selectedSheets.value = [...sheets];
-    } catch (e) {
-      availableSheets.value = [];
-      selectedSheets.value = [];
-      message.value = friendlyError(e);
+  function addFiles(paths: string[]) {
+    const valid = paths.filter(isXlsxPath);
+    for (const p of valid) {
+      if (!inputPaths.value.includes(p)) inputPaths.value.push(p);
+    }
+    results.value = [];
+    if (valid.length) {
+      message.value = `${inputPaths.value.length} file(s) ready to resize.`;
+      messageMode.value = "info";
+    } else if (paths.length) {
+      message.value = "Only .xlsx files are supported.";
       messageMode.value = "error";
-    } finally {
-      isLoadingSheets.value = false;
     }
   }
 
-  async function pickInputFile() {
+  function removeFile(path: string) {
+    inputPaths.value = inputPaths.value.filter((p) => p !== path);
+    results.value = results.value.filter((r) => r.source_path !== path);
+  }
+
+  function clearFiles() {
+    inputPaths.value = [];
+    results.value = [];
+  }
+
+  function setOutputFolder(value: string) {
+    outputFolder.value = value;
+  }
+
+  async function pickInputFiles() {
     if (!canUseTauriRuntime()) {
       message.value = tauriRuntimeMessage;
       messageMode.value = "error";
       return;
     }
     try {
-      const selected = await open({ multiple: false, filters: [{ name: "Excel workbook", extensions: ["xlsx"] }] });
-      if (typeof selected === "string") {
-        inputPath.value = selected;
-        outputPath.value = defaultResizedPath(selected);
-        result.value = null;
-        message.value = "Excel file selected. Confirm the output path and sizes, then resize.";
-        messageMode.value = "info";
-        await loadSheetNames(selected);
-      }
+      const selected = await open({ multiple: true, filters: [{ name: "Excel workbook", extensions: ["xlsx"] }] });
+      if (Array.isArray(selected) && selected.length) addFiles(selected);
     } catch (e) {
       message.value = friendlyError(e);
       messageMode.value = "error";
     }
   }
 
-  async function pickOutputFile() {
+  async function pickOutputFolder() {
     if (!canUseTauriRuntime()) {
       message.value = tauriRuntimeMessage;
       messageMode.value = "error";
       return;
     }
     try {
-      const selected = await save({
-        defaultPath: outputPath.value || defaultResizedPath(inputPath.value),
-        filters: [{ name: "Excel workbook", extensions: ["xlsx"] }],
-      });
+      const selected = await open({ directory: true });
       if (typeof selected === "string") {
-        outputPath.value = selected;
-        message.value = "Output path selected.";
+        outputFolder.value = selected;
+        message.value = "Output folder selected.";
         messageMode.value = "info";
       }
     } catch (e) {
@@ -131,13 +128,13 @@ export function useExcelHelper() {
   }
 
   async function run() {
-    if (!inputPath.value.trim()) {
-      message.value = "Please select an Excel workbook before resizing.";
+    if (!inputPaths.value.length) {
+      message.value = "Please add at least one Excel workbook before resizing.";
       messageMode.value = "error";
       return;
     }
-    if (!outputPath.value.trim()) {
-      message.value = "Please choose where to save the resized workbook.";
+    if (!outputFolder.value.trim()) {
+      message.value = "Please choose an output folder.";
       messageMode.value = "error";
       return;
     }
@@ -156,11 +153,6 @@ export function useExcelHelper() {
       messageMode.value = "error";
       return;
     }
-    if (availableSheets.value.length > 0 && selectedSheets.value.length === 0) {
-      message.value = "Please select at least one sheet to process.";
-      messageMode.value = "error";
-      return;
-    }
 
     const options: ExcelHelperOptions = {
       pageBreakPreview: pageBreakPreview.value,
@@ -173,31 +165,46 @@ export function useExcelHelper() {
     };
 
     isProcessing.value = true;
-    message.value = "Resizing evidence images...";
+    processedCount.value = 0;
+    results.value = [];
+    const total = inputPaths.value.length;
+    message.value = `Resizing evidence images (0/${total})...`;
     messageMode.value = "info";
-    try {
-      const resized = await resizeExcelImages(
-        inputPath.value,
-        outputPath.value,
-        widthCm.value && widthCm.value > 0 ? widthCm.value : null,
-        heightCm.value && heightCm.value > 0 ? heightCm.value : null,
-        options,
-        selectedSheets.value.length ? selectedSheets.value : null,
-      );
-      result.value = resized;
-      message.value = `${resized.images_resized} image(s) resized across ${resized.drawings_processed} sheet(s): ${resized.output_file_name}`;
-      messageMode.value = "info";
-    } catch (e) {
-      message.value = friendlyError(e);
+
+    const failures: string[] = [];
+    for (const inputPath of inputPaths.value) {
+      const outputPath = joinPath(outputFolder.value, `${baseNameWithoutExt(fileNameFromPath(inputPath))}_resized.xlsx`);
+      try {
+        const resized = await resizeExcelImages(
+          inputPath,
+          outputPath,
+          widthCm.value && widthCm.value > 0 ? widthCm.value : null,
+          heightCm.value && heightCm.value > 0 ? heightCm.value : null,
+          options,
+          null,
+        );
+        results.value.push(resized);
+      } catch (e) {
+        failures.push(`${fileNameFromPath(inputPath)}: ${friendlyError(e)}`);
+      }
+      processedCount.value += 1;
+      message.value = `Resizing evidence images (${processedCount.value}/${total})...`;
+    }
+
+    isProcessing.value = false;
+    if (failures.length) {
+      message.value = `${results.value.length} succeeded, ${failures.length} failed — ${failures.join("; ")}`;
       messageMode.value = "error";
-    } finally {
-      isProcessing.value = false;
+    } else {
+      const totalImages = results.value.reduce((sum, r) => sum + r.images_resized, 0);
+      message.value = `${results.value.length} file(s) resized, ${totalImages} image(s) total.`;
+      messageMode.value = "info";
     }
   }
 
   return {
-    inputPath,
-    outputPath,
+    inputPaths,
+    outputFolder,
     widthCm,
     heightCm,
     pageBreakPreview,
@@ -209,17 +216,17 @@ export function useExcelHelper() {
     fontSize,
     resetActiveCell,
     avoidCoveringContent,
-    availableSheets,
-    selectedSheets,
-    isLoadingSheets,
-    result,
+    results,
     message,
     messageMode,
     isProcessing,
-    updateInputPath,
-    setOutputPath,
-    pickInputFile,
-    pickOutputFile,
+    processedCount,
+    addFiles,
+    removeFile,
+    clearFiles,
+    setOutputFolder,
+    pickInputFiles,
+    pickOutputFolder,
     run,
     reset,
   };

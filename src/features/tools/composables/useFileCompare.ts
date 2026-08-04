@@ -46,25 +46,36 @@ export function useFileCompare() {
   );
   const canCompare = computed(() => !!commonKind.value && !loading.value);
 
+  function applyPickedPath(slot: "a" | "b", path: string): boolean {
+    const kind = kindFromPath(path);
+    if (!kind) {
+      error.value = "Định dạng không hỗ trợ. Chỉ nhận text, markdown, .docx, Excel.";
+      return false;
+    }
+    const name = path.split(/[/\\]/).pop() ?? path;
+    const picked: PickedFile = { path, name, kind };
+    if (slot === "a") fileA.value = picked;
+    else fileB.value = picked;
+    result.value = null;
+    return true;
+  }
+
   async function pickFile(slot: "a" | "b") {
     error.value = "";
     if (!canUseTauriRuntime()) return;
     try {
       const selected = await open({ multiple: false, directory: false, filters: DIALOG_FILTERS });
       if (typeof selected !== "string") return;
-      const kind = kindFromPath(selected);
-      if (!kind) {
-        error.value = "Định dạng không hỗ trợ. Chỉ nhận text, markdown, .docx, Excel.";
-        return;
-      }
-      const name = selected.split(/[/\\]/).pop() ?? selected;
-      const picked: PickedFile = { path: selected, name, kind };
-      if (slot === "a") fileA.value = picked;
-      else fileB.value = picked;
-      result.value = null;
+      applyPickedPath(slot, selected);
     } catch (e) {
       error.value = friendlyError(e);
     }
+  }
+
+  /** Kéo-thả file từ ngoài vào ô A/B — path lấy trực tiếp từ Tauri drag-drop, không qua dialog. */
+  function dropFile(slot: "a" | "b", path: string) {
+    error.value = "";
+    applyPickedPath(slot, path);
   }
 
   function clearFile(slot: "a" | "b") {
@@ -132,6 +143,7 @@ export function useFileCompare() {
     kindMismatch,
     canCompare,
     pickFile,
+    dropFile,
     clearFile,
     compare,
     exportExcel,

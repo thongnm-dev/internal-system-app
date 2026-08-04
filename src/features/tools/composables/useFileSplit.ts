@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { computed, reactive, ref } from "vue";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { explorerReadDir } from "@/tauri/commands/explorer";
 import { fileSplitCalcSize, fileSplitRun } from "@/tauri/commands/file-split";
 import type { MessageMode } from "@/_/types/app";
 
@@ -105,6 +106,28 @@ export function useFileSplit() {
       sources.value.push({ path, name: baseName(path), kind });
       existing.add(path);
     }
+  }
+
+  // Kéo-thả từ ngoài vào (Tauri webview drag-drop) chỉ cho path thô, không kèm biết file hay
+  // folder — không có lệnh "stat" riêng nên tận dụng explorer_read_dir đã có sẵn: đọc được ⇒ folder,
+  // lỗi ⇒ file. Giữ đúng thứ tự thả (không tách nhóm file/folder như 2 nút "Thêm file"/"Thêm folder").
+  async function classifyPath(path: string): Promise<"file" | "folder"> {
+    try {
+      await explorerReadDir(path);
+      return "folder";
+    } catch {
+      return "file";
+    }
+  }
+
+  async function addDroppedPaths(paths: string[]) {
+    const existing = new Set(sources.value.map((s) => s.path));
+    const uniquePaths = paths.filter((p) => !existing.has(p));
+    if (!uniquePaths.length) return;
+    const kinds = await Promise.all(uniquePaths.map(classifyPath));
+    uniquePaths.forEach((path, i) => {
+      sources.value.push({ path, name: baseName(path), kind: kinds[i] });
+    });
   }
 
   async function pickFiles() {
@@ -220,6 +243,7 @@ export function useFileSplit() {
     canRun,
     pickFiles,
     pickFolders,
+    addDroppedPaths,
     pickOutputDir,
     removeSource,
     clearSources,

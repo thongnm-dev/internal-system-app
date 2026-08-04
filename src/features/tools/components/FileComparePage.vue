@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
-import { ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import type { FileCompareKind } from "@/_/types/file-compare";
 import { explorerOpen, explorerOpenFile } from "@/tauri/commands/explorer";
 import { useFileCompare } from "../composables/useFileCompare";
@@ -17,6 +18,53 @@ const kindMeta: Record<FileCompareKind, { label: string; icon: string; color: st
 };
 
 const fullscreen = ref(false);
+
+// Kéo-thả file từ ngoài vào ô A/B — Tauri webview drag-drop chỉ báo 1 tọa độ chung cho cả cửa sổ
+// (không phải HTML5 drop event trên từng element), nên phải tự so tọa độ đó với bounding rect của
+// từng ô để biết thả vào A hay B. Tọa độ event là physical pixel, cần chia devicePixelRatio để về
+// logical pixel khớp với getBoundingClientRect().
+const boxARef = ref<HTMLElement | null>(null);
+const boxBRef = ref<HTMLElement | null>(null);
+const dragOverSlot = ref<"a" | "b" | null>(null);
+let unlistenDrop: (() => void) | null = null;
+
+function slotAtPoint(physicalX: number, physicalY: number): "a" | "b" | null {
+  const ratio = window.devicePixelRatio || 1;
+  const x = physicalX / ratio;
+  const y = physicalY / ratio;
+  const inRect = (el: HTMLElement | null) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  };
+  if (inRect(boxARef.value)) return "a";
+  if (inRect(boxBRef.value)) return "b";
+  return null;
+}
+
+onMounted(async () => {
+  try {
+    unlistenDrop = await getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === "drop") {
+        const slot = slotAtPoint(event.payload.position.x, event.payload.position.y);
+        dragOverSlot.value = null;
+        const path = event.payload.paths[0];
+        if (slot && path) ctrl.dropFile(slot, path);
+      } else if (event.payload.type === "over") {
+        dragOverSlot.value = slotAtPoint(event.payload.position.x, event.payload.position.y);
+      } else {
+        dragOverSlot.value = null;
+      }
+    });
+  } catch {
+    // Tauri drag-drop không khả dụng (vd chạy trong browser dev), nút "Chọn" vẫn dùng được.
+  }
+});
+
+onUnmounted(() => {
+  unlistenDrop?.();
+  unlistenDrop = null;
+});
 </script>
 
 <template>
@@ -35,7 +83,11 @@ const fullscreen = ref(false);
             <!-- File A -->
             <div class="grid gap-1.5">
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File gốc (A)</span>
-              <div class="flex items-center gap-3 rounded-md border border-divider bg-canvas px-3 py-2.5">
+              <div
+                ref="boxARef"
+                class="flex items-center gap-3 rounded-md border px-3 py-2.5 transition-colors"
+                :class="dragOverSlot === 'a' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
+              >
                 <template v-if="ctrl.fileA.value">
                   <i :class="[kindMeta[ctrl.fileA.value.kind].icon, kindMeta[ctrl.fileA.value.kind].color, 'text-lg']" />
                   <div class="min-w-0 flex-1">
@@ -51,7 +103,7 @@ const fullscreen = ref(false);
                 <template v-else>
                   <div class="flex flex-1 items-center gap-2 text-sm text-muted">
                     <i class="pi pi-file opacity-60" />
-                    <span>Chưa chọn file gốc</span>
+                    <span>Chưa chọn file gốc — kéo thả vào đây</span>
                   </div>
                   <Button icon="pi pi-plus" label="Chọn" size="small" severity="secondary" outlined @click="ctrl.pickFile('a')" />
                 </template>
@@ -61,7 +113,11 @@ const fullscreen = ref(false);
             <!-- File B -->
             <div class="grid gap-1.5">
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File so sánh (B)</span>
-              <div class="flex items-center gap-3 rounded-md border border-divider bg-canvas px-3 py-2.5">
+              <div
+                ref="boxBRef"
+                class="flex items-center gap-3 rounded-md border px-3 py-2.5 transition-colors"
+                :class="dragOverSlot === 'b' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
+              >
                 <template v-if="ctrl.fileB.value">
                   <i :class="[kindMeta[ctrl.fileB.value.kind].icon, kindMeta[ctrl.fileB.value.kind].color, 'text-lg']" />
                   <div class="min-w-0 flex-1">
@@ -77,7 +133,7 @@ const fullscreen = ref(false);
                 <template v-else>
                   <div class="flex flex-1 items-center gap-2 text-sm text-muted">
                     <i class="pi pi-file opacity-60" />
-                    <span>Chưa chọn file so sánh</span>
+                    <span>Chưa chọn file so sánh — kéo thả vào đây</span>
                   </div>
                   <Button icon="pi pi-plus" label="Chọn" size="small" severity="secondary" outlined @click="ctrl.pickFile('b')" />
                 </template>
