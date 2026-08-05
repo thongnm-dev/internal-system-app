@@ -39,7 +39,7 @@ watch(() => props.root, load, { immediate: true });
       <div v-if="loading" class="flex items-center gap-2 px-2 py-2 text-xs text-muted">
         <i class="pi pi-spinner pi-spin" /> Đang tải…
       </div>
-      <div v-else-if="error" class="px-2 py-2 text-xs text-red-600">{{ error }}</div>
+      <div v-else-if="error" class="px-2 py-2 text-xs text-red-500">{{ error }}</div>
       <div v-else-if="!entries.length" class="px-2 py-2 text-xs text-muted">Thư mục trống.</div>
       <TerminalTreeNode v-for="entry in entries" :key="entry.path" :entry="entry" :depth="0" />
     </div>

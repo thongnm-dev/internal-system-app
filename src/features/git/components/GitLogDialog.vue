@@ -174,7 +174,7 @@ watch(visible, (v) => {
       <!-- Search filters -->
       <div class="flex flex-wrap items-end gap-2 rounded-lg border border-divider bg-canvas p-3">
         <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium text-muted">From</label>
+          <label class="text-xs font-bold text-muted">From</label>
           <DatePicker
             v-model="filterFrom"
             date-format="yy-mm-dd"
@@ -182,11 +182,10 @@ watch(visible, (v) => {
             show-icon
             show-button-bar
             class="w-40"
-            input-class="text-sm h-8"
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium text-muted">To</label>
+          <label class="text-xs font-bold text-muted">To</label>
           <DatePicker
             v-model="filterTo"
             date-format="yy-mm-dd"
@@ -194,11 +193,10 @@ watch(visible, (v) => {
             show-icon
             show-button-bar
             class="w-40"
-            input-class="text-sm h-8"
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium text-muted">Message</label>
+          <label class="text-xs font-bold text-muted">Message</label>
           <InputText
             v-model="filterMessage"
             placeholder="Commit message…"
@@ -207,7 +205,7 @@ watch(visible, (v) => {
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium text-muted">Author</label>
+          <label class="text-xs font-bold text-muted">Author</label>
           <InputText
             v-model="filterAuthor"
             placeholder="Author…"
@@ -216,7 +214,7 @@ watch(visible, (v) => {
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-medium text-muted">File</label>
+          <label class="text-xs font-bold text-muted">File</label>
           <InputText
             v-model="filterFile"
             placeholder="File path…"

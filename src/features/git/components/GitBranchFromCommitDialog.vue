@@ -31,7 +31,7 @@ async function doBranchFrom() {
         <p class="mt-0.5 font-mono text-[11px] text-muted">{{ target.short_hash }}</p>
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Tên branch</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Tên branch</label>
         <InputText
           v-model="branchFromName"
           placeholder="feature/ten-branch"

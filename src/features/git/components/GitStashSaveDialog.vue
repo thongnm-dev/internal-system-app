@@ -34,7 +34,7 @@ async function confirmStash() {
         cất vào stash và working tree sẽ trở về sạch. Bạn có thể áp dụng lại sau trong "Quản lý stash…".
       </p>
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Message (tuỳ chọn)</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Message (tuỳ chọn)</label>
         <InputText
           v-model="message"
           placeholder="Mô tả ngắn cho lần stash này…"

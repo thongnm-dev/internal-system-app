@@ -136,7 +136,7 @@ function parseDateStr(value: string): Date | null {
             {{ day.day }}
           </span>
           <span class="mt-3 flex items-center justify-between gap-1">
-            <span class="text-[11px] font-semibold text-muted">Công việc</span>
+            <span class="text-xs font-bold text-muted">Công việc</span>
             <strong class="rounded-md bg-canvas px-2 py-1 text-xs text-secondary">{{ day.taskCount }}</strong>
           </span>
         </Button>

@@ -22,7 +22,7 @@ async function doClone() {
 <template>
   <Dialog v-model:visible="visible" modal header="Clone repository" :style="{ width: '460px' }">
     <div class="flex flex-col gap-3">
-      <label class="text-sm font-medium text-ink">URL repository</label>
+      <label class="text-xs font-bold text-muted">URL repository</label>
       <InputText
         v-model="cloneUrl"
         placeholder="https://github.com/user/repo.git"

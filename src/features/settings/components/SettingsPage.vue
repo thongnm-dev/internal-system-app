@@ -126,7 +126,7 @@ const themeOptions = [
               @click="updateTabMode(true)"
             />
           </div>
-          <p class="mt-1.5 text-[11px] text-muted">
+          <p class="mt-1.5 text-xs text-muted">
             Open pages in tabs to switch between them without losing state.
           </p>
         </div>

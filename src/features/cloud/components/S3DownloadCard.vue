@@ -286,7 +286,7 @@ onMounted(() => {
         <Button icon="pi pi-folder-open" severity="secondary" outlined title="Chọn thư mục" @click="chooseDestinationFolder" />
         <Button v-if="destinationPath" icon="pi pi-times" severity="danger" text title="Xoá đường dẫn" @click="destinationPath = ''" />
       </InputGroup>
-      <small v-if="errorCheck" class="text-danger">{{ errorCheck }}</small>
+      <small v-if="errorCheck" class="text-xs text-red-500">{{ errorCheck }}</small>
     </div>
     <template #footer>
       <DialogFooter

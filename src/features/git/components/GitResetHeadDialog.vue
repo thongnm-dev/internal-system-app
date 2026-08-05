@@ -28,11 +28,11 @@ async function doResetHead() {
   <Dialog v-model:visible="visible" modal header="Reset HEAD" :style="{ width: '460px' }">
     <div class="flex flex-col gap-3">
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Reset về (ref/commit)</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Reset về (ref/commit)</label>
         <InputText v-model="resetTarget" placeholder="HEAD, HEAD~1, origin/main…" class="w-full" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Chế độ</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Chế độ</label>
         <div class="flex overflow-hidden rounded-md border border-divider text-xs">
           <button
             v-for="m in (['soft','mixed','hard'] as const)"

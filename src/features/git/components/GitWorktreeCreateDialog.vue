@@ -74,7 +74,7 @@ async function doWorktreeCreate() {
   <Dialog v-model:visible="visible" modal header="Tạo worktree" :style="{ width: '520px' }">
     <div class="flex flex-col gap-3">
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Thư mục cha</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Thư mục cha</label>
         <InputGroup class="h-8">
           <InputText :model-value="wtParent" readonly placeholder="Chọn thư mục…" />
           <Button icon="pi pi-folder-open" severity="secondary" outlined title="Chọn thư mục cha" @click="pickWorktreeParent" />
@@ -82,7 +82,7 @@ async function doWorktreeCreate() {
         </InputGroup>
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Tên thư mục worktree</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Tên thư mục worktree</label>
         <InputText v-model="wtFolder" placeholder="(mặc định theo tên branch)" class="w-full" />
       </div>
       <div class="flex items-center gap-2">
@@ -90,11 +90,11 @@ async function doWorktreeCreate() {
         <label for="wt-new-branch" class="text-sm text-ink">Tạo branch mới (từ HEAD hiện tại)</label>
       </div>
       <div v-if="wtCreateNewBranch">
-        <label class="mb-1 block text-sm font-medium text-ink">Tên branch mới</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Tên branch mới</label>
         <InputText v-model="wtNewBranch" placeholder="feature/ten-branch" class="w-full" />
       </div>
       <div v-else>
-        <label class="mb-1 block text-sm font-medium text-ink">Branch (đã có)</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Branch (đã có)</label>
         <Select
           v-model="wtExistingBranch"
           :options="worktreeBranchOptions"

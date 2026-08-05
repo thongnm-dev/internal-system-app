@@ -862,7 +862,7 @@ async function executeSyncDailyReport() {
       <div class="space-y-4">
         <!-- Short name -->
         <label class="block">
-          <span class="text-xs font-bold text-muted">Short name <span class="text-danger">*</span></span>
+          <span class="text-xs font-bold text-muted">Short name <span class="text-red-500">*</span></span>
           <InputText
             v-model="taskForm.shortName"
             class="mt-1 w-full"
@@ -939,7 +939,7 @@ async function executeSyncDailyReport() {
 
       <template #footer>
         <div class="flex flex-col gap-2">
-          <p v-if="taskError" class="text-right text-sm font-semibold text-danger">{{ taskError }}</p>
+          <p v-if="taskError" class="text-right text-sm font-semibold text-red-500">{{ taskError }}</p>
           <DialogFooter
             :confirm-label="savingTask ? 'Saving…' : isEditingTask ? 'Cập nhật' : 'Add task'"
             :confirm-disabled="!canSaveTask || savingTask"

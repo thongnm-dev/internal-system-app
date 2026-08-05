@@ -273,7 +273,7 @@ function onPriorityChange(account: AiAccount, event: Event) {
                   <p v-if="account.email" class="mt-0.5 truncate text-xs text-muted" :title="account.email">
                     <i class="pi pi-envelope mr-1" />{{ account.email }}
                   </p>
-                  <p class="mt-0.5 truncate font-mono text-[11px] text-muted" :title="account.config_dir">
+                  <p class="mt-0.5 truncate font-mono text-xs text-muted" :title="account.config_dir">
                     <i class="pi pi-folder mr-1" />{{ account.config_dir || "—" }}
                   </p>
                 </template>
@@ -320,11 +320,11 @@ function onPriorityChange(account: AiAccount, event: Event) {
 
               <p
                 v-if="!account.session_reset_at && !account.weekly_reset_at"
-                class="text-[11px] text-muted"
+                class="text-xs text-muted"
               >
                 Chưa có số liệu — bấm Refresh để đọc usage (login còn hạn).
               </p>
-              <p v-if="account.last_checked_at" class="flex items-center gap-1 text-[11px] text-muted">
+              <p v-if="account.last_checked_at" class="flex items-center gap-1 text-xs text-muted">
                 <i class="pi pi-sync" />cập nhật {{ account.last_checked_at }}
               </p>
             </div>
@@ -512,12 +512,12 @@ function onPriorityChange(account: AiAccount, event: Event) {
             </div>
             <p
               v-if="(subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.token_expires_at"
-              class="mt-1 text-[11px] text-muted"
+              class="mt-1 text-xs text-muted"
             >
               <i class="pi pi-clock mr-1" />token hết hạn
               {{ (subMode === 'current' ? ctrl.capturePreview.value : ctrl.configDirPreview.value)?.token_expires_at }}
             </p>
-            <p class="mt-1.5 text-[11px] text-muted">
+            <p class="mt-1.5 text-xs text-muted">
               {{ subMode === 'current'
                 ? 'Tool sẽ lưu token này vào profile riêng trong app data dir.'
                 : 'Token đọc từ Keychain của config dir này (luôn mới).' }}
@@ -675,7 +675,7 @@ function onPriorityChange(account: AiAccount, event: Event) {
               {{ login.already_added ? "Đã thêm" : "Mới" }}
             </span>
           </div>
-          <div class="mt-1.5 grid gap-0.5 text-[11px] text-muted">
+          <div class="mt-1.5 grid gap-0.5 text-xs text-muted">
             <span v-if="login.display_name">{{ login.display_name }}</span>
             <span class="truncate font-mono" :title="login.config_dir">
               <i class="pi pi-folder mr-1" />{{ login.config_dir }}

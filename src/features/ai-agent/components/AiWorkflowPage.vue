@@ -737,7 +737,7 @@ const selectPt = {
         <label class="flex items-start gap-2">
           <Checkbox v-model="stepIsLatest" binary input-id="step-is-latest" class="mt-0.5" />
           <span class="min-w-0">
-            <span class="text-xs font-bold text-ink">Latest step</span>
+            <span class="text-sm text-ink">Latest step</span>
             <span class="block text-xs text-muted">
               Đánh dấu đây là bước cuối cùng của workflow. Khi task đã ở bước này sẽ không cho phép mở terminal.
             </span>

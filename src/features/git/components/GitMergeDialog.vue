@@ -55,7 +55,7 @@ async function doMerge() {
         <label for="merge-squash" class="text-sm text-ink">Squash &amp; merge (gộp thành 1 commit)</label>
       </div>
       <div v-if="mergeSquash">
-        <label class="mb-1 block text-sm font-medium text-ink">Commit message (tùy chọn)</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Commit message (tùy chọn)</label>
         <InputText
           v-model="mergeMessage"
           :placeholder="`Squash merge branch '${mergeBranchSel || '...'}'`"

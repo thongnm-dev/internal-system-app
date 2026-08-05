@@ -95,7 +95,7 @@ async function submitLogin() {
 
         <div class="flex cursor-pointer items-center gap-2 select-none">
           <Checkbox v-model="rememberMe" binary input-id="remember-me" />
-          <label for="remember-me" class="cursor-pointer text-sm text-muted">Ghi nhớ thông tin đăng nhập</label>
+          <label for="remember-me" class="cursor-pointer text-sm text-ink">Ghi nhớ thông tin đăng nhập</label>
         </div>
 
         <p

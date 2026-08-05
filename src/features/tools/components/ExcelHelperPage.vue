@@ -209,7 +209,7 @@ onUnmounted(() => {
         <div class="mt-4 grid gap-1.5">
           <div class="grid grid-cols-2 gap-3">
             <label class="grid gap-1.5">
-              <span class="font-bold tracking-wide text-muted">Width</span>
+              <span class="text-xs font-bold tracking-wide text-muted">Width</span>
               <InputNumber
                 class="h-8 w-full"
                 input-class="w-full"
@@ -223,7 +223,7 @@ onUnmounted(() => {
             </label>
 
             <label class="grid gap-1.5">
-              <span class="font-bold tracking-wide text-muted">Height</span>
+              <span class="text-xs font-bold tracking-wide text-muted">Height</span>
               <InputNumber
                 class="h-8 w-full"
                 input-class="w-full"
@@ -245,7 +245,7 @@ onUnmounted(() => {
 
         <div class="mt-4 grid gap-3 pt-4">
           <div class="flex items-center gap-2">
-            <span class="shrink-0 font-bold uppercase tracking-wide text-muted">Print settings</span>
+            <span class="shrink-0 text-xs font-bold uppercase tracking-wide text-muted">Print settings</span>
             <div class="h-px flex-1 border-t border-divider"></div>
           </div>
           <label class="flex items-center gap-2">
@@ -274,11 +274,11 @@ onUnmounted(() => {
 
         <div class="mt-4 grid gap-3 pt-3">
           <div class="flex items-center gap-2">
-            <span class="shrink-0 font-bold uppercase tracking-wide text-muted">Font</span>
+            <span class="shrink-0 text-xs font-bold uppercase tracking-wide text-muted">Font</span>
             <div class="h-px flex-1 border-t border-divider"></div>
           </div>
           <label class="grid gap-1.5">
-            <span class="font-bold uppercase tracking-wide text-muted">Font name</span>
+            <span class="text-xs font-bold uppercase tracking-wide text-muted">Font name</span>
             <InputText
               class="h-8"
               placeholder="e.g. Calibri"
@@ -288,7 +288,7 @@ onUnmounted(() => {
           </label>
 
           <label class="grid gap-1.5">
-            <span class="font-bold uppercase tracking-wide text-muted">Font size</span>
+            <span class="text-xs font-bold uppercase tracking-wide text-muted">Font size</span>
             <InputNumber
               class="h-8"
               :min="1"
@@ -301,7 +301,7 @@ onUnmounted(() => {
         </div>
         <div class="mt-4 grid gap-3 pt-3">
           <div class="flex items-center gap-2">
-            <span class="shrink-0 font-bold uppercase tracking-wide text-muted">Mixed</span>
+            <span class="shrink-0 text-xs font-bold uppercase tracking-wide text-muted">Mixed</span>
             <div class="h-px flex-1 border-t border-divider"></div>
           </div>
           <div class="flex items-center gap-2">

@@ -102,7 +102,7 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
         <span class="mt-1 flex h-10 items-center gap-2 rounded-md border border-divider bg-panel px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
           <i class="pi pi-search shrink-0 text-muted" />
           <InputText
-            class="w-full min-w-0 flex-1 !border-0 !bg-transparent !p-0 text-sm text-ink !shadow-none !outline-none !ring-0 focus:!border-0 focus:!bg-transparent focus:!shadow-none focus:!outline-none focus:!ring-0"
+            class="embedded-input w-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-ink shadow-none outline-none"
             placeholder="Name, tag, category, guidance"
             :model-value="ctrl.query.value"
             @update:model-value="ctrl.query.value = $event as string"

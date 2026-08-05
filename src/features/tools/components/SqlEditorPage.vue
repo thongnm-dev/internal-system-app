@@ -2,6 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import InputText from "primevue/inputtext";
+import InputNumber from "primevue/inputnumber";
+import Select from "primevue/select";
 import { useSqlEditor, type SuggestItem } from "../composables/useSqlEditor";
 import { getCaretCoordinates } from "../utils/caretCoordinates";
 import { highlightSql } from "../utils/highlightSql";
@@ -10,6 +13,13 @@ const sql = useSqlEditor();
 
 /** Kết quả của tab đang mở (null nếu tab chưa chạy query nào). */
 const activeResult = computed(() => sql.activeTab.value?.result ?? null);
+
+const dbTypeSelectOptions = computed(() =>
+  sql.dbTypeOptions.map((opt) => ({
+    value: opt.value,
+    label: opt.label + (opt.supported ? "" : " (sắp có)"),
+  })),
+);
 
 /** HTML đã tô màu cho lớp phủ highlight (thêm ký tự cuối để căn dòng chót). */
 const highlightedHtml = computed(() => highlightSql(sql.activeTab.value?.query ?? "") + "\n");
@@ -558,72 +568,52 @@ onBeforeUnmount(stopDrag);
       <div class="grid gap-3">
         <label class="grid gap-1">
           <span class="text-xs font-bold text-muted">Tên kết nối <span class="text-red-500">*</span></span>
-          <input
-            v-model="sql.form.name"
-            placeholder="Ví dụ: Prod PostgreSQL"
-            class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
-          />
+          <InputText v-model="sql.form.name" placeholder="Ví dụ: Prod PostgreSQL" class="mt-1 w-full" />
         </label>
 
         <div class="grid grid-cols-2 gap-3">
           <label class="grid gap-1">
             <span class="text-xs font-bold text-muted">Loại DB</span>
-            <select
-              :value="sql.form.db_type"
-              class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
-              @change="sql.onDbTypeChange(($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in sql.dbTypeOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}{{ opt.supported ? "" : " (sắp có)" }}
-              </option>
-            </select>
+            <Select
+              :model-value="sql.form.db_type"
+              :options="dbTypeSelectOptions"
+              option-label="label"
+              option-value="value"
+              class="mt-1 w-full"
+              @update:model-value="sql.onDbTypeChange($event)"
+            />
           </label>
           <label class="grid gap-1">
             <span class="text-xs font-bold text-muted">Port</span>
-            <input
-              v-model.number="sql.form.port"
-              type="number"
+            <InputNumber
+              :model-value="sql.form.port"
               placeholder="5432"
-              class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
+              class="mt-1 w-full"
+              input-class="w-full"
+              :use-grouping="false"
+              @update:model-value="(v) => { if (v !== null) sql.form.port = v; }"
             />
           </label>
         </div>
 
         <label class="grid gap-1">
           <span class="text-xs font-bold text-muted">Host <span class="text-red-500">*</span></span>
-          <input
-            v-model="sql.form.host"
-            placeholder="localhost"
-            class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
-          />
+          <InputText v-model="sql.form.host" placeholder="localhost" class="mt-1 w-full" />
         </label>
 
         <label class="grid gap-1">
           <span class="text-xs font-bold text-muted">Database <span class="text-red-500">*</span></span>
-          <input
-            v-model="sql.form.database"
-            placeholder="Tên database"
-            class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
-          />
+          <InputText v-model="sql.form.database" placeholder="Tên database" class="mt-1 w-full" />
         </label>
 
         <div class="grid grid-cols-2 gap-3">
           <label class="grid gap-1">
             <span class="text-xs font-bold text-muted">Username</span>
-            <input
-              v-model="sql.form.username"
-              placeholder="postgres"
-              class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
-            />
+            <InputText v-model="sql.form.username" placeholder="postgres" class="mt-1 w-full" />
           </label>
           <label class="grid gap-1">
             <span class="text-xs font-bold text-muted">Password</span>
-            <input
-              v-model="sql.form.password"
-              type="password"
-              placeholder="••••••"
-              class="rounded-md border border-divider bg-panel px-3 py-2 text-sm outline-none focus:border-brand"
-            />
+            <InputText v-model="sql.form.password" type="password" placeholder="••••••" class="mt-1 w-full" />
           </label>
         </div>
 

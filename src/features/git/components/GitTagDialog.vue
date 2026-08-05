@@ -47,7 +47,7 @@ async function doCreateTag() {
     <div class="flex flex-col gap-3">
       <p class="text-xs text-muted">Tạo tag tại: <strong class="text-ink">{{ target.label }}</strong></p>
       <div>
-        <label class="mb-1 block text-sm font-medium text-ink">Tên tag</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Tên tag</label>
         <InputText v-model="tagName" placeholder="v1.0.0" class="w-full" @keydown.enter="doCreateTag" />
       </div>
       <div class="flex items-center gap-2">
@@ -55,7 +55,7 @@ async function doCreateTag() {
         <label for="tag-annotated" class="text-sm text-ink">Annotated (kèm message)</label>
       </div>
       <div v-if="tagAnnotated">
-        <label class="mb-1 block text-sm font-medium text-ink">Message</label>
+        <label class="mb-1 block text-xs font-bold text-muted">Message</label>
         <InputText v-model="tagMessage" placeholder="Mô tả cho tag" class="w-full" />
       </div>
       <div class="flex items-center gap-2">

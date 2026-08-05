@@ -215,7 +215,7 @@ function reloadBacklogProject() {
             <InputText class="mt-1 w-full" placeholder="Auto generated" readonly :model-value="String(form.id ?? '')" />
           </label>
           <label>
-            <span class="text-xs font-bold text-muted">Project Code <span class="text-red-600">*</span></span>
+            <span class="text-xs font-bold text-muted">Project Code <span class="text-red-500">*</span></span>
             <InputText
               class="mt-1 w-full"
               :class="{ 'p-invalid': fieldErrors.code }"
@@ -224,10 +224,10 @@ function reloadBacklogProject() {
               :model-value="form.code"
               @update:model-value="updateForm('code', $event as string)"
             />
-            <small v-if="fieldErrors.code" class="mt-1 block text-red-600">{{ fieldErrors.code }}</small>
+            <small v-if="fieldErrors.code" class="mt-1 block text-xs text-red-500">{{ fieldErrors.code }}</small>
           </label>
           <label class="md:col-span-2">
-            <span class="text-xs font-bold text-muted">Project Name <span class="text-red-600">*</span></span>
+            <span class="text-xs font-bold text-muted">Project Name <span class="text-red-500">*</span></span>
             <InputText
               class="mt-1 w-full"
               :class="{ 'p-invalid': fieldErrors.name }"
@@ -236,7 +236,7 @@ function reloadBacklogProject() {
               :model-value="form.name"
               @update:model-value="updateForm('name', $event as string)"
             />
-            <small v-if="fieldErrors.name" class="mt-1 block text-red-600">{{ fieldErrors.name }}</small>
+            <small v-if="fieldErrors.name" class="mt-1 block text-xs text-red-500">{{ fieldErrors.name }}</small>
           </label>
           <label class="md:col-span-2">
             <span class="text-xs font-bold text-muted">Client</span>
@@ -248,7 +248,7 @@ function reloadBacklogProject() {
               :model-value="form.client"
               @update:model-value="updateForm('client', $event as string)"
             />
-            <small v-if="fieldErrors.client" class="mt-1 block text-red-600">{{ fieldErrors.client }}</small>
+            <small v-if="fieldErrors.client" class="mt-1 block text-xs text-red-500">{{ fieldErrors.client }}</small>
           </label>
           <Fieldset class="rounded-lg border border-divider p-4 md:col-span-2 fieldset-nested" legend="Backlog" toggleable>
             <div class="grid gap-3 md:grid-cols-2">
@@ -273,7 +273,7 @@ function reloadBacklogProject() {
                     @click="reloadBacklogProject"
                   />
                 </div>
-                <small v-if="fieldErrors.backlogKey" class="mt-1 block text-red-600">{{ fieldErrors.backlogKey }}</small>
+                <small v-if="fieldErrors.backlogKey" class="mt-1 block text-xs text-red-500">{{ fieldErrors.backlogKey }}</small>
               </div>
               <label>
                 <span class="text-xs font-bold text-muted">Backlog Code</span>
@@ -283,7 +283,7 @@ function reloadBacklogProject() {
                 <span class="text-xs font-bold text-muted">Backlog Name</span>
                 <InputText class="mt-1 w-full" disabled :placeholder="isBacklogLookupLoading ? 'Loading...' : ''" :model-value="form.backlogName" />
               </label>
-              <p v-if="backlogLookupError" class="text-sm text-red-600 md:col-span-2">{{ backlogLookupError }}</p>
+              <p v-if="backlogLookupError" class="text-sm text-red-500 md:col-span-2">{{ backlogLookupError }}</p>
             </div>
           </Fieldset>
         </div>

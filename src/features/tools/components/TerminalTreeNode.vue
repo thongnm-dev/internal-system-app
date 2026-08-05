@@ -57,7 +57,7 @@ async function toggle() {
       <div v-if="loading" class="px-1 py-1 text-[11px] text-muted" :style="{ paddingLeft: `${(depth + 1) * 14 + 6}px` }">
         <i class="pi pi-spinner pi-spin" />
       </div>
-      <div v-else-if="error" class="truncate px-1 py-1 text-[11px] text-red-600" :style="{ paddingLeft: `${(depth + 1) * 14 + 6}px` }" :title="error">
+      <div v-else-if="error" class="truncate px-1 py-1 text-xs text-red-500" :style="{ paddingLeft: `${(depth + 1) * 14 + 6}px` }" :title="error">
         {{ error }}
       </div>
       <div v-else-if="!children.length" class="px-1 py-1 text-[11px] text-muted" :style="{ paddingLeft: `${(depth + 1) * 14 + 6}px` }">

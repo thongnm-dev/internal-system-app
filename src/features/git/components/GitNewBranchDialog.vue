@@ -22,7 +22,7 @@ async function doCreateBranch() {
 <template>
   <Dialog v-model:visible="visible" modal header="Tạo branch mới" :style="{ width: '420px' }">
     <div class="flex flex-col gap-3">
-      <label class="text-sm font-medium text-ink">Tên branch</label>
+      <label class="text-xs font-bold text-muted">Tên branch</label>
       <InputText
         v-model="newBranchName"
         placeholder="feature/ten-branch"
