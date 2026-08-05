@@ -10,6 +10,7 @@ import type { GitBranch, GitCommit, GitFileChange, GitRepo } from "@/_/types/git
 import { statusMeta, baseName, dirName } from "../utils/fileStatus";
 import { guessBase } from "../utils/gitRefs";
 
+import GitTabSwitcher from "./GitTabSwitcher.vue";
 import GitCloneRepoDialog from "./GitCloneRepoDialog.vue";
 import GitNewBranchDialog from "./GitNewBranchDialog.vue";
 import GitDiscardConfirmDialog from "./GitDiscardConfirmDialog.vue";
@@ -366,10 +367,6 @@ function openGraphDialog() {
 
 // === Context menu trên history ===
 const commitMenu = ref<{ x: number; y: number; commit: GitCommit } | null>(null);
-const ctxItem =
-  "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-secondary transition-colors hover:bg-canvas hover:text-brand";
-const ctxDanger =
-  "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50";
 
 function openCommitMenu(e: MouseEvent, commit: GitCommit) {
   e.preventDefault();
@@ -654,50 +651,50 @@ onUnmounted(closeCommitMenu);
                 v-if="moreMenuOpen"
                 class="absolute bottom-full right-0 z-30 mb-2 w-60 rounded-lg border border-divider bg-panel p-1.5 shadow-float"
               >
-                <button :class="ctxItem" @click="openRebaseDialog">
+                <button class="ctx-menu-item" @click="openRebaseDialog">
                   <i class="pi pi-arrows-v text-xs" /> Rebase current branch…
                 </button>
-                <button :class="ctxItem" @click="openWorktreeCreate">
+                <button class="ctx-menu-item" @click="openWorktreeCreate">
                   <i class="pi pi-clone text-xs" /> Tạo worktree…
                 </button>
-                <button :class="ctxItem" @click="openWorktreeList">
+                <button class="ctx-menu-item" @click="openWorktreeList">
                   <i class="pi pi-list text-xs" /> Quản lý worktree…
                 </button>
                 <div class="my-1 border-t border-divider" />
-                <button :class="ctxItem" @click="openStashList">
+                <button class="ctx-menu-item" @click="openStashList">
                   <i class="pi pi-inbox text-xs" /> Quản lý stash…
                   <span v-if="git.stashes.value.length" class="ml-auto rounded-full bg-canvas px-1.5 text-[10px] font-semibold text-muted">{{ git.stashes.value.length }}</span>
                 </button>
                 <div class="my-1 border-t border-divider" />
-                <button :class="ctxItem" @click="openTagDialog()">
+                <button class="ctx-menu-item" @click="openTagDialog()">
                   <i class="pi pi-tag text-xs" /> Tạo tag…
                 </button>
-                <button :class="ctxItem" @click="openTagListDialog">
+                <button class="ctx-menu-item" @click="openTagListDialog">
                   <i class="pi pi-tags text-xs" /> Quản lý tags…
                 </button>
-                <button :class="ctxItem" @click="openMergeDialog">
+                <button class="ctx-menu-item" @click="openMergeDialog">
                   <i class="pi pi-code-branch text-xs" /> Merge branch…
                 </button>
-                <button :class="ctxItem" @click="openCompareDialog">
+                <button class="ctx-menu-item" @click="openCompareDialog">
                   <i class="pi pi-arrows-h text-xs" /> So sánh / Pull Request…
                 </button>
-                <button :class="ctxItem" @click="openPrDialog">
+                <button class="ctx-menu-item" @click="openPrDialog">
                   <i class="pi pi-flag text-xs" /> Xem Pull Requests…
                 </button>
                 <div class="my-1 border-t border-divider" />
-                <button v-if="!isOnBaseBranch" :class="ctxItem" @click="openUpdateDialog">
+                <button v-if="!isOnBaseBranch" class="ctx-menu-item" @click="openUpdateDialog">
                   <i class="pi pi-arrow-circle-down text-xs" /> Cập nhật từ main/master…
                 </button>
-                <button :class="ctxItem" @click="openResetHeadDialog">
+                <button class="ctx-menu-item" @click="openResetHeadDialog">
                   <i class="pi pi-backward text-xs" /> Reset HEAD…
                 </button>
-                <button :class="ctxItem" @click="openCleanupDialog">
+                <button class="ctx-menu-item" @click="openCleanupDialog">
                   <i class="pi pi-eraser text-xs" /> Cleanup branch đã merge…
                 </button>
-                <button :class="ctxItem" @click="openCommitBrowser">
+                <button class="ctx-menu-item" @click="openCommitBrowser">
                   <i class="pi pi-copy text-xs" /> Duyệt commit / copy SHA…
                 </button>
-                <button :class="ctxItem" @click="logDialogVisible = true;">
+                <button class="ctx-menu-item" @click="logDialogVisible = true;">
                   <i class="pi pi-list-check text-xs" /> Show log…
                 </button>
               </div>
@@ -801,37 +798,14 @@ onUnmounted(closeCommitMenu);
             :style="{ width: changesListWidth + 'px' }"
           >
             <!-- Tabs (trong cột 1) -->
-            <div class="flex items-center gap-1 border-b border-divider p-1">
-              <button
-                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-                :class="git.tab.value === 'changes' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
-                @click="git.switchTab('changes')"
-              >
-                <i class="pi pi-pencil text-[11px]" /> Changes
-                <span
-                  v-if="git.hasChanges.value"
-                  class="rounded-full px-1.5 text-[10px] font-bold"
-                  :class="git.tab.value === 'changes' ? 'bg-white/25' : 'bg-canvas text-secondary'"
-                >
-                  {{ git.staged.value.length + git.unstaged.value.length }}
-                </span>
-              </button>
-              <button
-                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-                :class="git.tab.value === 'history' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
-                @click="git.switchTab('history')"
-              >
-                <i class="pi pi-history text-[11px]" /> History
-              </button>
-              <button
-                class="rounded p-1 text-muted transition-colors hover:bg-canvas hover:text-brand"
-                title="Làm mới"
-                @click="git.refreshStatusAndInfo()"
-              >
-                <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin text-[11px]" />
-                <i v-else class="pi pi-sync text-[11px]" />
-              </button>
-            </div>
+            <GitTabSwitcher
+              :active-tab="git.tab.value"
+              :changes-count="git.staged.value.length + git.unstaged.value.length"
+              :history-count="git.commits.value.length"
+              :refreshing="git.refreshing.value || git.loadingRepo.value"
+              @switch-tab="git.switchTab($event)"
+              @refresh="git.refreshStatusAndInfo()"
+            />
 
             <div class="min-h-0 flex-1 overflow-y-auto">
               <!-- Staged -->
@@ -1053,44 +1027,14 @@ onUnmounted(closeCommitMenu);
             :style="{ width: commitListWidth + 'px' }"
           >
             <!-- Tabs (trong cột 1) -->
-            <div class="flex items-center gap-1 border-b border-divider p-1">
-              <button
-                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-                :class="git.tab.value === 'changes' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
-                @click="git.switchTab('changes')"
-              >
-                <i class="pi pi-pencil text-[11px]" /> Changes
-                <span
-                  v-if="git.hasChanges.value"
-                  class="rounded-full px-1.5 text-[10px] font-bold"
-                  :class="git.tab.value === 'changes' ? 'bg-white/25' : 'bg-canvas text-secondary'"
-                >
-                  {{ git.staged.value.length + git.unstaged.value.length }}
-                </span>
-              </button>
-              <button
-                class="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-                :class="git.tab.value === 'history' ? 'bg-brand text-white' : 'text-secondary hover:bg-canvas'"
-                @click="git.switchTab('history')"
-              >
-                <i class="pi pi-history text-[11px]" /> History
-                <span
-                  v-if="git.commits.value.length"
-                  class="rounded-full px-1.5 text-[10px] font-bold"
-                  :class="git.tab.value === 'history' ? 'bg-white/25' : 'bg-canvas text-secondary'"
-                >
-                  {{ git.commits.value.length }}
-                </span>
-              </button>
-              <button
-                class="rounded p-1 text-muted transition-colors hover:bg-canvas hover:text-brand"
-                title="Làm mới"
-                @click="git.refreshStatusAndInfo()"
-              >
-                <i v-if="git.refreshing.value || git.loadingRepo.value" class="pi pi-spinner pi-spin text-[11px]" />
-                <i v-else class="pi pi-sync text-[11px]" />
-              </button>
-            </div>
+            <GitTabSwitcher
+              :active-tab="git.tab.value"
+              :changes-count="git.staged.value.length + git.unstaged.value.length"
+              :history-count="git.commits.value.length"
+              :refreshing="git.refreshing.value || git.loadingRepo.value"
+              @switch-tab="git.switchTab($event)"
+              @refresh="git.refreshStatusAndInfo()"
+            />
 
             <div class="min-h-0 flex-1 overflow-y-auto">
               <button
@@ -1289,17 +1233,17 @@ onUnmounted(closeCommitMenu);
       :style="{ left: fileMenu.x + 'px', top: fileMenu.y + 'px' }"
       @click.stop
     >
-      <button :class="ctxItem" @click="git.copyText(absPath(fileMenu.rel), 'đường dẫn'); closeFileMenu()">
+      <button class="ctx-menu-item" @click="git.copyText(absPath(fileMenu.rel), 'đường dẫn'); closeFileMenu()">
         <i class="pi pi-copy text-xs" /> Copy path
       </button>
-      <button :class="ctxItem" @click="git.copyText(relPath(fileMenu.rel), 'đường dẫn tương đối'); closeFileMenu()">
+      <button class="ctx-menu-item" @click="git.copyText(relPath(fileMenu.rel), 'đường dẫn tương đối'); closeFileMenu()">
         <i class="pi pi-copy text-xs" /> Copy relative path
       </button>
-      <button :class="ctxItem" @click="git.showInFolder(absPath(fileMenu.rel)); closeFileMenu()">
+      <button class="ctx-menu-item" @click="git.showInFolder(absPath(fileMenu.rel)); closeFileMenu()">
         <i class="pi pi-folder-open text-xs" /> Show in folder
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="openBlameDialog(fileMenu.rel)">
+      <button class="ctx-menu-item" @click="openBlameDialog(fileMenu.rel)">
         <i class="pi pi-user-edit text-xs" /> Xem Git blame
       </button>
     </div>
@@ -1311,40 +1255,40 @@ onUnmounted(closeCommitMenu);
       :style="{ left: commitMenu.x + 'px', top: commitMenu.y + 'px' }"
       @click.stop
     >
-      <button v-if="isTopCommit(commitMenu.commit)" :class="ctxItem" @click="handleAmendCommit(commitMenu.commit); closeCommitMenu()">
+      <button v-if="isTopCommit(commitMenu.commit)" class="ctx-menu-item" @click="handleAmendCommit(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-pencil text-xs" /> Amend commit
       </button>
-      <button v-if="isTopCommit(commitMenu.commit) && (git.info.value?.ahead ?? 0) > 0" :class="ctxItem" @click="git.undoLastCommit(); closeCommitMenu()">
+      <button v-if="isTopCommit(commitMenu.commit) && (git.info.value?.ahead ?? 0) > 0" class="ctx-menu-item" @click="git.undoLastCommit(); closeCommitMenu()">
         <i class="pi pi-replay text-xs" /> Undo commit
       </button>
-      <button :class="ctxItem" @click="askRevert(commitMenu.commit); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="askRevert(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-undo text-xs" /> Revert commit
       </button>
-      <button :class="ctxItem" @click="git.cherryPick(commitMenu.commit.hash); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="git.cherryPick(commitMenu.commit.hash); closeCommitMenu()">
         <i class="pi pi-share-alt text-xs" /> Cherry-pick commit
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="askBranchFrom(commitMenu.commit); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="askBranchFrom(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-sitemap text-xs" /> Tạo branch from commit
       </button>
-      <button :class="ctxItem" @click="git.checkoutCommit(commitMenu.commit.hash); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="git.checkoutCommit(commitMenu.commit.hash); closeCommitMenu()">
         <i class="pi pi-arrow-right text-xs" /> Checkout commit
       </button>
-      <button :class="ctxItem" @click="openTagDialog({ hash: commitMenu.commit.hash, label: commitMenu.commit.short_hash + ' — ' + commitMenu.commit.subject })">
+      <button class="ctx-menu-item" @click="openTagDialog({ hash: commitMenu.commit.hash, label: commitMenu.commit.short_hash + ' — ' + commitMenu.commit.subject })">
         <i class="pi pi-tag text-xs" /> Tạo tag
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="git.resetTo(commitMenu.commit.hash, 'mixed'); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="git.resetTo(commitMenu.commit.hash, 'mixed'); closeCommitMenu()">
         <i class="pi pi-history text-xs" /> Reset commit
       </button>
-      <button :class="ctxDanger" @click="askResetHard(commitMenu.commit); closeCommitMenu()">
+      <button class="ctx-menu-item-danger" @click="askResetHard(commitMenu.commit); closeCommitMenu()">
         <i class="pi pi-exclamation-triangle text-xs" /> Reset hard (xóa commit)
       </button>
       <div class="my-1 border-t border-divider" />
-      <button :class="ctxItem" @click="git.copyText(commitMenu.commit.hash, 'SHA'); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="git.copyText(commitMenu.commit.hash, 'SHA'); closeCommitMenu()">
         <i class="pi pi-copy text-xs" /> Copy SHA
       </button>
-      <button :class="ctxItem" @click="git.copyText(commitMenu.commit.subject, 'commit message'); closeCommitMenu()">
+      <button class="ctx-menu-item" @click="git.copyText(commitMenu.commit.subject, 'commit message'); closeCommitMenu()">
         <i class="pi pi-copy text-xs" /> Copy message
       </button>
     </div>

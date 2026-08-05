@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import InputText from "primevue/inputtext";
 import {
   backlogGetConfig,
@@ -156,15 +157,15 @@ async function saveConfig() {
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-end gap-2">
-        <Button label="Huỷ" severity="secondary" outlined :disabled="isSaving" @click="showDialog = false" />
-        <Button
-          icon="pi pi-save"
-          label="Lưu cấu hình"
-          :loading="isSaving"
-          @click="saveConfig()"
-        />
-      </div>
+      <DialogFooter
+        cancel-label="Huỷ"
+        confirm-label="Lưu cấu hình"
+        confirm-icon="pi pi-save"
+        :cancel-disabled="isSaving"
+        :busy="isSaving"
+        @cancel="showDialog = false"
+        @confirm="saveConfig()"
+      />
     </template>
   </Dialog>
 </template>

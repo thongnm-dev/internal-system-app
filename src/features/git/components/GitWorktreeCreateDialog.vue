@@ -7,6 +7,7 @@ import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
 import Select from "primevue/select";
 import { open } from "@tauri-apps/plugin-dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -110,10 +111,14 @@ async function doWorktreeCreate() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!worktreeCanCreate || !!git.busyMessage.value" @click="doWorktreeCreate">
-        <i class="pi pi-clone mr-1.5" /> Tạo worktree
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Tạo worktree"
+        confirm-icon="pi pi-clone"
+        :confirm-disabled="!worktreeCanCreate || !!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doWorktreeCreate"
+      />
     </template>
   </Dialog>
 </template>

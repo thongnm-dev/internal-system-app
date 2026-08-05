@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -61,15 +61,15 @@ async function doCleanup() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button
-        size="small"
-        severity="danger"
-        :disabled="!cleanupSelected.size"
-        @click="doCleanup"
-      >
-        <i class="pi pi-trash mr-1.5" /> Xóa {{ cleanupSelected.size }} branch
-      </Button>
+      <DialogFooter
+        cancel-label="Đóng"
+        :confirm-label="`Xóa ${cleanupSelected.size} branch`"
+        confirm-icon="pi pi-trash"
+        confirm-severity="danger"
+        :confirm-disabled="!cleanupSelected.size"
+        @cancel="visible = false"
+        @confirm="doCleanup"
+      />
     </template>
   </Dialog>
 </template>

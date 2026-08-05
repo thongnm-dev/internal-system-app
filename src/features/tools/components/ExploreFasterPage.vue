@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, nextTick, type ComponentPublicInstance } from "vue";
 import Button from "primevue/button";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import Checkbox from "primevue/checkbox";
 import InputText from "primevue/inputtext";
 import { useExploreFaster } from "../composables/useExploreFaster";
@@ -891,27 +892,27 @@ function parentPath(fullPath: string): string {
     >
       <!-- === Entry context menu === -->
       <template v-if="ctxMenu.type === 'entry' && ctxMenu.entry">
-        <Button v-if="ctxMenu.entry.is_dir" class="ctx-item" unstyled @click="handleEntryClick(ctxMenu.entry!); closeCtxMenu()">
+        <Button v-if="ctxMenu.entry.is_dir" class="ctx-menu-item" unstyled @click="handleEntryClick(ctxMenu.entry!); closeCtxMenu()">
           <i class="pi pi-folder-open" /> Open
         </Button>
-        <Button class="ctx-item" unstyled @click="ctrl.openInExplorer(ctxMenu.entry!.path); closeCtxMenu()">
+        <Button class="ctx-menu-item" unstyled @click="ctrl.openInExplorer(ctxMenu.entry!.path); closeCtxMenu()">
           <i class="pi pi-external-link" /> Show in Explorer
         </Button>
         <div class="ctx-sep" />
-        <Button class="ctx-item" unstyled @click="ctxCut">
+        <Button class="ctx-menu-item" unstyled @click="ctxCut">
           <i class="pi pi-scissors" /> Cut
           <span class="ctx-shortcut">Ctrl+X</span>
         </Button>
-        <Button class="ctx-item" unstyled @click="ctxCopy">
+        <Button class="ctx-menu-item" unstyled @click="ctxCopy">
           <i class="pi pi-copy" /> Copy
           <span class="ctx-shortcut">Ctrl+C</span>
         </Button>
         <div class="ctx-sep" />
-        <Button class="ctx-item" unstyled @click="ctxRename">
+        <Button class="ctx-menu-item" unstyled @click="ctxRename">
           <i class="pi pi-pencil" /> Rename
           <span class="ctx-shortcut">F2</span>
         </Button>
-        <Button class="ctx-item text-red-600 hover:!bg-red-50" unstyled @click="ctxDelete">
+        <Button class="ctx-menu-item-danger" unstyled @click="ctxDelete">
           <i class="pi pi-trash" /> Delete
           <span class="ctx-shortcut">Del</span>
         </Button>
@@ -921,7 +922,7 @@ function parentPath(fullPath: string): string {
       <template v-else-if="ctxMenu.type === 'background'">
         <!-- New submenu -->
         <div class="relative">
-          <Button class="ctx-item" unstyled @click.stop="toggleSubmenu('new')">
+          <Button class="ctx-menu-item" unstyled @click.stop="toggleSubmenu('new')">
             <i class="pi pi-plus" /> New
             <i class="pi pi-chevron-right ml-auto text-[10px]" />
           </Button>
@@ -929,10 +930,10 @@ function parentPath(fullPath: string): string {
             v-if="ctxSubmenu === 'new'"
             class="absolute left-full top-0 z-10 min-w-40 rounded-lg border border-divider bg-panel py-1 shadow-xl"
           >
-            <Button class="ctx-item" unstyled @click="ctxNewFolder">
+            <Button class="ctx-menu-item" unstyled @click="ctxNewFolder">
               <i class="pi pi-folder" /> Folder
             </Button>
-            <Button class="ctx-item" unstyled @click="ctxNewFile">
+            <Button class="ctx-menu-item" unstyled @click="ctxNewFile">
               <i class="pi pi-file" /> File
             </Button>
           </div>
@@ -940,7 +941,7 @@ function parentPath(fullPath: string): string {
         <div class="ctx-sep" />
 
         <!-- Paste -->
-        <Button class="ctx-item" :class="!clipboard ? 'opacity-40 pointer-events-none' : ''" unstyled @click="ctxPaste">
+        <Button class="ctx-menu-item" :class="!clipboard ? 'opacity-40 pointer-events-none' : ''" unstyled @click="ctxPaste">
           <i class="pi pi-clipboard" /> Paste
           <span class="ctx-shortcut">Ctrl+V</span>
         </Button>
@@ -948,7 +949,7 @@ function parentPath(fullPath: string): string {
 
         <!-- Sort submenu -->
         <div class="relative">
-          <Button class="ctx-item" unstyled @click.stop="toggleSubmenu('sort')">
+          <Button class="ctx-menu-item" unstyled @click.stop="toggleSubmenu('sort')">
             <i class="pi pi-sort-alt" /> Sort by
             <i class="pi pi-chevron-right ml-auto text-[10px]" />
           </Button>
@@ -956,16 +957,16 @@ function parentPath(fullPath: string): string {
             v-if="ctxSubmenu === 'sort'"
             class="absolute left-full top-0 z-10 min-w-40 rounded-lg border border-divider bg-panel py-1 shadow-xl"
           >
-            <Button class="ctx-item" :class="sortKey === 'name' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('name')">
+            <Button class="ctx-menu-item" :class="sortKey === 'name' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('name')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'name' ? '' : 'invisible'" /> Name
             </Button>
-            <Button class="ctx-item" :class="sortKey === 'extension' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('extension')">
+            <Button class="ctx-menu-item" :class="sortKey === 'extension' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('extension')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'extension' ? '' : 'invisible'" /> Extension
             </Button>
-            <Button class="ctx-item" :class="sortKey === 'size' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('size')">
+            <Button class="ctx-menu-item" :class="sortKey === 'size' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('size')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'size' ? '' : 'invisible'" /> Size
             </Button>
-            <Button class="ctx-item" :class="sortKey === 'modified' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('modified')">
+            <Button class="ctx-menu-item" :class="sortKey === 'modified' ? 'font-bold text-brand' : ''" unstyled @click="ctxSortBy('modified')">
               <i class="pi pi-check text-[10px]" :class="sortKey === 'modified' ? '' : 'invisible'" /> Date modified
             </Button>
           </div>
@@ -973,7 +974,7 @@ function parentPath(fullPath: string): string {
 
         <!-- Group by submenu -->
         <div class="relative">
-          <Button class="ctx-item" unstyled @click.stop="toggleSubmenu('group')">
+          <Button class="ctx-menu-item" unstyled @click.stop="toggleSubmenu('group')">
             <i class="pi pi-objects-column" /> Group by
             <i class="pi pi-chevron-right ml-auto text-[10px]" />
           </Button>
@@ -981,20 +982,20 @@ function parentPath(fullPath: string): string {
             v-if="ctxSubmenu === 'group'"
             class="absolute left-full top-0 z-10 min-w-40 rounded-lg border border-divider bg-panel py-1 shadow-xl"
           >
-            <Button class="ctx-item" :class="!groupBy ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('')">
+            <Button class="ctx-menu-item" :class="!groupBy ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('')">
               <i class="pi pi-check text-[10px]" :class="!groupBy ? '' : 'invisible'" /> None
             </Button>
-            <Button class="ctx-item" :class="groupBy === 'type' ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('type')">
+            <Button class="ctx-menu-item" :class="groupBy === 'type' ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('type')">
               <i class="pi pi-check text-[10px]" :class="groupBy === 'type' ? '' : 'invisible'" /> Type
             </Button>
-            <Button class="ctx-item" :class="groupBy === 'extension' ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('extension')">
+            <Button class="ctx-menu-item" :class="groupBy === 'extension' ? 'font-bold text-brand' : ''" unstyled @click="ctxGroupBy('extension')">
               <i class="pi pi-check text-[10px]" :class="groupBy === 'extension' ? '' : 'invisible'" /> Extension
             </Button>
           </div>
         </div>
 
         <div class="ctx-sep" />
-        <Button class="ctx-item" unstyled @click="ctxRefresh">
+        <Button class="ctx-menu-item" unstyled @click="ctxRefresh">
           <i class="pi pi-refresh" /> Refresh
         </Button>
       </template>
@@ -1011,19 +1012,18 @@ function parentPath(fullPath: string): string {
         <p class="mb-5 text-sm text-secondary">
           Are you sure you want to delete <strong>{{ confirmDeleteLabel }}</strong>? This action cannot be undone.
         </p>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" size="small" @click="confirmDeleteTarget = null" />
-          <Button label="Delete" severity="danger" size="small" @click="executeDelete" />
-        </div>
+        <DialogFooter
+          confirm-label="Delete"
+          confirm-severity="danger"
+          @cancel="confirmDeleteTarget = null"
+          @confirm="executeDelete"
+        />
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.ctx-item {
-  @apply flex h-8 w-full items-center gap-2.5 px-3 text-left text-sm text-secondary hover:bg-canvas;
-}
 .ctx-sep {
   @apply my-1 border-t border-divider;
 }

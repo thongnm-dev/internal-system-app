@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import { statusMeta, baseName } from "../utils/fileStatus";
 import type { GitFileChange, GitGraphCommit } from "@/_/types/git";
@@ -354,7 +354,7 @@ function refClass(r: string) {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
+      <DialogFooter cancel-label="Đóng" hide-confirm @cancel="visible = false" />
     </template>
   </Dialog>
 </template>

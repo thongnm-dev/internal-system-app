@@ -10,6 +10,7 @@ import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useAiTranslateCowork } from "../composables/useAiTranslateCowork";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import AiAccountPanel from "./AiAccountPanel.vue";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
@@ -729,16 +730,15 @@ function isTextResult(entry: FileEntry): boolean {
         Thư mục trống.
       </p>
       <template #footer>
-        <Button
-          icon="pi pi-trash"
-          label="Xoá"
-          severity="danger"
-          outlined
-          size="small"
-          :disabled="!folderPeekSelected.size"
-          @click="openFolderPeekDeleteConfirm"
+        <DialogFooter
+          cancel-label="Đóng"
+          confirm-label="Xoá"
+          confirm-icon="pi pi-trash"
+          confirm-severity="danger"
+          :confirm-disabled="!folderPeekSelected.size"
+          @cancel="showFolderPeek = false"
+          @confirm="openFolderPeekDeleteConfirm"
         />
-        <Button label="Đóng" severity="secondary" @click="showFolderPeek = false" />
       </template>
     </Dialog>
 
@@ -756,8 +756,12 @@ function isTextResult(entry: FileEntry): boolean {
         Xoá <strong class="text-ink">{{ folderPeekDeleteCount }}</strong> mục đã chọn trong "{{ folderPeekName }}"? Hành động này không thể hoàn tác.
       </p>
       <template #footer>
-        <Button label="Cancel" severity="secondary" @click="showFolderPeekDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" @click="confirmFolderPeekDelete" />
+        <DialogFooter
+          confirm-label="Delete"
+          confirm-severity="danger"
+          @cancel="showFolderPeekDeleteConfirm = false"
+          @confirm="confirmFolderPeekDelete"
+        />
       </template>
     </Dialog>
 
@@ -797,8 +801,12 @@ function isTextResult(entry: FileEntry): boolean {
         Xoá <strong class="text-ink">{{ deleteCount }}</strong> mục đã chọn? Hành động này không thể hoàn tác.
       </p>
       <template #footer>
-        <Button label="Cancel" severity="secondary" @click="showDeleteConfirm = false" />
-        <Button label="Delete" severity="danger" @click="confirmDelete" />
+        <DialogFooter
+          confirm-label="Delete"
+          confirm-severity="danger"
+          @cancel="showDeleteConfirm = false"
+          @confirm="confirmDelete"
+        />
       </template>
     </Dialog>
 
@@ -857,32 +865,32 @@ function isTextResult(entry: FileEntry): boolean {
         :style="{ left: ctxX + 'px', top: ctxY + 'px' }"
       >
         <button
-          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink hover:bg-canvas/80"
+          class="ctx-menu-item"
           @click="closeCtxMenu(); openNewFolder('input')"
         >
-          <i class="pi pi-folder-plus text-xs text-muted" />New Folder
+          <i class="pi pi-folder-plus" />New Folder
         </button>
         <div class="my-1 border-t border-divider" />
         <button
-          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink hover:bg-canvas/80 disabled:opacity-40 disabled:hover:bg-transparent"
+          class="ctx-menu-item"
           :disabled="!ctrl.input.selected.value.size"
           @click="ctxCopy"
         >
-          <i class="pi pi-copy text-xs text-muted" />Copy
+          <i class="pi pi-copy" />Copy
         </button>
         <button
-          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-ink hover:bg-canvas/80 disabled:opacity-40 disabled:hover:bg-transparent"
+          class="ctx-menu-item"
           @click="ctxPaste"
         >
-          <i class="pi pi-clipboard text-xs text-muted" />Paste
+          <i class="pi pi-clipboard" />Paste
         </button>
         <div class="my-1 border-t border-divider" />
         <button
-          class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-canvas/80 disabled:opacity-40 disabled:hover:bg-transparent"
+          class="ctx-menu-item-danger"
           :disabled="!ctrl.input.selected.value.size"
           @click="ctxDelete"
         >
-          <i class="pi pi-trash text-xs" />Delete
+          <i class="pi pi-trash" />Delete
         </button>
       </div>
     </Teleport>

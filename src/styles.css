@@ -195,7 +195,58 @@
   }
 
   .status-item {
-    @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
+    @apply flex min-w-0 items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium;
+  }
+
+  .status-item > span {
+    @apply min-w-0 truncate;
+  }
+
+  /* ── Toggle chip / segmented filter chuẩn ──────────────────
+     Dùng cho mọi nhóm filter dạng chip/segmented switch (trạng thái,
+     chế độ hiển thị...). Một nơi duy nhất quyết định size/font — xem
+     ToggleChip.vue để dùng qua component thay vì lặp lại class này.
+     "segment": segmented control 2-3 lựa chọn loại trừ nhau (theme,
+     view mode, active/inactive). "filter": chip multi-select nằm
+     trong wrapper viền (status filter dạng flex-wrap). */
+  .toggle-chip {
+    @apply flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-bold transition;
+  }
+
+  .toggle-chip-active {
+    @apply toggle-chip bg-panel text-ink shadow-sm;
+  }
+
+  .toggle-chip-inactive {
+    @apply toggle-chip text-muted hover:text-secondary;
+  }
+
+  .filter-chip {
+    @apply flex min-w-0 items-center justify-center gap-1.5 truncate rounded px-2 py-1 text-sm font-semibold transition;
+  }
+
+  .filter-chip-active {
+    @apply filter-chip bg-brand text-on-brand;
+  }
+
+  .filter-chip-inactive {
+    @apply filter-chip text-secondary hover:bg-canvas;
+  }
+
+  /* ── Context menu row chuẩn ─────────────────────────────────
+     Một nguồn duy nhất cho mọi dòng context-menu (chuột phải) trong
+     app — thay vì mỗi trang tự định nghĩa class riêng. */
+  .ctx-menu-item {
+    @apply flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-secondary transition-colors hover:bg-canvas hover:text-brand disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ctx-menu-item-danger {
+    @apply ctx-menu-item text-red-600 hover:bg-red-50 hover:text-red-600;
+  }
+
+  .ctx-menu-item > .pi,
+  .ctx-menu-item-danger > .pi {
+    @apply shrink-0 text-xs;
   }
 
   .table-cell {

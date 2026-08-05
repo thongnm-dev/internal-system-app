@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import { statusMeta, baseName } from "../utils/fileStatus";
 import type { GitCommit, GitFileChange } from "@/_/types/git";
@@ -179,20 +180,23 @@ async function copySelectedFiles() {
       </div>
     </div>
     <template #footer>
-      <span class="mr-auto text-xs text-muted">Tick chọn nhiều commit rồi copy SHA hoặc danh sách file thay đổi.</span>
-      <Button
-      size="small"
-      outlined
-      :disabled="!browserSelected.size"
-      :loading="copyingFiles"
-      @click="copySelectedFiles"
-      >
-      <i class="pi pi-file-export mr-1.5" /> Copy file thay đổi
-    </Button>
-    <Button size="small" :disabled="!browserSelected.size" @click="copySelectedShas">
-      <i class="pi pi-copy mr-1.5" /> Copy {{ browserSelected.size }} SHA
-    </Button>
-    <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
+      <DialogFooter cancel-label="Đóng" hide-confirm @cancel="visible = false">
+        <template #extra>
+          <span class="mr-auto text-xs text-muted">Tick chọn nhiều commit rồi copy SHA hoặc danh sách file thay đổi.</span>
+          <Button
+            size="small"
+            outlined
+            :disabled="!browserSelected.size"
+            :loading="copyingFiles"
+            @click="copySelectedFiles"
+          >
+            <i class="pi pi-file-export mr-1.5" /> Copy file thay đổi
+          </Button>
+          <Button size="small" :disabled="!browserSelected.size" @click="copySelectedShas">
+            <i class="pi pi-copy mr-1.5" /> Copy {{ browserSelected.size }} SHA
+          </Button>
+        </template>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

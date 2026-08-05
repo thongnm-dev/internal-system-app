@@ -5,6 +5,9 @@ import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import ToggleChip from "@/shared/components/ToggleChip.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import Password from "primevue/password";
 import InputText from "primevue/inputtext";
 import { useGovernanceUsers } from "../composables/useGovernanceUsers";
@@ -236,8 +239,8 @@ onMounted(() => ctrl.init());
         <Column header="Actions" header-class="text-center" body-class="text-center" :style="{ width: '90px' }">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <Button icon="pi pi-key" severity="secondary" text rounded size="small" title="Reset password" @click.stop="openResetPassword(data.id)" />
-              <Button icon="pi pi-trash" severity="danger" text rounded size="small" title="Delete user" @click.stop="confirmDelete(data.id)" />
+              <IconActionButton icon="pi pi-key" severity="secondary" title="Reset password" @click.stop="openResetPassword(data.id)" />
+              <IconActionButton icon="pi pi-trash" severity="danger" title="Delete user" @click.stop="confirmDelete(data.id)" />
             </div>
           </template>
         </Column>
@@ -353,37 +356,26 @@ onMounted(() => ctrl.init());
         <div v-if="!ctrl.isCreating.value">
           <span class="text-xs font-bold text-muted">Status</span>
           <div class="mt-1 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
-            <Button
-              :class="[
-                'flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-bold transition',
-                ctrl.draft.value.isActive ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
+            <ToggleChip
+              variant="segment"
+              :active="ctrl.draft.value.isActive"
+              icon="pi-check-circle"
+              label="active"
               @click="ctrl.updateDraft('isActive', true)"
-            >
-              <i class="pi pi-check-circle text-xs" />
-              active
-            </Button>
-            <Button
-              :class="[
-                'flex h-9 items-center justify-center gap-1.5 rounded-md text-sm font-bold transition',
-                !ctrl.draft.value.isActive ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
+            />
+            <ToggleChip
+              variant="segment"
+              :active="!ctrl.draft.value.isActive"
+              icon="pi-minus-circle"
+              label="inactive"
               @click="ctrl.updateDraft('isActive', false)"
-            >
-              <i class="pi pi-minus-circle text-xs" />
-              inactive
-            </Button>
+            />
           </div>
         </div>
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="closeDialog" />
-          <Button :label="ctrl.isCreating.value ? 'Create' : 'Save'" @click="saveAndClose" />
-        </div>
+        <DialogFooter :confirm-label="ctrl.isCreating.value ? 'Create' : 'Save'" @cancel="closeDialog" @confirm="saveAndClose" />
       </template>
     </Dialog>
 
@@ -400,10 +392,7 @@ onMounted(() => ctrl.init());
       </template>
       <p class="text-sm text-secondary">Are you sure you want to delete this user? This action cannot be undone.</p>
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="confirmDeleteId = null" />
-          <Button label="Delete" severity="danger" @click="executeDelete" />
-        </div>
+        <DialogFooter confirm-label="Delete" confirm-severity="danger" @cancel="confirmDeleteId = null" @confirm="executeDelete" />
       </template>
     </Dialog>
 
@@ -431,10 +420,12 @@ onMounted(() => ctrl.init());
         />
       </label>
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="resetPwUserId = null" />
-          <Button label="Reset" :disabled="!resetPwValue.trim()" @click="executeResetPassword" />
-        </div>
+        <DialogFooter
+          confirm-label="Reset"
+          :confirm-disabled="!resetPwValue.trim()"
+          @cancel="resetPwUserId = null"
+          @confirm="executeResetPassword"
+        />
       </template>
     </Dialog>
   </section>

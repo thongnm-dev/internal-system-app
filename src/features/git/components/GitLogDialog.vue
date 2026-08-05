@@ -6,6 +6,7 @@ import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import DatePicker from "primevue/datepicker";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import type { GitCommit, GitCommitDetail } from "@/_/types/git";
 import { gitLogSearch, gitCommitDetail } from "@/tauri/commands/git";
@@ -351,7 +352,7 @@ watch(visible, (v) => {
     </div>
 
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
+      <DialogFooter cancel-label="Đóng" hide-confirm @cancel="visible = false" />
     </template>
   </Dialog>
 </template>

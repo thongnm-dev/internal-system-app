@@ -7,6 +7,8 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { ref } from "vue";
 import { useStoreProcedure } from "../composables/useStoreProcedure";
 import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
@@ -143,20 +145,14 @@ onMounted(() => ctrl.init());
         <Column header-class="text-center" body-class="text-center" :style="{ width: '120px' }">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <Button
+              <IconActionButton
                 icon="pi pi-eye"
                 severity="secondary"
-                text
-                rounded
-                size="small"
                 @click="ctrl.viewScript(data.name)"
               />
-              <Button
+              <IconActionButton
                 icon="pi pi-play"
                 severity="info"
-                text
-                rounded
-                size="small"
                 :loading="ctrl.executingNames.value.has(data.name)"
                 @click="handleExecuteSingle(data.name)"
               />
@@ -221,19 +217,13 @@ onMounted(() => ctrl.init());
         </p>
       </div>
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            @click="confirmExecute = false"
-          />
-          <Button
-            icon="pi pi-database"
-            label="Execute All"
-            severity="warning"
-            @click="handleExecute"
-          />
-        </div>
+        <DialogFooter
+          confirm-icon="pi pi-database"
+          confirm-label="Execute All"
+          confirm-severity="warn"
+          @cancel="confirmExecute = false"
+          @confirm="handleExecute"
+        />
       </template>
     </Dialog>
   </section>

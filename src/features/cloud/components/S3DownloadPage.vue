@@ -7,6 +7,7 @@ import InputGroup from "primevue/inputgroup";
 import ProgressSpinner from "primevue/progressspinner";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import S3DownloadCard from "./S3DownloadCard.vue";
 import S3ConfigError from "./S3ConfigError.vue";
 import S3BugFoldersDialog from "./S3BugFoldersDialog.vue";
@@ -348,8 +349,12 @@ function formatTime(hms: string): string {
         </span>
       </div>
       <template #footer>
-        <Button label="Cancel" icon="pi pi-times" severity="secondary" @click="showS3ConfirmDialog = false" />
-        <Button label="OK" icon="pi pi-check" @click="showS3ConfirmDialog = false; showBugFoldersDialog = true" />
+        <DialogFooter
+          confirm-label="OK"
+          confirm-icon="pi pi-check"
+          @cancel="showS3ConfirmDialog = false"
+          @confirm="showS3ConfirmDialog = false; showBugFoldersDialog = true"
+        />
       </template>
     </Dialog>
 
@@ -429,18 +434,14 @@ function formatTime(hms: string): string {
         </div>
       </div>
       <template #footer>
-        <Button
-          label="Đóng"
-          icon="pi pi-times"
-          severity="secondary"
-          @click="showCopyDialog = false"
-        />
-        <Button
-          label="Copy"
-          icon="pi pi-copy"
-          :disabled="!copyDestPath"
-          :loading="isCopying"
-          @click="handleCopy"
+        <DialogFooter
+          cancel-label="Đóng"
+          confirm-label="Copy"
+          confirm-icon="pi pi-copy"
+          :confirm-disabled="!copyDestPath"
+          :busy="isCopying"
+          @cancel="showCopyDialog = false"
+          @confirm="handleCopy"
         />
       </template>
     </Dialog>

@@ -10,6 +10,8 @@ import Calendar from "primevue/calendar";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useAuthStore } from "@/app/stores/auth";
 import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import { friendlyError } from "@/tauri/commands/_base";
@@ -171,8 +173,8 @@ async function saveTask() {
         <Column header="Action" body-class="text-center" header-class="w-28 text-center">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <Button icon="pi pi-pencil" severity="secondary" outlined size="small" title="Edit task" @click="openEditDialog(data)" />
-              <Button icon="pi pi-trash" severity="secondary" outlined size="small" title="Delete task" @click="ctrl.removeTask(data.id)" />
+              <IconActionButton icon="pi pi-pencil" title="Edit task" @click="openEditDialog(data)" />
+              <IconActionButton icon="pi pi-trash" severity="danger" title="Delete task" @click="ctrl.removeTask(data.id)" />
             </div>
           </template>
         </Column>
@@ -281,14 +283,12 @@ async function saveTask() {
       <template #footer>
         <div class="flex flex-col gap-2">
           <p v-if="saveError" class="text-right text-sm font-semibold text-red-500">{{ saveError }}</p>
-          <div class="flex items-center justify-end gap-2">
-            <Button label="Cancel" severity="secondary" outlined @click="isAddDialogOpen = false" />
-            <Button
-              :label="saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add task'"
-              :disabled="!canSave || saving"
-              @click="saveTask"
-            />
-          </div>
+          <DialogFooter
+            :confirm-label="saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add task'"
+            :confirm-disabled="!canSave || saving"
+            @cancel="isAddDialogOpen = false"
+            @confirm="saveTask"
+          />
         </div>
       </template>
     </Dialog>

@@ -7,6 +7,7 @@ import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Select from "primevue/select";
 import ProgressSpinner from "primevue/progressspinner";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import S3UploadCard from "./S3UploadCard.vue";
 import S3ConfigError from "./S3ConfigError.vue";
 import S3BugFoldersDialog from "./S3BugFoldersDialog.vue";
@@ -224,12 +225,13 @@ function handleCloseModal() {
     </div>
 
     <template #footer>
-      <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCloseModal" />
-      <Button
-        label="Bắt đầu tải lên"
-        icon="pi pi-upload"
-        :loading="isUploading"
-        @click="handleConfirm"
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Bắt đầu tải lên"
+        confirm-icon="pi pi-upload"
+        :busy="isUploading"
+        @cancel="handleCloseModal"
+        @confirm="handleConfirm"
       />
     </template>
   </Dialog>
@@ -249,8 +251,12 @@ function handleCloseModal() {
       </span>
     </div>
     <template #footer>
-      <Button label="Cancel" icon="pi pi-times" severity="secondary" @click="showS3ConfirmDialog = false" />
-      <Button label="OK" icon="pi pi-check" @click="showS3ConfirmDialog = false; showBugFoldersDialog = true" />
+      <DialogFooter
+        confirm-label="OK"
+        confirm-icon="pi pi-check"
+        @cancel="showS3ConfirmDialog = false"
+        @confirm="showS3ConfirmDialog = false; showBugFoldersDialog = true"
+      />
     </template>
   </Dialog>
 
@@ -304,13 +310,14 @@ function handleCloseModal() {
     </div>
 
     <template #footer>
-      <Button label="Bỏ qua" icon="pi pi-times" severity="secondary" @click="dismissDeleteDialog" />
-      <Button
-        label="Xác nhận xoá"
-        icon="pi pi-trash"
-        severity="danger"
-        :loading="isDeleting"
-        @click="confirmDelete"
+      <DialogFooter
+        cancel-label="Bỏ qua"
+        confirm-label="Xác nhận xoá"
+        confirm-icon="pi pi-trash"
+        confirm-severity="danger"
+        :busy="isDeleting"
+        @cancel="dismissDeleteDialog"
+        @confirm="confirmDelete"
       />
     </template>
   </Dialog>

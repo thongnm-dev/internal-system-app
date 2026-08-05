@@ -73,7 +73,7 @@ function tooltipOpts(label: string) {
         unstyled
         @click="emit('menuChange', item.key as MenuKey)"
       >
-        <i :class="`pi ${item.icon} shrink-0`" />
+        <i :class="`pi ${item.icon} shrink-0 text-sm`" />
         <span v-if="!isCollapsed">{{ item.title }}</span>
       </Button>
 
@@ -91,7 +91,7 @@ function tooltipOpts(label: string) {
           unstyled
           @click="groupOpen[g.label] = !groupOpen[g.label]"
         >
-          <i :class="`pi ${groupIcon(g.label)} shrink-0`" />
+          <i :class="`pi ${groupIcon(g.label)} shrink-0 text-sm`" />
         </Button>
 
         <Button
@@ -105,7 +105,7 @@ function tooltipOpts(label: string) {
           unstyled
           @click="groupOpen[g.label] = !groupOpen[g.label]"
         >
-          <i :class="`pi ${groupIcon(g.label)} shrink-0`" />
+          <i :class="`pi ${groupIcon(g.label)} shrink-0 text-sm`" />
           <span class="flex-1">{{ g.label }}</span>
           <i :class="['pi shrink-0 text-xs transition-transform', groupOpen[g.label] ? 'pi-chevron-down' : 'pi-chevron-right']" />
         </Button>
@@ -116,7 +116,7 @@ function tooltipOpts(label: string) {
             :key="child.key"
             v-tooltip.right="tooltipOpts(child.title)"
             :class="[
-              'flex h-9 w-full items-center rounded-md text-sm font-medium transition',
+              'flex h-9 w-full items-center rounded-md text-sm font-semibold transition',
               isCollapsed ? 'justify-center px-0' : 'gap-3 pl-9 pr-3 text-left',
               activeMenu === child.key
                 ? 'bg-sidebar-active text-sidebar-text-active'
@@ -145,7 +145,7 @@ function tooltipOpts(label: string) {
         unstyled
         @click="emit('menuChange', (menu.settingsMenu?.key ?? 'settings') as MenuKey)"
       >
-        <i :class="`pi ${menu.settingsMenu.icon} shrink-0`" />
+        <i :class="`pi ${menu.settingsMenu.icon} shrink-0 text-sm`" />
         <span v-if="!isCollapsed">{{ menu.settingsMenu.title }}</span>
       </Button>
     </div>

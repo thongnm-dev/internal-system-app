@@ -6,6 +6,7 @@ import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import IconPickerDialog from "@/shared/components/IconPickerDialog.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useAiWorkflow } from "../composables/useAiWorkflow";
 import type { WorkflowStepType } from "@/_/types/ai-workflow";
 import { STEP_TYPE_META } from "@/_/types/ai-workflow";
@@ -648,10 +649,12 @@ const selectPt = {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="showWorkflowDialog = false" />
-          <Button :label="editingWorkflowId ? 'Save' : 'Create'" :disabled="!wfName.trim()" @click="saveWorkflow" />
-        </div>
+        <DialogFooter
+          :confirm-label="editingWorkflowId ? 'Save' : 'Create'"
+          :confirm-disabled="!wfName.trim()"
+          @cancel="showWorkflowDialog = false"
+          @confirm="saveWorkflow"
+        />
       </template>
     </Dialog>
 
@@ -743,10 +746,12 @@ const selectPt = {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="showStepDialog = false" />
-          <Button :label="editingStepId ? 'Save' : 'Add'" :disabled="!stepName.trim()" @click="saveStep" />
-        </div>
+        <DialogFooter
+          :confirm-label="editingStepId ? 'Save' : 'Add'"
+          :confirm-disabled="!stepName.trim()"
+          @cancel="showStepDialog = false"
+          @confirm="saveStep"
+        />
       </template>
     </Dialog>
 
@@ -777,10 +782,7 @@ const selectPt = {
       </p>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="showDeleteDialog = false" />
-          <Button label="Delete" severity="danger" @click="executeDelete" />
-        </div>
+        <DialogFooter confirm-label="Delete" confirm-severity="danger" @cancel="showDeleteDialog = false" @confirm="executeDelete" />
       </template>
     </Dialog>
   </div>

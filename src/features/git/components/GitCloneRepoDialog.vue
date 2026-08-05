@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -32,10 +32,15 @@ async function doClone() {
       <p class="text-xs text-muted">Sau khi nhập URL, bạn sẽ chọn thư mục để clone vào.</p>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :loading="git.syncing.value" :disabled="!cloneUrl.trim()" @click="doClone">
-        <i class="pi pi-cloud-download mr-1.5" /> Clone
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Clone"
+        confirm-icon="pi pi-cloud-download"
+        :busy="git.syncing.value"
+        :confirm-disabled="!cloneUrl.trim()"
+        @cancel="visible = false"
+        @confirm="doClone"
+      />
     </template>
   </Dialog>
 </template>

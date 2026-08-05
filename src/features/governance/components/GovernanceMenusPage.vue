@@ -5,6 +5,8 @@ import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import IconPickerDialog from "@/shared/components/IconPickerDialog.vue";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useGovernanceMenus } from "../composables/useGovernanceMenus";
 
 const ctrl = useGovernanceMenus();
@@ -122,20 +124,17 @@ async function createAndClose() {
               </span>
             </td>
             <td class="px-4 py-2.5 text-center">
-              <Button
+              <IconActionButton
                 :icon="item.visible ? 'pi pi-eye' : 'pi pi-eye-slash'"
                 :title="item.visible ? 'Hide menu' : 'Show menu'"
-                text
-                rounded
-                size="small"
                 :class="item.visible ? 'text-brand' : 'text-muted'"
                 @click.stop="ctrl.toggleVisibility(item.key)"
               />
             </td>
             <td class="px-4 py-2.5 text-center">
               <div class="flex items-center justify-center gap-1">
-                <Button icon="pi pi-chevron-up" text rounded size="small" title="Move up" @click.stop="ctrl.moveUp(item.key)" />
-                <Button icon="pi pi-chevron-down" text rounded size="small" title="Move down" @click.stop="ctrl.moveDown(item.key)" />
+                <IconActionButton icon="pi pi-chevron-up" title="Move up" @click.stop="ctrl.moveUp(item.key)" />
+                <IconActionButton icon="pi pi-chevron-down" title="Move down" @click.stop="ctrl.moveDown(item.key)" />
               </div>
             </td>
           </tr>
@@ -245,10 +244,7 @@ async function createAndClose() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined @click="closeDialog" />
-          <Button label="Save" @click="saveAndClose" />
-        </div>
+        <DialogFooter @cancel="closeDialog" @confirm="saveAndClose" />
       </template>
     </Dialog>
 
@@ -365,10 +361,7 @@ async function createAndClose() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined @click="closeCreate" />
-          <Button label="Create" :disabled="!canCreate" @click="createAndClose" />
-        </div>
+        <DialogFooter confirm-label="Create" :confirm-disabled="!canCreate" @cancel="closeCreate" @confirm="createAndClose" />
       </template>
     </Dialog>
     <!-- Icon Picker Dialog -->

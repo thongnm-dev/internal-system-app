@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import type { GitCommit } from "@/_/types/git";
 
@@ -21,10 +21,15 @@ async function doResetHard() {
       Thao tác này không thể hoàn tác.
     </p>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" severity="danger" :disabled="!!git.busyMessage.value" @click="doResetHard">
-        <i class="pi pi-exclamation-triangle mr-1.5" /> Reset hard
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Reset hard"
+        confirm-icon="pi pi-exclamation-triangle"
+        confirm-severity="danger"
+        :confirm-disabled="!!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doResetHard"
+      />
     </template>
   </Dialog>
 </template>

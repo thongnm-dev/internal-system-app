@@ -9,6 +9,7 @@ import Checkbox from "primevue/checkbox";
 import Calendar from "primevue/calendar";
 import Select from "primevue/select";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useToast } from "@/shared/composables/useToast";
 import { useAuthStore } from "@/app/stores/auth";
 import { syncDailyReport, type SyncResult } from "@/tauri/commands/sync";
@@ -771,10 +772,7 @@ async function executeSyncDailyReport() {
       <template #footer>
         <div class="flex items-center justify-between gap-3">
           <Button label="Clear" severity="danger" outlined @click="clearEntry" />
-          <div class="flex items-center gap-2">
-            <Button label="Cancel" severity="secondary" @click="editingCell = null" />
-            <Button label="Save" @click="saveEntry" />
-          </div>
+          <DialogFooter @cancel="editingCell = null" @confirm="saveEntry" />
         </div>
       </template>
     </Dialog>
@@ -834,10 +832,12 @@ async function executeSyncDailyReport() {
       <template #footer>
         <div class="flex items-center justify-between gap-3">
           <span class="text-sm font-semibold text-muted">{{ selectedProjectIds.length }} selected</span>
-          <div class="flex items-center gap-2">
-            <Button label="Cancel" severity="secondary" @click="isAddingProject = false" />
-            <Button label="Add projects" :disabled="selectedProjectIds.length === 0" @click="confirmAddProjects" />
-          </div>
+          <DialogFooter
+            confirm-label="Add projects"
+            :confirm-disabled="selectedProjectIds.length === 0"
+            @cancel="isAddingProject = false"
+            @confirm="confirmAddProjects"
+          />
         </div>
       </template>
     </Dialog>
@@ -940,10 +940,12 @@ async function executeSyncDailyReport() {
       <template #footer>
         <div class="flex flex-col gap-2">
           <p v-if="taskError" class="text-right text-sm font-semibold text-danger">{{ taskError }}</p>
-          <div class="flex items-center justify-end gap-2">
-            <Button label="Cancel" severity="secondary" @click="isTaskDialogOpen = false" />
-            <Button :label="savingTask ? 'Saving…' : isEditingTask ? 'Cập nhật' : 'Add task'" :disabled="!canSaveTask || savingTask" @click="saveTask" />
-          </div>
+          <DialogFooter
+            :confirm-label="savingTask ? 'Saving…' : isEditingTask ? 'Cập nhật' : 'Add task'"
+            :confirm-disabled="!canSaveTask || savingTask"
+            @cancel="isTaskDialogOpen = false"
+            @confirm="saveTask"
+          />
         </div>
       </template>
     </Dialog>
@@ -956,9 +958,15 @@ async function executeSyncDailyReport() {
       @click.stop
       @contextmenu.prevent
     >
-      <Button icon="pi pi-plus" label="Thêm nhanh task" text size="small" class="w-full justify-start" @click="openTaskDialog" />
-      <Button icon="pi pi-folder-open" label="Xem backlog" text size="small" class="w-full justify-start" @click="openBacklog" />
-      <Button icon="pi pi-upload" label="Import task" text size="small" class="w-full justify-start" />
+      <button class="ctx-menu-item" @click="openTaskDialog">
+        <i class="pi pi-plus" /> Thêm nhanh task
+      </button>
+      <button class="ctx-menu-item" @click="openBacklog">
+        <i class="pi pi-folder-open" /> Xem backlog
+      </button>
+      <button class="ctx-menu-item">
+        <i class="pi pi-upload" /> Import task
+      </button>
     </div>
 
     <!-- Task context menu -->
@@ -969,9 +977,15 @@ async function executeSyncDailyReport() {
       @click.stop
       @contextmenu.prevent
     >
-      <Button v-if="taskContextMenu.task.isUserAdded" icon="pi pi-pencil" label="Chỉnh sửa task" text size="small" class="w-full justify-start" @click="openEditTaskDialog(taskContextMenu.project, taskContextMenu.task)" />
-      <Button icon="pi pi-folder-open" label="Xem backlog" text size="small" class="w-full justify-start" @click="openTaskBacklog(taskContextMenu.task)" />
-      <Button v-if="taskContextMenu.task.isUserAdded && !taskContextMenu.task.isCompleted" icon="pi pi-trash" label="Xóa task" text severity="danger" size="small" class="w-full justify-start" @click="confirmDeleteTask" />
+      <button v-if="taskContextMenu.task.isUserAdded" class="ctx-menu-item" @click="openEditTaskDialog(taskContextMenu.project, taskContextMenu.task)">
+        <i class="pi pi-pencil" /> Chỉnh sửa task
+      </button>
+      <button class="ctx-menu-item" @click="openTaskBacklog(taskContextMenu.task)">
+        <i class="pi pi-folder-open" /> Xem backlog
+      </button>
+      <button v-if="taskContextMenu.task.isUserAdded && !taskContextMenu.task.isCompleted" class="ctx-menu-item-danger" @click="confirmDeleteTask">
+        <i class="pi pi-trash" /> Xóa task
+      </button>
     </div>
 
     <!-- Delete task confirm dialog -->
@@ -989,10 +1003,14 @@ async function executeSyncDailyReport() {
         <strong class="text-ink">{{ taskDeleteConfirm?.task.name }}</strong>?
       </p>
       <template #footer>
-        <div class="flex justify-end gap-2">
-          <Button label="Hủy" severity="secondary" @click="taskDeleteConfirm = null" />
-          <Button label="Xóa" severity="danger" :disabled="deletingTask" @click="executeDeleteTask" />
-        </div>
+        <DialogFooter
+          cancel-label="Hủy"
+          confirm-label="Xóa"
+          confirm-severity="danger"
+          :confirm-disabled="deletingTask"
+          @cancel="taskDeleteConfirm = null"
+          @confirm="executeDeleteTask"
+        />
       </template>
     </Dialog>
 
@@ -1075,10 +1093,15 @@ async function executeSyncDailyReport() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Đóng" severity="secondary" @click="isSyncDialogOpen = false" />
-          <Button :icon="isSyncing ? 'pi pi-spinner pi-spin' : 'pi pi-sync'" :label="isSyncing ? 'Đang đồng bộ…' : 'Đồng bộ'" :disabled="syncRows.length === 0 || isSyncing" @click="executeSyncDailyReport" />
-        </div>
+        <DialogFooter
+          cancel-label="Đóng"
+          confirm-icon="pi pi-sync"
+          :confirm-label="isSyncing ? 'Đang đồng bộ…' : 'Đồng bộ'"
+          :confirm-disabled="syncRows.length === 0 || isSyncing"
+          :busy="isSyncing"
+          @cancel="isSyncDialogOpen = false"
+          @confirm="executeSyncDailyReport"
+        />
       </template>
     </Dialog>
   </section>

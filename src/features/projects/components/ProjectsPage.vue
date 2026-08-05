@@ -112,17 +112,11 @@ function formatDate(value: string) {
       </DataTable>
 
       <div v-if="contextMenu" class="fixed z-50 min-w-48 overflow-hidden rounded-lg border border-divider bg-panel py-1 shadow-xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop @contextmenu.prevent>
-        <Button class="ctx-item" unstyled @click="goToProjectRoute('')"><i class="pi pi-pencil" /> Edit</Button>
-        <Button class="ctx-item" unstyled @click="goToProjectRoute('/tasks/new')"><i class="pi pi-plus" /> Add Task</Button>
-        <Button class="ctx-item" unstyled @click="goToProjectRoute('/tasks')"><i class="pi pi-list" /> View Tasks</Button>
-        <Button class="ctx-item" unstyled @click="goToProjectRoute('/report')"><i class="pi pi-chart-bar" /> View Report</Button>
+        <Button class="ctx-menu-item" unstyled @click="goToProjectRoute('')"><i class="pi pi-pencil" /> Edit</Button>
+        <Button class="ctx-menu-item" unstyled @click="goToProjectRoute('/tasks/new')"><i class="pi pi-plus" /> Add Task</Button>
+        <Button class="ctx-menu-item" unstyled @click="goToProjectRoute('/tasks')"><i class="pi pi-list" /> View Tasks</Button>
+        <Button class="ctx-menu-item" unstyled @click="goToProjectRoute('/report')"><i class="pi pi-chart-bar" /> View Report</Button>
       </div>
     </section>
   </section>
 </template>
-
-<style scoped>
-.ctx-item {
-  @apply flex h-8 w-full items-center gap-2.5 px-3 text-left text-sm text-secondary hover:bg-canvas;
-}
-</style>

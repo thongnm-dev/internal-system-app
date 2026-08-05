@@ -7,6 +7,8 @@ import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useGovernanceRoles } from "../composables/useGovernanceRoles";
 import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 import { useToast } from "@/shared/composables/useToast";
@@ -148,7 +150,7 @@ onMounted(() => ctrl.init());
         <Column header="Actions" header-class="text-center" body-class="text-center" :style="{ width: '70px' }">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <Button icon="pi pi-trash" severity="danger" text rounded size="small" title="Delete role" @click.stop="confirmDelete(data.id)" />
+              <IconActionButton icon="pi pi-trash" severity="danger" title="Delete role" @click.stop="confirmDelete(data.id)" />
             </div>
           </template>
         </Column>
@@ -198,10 +200,7 @@ onMounted(() => ctrl.init());
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="closeDialog" />
-          <Button :label="ctrl.isCreating.value ? 'Create' : 'Save'" @click="saveAndClose" />
-        </div>
+        <DialogFooter :confirm-label="ctrl.isCreating.value ? 'Create' : 'Save'" @cancel="closeDialog" @confirm="saveAndClose" />
       </template>
     </Dialog>
 
@@ -218,10 +217,7 @@ onMounted(() => ctrl.init());
       </template>
       <p class="text-sm text-secondary">Are you sure you want to delete this role? This action cannot be undone.</p>
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="confirmDeleteId = null" />
-          <Button label="Delete" severity="danger" @click="executeDelete" />
-        </div>
+        <DialogFooter confirm-label="Delete" confirm-severity="danger" @cancel="confirmDeleteId = null" @confirm="executeDelete" />
       </template>
     </Dialog>
   </section>

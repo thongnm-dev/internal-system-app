@@ -6,6 +6,8 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
+import ToggleChip from "@/shared/components/ToggleChip.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useAuthStore } from "@/app/stores/auth";
 import { canUseTauriRuntime } from "@/tauri/commands/_base";
 import { getProjectDetail } from "@/tauri/commands/project";
@@ -515,33 +517,27 @@ async function importSelected() {
             <div class="block min-w-0">
               <span class="text-xs font-bold text-muted">Status</span>
               <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-divider bg-panel p-1 text-sm leading-none">
-                <Button
-                  :class="[
-                    'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
-                    blSelectedStatuses.length === 0 && !blNotClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
-                  ]"
-                  unstyled
+                <ToggleChip
+                  variant="filter"
+                  :active="blSelectedStatuses.length === 0 && !blNotClosed"
+                  label="All"
                   @click="blSelectedStatuses = []; blNotClosed = false"
-                >All</Button>
-                <Button
+                />
+                <ToggleChip
                   v-for="s in blStatusOptions"
                   :key="s.id"
-                  :class="[
-                    'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
-                    !blNotClosed && blSelectedStatuses.includes(s.id) ? 'bg-brand text-white' : 'hover:bg-canvas',
-                  ]"
-                  unstyled
+                  variant="filter"
+                  :active="!blNotClosed && blSelectedStatuses.includes(s.id)"
+                  :label="s.name"
                   @click="toggleBlStatus(s.id)"
-                >{{ s.name }}</Button>
-                <Button
-                  :class="[
-                    'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-xs font-normal transition',
-                    blNotClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
-                  ]"
-                  unstyled
+                />
+                <ToggleChip
+                  variant="filter"
+                  :active="blNotClosed"
+                  label="Not Closed"
                   :disabled="blStatusOptions.length === 0"
                   @click="selectBlNotClosed()"
-                >Not Closed</Button>
+                />
               </div>
             </div>
 
@@ -581,7 +577,6 @@ async function importSelected() {
               <Button
                 :icon="backlogSearching ? 'pi pi-spinner pi-spin' : 'pi pi-search'"
                 :label="backlogSearching ? 'Searching...' : 'Search'"
-                size="small"
                 :disabled="backlogSearching"
                 @click="searchBacklog()"
               />
@@ -641,15 +636,13 @@ async function importSelected() {
       </template>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined @click="backlogDialogVisible = false" />
-          <Button
-            icon="pi pi-check"
-            :label="`Select ${backlogSelectedCount} task${backlogSelectedCount !== 1 ? 's' : ''}`"
-            :disabled="backlogSelectedCount === 0"
-            @click="confirmBacklogSelection"
-          />
-        </div>
+        <DialogFooter
+          confirm-icon="pi pi-check"
+          :confirm-label="`Select ${backlogSelectedCount} task${backlogSelectedCount !== 1 ? 's' : ''}`"
+          :confirm-disabled="backlogSelectedCount === 0"
+          @cancel="backlogDialogVisible = false"
+          @confirm="confirmBacklogSelection"
+        />
       </template>
     </Dialog>
   </section>

@@ -5,6 +5,7 @@ import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { TASK_CATEGORY_OPTIONS } from "@/_/types/ai-task";
 import type { AiTaskCategory, AiTaskResult } from "@/tauri/commands/ai-task";
 
@@ -104,15 +105,13 @@ function handleSave() {
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-end gap-2">
-        <Button label="Cancel" severity="secondary" @click="emit('update:visible', false)" />
-        <Button
-          :label="isEdit ? 'Save' : 'Create'"
-          :disabled="!taskCd.trim()"
-          :loading="props.loading"
-          @click="handleSave"
-        />
-      </div>
+      <DialogFooter
+        :confirm-label="isEdit ? 'Save' : 'Create'"
+        :confirm-disabled="!taskCd.trim()"
+        :busy="props.loading"
+        @cancel="emit('update:visible', false)"
+        @confirm="handleSave"
+      />
     </template>
   </Dialog>
 </template>

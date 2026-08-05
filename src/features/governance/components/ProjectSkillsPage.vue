@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
 import InputText from "primevue/inputtext";
+import ToggleChip from "@/shared/components/ToggleChip.vue";
 import {
   skillCategories,
   useProjectSkills,
@@ -115,19 +116,12 @@ function skillCardClass(skill: ManagedSkill, isActive: boolean, viewMode: SkillV
     <!-- Category tabs + view mode -->
     <section class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex flex-wrap gap-2">
-        <Button
+        <ToggleChip
           v-for="item in categoryOptions"
           :key="item"
+          variant="filter"
+          :active="ctrl.category.value === item"
           :label="item"
-          :class="[
-            'h-9 text-xs',
-            ctrl.category.value === item
-              ? 'border-brand bg-emerald-50 text-brand'
-              : '',
-          ]"
-          :severity="ctrl.category.value === item ? undefined : 'secondary'"
-          :outlined="ctrl.category.value !== item"
-          size="small"
           @click="ctrl.category.value = item as SkillCategory | 'All'"
         />
       </div>

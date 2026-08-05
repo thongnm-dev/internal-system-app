@@ -7,6 +7,8 @@ import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { friendlyError } from "@/tauri/commands/_base";
 import { createProject, updateProject, getBacklogProjectByKey, getProjectDetail } from "@/tauri/commands/project";
 import { useToast } from "@/shared/composables/useToast";
@@ -298,7 +300,7 @@ function reloadBacklogProject() {
             <Column field="name" header="Name" />
             <Column header="Action" body-class="text-center" header-class="w-20 text-center">
               <template #body="{ data }">
-                <Button icon="pi pi-trash" severity="danger" text rounded size="small" title="Remove member" @click="removeMember(data.username)" />
+                <IconActionButton icon="pi pi-trash" severity="danger" title="Remove member" @click="removeMember(data.username)" />
               </template>
             </Column>
           </DataTable>
@@ -377,16 +379,23 @@ function reloadBacklogProject() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <template v-if="!isConfirmStage">
-            <Button label="Cancel" severity="secondary" outlined @click="isSearchHelpOpen = false" />
-            <Button icon="pi pi-check" :label="`Select (${selectedMembers.length})`" :disabled="selectedMembers.length === 0" @click="goToConfirm" />
-          </template>
-          <template v-else>
-            <Button icon="pi pi-arrow-left" label="Back" severity="secondary" outlined @click="isConfirmStage = false" />
-            <Button icon="pi pi-check" label="Confirm" @click="confirmMembers" />
-          </template>
-        </div>
+        <DialogFooter
+          v-if="!isConfirmStage"
+          confirm-icon="pi pi-check"
+          :confirm-label="`Select (${selectedMembers.length})`"
+          :confirm-disabled="selectedMembers.length === 0"
+          @cancel="isSearchHelpOpen = false"
+          @confirm="goToConfirm"
+        />
+        <DialogFooter
+          v-else
+          cancel-label="Back"
+          cancel-icon="pi pi-arrow-left"
+          confirm-icon="pi pi-check"
+          confirm-label="Confirm"
+          @cancel="isConfirmStage = false"
+          @confirm="confirmMembers"
+        />
       </template>
     </Dialog>
   </section>

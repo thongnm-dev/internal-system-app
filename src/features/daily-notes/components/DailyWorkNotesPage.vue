@@ -4,6 +4,9 @@ import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dialog from "primevue/dialog";
 import Calendar from "primevue/calendar";
+import ToggleChip from "@/shared/components/ToggleChip.vue";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useAuthStore } from "@/app/stores/auth";
 import { useDailyWorkNotes } from "../composables/useDailyWorkNotes";
 import type { DailyWorkNoteDraft, DailyWorkStatus } from "../composables/useDailyWorkNotes";
@@ -155,22 +158,17 @@ function parseDateStr(value: string): Date | null {
       <section class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
         <div class="shrink-0 border-b border-divider p-4">
           <div class="grid grid-cols-3 rounded-md border border-divider bg-canvas p-1">
-            <Button
+            <ToggleChip
               v-for="opt in statusOptions"
               :key="opt.value"
-              :class="[
-                'flex h-10 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
-                ctrl.statusFilter.value === opt.value
-                  ? 'bg-panel text-ink shadow-sm'
-                  : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
+              variant="segment"
+              :active="ctrl.statusFilter.value === opt.value"
+              :icon="opt.icon"
               @click="ctrl.statusFilter.value = opt.value"
             >
-              <i :class="`pi ${opt.icon}`" />
               <span class="truncate">{{ opt.label }}</span>
               <span class="rounded-md bg-panel/70 px-1.5 py-0.5 text-xs">{{ ctrl.statusCounts.value[opt.value] }}</span>
-            </Button>
+            </ToggleChip>
           </div>
         </div>
 
@@ -192,8 +190,8 @@ function parseDateStr(value: string): Date | null {
                   {{ note.content }}
                 </p>
                 <div class="flex shrink-0 items-center gap-1">
-                  <Button icon="pi pi-pencil" severity="secondary" outlined size="small" title="Chỉnh sửa" @click="openEditDialog(note)" />
-                  <Button icon="pi pi-trash" severity="danger" outlined size="small" title="Xóa công việc" @click="ctrl.removeNote(note.id)" />
+                  <IconActionButton icon="pi pi-pencil" title="Chỉnh sửa" @click="openEditDialog(note)" />
+                  <IconActionButton icon="pi pi-trash" severity="danger" title="Xóa công việc" @click="ctrl.removeNote(note.id)" />
                 </div>
               </div>
               <div class="mt-4 flex flex-wrap items-center gap-2">
@@ -254,21 +252,15 @@ function parseDateStr(value: string): Date | null {
         <div>
           <span class="text-xs font-bold text-muted">Trạng thái</span>
           <div class="mt-1 grid grid-cols-3 rounded-md border border-divider bg-canvas p-1">
-            <Button
+            <ToggleChip
               v-for="opt in statusOptions"
               :key="opt.value"
-              :class="[
-                'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
-                draftStatus === opt.value
-                  ? 'bg-panel text-ink shadow-sm'
-                  : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
+              variant="segment"
+              :active="draftStatus === opt.value"
+              :icon="opt.icon"
+              :label="opt.label"
               @click="draftStatus = opt.value"
-            >
-              <i :class="`pi ${opt.icon}`" />
-              <span class="truncate">{{ opt.label }}</span>
-            </Button>
+            />
           </div>
         </div>
 
@@ -283,14 +275,13 @@ function parseDateStr(value: string): Date | null {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Hủy" severity="secondary" outlined @click="dialogVisible = false" />
-          <Button
-            :label="isEditing ? 'Cập nhật' : 'Lưu công việc'"
-            :disabled="!draftContent.trim() || !draftDate"
-            @click="saveDraft"
-          />
-        </div>
+        <DialogFooter
+          cancel-label="Hủy"
+          :confirm-label="isEditing ? 'Cập nhật' : 'Lưu công việc'"
+          :confirm-disabled="!draftContent.trim() || !draftDate"
+          @cancel="dialogVisible = false"
+          @confirm="saveDraft"
+        />
       </template>
     </Dialog>
   </section>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import type { GitCommit } from "@/_/types/git";
 
@@ -24,10 +24,14 @@ async function doRevert() {
       <p class="mt-0.5 font-mono text-[11px] text-muted">{{ target.short_hash }} · {{ target.author_name }}</p>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!!git.busyMessage.value" @click="doRevert">
-        <i class="pi pi-undo mr-1.5" /> Revert
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Revert"
+        confirm-icon="pi pi-undo"
+        :confirm-disabled="!!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doRevert"
+      />
     </template>
   </Dialog>
 </template>

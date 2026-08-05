@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import type { GitCommit } from "@/_/types/git";
 
@@ -41,10 +41,14 @@ async function doBranchFrom() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!branchFromName.trim()" @click="doBranchFrom">
-        <i class="pi pi-sitemap mr-1.5" /> Tạo branch
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Tạo branch"
+        confirm-icon="pi pi-sitemap"
+        :confirm-disabled="!branchFromName.trim()"
+        @cancel="visible = false"
+        @confirm="doBranchFrom"
+      />
     </template>
   </Dialog>
 </template>

@@ -8,6 +8,8 @@ import { useS3ConfigGuard } from "../composables/useS3ConfigGuard";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import MessageBanner from "@/shared/components/MessageBanner.vue";
+import IconActionButton from "@/shared/components/IconActionButton.vue";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import S3ConfigError from "./S3ConfigError.vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
@@ -386,9 +388,13 @@ function contextCopyKey() {
                 class="absolute right-0 top-full z-50 mt-1 min-w-40 overflow-hidden rounded-md border border-divider bg-panel py-1 shadow-xl"
                 @click.stop
               >
-                <Button icon="pi pi-arrow-right-arrow-left" label="Move" text size="small" class="w-full justify-start" @click="openMoveDialog()" />
+                <button class="ctx-menu-item" @click="openMoveDialog()">
+                  <i class="pi pi-arrow-right-arrow-left" /> Move
+                </button>
                 <div class="my-0.5 border-t border-divider" />
-                <Button icon="pi pi-trash" label="Delete" text severity="danger" size="small" class="w-full justify-start" @click="closeMoreActions(); confirmDeleteSelected()" />
+                <button class="ctx-menu-item-danger" @click="closeMoreActions(); confirmDeleteSelected()">
+                  <i class="pi pi-trash" /> Delete
+                </button>
               </div>
             </div>
             <Button :icon="ctrl.isLoading.value ? 'pi pi-spinner pi-spin' : 'pi pi-refresh'" severity="secondary" outlined size="small" :disabled="isOperating" @click="ctrl.refresh()" />
@@ -461,8 +467,8 @@ function contextCopyKey() {
         <Column v-if="ctrl.actionsAllowed.value" header="" :sortable="false" style="width: 80px">
           <template #body="{ data }">
             <div class="flex items-center justify-center gap-1">
-              <Button icon="pi pi-download" severity="secondary" text rounded size="small" title="Download" @click.stop="ctrl.downloadSingle(data.key)" />
-              <Button icon="pi pi-trash" severity="danger" text rounded size="small" title="Delete" @click.stop="confirmDeleteSingle(data)" />
+              <IconActionButton icon="pi pi-download" severity="secondary" title="Download" @click.stop="ctrl.downloadSingle(data.key)" />
+              <IconActionButton icon="pi pi-trash" severity="danger" title="Delete" @click.stop="confirmDeleteSingle(data)" />
             </div>
           </template>
         </Column>
@@ -477,11 +483,17 @@ function contextCopyKey() {
       @click.stop
       @contextmenu.prevent
     >
-      <Button v-if="ctrl.actionsAllowed.value" icon="pi pi-download" label="Download" text size="small" class="w-full justify-start" @click="contextDownload()" />
-      <Button icon="pi pi-copy" label="Copy Key" text size="small" class="w-full justify-start" @click="contextCopyKey()" />
+      <button v-if="ctrl.actionsAllowed.value" class="ctx-menu-item" @click="contextDownload()">
+        <i class="pi pi-download" /> Download
+      </button>
+      <button class="ctx-menu-item" @click="contextCopyKey()">
+        <i class="pi pi-copy" /> Copy Key
+      </button>
       <template v-if="ctrl.actionsAllowed.value">
         <div class="my-1 border-t border-divider" />
-        <Button icon="pi pi-trash" label="Delete" text severity="danger" size="small" class="w-full justify-start" @click="contextDelete()" />
+        <button class="ctx-menu-item-danger" @click="contextDelete()">
+          <i class="pi pi-trash" /> Delete
+        </button>
       </template>
     </div>
 
@@ -506,10 +518,12 @@ function contextCopyKey() {
         />
       </label>
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined @click="showCreateFolder = false" />
-          <Button label="Create" :disabled="!newFolderName.trim()" @click="submitCreateFolder()" />
-        </div>
+        <DialogFooter
+          confirm-label="Create"
+          :confirm-disabled="!newFolderName.trim()"
+          @cancel="showCreateFolder = false"
+          @confirm="submitCreateFolder()"
+        />
       </template>
     </Dialog>
 
@@ -528,10 +542,7 @@ function contextCopyKey() {
         Are you sure you want to delete <strong>{{ confirmDeleteTarget?.label }}</strong>? This action cannot be undone.
       </p>
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined @click="confirmDeleteTarget = null" />
-          <Button label="Delete" severity="danger" @click="executeDelete()" />
-        </div>
+        <DialogFooter confirm-label="Delete" confirm-severity="danger" @cancel="confirmDeleteTarget = null" @confirm="executeDelete()" />
       </template>
     </Dialog>
 
@@ -593,15 +604,13 @@ function contextCopyKey() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined :disabled="ctrl.isUploading.value" @click="closeUploadFolderDialog()" />
-          <Button
-            :icon="ctrl.isUploading.value ? 'pi pi-spinner pi-spin' : undefined"
-            label="Upload"
-            :disabled="!folderPath || scannedFiles.length === 0 || ctrl.isUploading.value || isScanning"
-            @click="executeUploadFolder()"
-          />
-        </div>
+        <DialogFooter
+          confirm-label="Upload"
+          :confirm-disabled="!folderPath || scannedFiles.length === 0 || ctrl.isUploading.value || isScanning"
+          :busy="ctrl.isUploading.value"
+          @cancel="closeUploadFolderDialog()"
+          @confirm="executeUploadFolder()"
+        />
       </template>
     </Dialog>
 
@@ -656,7 +665,7 @@ function contextCopyKey() {
                 unstyled
                 @click="navigateMoveFolder(crumb.prefix)"
               >
-                <i v-if="idx === 0" class="pi pi-server mr-0.5" />
+                <i v-if="idx === 0" class="pi pi-server mr-1" />
                 {{ crumb.label }}
               </Button>
             </template>
@@ -688,15 +697,13 @@ function contextCopyKey() {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" outlined :disabled="ctrl.isMoving.value" @click="closeMoveDialog()" />
-          <Button
-            :icon="ctrl.isMoving.value ? 'pi pi-spinner pi-spin' : undefined"
-            label="Move"
-            :disabled="moveKeys.size === 0 || ctrl.isMoving.value"
-            @click="executeMove()"
-          />
-        </div>
+        <DialogFooter
+          confirm-label="Move"
+          :confirm-disabled="moveKeys.size === 0 || ctrl.isMoving.value"
+          :busy="ctrl.isMoving.value"
+          @cancel="closeMoveDialog()"
+          @confirm="executeMove()"
+        />
       </template>
     </Dialog>
 

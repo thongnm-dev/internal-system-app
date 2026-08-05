@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -44,10 +44,14 @@ async function confirmStash() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :loading="saving" @click="confirmStash">
-        <i class="pi pi-inbox mr-1.5" /> Cất vào stash
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Cất vào stash"
+        confirm-icon="pi pi-inbox"
+        :busy="saving"
+        @cancel="visible = false"
+        @confirm="confirmStash"
+      />
     </template>
   </Dialog>
 </template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import { guessBase, resolveRef } from "../utils/gitRefs";
 import { statusMeta, baseName } from "../utils/fileStatus";
@@ -188,20 +188,23 @@ async function doCreatePR() {
       </div>
     </div>
     <template #footer>
-      <span
-        v-if="git.comparison.value && !git.comparison.value.web_url"
-        class="mr-auto text-xs text-amber-600"
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Tạo Pull Request"
+        confirm-icon="pi pi-external-link"
+        :confirm-disabled="!git.comparison.value?.web_url || !git.comparison.value?.ahead"
+        @cancel="visible = false"
+        @confirm="doCreatePR"
       >
-        Repo không có remote origin — không tạo được Pull Request.
-      </span>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button
-        size="small"
-        :disabled="!git.comparison.value?.web_url || !git.comparison.value?.ahead"
-        @click="doCreatePR"
-      >
-        <i class="pi pi-external-link mr-1.5" /> Tạo Pull Request
-      </Button>
+        <template #extra>
+          <span
+            v-if="git.comparison.value && !git.comparison.value.web_url"
+            class="mr-auto text-xs text-amber-600"
+          >
+            Repo không có remote origin — không tạo được Pull Request.
+          </span>
+        </template>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

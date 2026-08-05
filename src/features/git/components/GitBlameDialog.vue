@@ -2,6 +2,7 @@
 import { computed, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import { baseName } from "../utils/fileStatus";
 import type { GitBlameLine } from "@/_/types/git";
@@ -127,14 +128,17 @@ function openInHistory() {
       </div>
     </div>
     <template #footer>
-      <span class="mr-auto text-xs text-muted">Bấm vào một dòng để xem commit đã sửa dòng đó.</span>
-      <Button size="small" outlined :disabled="!git.blameSelectedHash.value" @click="copySha">
-        <i class="pi pi-copy mr-1.5" /> Copy SHA
-      </Button>
-      <Button size="small" outlined :disabled="!git.blameSelectedHash.value" @click="openInHistory">
-        <i class="pi pi-history mr-1.5" /> Xem trong History
-      </Button>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
+      <DialogFooter cancel-label="Đóng" hide-confirm @cancel="visible = false">
+        <template #extra>
+          <span class="mr-auto text-xs text-muted">Bấm vào một dòng để xem commit đã sửa dòng đó.</span>
+          <Button size="small" outlined :disabled="!git.blameSelectedHash.value" @click="copySha">
+            <i class="pi pi-copy mr-1.5" /> Copy SHA
+          </Button>
+          <Button size="small" outlined :disabled="!git.blameSelectedHash.value" @click="openInHistory">
+            <i class="pi pi-history mr-1.5" /> Xem trong History
+          </Button>
+        </template>
+      </DialogFooter>
     </template>
   </Dialog>
 </template>

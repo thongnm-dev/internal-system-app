@@ -59,6 +59,7 @@ function toggleTheme() {
         severity="secondary"
         outlined
         rounded
+        size="small"
         :title="settings.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
         @click="toggleTheme"
       />

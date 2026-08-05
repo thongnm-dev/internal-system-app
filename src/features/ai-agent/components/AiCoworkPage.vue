@@ -13,6 +13,7 @@ import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import { useAiCowork } from "../composables/useAiCowork";
 import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import AiAccountPanel from "./AiAccountPanel.vue";
 import AiTaskDialog from "./AiTaskDialog.vue";
 import type { TaskDialogPayload } from "./AiTaskDialog.vue";
@@ -603,8 +604,8 @@ function isMarkdown(entry: FileEntry): boolean {
               />
             </label>
             <div class="flex items-center justify-end gap-2">
-              <Button icon="pi pi-refresh" label="Reset" size="small" severity="secondary" outlined @click="ctrl.taskSearchQuery.value = ''; ctrl.triggerTaskSearch()" />
-              <Button icon="pi pi-search" label="Search" size="small" @click="ctrl.triggerTaskSearch" />
+              <Button icon="pi pi-refresh" label="Reset" severity="secondary" outlined @click="ctrl.taskSearchQuery.value = ''; ctrl.triggerTaskSearch()" />
+              <Button icon="pi pi-search" label="Search" @click="ctrl.triggerTaskSearch" />
             </div>
           </div>
         </Fieldset>
@@ -659,14 +660,12 @@ function isMarkdown(entry: FileEntry): boolean {
       <template #footer>
         <div class="flex w-full items-center justify-between gap-2">
           <span class="text-xs text-muted">{{ ctrl.pickerSelectedCount.value }} task selected</span>
-          <div class="flex items-center gap-2">
-            <Button label="Cancel" severity="secondary" @click="ctrl.showTaskPicker.value = false" />
-            <Button
-              label="Add Selected"
-              :disabled="ctrl.pickerSelectedCount.value === 0"
-              @click="ctrl.confirmTaskPicker"
-            />
-          </div>
+          <DialogFooter
+            confirm-label="Add Selected"
+            :confirm-disabled="ctrl.pickerSelectedCount.value === 0"
+            @cancel="ctrl.showTaskPicker.value = false"
+            @confirm="ctrl.confirmTaskPicker"
+          />
         </div>
       </template>
     </Dialog>

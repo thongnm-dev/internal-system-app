@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{
@@ -22,10 +22,14 @@ async function confirmDiscard() {
       Thao tác này không thể hoàn tác.
     </p>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" severity="danger" @click="confirmDiscard">
-        <i class="pi pi-trash mr-1.5" /> Discard
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Discard"
+        confirm-icon="pi pi-trash"
+        confirm-severity="danger"
+        @cancel="visible = false"
+        @confirm="confirmDiscard"
+      />
     </template>
   </Dialog>
 </template>

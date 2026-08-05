@@ -5,6 +5,7 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { canUseTauriRuntime, safeInvoke } from "@/tauri/commands/_base";
 import { getProjectDetail } from "@/tauri/commands/project";
@@ -244,15 +245,13 @@ async function executeImport() {
     </template>
 
     <template #footer>
-      <div class="flex items-center justify-end gap-2 pt-4">
-        <Button label="Cancel" severity="secondary" outlined @click="close" />
-        <Button
-          icon="pi pi-file-import"
-          :label="`Import ${importSelectedCount} issue${importSelectedCount !== 1 ? 's' : ''}`"
-          :disabled="importSelectedCount === 0 || importing"
-          @click="executeImport"
-        />
-      </div>
+      <DialogFooter
+        confirm-icon="pi pi-file-import"
+        :confirm-label="`Import ${importSelectedCount} issue${importSelectedCount !== 1 ? 's' : ''}`"
+        :confirm-disabled="importSelectedCount === 0 || importing"
+        @cancel="close"
+        @confirm="executeImport"
+      />
     </template>
   </Dialog>
 </template>

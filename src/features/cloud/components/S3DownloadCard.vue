@@ -6,6 +6,7 @@ import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { AwsStorage } from "@/_/types/s3";
 import { s3GetLocalSyncWorkdir } from "@/tauri/commands/s3";
 
@@ -288,12 +289,13 @@ onMounted(() => {
       <small v-if="errorCheck" class="text-danger">{{ errorCheck }}</small>
     </div>
     <template #footer>
-      <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCancelModal" />
-      <Button
-        label="Bắt đầu..."
-        icon="pi pi-check"
-        :disabled="!destinationPath || !!errorCheck"
-        @click="handleConfirmDownload"
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Bắt đầu..."
+        confirm-icon="pi pi-check"
+        :confirm-disabled="!destinationPath || !!errorCheck"
+        @cancel="handleCancelModal"
+        @confirm="handleConfirmDownload"
       />
     </template>
   </Dialog>
@@ -392,8 +394,13 @@ onMounted(() => {
       </div>
     </div>
     <template #footer>
-      <Button label="Đóng" icon="pi pi-times" severity="secondary" @click="handleCancelModal" />
-      <Button label="Bắt đầu..." icon="pi pi-check" @click="handleConfirmMove" />
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Bắt đầu..."
+        confirm-icon="pi pi-check"
+        @cancel="handleCancelModal"
+        @confirm="handleConfirmMove"
+      />
     </template>
   </Dialog>
 </template>

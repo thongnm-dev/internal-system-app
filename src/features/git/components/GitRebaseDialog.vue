@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -48,10 +48,14 @@ async function doRebase() {
       </p>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!rebaseTarget || !!git.busyMessage.value" @click="doRebase">
-        <i class="pi pi-arrows-v mr-1.5" /> Rebase
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Rebase"
+        confirm-icon="pi pi-arrows-v"
+        :confirm-disabled="!rebaseTarget || !!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doRebase"
+      />
     </template>
   </Dialog>
 </template>

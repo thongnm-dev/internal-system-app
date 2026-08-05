@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -123,10 +123,13 @@ function createNewPr() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button size="small" @click="createNewPr">
-        <i class="pi pi-plus mr-1.5" /> Tạo Pull Request
-      </Button>
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Tạo Pull Request"
+        confirm-icon="pi pi-plus"
+        @cancel="visible = false"
+        @confirm="createNewPr"
+      />
     </template>
   </Dialog>
 </template>

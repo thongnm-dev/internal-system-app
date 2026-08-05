@@ -12,6 +12,7 @@ import Button from "primevue/button";
 import RadioButton from "primevue/radiobutton";
 import { useAuthStore } from "@/app/stores/auth";
 import { useCheckMonthlyReport } from "../composables/useCheckMonthlyReport";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { emptyTotals, formatHourValue, totalMinutes } from "@/shared/utils/timeMath";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
@@ -478,10 +479,12 @@ function onOpenDetail(detail: SelectedReportPhaseDetail) {
         </div>
       </div>
       <template #footer>
-        <div class="flex justify-end gap-2">
-          <Button label="Hủy" severity="secondary" outlined @click="isSourceConflictDialogOpen = false" />
-          <Button label="Xác nhận" @click="confirmSourceSelection()" />
-        </div>
+        <DialogFooter
+          cancel-label="Hủy"
+          confirm-label="Xác nhận"
+          @cancel="isSourceConflictDialogOpen = false"
+          @confirm="confirmSourceSelection()"
+        />
       </template>
     </Dialog>
 

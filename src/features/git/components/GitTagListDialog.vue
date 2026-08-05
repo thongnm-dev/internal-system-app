@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import { useDataTablePagination } from "@/shared/composables/useDataTablePagination";
 
@@ -81,10 +82,13 @@ watch(visible, (v) => {
       </Column>
     </DataTable>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button size="small" @click="emit('create-tag')">
-        <i class="pi pi-plus mr-1.5" /> Tạo tag mới
-      </Button>
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Tạo tag mới"
+        confirm-icon="pi pi-plus"
+        @cancel="visible = false"
+        @confirm="emit('create-tag')"
+      />
     </template>
   </Dialog>
 </template>

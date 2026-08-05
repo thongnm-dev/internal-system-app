@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -80,10 +81,13 @@ function requestCreate() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button size="small" @click="requestCreate">
-        <i class="pi pi-plus mr-1.5" /> Tạo worktree
-      </Button>
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Tạo worktree"
+        confirm-icon="pi pi-plus"
+        @cancel="visible = false"
+        @confirm="requestCreate"
+      />
     </template>
   </Dialog>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
+import ToggleChip from "@/shared/components/ToggleChip.vue";
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
@@ -84,16 +85,13 @@ const themeOptions = [
         <div>
           <span class="text-xs font-bold text-muted">Theme</span>
           <div class="mt-1.5 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
-            <Button
+            <ToggleChip
               v-for="opt in themeOptions"
               :key="opt.value"
-              :icon="`pi ${opt.icon}`"
+              variant="segment"
+              :active="settings.theme === opt.value"
+              :icon="opt.icon"
               :label="opt.label"
-              :class="[
-                'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
-                settings.theme === opt.value ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
               @click="updateTheme(opt.value)"
             />
           </div>
@@ -113,24 +111,18 @@ const themeOptions = [
         <div>
           <span class="text-xs font-bold text-muted">Navigation</span>
           <div class="mt-1.5 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
-            <Button
-              icon="pi pi-file"
+            <ToggleChip
+              variant="segment"
+              :active="!settings.tabMode"
+              icon="pi-file"
               label="Single"
-              :class="[
-                'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
-                !settings.tabMode ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
               @click="updateTabMode(false)"
             />
-            <Button
-              icon="pi pi-clone"
+            <ToggleChip
+              variant="segment"
+              :active="settings.tabMode"
+              icon="pi-clone"
               label="Tabs"
-              :class="[
-                'flex h-9 items-center justify-center gap-2 rounded-md text-sm font-bold transition',
-                settings.tabMode ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-secondary',
-              ]"
-              unstyled
               @click="updateTabMode(true)"
             />
           </div>

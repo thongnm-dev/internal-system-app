@@ -6,6 +6,7 @@ import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAiUsage } from "../composables/useAiUsage";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import AiUsageMeter from "./AiUsageMeter.vue";
 import {
   AI_ACCOUNT_STATUS_META,
@@ -583,14 +584,12 @@ function onPriorityChange(account: AiAccount, event: Event) {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="isDialogOpen = false" />
-          <Button
-            :label="ctrl.isSaving.value || ctrl.isCapturing.value ? 'Đang lưu...' : 'Save'"
-            :disabled="!canSaveAccount || ctrl.isSaving.value || ctrl.isCapturing.value"
-            @click="saveAccount"
-          />
-        </div>
+        <DialogFooter
+          :confirm-label="ctrl.isSaving.value || ctrl.isCapturing.value ? 'Đang lưu...' : 'Save'"
+          :confirm-disabled="!canSaveAccount || ctrl.isSaving.value || ctrl.isCapturing.value"
+          @cancel="isDialogOpen = false"
+          @confirm="saveAccount"
+        />
       </template>
     </Dialog>
 
@@ -633,10 +632,7 @@ function onPriorityChange(account: AiAccount, event: Event) {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="showSettings = false" />
-          <Button label="Save" @click="saveSettings" />
-        </div>
+        <DialogFooter @cancel="showSettings = false" @confirm="saveSettings" />
       </template>
     </Dialog>
 
@@ -699,15 +695,14 @@ function onPriorityChange(account: AiAccount, event: Event) {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Đóng" severity="secondary" @click="showDetect = false" />
-          <Button
-            icon="pi pi-download"
-            :label="ctrl.isDetecting.value ? 'Đang thêm...' : 'Thêm login mới'"
-            :disabled="ctrl.isDetecting.value || !ctrl.detected.value.some((l) => !l.already_added)"
-            @click="ctrl.importDetected()"
-          />
-        </div>
+        <DialogFooter
+          cancel-label="Đóng"
+          confirm-icon="pi pi-download"
+          :confirm-label="ctrl.isDetecting.value ? 'Đang thêm...' : 'Thêm login mới'"
+          :confirm-disabled="ctrl.isDetecting.value || !ctrl.detected.value.some((l) => !l.already_added)"
+          @cancel="showDetect = false"
+          @confirm="ctrl.importDetected()"
+        />
       </template>
     </Dialog>
 
@@ -753,10 +748,12 @@ function onPriorityChange(account: AiAccount, event: Event) {
       </div>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-2">
-          <Button label="Cancel" severity="secondary" @click="showTerminal = false" />
-          <Button label="Continue" :disabled="!terminalWorkDir.trim()" @click="confirmOpenTerminal" />
-        </div>
+        <DialogFooter
+          confirm-label="Continue"
+          :confirm-disabled="!terminalWorkDir.trim()"
+          @cancel="showTerminal = false"
+          @confirm="confirmOpenTerminal"
+        />
       </template>
     </Dialog>
   </div>

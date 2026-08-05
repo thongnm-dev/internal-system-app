@@ -2,6 +2,7 @@
 import { watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -60,7 +61,7 @@ watch(visible, (v) => {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
+      <DialogFooter cancel-label="Đóng" hide-confirm @cancel="visible = false" />
     </template>
   </Dialog>
 </template>

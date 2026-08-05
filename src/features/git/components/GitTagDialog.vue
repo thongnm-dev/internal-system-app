@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{
@@ -85,10 +85,14 @@ async function doCreateTag() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button size="small" :disabled="!tagName.trim() || !!git.busyMessage.value" @click="doCreateTag">
-        <i class="pi pi-tag mr-1.5" /> Tạo tag
-      </Button>
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Tạo tag"
+        confirm-icon="pi pi-tag"
+        :confirm-disabled="!tagName.trim() || !!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doCreateTag"
+      />
     </template>
   </Dialog>
 </template>

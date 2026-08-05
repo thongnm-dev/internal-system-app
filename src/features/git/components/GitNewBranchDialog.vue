@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -34,10 +34,14 @@ async function doCreateBranch() {
       </p>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!newBranchName.trim()" @click="doCreateBranch">
-        <i class="pi pi-plus mr-1.5" /> Tạo branch
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Tạo branch"
+        confirm-icon="pi pi-plus"
+        :confirm-disabled="!newBranchName.trim()"
+        @cancel="visible = false"
+        @confirm="doCreateBranch"
+      />
     </template>
   </Dialog>
 </template>

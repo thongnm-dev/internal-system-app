@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -59,14 +59,14 @@ async function doFinishConflict() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Đóng</Button>
-      <Button
-        size="small"
-        :disabled="!!git.conflicts.value.length || !!git.busyMessage.value"
-        @click="doFinishConflict"
-      >
-        <i class="pi pi-check mr-1.5" /> Hoàn tất
-      </Button>
+      <DialogFooter
+        cancel-label="Đóng"
+        confirm-label="Hoàn tất"
+        confirm-icon="pi pi-check"
+        :confirm-disabled="!!git.conflicts.value.length || !!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doFinishConflict"
+      />
     </template>
   </Dialog>
 </template>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 import { guessBase } from "../utils/gitRefs";
 
@@ -53,10 +53,14 @@ async function doUpdateFromMain() {
       </p>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!updateBranchSel || !!git.busyMessage.value" @click="doUpdateFromMain">
-        <i class="pi pi-arrow-circle-down mr-1.5" /> Cập nhật
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        confirm-label="Cập nhật"
+        confirm-icon="pi pi-arrow-circle-down"
+        :confirm-disabled="!updateBranchSel || !!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doUpdateFromMain"
+      />
     </template>
   </Dialog>
 </template>

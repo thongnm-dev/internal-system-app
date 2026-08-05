@@ -7,6 +7,7 @@ import Column from "primevue/column";
 import Fieldset from "primevue/fieldset";
 import Calendar from "primevue/calendar";
 import InputText from "primevue/inputtext";
+import ToggleChip from "@/shared/components/ToggleChip.vue";
 import BacklogConfigError from "./BacklogConfigError.vue";
 import ImportIssuesDialog from "./ImportIssuesPage.vue";
 import {
@@ -125,41 +126,29 @@ const importDialogVisible = ref(false);
           <div class="block min-w-0">
             <span class="text-xs font-bold text-muted">Status</span>
             <div class="mt-1 flex h-10 min-w-0 flex-wrap items-center gap-1 rounded-md border border-divider bg-panel p-1 text-sm leading-none">
-              <Button
-                :class="[
-                  'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
-                  ctrl.criteria.value.status.length === 0 && !ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
-                ]"
-                unstyled
+              <ToggleChip
+                variant="filter"
+                :active="ctrl.criteria.value.status.length === 0 && !ctrl.criteria.value.notClosed"
+                label="All"
                 :disabled="searchDisabled"
                 @click="selectAll()"
-              >
-                All
-              </Button>
-              <Button
+              />
+              <ToggleChip
                 v-for="s in statusOptions"
                 :key="s"
-                :class="[
-                  'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
-                  !ctrl.criteria.value.notClosed && ctrl.criteria.value.status.includes(s) ? 'bg-brand text-white' : 'hover:bg-canvas',
-                ]"
-                unstyled
+                variant="filter"
+                :active="!ctrl.criteria.value.notClosed && ctrl.criteria.value.status.includes(s)"
+                :label="s"
                 :disabled="searchDisabled"
                 @click="toggleStatus(s)"
-              >
-                {{ s }}
-              </Button>
-              <Button
-                :class="[
-                  'flex min-w-0 items-center justify-center truncate rounded px-2 py-1 text-sm font-normal transition',
-                  ctrl.criteria.value.notClosed ? 'bg-brand text-white' : 'hover:bg-canvas',
-                ]"
-                unstyled
+              />
+              <ToggleChip
+                variant="filter"
+                :active="ctrl.criteria.value.notClosed"
+                label="Not Closed"
                 :disabled="searchDisabled || statusOptions.length === 0"
                 @click="selectNotClosed()"
-              >
-                Not Closed
-              </Button>
+              />
             </div>
           </div>
         </div>

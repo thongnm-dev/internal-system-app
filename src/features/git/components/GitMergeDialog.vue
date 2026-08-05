@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -67,10 +67,14 @@ async function doMerge() {
       </p>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button size="small" :disabled="!mergeBranchSel || !!git.busyMessage.value" @click="doMerge">
-        <i class="pi pi-code-branch mr-1.5" /> {{ mergeSquash ? "Squash & merge" : "Merge" }}
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        :confirm-label="mergeSquash ? 'Squash & merge' : 'Merge'"
+        confirm-icon="pi pi-code-branch"
+        :confirm-disabled="!mergeBranchSel || !!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doMerge"
+      />
     </template>
   </Dialog>
 </template>

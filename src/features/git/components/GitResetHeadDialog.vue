@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import type { GitApi } from "../composables/useGit";
 
 const props = defineProps<{ git: GitApi }>();
@@ -52,15 +52,15 @@ async function doResetHead() {
       </div>
     </div>
     <template #footer>
-      <Button size="small" outlined severity="secondary" @click="visible = false">Hủy</Button>
-      <Button
-        size="small"
-        :severity="resetMode === 'hard' ? 'danger' : undefined"
-        :disabled="!!git.busyMessage.value"
-        @click="doResetHead"
-      >
-        <i class="pi pi-backward mr-1.5" /> Reset ({{ resetMode }})
-      </Button>
+      <DialogFooter
+        cancel-label="Hủy"
+        :confirm-label="`Reset (${resetMode})`"
+        confirm-icon="pi pi-backward"
+        :confirm-severity="resetMode === 'hard' ? 'danger' : undefined"
+        :confirm-disabled="!!git.busyMessage.value"
+        @cancel="visible = false"
+        @confirm="doResetHead"
+      />
     </template>
   </Dialog>
 </template>
