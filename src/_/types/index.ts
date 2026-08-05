@@ -1,6 +1,5 @@
 export * from "./app";
 export * from "./system";
-export * from "./analysis";
 export * from "./check-monthly-report";
 export * from "./excel2md";
 export * from "./s3";

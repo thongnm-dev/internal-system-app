@@ -59,3 +59,47 @@ export type CompareRow = {
   csv_details: CsvDetail[];
   schedule_details: ScheduleDetail[];
 };
+
+export type MinuteTotals = {
+  regular_minutes: number;
+  normal_overtime_minutes: number;
+  legal_holiday_overtime_minutes: number;
+  legal_public_holiday_overtime_minutes: number;
+  late_night_overtime_minutes: number;
+};
+
+export type ReportWorkDetail = {
+  date: string;
+  work_content: string;
+  total_minutes: number;
+};
+
+export type ReportPhaseSummary = {
+  process_code: string;
+  phase_name: string;
+  totals: MinuteTotals;
+  row_count: number;
+  details: ReportWorkDetail[];
+};
+
+export type ReportProjectSummary = {
+  project_code: string;
+  project_name: string;
+  totals: MinuteTotals;
+  row_count: number;
+  phases: ReportPhaseSummary[];
+};
+
+/** Tổng hợp project/phase/work-detail được build ở frontend từ dữ liệu CSV import preview. */
+export type MonthlyReportSummary = {
+  source_path: string;
+  row_count: number;
+  grand_total: MinuteTotals;
+  projects: ReportProjectSummary[];
+};
+
+export type SelectedReportPhaseDetail = {
+  project_code: string;
+  project_name: string;
+  phase: ReportPhaseSummary;
+};

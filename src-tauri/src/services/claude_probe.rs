@@ -165,29 +165,36 @@ pub(crate) async fn probe_subscription(client: &Client, account: &StoredAccount)
         None => (None, None),
     };
 
-    // % tổng hợp = giới hạn nào còn ít hơn.
-    let combined = [session_percent, weekly_percent]
-        .into_iter()
-        .flatten()
-        .fold(None, |acc: Option<f64>, p| Some(acc.map_or(p, |a| a.min(p))));
+    // % tổng hợp = giới hạn nào còn ít hơn — và `reset_at`/`usage_window` phải đi theo
+    // ĐÚNG giới hạn đó, chứ không mặc định lấy session_reset_at (bug cũ: countdown hiển
+    // thị luôn theo session dù % hiển thị đang bị kéo xuống bởi weekly).
+    let (usage_percent, usage_reset_at, usage_window): (Option<f64>, Option<String>, Option<String>) =
+        match (session_percent, weekly_percent) {
+            (Some(s), Some(w)) if w < s => (Some(w), weekly_reset_at.clone(), Some("weekly".to_string())),
+            (Some(s), Some(_)) => (Some(s), session_reset_at.clone(), Some("session".to_string())),
+            (Some(s), None) => (Some(s), session_reset_at.clone(), Some("session".to_string())),
+            (None, Some(w)) => (Some(w), weekly_reset_at.clone(), Some("weekly".to_string())),
+            (None, None) => (None, None, None),
+        };
 
     log::debug!(
-        "[probe] id={} email={} — session={:?}% weekly={:?}% combined={:?}%",
-        account.id, account.email, session_percent, weekly_percent, combined,
+        "[probe] id={} email={} — session={:?}% weekly={:?}% usage={:?}% window={:?}",
+        account.id, account.email, session_percent, weekly_percent, usage_percent, usage_window,
     );
 
     ProbeOutcome {
         id: account.id,
-        status: combined
+        status: usage_percent
             .map(status_from_percent)
             .unwrap_or_else(|| "unknown".to_string()),
-        usage_percent: combined,
-        reset_at: session_reset_at.clone(),
+        usage_percent,
+        reset_at: usage_reset_at,
         usage_source: "billing_api".to_string(),
         session_percent,
         session_reset_at,
         weekly_percent,
         weekly_reset_at,
+        usage_window,
     }
 }
 
@@ -204,6 +211,7 @@ fn keep_previous(account: &StoredAccount) -> ProbeOutcome {
         session_reset_at: None,
         weekly_percent: None,
         weekly_reset_at: None,
+        usage_window: None,
     }
 }
 
@@ -265,6 +273,7 @@ pub(crate) async fn probe(client: &Client, account: &StoredAccount) -> ProbeOutc
             session_reset_at: None,
             weekly_percent: None,
             weekly_reset_at: None,
+            usage_window: None,
         };
     }
 
@@ -286,6 +295,7 @@ pub(crate) async fn probe(client: &Client, account: &StoredAccount) -> ProbeOutc
                 session_reset_at: None,
                 weekly_percent: None,
                 weekly_reset_at: None,
+                usage_window: None,
             }
         }
         // Key hợp lệ nhưng không có header usage → coi là healthy, không rõ % còn lại.

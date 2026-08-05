@@ -156,6 +156,7 @@ pub fn capture_add(name: Option<String>) -> AppResult<AiAccount> {
             session_reset_at: String::new(),
             weekly_percent: 100.0,
             weekly_reset_at: String::new(),
+            usage_window: String::new(),
             session_count: 0,
             last_checked_at: String::new(),
             created_at: current_timestamp(),

@@ -8,11 +8,9 @@ import Dialog from "primevue/dialog";
 import Fieldset from "primevue/fieldset";
 import InputGroup from "primevue/inputgroup";
 import InputText from "primevue/inputtext";
-import RadioButton from "primevue/radiobutton";
 import Select from "primevue/select";
 import { useAiTranslateCowork } from "../composables/useAiTranslateCowork";
-import type { AiAccount, AiAccountStatus, AiAccountType, AiProvider } from "@/_/types/ai-usage";
-import type { AiModelResult } from "@/tauri/commands/ai-workflow";
+import AiAccountPanel from "./AiAccountPanel.vue";
 import type { FileEntry } from "@/tauri/commands/explorer";
 
 const ctrl = useAiTranslateCowork();
@@ -21,14 +19,6 @@ type PanelKey = "input" | "output";
 
 function panelByKey(key: PanelKey) {
   return key === "input" ? ctrl.input : ctrl.output;
-}
-
-// Account đang active — dùng làm giá trị cho nhóm radio chọn account.
-const activeAccountId = computed(() => ctrl.accounts.value.find((a) => a.is_active)?.id ?? null);
-
-function selectAccount(id: number | null) {
-  if (id == null || id === activeAccountId.value) return;
-  void ctrl.setActiveAccount(id);
 }
 
 onMounted(() => {
@@ -354,134 +344,6 @@ function startRowDrag(event: MouseEvent) {
 
 onBeforeUnmount(() => { cleanupDrag?.(); cleanupRowDrag?.(); });
 
-// --- Account helpers (copied from AI Cowork) ---
-function providerLabel(p: AiProvider): string {
-  return p === "codex" ? "Codex" : "Claude";
-}
-
-function typeLabel(type: AiAccountType): string {
-  switch (type) {
-    case "api":
-      return "API";
-    case "admin":
-      return "Admin";
-    case "oauth":
-      return "OAuth";
-    case "subscription":
-      return "Subscription";
-    default:
-      return "Unknown";
-  }
-}
-
-function typeBadgeClass(type: AiAccountType): string {
-  switch (type) {
-    case "api":
-      return "badge-info";
-    case "admin":
-      return "badge-warning";
-    case "oauth":
-      return "badge-info";
-    case "subscription":
-      return "badge-info";
-    default:
-      return "badge-neutral";
-  }
-}
-
-function statusLabel(status: AiAccountStatus): string {
-  switch (status) {
-    case "healthy":
-      return "Healthy";
-    case "low":
-      return "Low";
-    case "exhausted":
-      return "Exhausted";
-    case "error":
-      return "Error";
-    default:
-      return "Unknown";
-  }
-}
-
-function statusClass(status: AiAccountStatus): string {
-  switch (status) {
-    case "healthy":
-      return "badge-success";
-    case "low":
-      return "badge-warning";
-    case "exhausted":
-    case "error":
-      return "badge-danger";
-    default:
-      return "badge-neutral";
-  }
-}
-
-/** account.usage_percent là % còn lại "xấu nhất" (min của session/weekly với subscription) — backend đã tính sẵn, dùng chung cho mọi loại account để màu bar khớp với status badge. */
-function usagePercent(account: AiAccount): number {
-  return account.usage_percent;
-}
-
-/** usagePercent() là % còn lại (backend) → đổi sang % đã dùng để hiển thị bar tăng dần 0→100%. */
-function usedPercent(account: AiAccount): number {
-  return Math.min(100, Math.max(0, 100 - usagePercent(account)));
-}
-
-function usageBarClass(usedPercentValue: number): string {
-  if (usedPercentValue >= 90) return "bg-red-500";
-  if (usedPercentValue >= 70) return "bg-amber-500";
-  return "bg-brand";
-}
-
-function hasUsage(account: AiAccount): boolean {
-  return account.status !== "exhausted" && usagePercent(account) > 0;
-}
-
-function usageResetAt(account: AiAccount): string {
-  return account.account_type === "subscription" ? account.session_reset_at : account.reset_at;
-}
-
-/** Nhãn hiển thị model: "Sonnet 5" (viết hoa chữ đầu + version). */
-function modelLabel(m: AiModelResult): string {
-  const name = m.model.charAt(0).toUpperCase() + m.model.slice(1);
-  return m.version ? `${name} ${m.version}` : name;
-}
-
-function modelOptions(account: AiAccount) {
-  return ctrl.modelOptionsFor(account).map((m) => ({ label: modelLabel(m), value: m.id }));
-}
-
-function selectAccountModel(account: AiAccount, modelId: number | null) {
-  ctrl.setSelectedModel(account.id, modelId);
-}
-
-const modelSelectPt = {
-  root: { class: "!bg-canvas !border-divider !min-h-0" },
-  label: { class: "!text-[11px] !py-1" },
-  option: { class: "!text-xs" },
-};
-
-function resetHint(resetAt: string): string {
-  const raw = resetAt?.trim();
-  if (!raw) return "—";
-  const target = new Date(raw.replace(" ", "T"));
-  if (Number.isNaN(target.getTime())) return raw;
-  const diffMs = target.getTime() - Date.now();
-  const clock = raw.slice(11, 16) || "";
-  if (diffMs <= 0) return `sắp reset · ${clock}`;
-  const mins = Math.round(diffMs / 60000);
-  const days = Math.floor(mins / 1440);
-  const hours = Math.floor((mins % 1440) / 60);
-  const rem = mins % 60;
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (days === 0 && rem > 0) parts.push(`${rem}m`);
-  const rel = parts.length ? parts.join(" ") : "<1m";
-  return `còn ${rel} · ${clock}`;
-}
-
 // --- File-entry helpers ---
 function formatSize(entry: FileEntry): string {
   if (entry.is_dir) return "—";
@@ -510,82 +372,17 @@ function isTextResult(entry: FileEntry): boolean {
 
 <template>
   <div class="flex flex-1 flex-col gap-4 overflow-hidden">
-    <!-- Account AI -->
-    <Fieldset
-      class="shrink-0 rounded-lg border border-divider bg-panel p-4 shadow-sm fieldset-nested"
-      legend="Account AI"
-      toggleable
-    >
-      <div class="mt-4 max-h-56 overflow-auto">
-        <p v-if="ctrl.isLoadingAccounts.value" class="p-4 text-center text-xs text-muted">Loading accounts...</p>
-        <div v-else-if="ctrl.accounts.value.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <div
-            v-for="account in ctrl.accounts.value"
-            :key="account.id"
-            class="rounded-lg border p-3 transition-colors"
-            :class="[
-              account.is_active ? 'border-brand ring-1 ring-brand/40' : 'border-divider',
-              hasUsage(account) ? 'cursor-pointer hover:border-brand/60' : 'opacity-60',
-            ]"
-            :title="hasUsage(account) ? 'Chọn account này để sử dụng' : 'Account đã hết usage'"
-            @click="hasUsage(account) && selectAccount(account.id)"
-          >
-            <div class="flex flex-wrap items-center gap-2">
-              <RadioButton
-                :model-value="activeAccountId"
-                :value="account.id"
-                :disabled="!hasUsage(account) || ctrl.settingActiveId.value !== null"
-                :name="'ai-account'"
-                class="shrink-0"
-                @update:model-value="selectAccount"
-                @click.stop
-              />
-              <i v-if="ctrl.settingActiveId.value === account.id" class="pi pi-spinner pi-spin shrink-0 text-xs text-brand" />
-              <span class="truncate font-semibold text-ink" :title="account.name">{{ account.name }}</span>
-              <span :class="['shrink-0', typeBadgeClass(account.account_type)]">
-                {{ typeLabel(account.account_type) }}
-              </span>
-              <span
-                v-if="account.subscription_type"
-                class="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-bold text-muted"
-              >
-                {{ account.subscription_type }}
-              </span>
-              <span :class="['ml-auto shrink-0', statusClass(account.status)]">
-                {{ statusLabel(account.status) }}
-              </span>
-            </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="font-bold text-muted">Usage used</span>
-              <span class="font-bold text-ink">{{ Math.round(usedPercent(account)) }}%</span>
-            </div>
-            <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-canvas">
-              <div
-                :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account))]"
-                :style="{ width: `${usedPercent(account)}%` }"
-              />
-            </div>
-            <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
-              <i class="pi pi-clock" />reset {{ resetHint(usageResetAt(account)) }}
-            </p>
-            <label v-if="modelOptions(account).length" class="mt-2 block" @click.stop>
-              <span class="text-[11px] font-bold text-muted">Model</span>
-              <Select
-                :model-value="ctrl.selectedModelIdFor(account)"
-                :options="modelOptions(account)"
-                option-label="label"
-                option-value="value"
-                placeholder="Mặc định (Sonnet)"
-                class="mt-1 w-full"
-                :pt="modelSelectPt"
-                @update:model-value="(v) => selectAccountModel(account, v)"
-              />
-            </label>
-          </div>
-        </div>
-        <p v-else class="p-4 text-center text-xs text-muted">Chưa có account AI nào. Thêm ở màn AI Usage.</p>
-      </div>
-    </Fieldset>
+    <AiAccountPanel
+      :accounts="ctrl.accounts.value"
+      :is-loading="ctrl.isLoadingAccounts.value"
+      :setting-active-id="ctrl.settingActiveId.value"
+      :model-options-for="ctrl.modelOptionsFor"
+      :selected-model-id-for="ctrl.selectedModelIdFor"
+      default-model-label="Sonnet"
+      :columns="4"
+      @select-account="ctrl.setActiveAccount"
+      @select-model="ctrl.setSelectedModel"
+    />
 
     <!-- Row 3: 3 columns (chỉ hiển thị khi đã chọn Project Directory) -->
     <div v-if="ctrl.projectDir.value" class="flex min-h-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden">

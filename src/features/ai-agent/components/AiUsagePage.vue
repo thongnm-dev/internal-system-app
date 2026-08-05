@@ -6,13 +6,14 @@ import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAiUsage } from "../composables/useAiUsage";
-import type {
-  AiAccount,
-  AiAccountStatus,
-  AiAccountType,
-  AiProvider,
-  AiUsageSource,
+import AiUsageMeter from "./AiUsageMeter.vue";
+import {
+  AI_ACCOUNT_STATUS_META,
+  AI_ACCOUNT_TYPE_META,
+  AI_PROVIDER_LABEL,
+  AI_USAGE_SOURCE_LABEL,
 } from "@/_/types/ai-usage";
+import type { AiAccount, AiProvider } from "@/_/types/ai-usage";
 
 const ctrl = useAiUsage();
 
@@ -203,120 +204,6 @@ function onPriorityChange(account: AiAccount, event: Event) {
   }
 }
 
-function providerLabel(p: AiProvider): string {
-  return p === "codex" ? "Codex" : "Claude";
-}
-
-function typeLabel(type: AiAccountType): string {
-  switch (type) {
-    case "api":
-      return "API";
-    case "admin":
-      return "Admin";
-    case "oauth":
-      return "OAuth";
-    case "subscription":
-      return "Subscription";
-    default:
-      return "Unknown";
-  }
-}
-
-function typeBadgeClass(type: AiAccountType): string {
-  switch (type) {
-    case "api":
-      return "badge-info";
-    case "admin":
-      return "badge-warning";
-    case "oauth":
-      return "badge-info";
-    case "subscription":
-      return "badge-info";
-    default:
-      return "badge-neutral";
-  }
-}
-
-function statusLabel(status: AiAccountStatus): string {
-  switch (status) {
-    case "healthy":
-      return "Healthy";
-    case "low":
-      return "Low";
-    case "exhausted":
-      return "Exhausted";
-    case "error":
-      return "Error";
-    default:
-      return "Unknown";
-  }
-}
-
-function statusClass(status: AiAccountStatus): string {
-  switch (status) {
-    case "healthy":
-      return "badge-success";
-    case "low":
-      return "badge-warning";
-    case "exhausted":
-      return "badge-danger";
-    case "error":
-      return "badge-danger";
-    default:
-      return "badge-neutral";
-  }
-}
-
-function sourceLabel(source: AiUsageSource): string {
-  switch (source) {
-    case "billing_api":
-      return "billing API";
-    case "ratelimit_header":
-      return "rate-limit header";
-    case "error_signal":
-      return "usage signal";
-    case "manual":
-      return "manual";
-    default:
-      return "not measured";
-  }
-}
-
-/** `percent` truyền vào đây là % còn lại từ backend → đổi sang % đã dùng để bar tăng dần 0→100%. */
-function usedPercent(remainingPercent: number): number {
-  return Math.min(100, Math.max(0, 100 - remainingPercent));
-}
-
-function usageBarClass(usedPercentValue: number): string {
-  if (usedPercentValue >= 90) return "bg-red-500";
-  if (usedPercentValue >= 70) return "bg-amber-500";
-  return "bg-brand";
-}
-
-/**
- * Diễn giải thời điểm reset (`YYYY-MM-DD HH:MM:SS`) thành chuỗi thân thiện,
- * ví dụ "còn 2h 15m · 11:10". Trả `"—"` nếu chưa có số liệu.
- */
-function resetHint(resetAt: string): string {
-  const raw = resetAt?.trim();
-  if (!raw) return "—";
-  // Chuỗi backend là giờ local; thêm khoảng trắng → ISO để Date parse ổn định.
-  const target = new Date(raw.replace(" ", "T"));
-  if (Number.isNaN(target.getTime())) return raw;
-  const diffMs = target.getTime() - Date.now();
-  const clock = raw.slice(11, 16) || "";
-  if (diffMs <= 0) return `sắp reset · ${clock}`;
-  const mins = Math.round(diffMs / 60000);
-  const days = Math.floor(mins / 1440);
-  const hours = Math.floor((mins % 1440) / 60);
-  const rem = mins % 60;
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (days === 0 && rem > 0) parts.push(`${rem}m`);
-  const rel = parts.length ? parts.join(" ") : "<1m";
-  return `còn ${rel} · ${clock}`;
-}
 </script>
 
 <template>
@@ -349,7 +236,7 @@ function resetHint(resetAt: string): string {
     <template v-if="ctrl.accounts.value.length">
       <div v-for="[groupProvider, list] in groups" :key="groupProvider" class="space-y-3">
         <h3 class="section-eyebrow px-1">
-          {{ providerLabel(groupProvider) }}
+          {{ AI_PROVIDER_LABEL[groupProvider] }}
         </h3>
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div
@@ -370,9 +257,9 @@ function resetHint(resetAt: string): string {
                   </span>
                   <span
                     v-if="account.account_type !== 'subscription'"
-                    :class="['shrink-0', typeBadgeClass(account.account_type)]"
+                    :class="['shrink-0', AI_ACCOUNT_TYPE_META[account.account_type].badgeClass]"
                   >
-                    {{ typeLabel(account.account_type) }}
+                    {{ AI_ACCOUNT_TYPE_META[account.account_type].label }}
                   </span>
                   <span
                     v-if="account.subscription_type"
@@ -404,61 +291,31 @@ function resetHint(resetAt: string): string {
 
             <!-- Status + usage source -->
             <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-              <span :class="statusClass(account.status)">
-                {{ statusLabel(account.status) }}
+              <span :class="AI_ACCOUNT_STATUS_META[account.status].badgeClass">
+                {{ AI_ACCOUNT_STATUS_META[account.status].label }}
               </span>
-              <span class="text-muted">source: {{ sourceLabel(account.usage_source) }}</span>
+              <span class="text-muted">source: {{ AI_USAGE_SOURCE_LABEL[account.usage_source] }}</span>
             </div>
 
             <!-- Usage used (API / Codex — số liệu tổng hợp) -->
             <div v-if="account.account_type !== 'subscription'" class="mt-3">
-              <div class="flex items-center justify-between text-xs">
-                <span class="font-bold text-muted">Usage used</span>
-                <span class="font-bold text-ink">{{ Math.round(usedPercent(account.usage_percent)) }}%</span>
-              </div>
-              <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
-                <div
-                  :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account.usage_percent))]"
-                  :style="{ width: `${usedPercent(account.usage_percent)}%` }"
-                />
-              </div>
+              <AiUsageMeter label="Usage used" :remaining-percent="account.usage_percent" size="md" />
             </div>
 
             <!-- Subscription: session (5h) + weekly (7 ngày) từ OAuth usage endpoint -->
             <div v-else class="mt-3 space-y-3">
-              <!-- Current session -->
-              <div>
-                <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold text-muted">Current session</span>
-                  <span class="font-bold text-ink">{{ Math.round(usedPercent(account.session_percent)) }}%</span>
-                </div>
-                <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
-                  <div
-                    :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account.session_percent))]"
-                    :style="{ width: `${usedPercent(account.session_percent)}%` }"
-                  />
-                </div>
-                <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
-                  <i class="pi pi-clock" />reset {{ resetHint(account.session_reset_at) }}
-                </p>
-              </div>
-
-              <!-- Weekly limit -->
-              <div>
-                <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold text-muted">Weekly limit</span>
-                  <span class="font-bold text-ink">{{ Math.round(usedPercent(account.weekly_percent)) }}%</span>
-                </div>
-                <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
-                  <div
-                    :class="['h-full rounded-full transition-all', usageBarClass(usedPercent(account.weekly_percent))]"
-                    :style="{ width: `${usedPercent(account.weekly_percent)}%` }"
-                  />
-                </div>
-                <p class="mt-1 flex items-center gap-1 text-[11px] text-muted">
-                  <i class="pi pi-clock" />reset {{ resetHint(account.weekly_reset_at) }}
-                </p>
-              </div>
+              <AiUsageMeter
+                label="Current session"
+                :remaining-percent="account.session_percent"
+                :reset-at="account.session_reset_at"
+                size="md"
+              />
+              <AiUsageMeter
+                label="Weekly limit"
+                :remaining-percent="account.weekly_percent"
+                :reset-at="account.weekly_reset_at"
+                size="md"
+              />
 
               <p
                 v-if="!account.session_reset_at && !account.weekly_reset_at"

@@ -118,6 +118,7 @@ pub(crate) fn to_public(account: &StoredAccount) -> AiAccount {
         session_reset_at: account.session_reset_at.clone(),
         weekly_percent: account.weekly_percent,
         weekly_reset_at: account.weekly_reset_at.clone(),
+        usage_window: account.usage_window.clone(),
         session_count: account.session_count,
         last_checked_at: account.last_checked_at.clone(),
         created_at: account.created_at.clone(),
@@ -208,6 +209,9 @@ fn apply_probe_results(outcomes: Vec<ProbeOutcome>) -> AppResult<()> {
                 }
                 if let Some(reset_at) = outcome.weekly_reset_at.clone() {
                     account.weekly_reset_at = reset_at;
+                }
+                if let Some(window) = outcome.usage_window.clone() {
+                    account.usage_window = window;
                 }
                 if let Some(percent) = outcome.usage_percent {
                     account.usage_percent = percent;

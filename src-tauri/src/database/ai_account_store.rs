@@ -53,6 +53,9 @@ pub struct StoredAccount {
     /// Thời điểm reset weekly (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu).
     #[serde(default)]
     pub weekly_reset_at: String,
+    /// Giới hạn đang quyết định `usage_percent`/`reset_at`: `session` | `weekly` (rỗng nếu N/A).
+    #[serde(default)]
+    pub usage_window: String,
     pub session_count: i32,
     pub last_checked_at: String,
     pub created_at: String,

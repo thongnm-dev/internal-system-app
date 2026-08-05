@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { AnalysisResult } from "@/_/types/analysis";
+import type { MonthlyReportSummary } from "@/_/types/check-monthly-report";
 
 export type ProjectFilters = {
   code: string;
@@ -9,7 +9,7 @@ export type ProjectFilters = {
 
 export function useProjects() {
   const filters = ref<ProjectFilters>({ code: "", keyword: "", name: "" });
-  const result = ref<AnalysisResult | null>(null);
+  const result = ref<MonthlyReportSummary | null>(null);
 
   function searchProjects() {}
   function resetFilters() { filters.value = { code: "", keyword: "", name: "" }; }

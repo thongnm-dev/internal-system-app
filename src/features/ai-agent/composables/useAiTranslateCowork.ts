@@ -1,8 +1,10 @@
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref } from "vue";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { onAiUsageUpdated } from "@/tauri/events";
 import { aiUsageListAccounts, aiUsageOpenTerminal, aiUsageSetActive } from "@/tauri/commands/ai-usage";
 import { aiModelList } from "@/tauri/commands/ai-workflow";
 import { aiTranslateCoworkGetState, aiTranslateCoworkSaveState } from "@/tauri/commands/ai-translate-cowork";
@@ -41,6 +43,7 @@ export function useAiTranslateCowork() {
   const accounts = ref<AiAccount[]>([]);
   const isLoadingAccounts = ref(false);
   const settingActiveId = ref<number | null>(null);
+  let unlistenUsageUpdated: UnlistenFn | null = null;
 
   // Model AI để chạy skill (`--model`), chọn riêng cho từng account (mặc định: Sonnet).
   const models = ref<AiModelResult[]>([]);
@@ -501,6 +504,10 @@ export function useAiTranslateCowork() {
 
   async function init() {
     await Promise.all([loadAccounts(), loadModels()]);
+    // Cập nhật lại account mỗi khi poll nền bắn event, để khớp với AiUsagePage (tránh usage hiển thị bị stale).
+    unlistenUsageUpdated = await onAiUsageUpdated(() => {
+      void loadAccounts();
+    });
     if (!canUseTauriRuntime()) return;
     try {
       const state = await aiTranslateCoworkGetState();
@@ -512,6 +519,11 @@ export function useAiTranslateCowork() {
       // Không có lịch sử hoặc lỗi đọc file — bỏ qua, giữ màn hình ở trạng thái mặc định.
     }
   }
+
+  onUnmounted(() => {
+    unlistenUsageUpdated?.();
+    unlistenUsageUpdated = null;
+  });
 
   return {
     // row 1

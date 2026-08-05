@@ -40,6 +40,7 @@ pub(crate) async fn probe(client: &Client, account: &StoredAccount) -> ProbeOutc
             session_reset_at: None,
             weekly_percent: None,
             weekly_reset_at: None,
+            usage_window: None,
         };
     }
 
@@ -60,6 +61,7 @@ pub(crate) async fn probe(client: &Client, account: &StoredAccount) -> ProbeOutc
                 session_reset_at: None,
                 weekly_percent: None,
                 weekly_reset_at: None,
+                usage_window: None,
             }
         }
         _ => ProbeOutcome::simple(account.id, "healthy", "unknown"),

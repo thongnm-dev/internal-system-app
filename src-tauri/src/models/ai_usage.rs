@@ -44,6 +44,9 @@ pub struct AiAccount {
     pub weekly_percent: f64,
     /// Thời điểm reset weekly (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu).
     pub weekly_reset_at: String,
+    /// Giới hạn nào đang quyết định `usage_percent`/`reset_at` ở trên: `session` | `weekly`
+    /// (rỗng nếu account không có số liệu tách session/weekly, ví dụ account API key).
+    pub usage_window: String,
     /// Số session đã mở với account này.
     pub session_count: i32,
     /// Lần probe usage gần nhất (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa probe).
@@ -207,6 +210,9 @@ pub struct ProbeOutcome {
     /// Weekly limit (7 ngày) — phần trăm CÒN LẠI. `None` = giữ giá trị cũ.
     pub weekly_percent: Option<f64>,
     pub weekly_reset_at: Option<String>,
+    /// Giới hạn quyết định `usage_percent`/`reset_at` ở trên (`session` | `weekly`).
+    /// `None` = giữ giá trị cũ (hoặc account này không tách session/weekly).
+    pub usage_window: Option<String>,
 }
 
 impl ProbeOutcome {
@@ -222,6 +228,7 @@ impl ProbeOutcome {
             session_reset_at: None,
             weekly_percent: None,
             weekly_reset_at: None,
+            usage_window: None,
         }
     }
 }

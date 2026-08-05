@@ -1,9 +1,11 @@
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
+import type { UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAuthStore } from "@/app/stores/auth";
 import { useToast } from "@/shared/composables/useToast";
 import { tauriRuntimeMessage } from "@/shared/config/appConfig";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import { onAiUsageUpdated } from "@/tauri/events";
 import { aiCoworkGetState, aiCoworkSaveState } from "@/tauri/commands/ai-cowork";
 import { aiModelList, aiWorkflowList, aiWorkflowStepList } from "@/tauri/commands/ai-workflow";
 import type {
@@ -133,6 +135,7 @@ export function useAiCowork() {
   const settingActiveId = ref<number | null>(null);
   // Model AI đã chọn cho từng account (key = account.id); chưa chọn → dùng defaultModelIdFor.
   const selectedModelId = ref<Record<number, number | null>>({});
+  let unlistenUsageUpdated: UnlistenFn | null = null;
 
   // Column "Tasks" — danh sách task đã chọn cho lần chạy này.
   const selectedTasks = ref<AiTaskResult[]>([]);
@@ -843,6 +846,10 @@ export function useAiCowork() {
 
   async function init() {
     await Promise.all([loadWorkflows(), loadAccounts(), loadModels()]);
+    // Cập nhật lại account mỗi khi poll nền bắn event, để khớp với AiUsagePage (tránh usage hiển thị bị stale).
+    unlistenUsageUpdated = await onAiUsageUpdated(() => {
+      void loadAccounts();
+    });
     if (!canUseTauriRuntime()) {
       hydrated = true;
       return;
@@ -878,6 +885,11 @@ export function useAiCowork() {
       hydrated = true;
     }
   }
+
+  onUnmounted(() => {
+    unlistenUsageUpdated?.();
+    unlistenUsageUpdated = null;
+  });
 
   return {
     projectDir,

@@ -19,11 +19,11 @@ import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { useToast } from "@/shared/composables/useToast";
 import { readScheduleExcel, type ScheduleResult } from "@/tauri/commands/schedule";
 import type {
-  AnalysisResult,
-  ProjectSummary,
-  SelectedPhaseDetail,
-} from "@/_/types/analysis";
-import type { ImportCsvPreviewResult } from "@/_/types/check-monthly-report";
+  ImportCsvPreviewResult,
+  MonthlyReportSummary,
+  ReportProjectSummary,
+  SelectedReportPhaseDetail,
+} from "@/_/types/check-monthly-report";
 
 const auth = useAuthStore();
 const loading = useGlobalLoading();
@@ -176,11 +176,11 @@ async function pickScheduleFile() {
 }
 
 type ImportProjectTableRow =
-  | { id: string; kind: "project"; project: ProjectSummary; phase: null; rowCount: number; totals: ProjectSummary["totals"] }
-  | { id: string; kind: "phase"; project: ProjectSummary; phase: ProjectSummary["phases"][number]; rowCount: number; totals: ProjectSummary["totals"] };
+  | { id: string; kind: "project"; project: ReportProjectSummary; phase: null; rowCount: number; totals: ReportProjectSummary["totals"] }
+  | { id: string; kind: "phase"; project: ReportProjectSummary; phase: ReportProjectSummary["phases"][number]; rowCount: number; totals: ReportProjectSummary["totals"] };
 
-function buildImportSummary(result: ImportCsvPreviewResult): AnalysisResult {
-  const projects = new Map<string, ProjectSummary>();
+function buildImportSummary(result: ImportCsvPreviewResult): MonthlyReportSummary {
+  const projects = new Map<string, ReportProjectSummary>();
   for (const row of result.preview_rows) {
     const project = projects.get(row.project_code) ?? {
       project_code: row.project_code,
@@ -188,7 +188,7 @@ function buildImportSummary(result: ImportCsvPreviewResult): AnalysisResult {
       totals: emptyTotals(),
       row_count: 0,
       phases: [],
-    } satisfies ProjectSummary;
+    } satisfies ReportProjectSummary;
 
     let phase = project.phases.find((p) => p.process_code === row.process_code);
     if (!phase) {
@@ -207,7 +207,7 @@ function buildImportSummary(result: ImportCsvPreviewResult): AnalysisResult {
   return { source_path: result.source_path, row_count: result.row_count, grand_total: { regular_minutes: result.total_minutes, normal_overtime_minutes: 0, legal_holiday_overtime_minutes: 0, legal_public_holiday_overtime_minutes: 0, late_night_overtime_minutes: 0 }, projects: sorted };
 }
 
-function buildImportProjectRows(project: ProjectSummary): ImportProjectTableRow[] {
+function buildImportProjectRows(project: ReportProjectSummary): ImportProjectTableRow[] {
   return [
     { id: `${project.project_code}-all`, kind: "project", project, phase: null, rowCount: project.row_count, totals: project.totals },
     ...project.phases.map((phase) => ({ id: `${project.project_code}-${phase.process_code}`, kind: "phase" as const, project, phase, rowCount: phase.row_count, totals: phase.totals })),
@@ -322,7 +322,7 @@ function compareRowClass(row: any) {
   return 'bg-amber-50';
 }
 
-function onOpenDetail(detail: SelectedPhaseDetail) {
+function onOpenDetail(detail: SelectedReportPhaseDetail) {
   void detail;
 }
 </script>

@@ -26,6 +26,53 @@ export type AiUsageSource =
   | "manual"
   | "unknown";
 
+/**
+ * Giới hạn đang quyết định `usage_percent`/`reset_at` của account (backend đã tính sẵn
+ * theo giới hạn còn ít hơn giữa session/weekly). Rỗng nếu account không tách session/weekly
+ * (vd account API key chỉ có 1 rate limit phẳng).
+ */
+export type AiUsageWindow = "session" | "weekly" | "";
+
+/** Nhãn hiển thị theo `usage_window` — dùng chung ở mọi màn hình liệt kê account AI. */
+export const AI_USAGE_WINDOW_LABEL: Record<AiUsageWindow, string> = {
+  session: "Session",
+  weekly: "Weekly",
+  "": "",
+};
+
+/** Nhãn hiển thị cho provider — dùng chung ở mọi màn hình liệt kê account AI. */
+export const AI_PROVIDER_LABEL: Record<AiProvider, string> = {
+  claude: "Claude",
+  codex: "Codex",
+};
+
+/** Nhãn + badge class theo loại account — dùng chung ở mọi màn hình liệt kê account AI. */
+export const AI_ACCOUNT_TYPE_META: Record<AiAccountType, { label: string; badgeClass: string }> = {
+  api: { label: "API", badgeClass: "badge-info" },
+  admin: { label: "Admin", badgeClass: "badge-warning" },
+  oauth: { label: "OAuth", badgeClass: "badge-info" },
+  subscription: { label: "Subscription", badgeClass: "badge-info" },
+  unknown: { label: "Unknown", badgeClass: "badge-neutral" },
+};
+
+/** Nhãn + badge class theo trạng thái usage — dùng chung ở mọi màn hình liệt kê account AI. */
+export const AI_ACCOUNT_STATUS_META: Record<AiAccountStatus, { label: string; badgeClass: string }> = {
+  healthy: { label: "Healthy", badgeClass: "badge-success" },
+  low: { label: "Low", badgeClass: "badge-warning" },
+  exhausted: { label: "Exhausted", badgeClass: "badge-danger" },
+  error: { label: "Error", badgeClass: "badge-danger" },
+  unknown: { label: "Unknown", badgeClass: "badge-neutral" },
+};
+
+/** Nhãn hiển thị nguồn số liệu usage — dùng chung ở mọi màn hình liệt kê account AI. */
+export const AI_USAGE_SOURCE_LABEL: Record<AiUsageSource, string> = {
+  billing_api: "billing API",
+  ratelimit_header: "rate-limit header",
+  error_signal: "usage signal",
+  manual: "manual",
+  unknown: "not measured",
+};
+
 /** Một account AI đã đăng ký (backend trả về, API key đã che). */
 export type AiAccount = {
   id: number;
@@ -60,6 +107,8 @@ export type AiAccount = {
   weekly_percent: number;
   /** Thời điểm reset weekly (`YYYY-MM-DD HH:MM:SS`, rỗng nếu chưa có số liệu). */
   weekly_reset_at: string;
+  /** Giới hạn nào đang quyết định `usage_percent`/`reset_at` ở trên. */
+  usage_window: AiUsageWindow;
   /** Số session đã mở với account này. */
   session_count: number;
   /** Lần probe usage gần nhất (`YYYY-MM-DD HH:MM:SS`, có thể rỗng). */
