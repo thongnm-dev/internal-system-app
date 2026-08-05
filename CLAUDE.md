@@ -144,6 +144,20 @@ PrimeVue 4 with Aura theme preset, dark mode via `[data-theme='dark']` selector.
 
 Default size: 1200×760, minimum: 980×600. Opens maximized. Design features to fit within minimum dimensions.
 
+## Adding a New Feature
+
+Every layer a new feature touches has a ready-to-copy, unregistered template sitting next to the real code it mirrors — copy, rename, then wire in. `docs/NEW_FEATURE_TEMPLATE.md` is the checklist: which file to copy, what to rename it to, and every place it must be registered.
+
+- Frontend: `src/_/types/_template.ts`, `src/tauri/commands/_template.ts`, `src/features/_template/composables/useTemplate.ts`, `src/features/_template/components/TemplateListPage.vue`
+- Backend: `src-tauri/src/models/_template.rs`, `src-tauri/src/database/_template_store.rs`, `src-tauri/src/services/_template_service.rs`, `src-tauri/src/commands/_template_commands.rs`
+- Stored procedures: `docs/store-procedure/_TEMPLATE.md`
+
+None of the `_template` files are registered anywhere (not in `src-tauri/src/modules/*.rs`, not in `invoke_handler.rs`, not exported from `commands/index.ts`, no route) — they exist purely as copy-paste starting points and never compile/build/route as live code. Two registration points are easy to miss:
+- A new command file needs both a `pub mod` line in the matching `src-tauri/src/modules/*.rs` file AND a `use commands::<domain>_commands::*;` + function list entry in `src-tauri/src/invoke_handler.rs`.
+- A new stored procedure needs registering in **both** `services/sp_management_service.rs::all_procedures()` and `database/startup_store.rs::ensure_stored_procedures()` — missing either one means it silently doesn't apply or doesn't show in the Store Procedure management screen.
+
+A generalized version of this same pattern (not tied to this app's specific domains) lives in `.claude/skills/tauri-app-scaffold/` — use it when adding a feature to a *different* app on this same stack, or when standardizing another app for future features.
+
 ## Key Files
 
 | File | Role |
@@ -160,3 +174,4 @@ Default size: 1200×760, minimum: 980×600. Opens maximized. Design features to 
 | `src-tauri/src/lib.rs` | Tauri command registration + plugin setup + background services |
 | `src-tauri/tauri.conf.json` | App config (name, window size, build commands, updater) |
 | `docs/store-procedure/` | All PostgreSQL stored procedure definitions |
+| `docs/NEW_FEATURE_TEMPLATE.md` | Checklist for adding a new feature — which `_template` file to copy per layer, what to rename it to, where to register it |
