@@ -19,3 +19,7 @@ src-tauri/config.ini
 src-tauri/config/
 **toolold/**
 **~/**
+
+apps/*/node_modules/
+apps/*/dist/
+apps/*/src-tauri/target/
