@@ -15,6 +15,8 @@ mod services {
     pub mod file_split_service;
     /// Service so sánh khác biệt giữa 2 file (text/markdown/word/excel).
     pub mod file_compare_service;
+    /// Service cho công cụ đồng bộ tài liệu thiết kế chi tiết VN → JP.
+    pub mod vnjp_sync_service;
     /// Service resize ảnh evidence (hardcopy) trong Excel (XML splicing trực tiếp).
     pub mod excel_helper_service;
     /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.

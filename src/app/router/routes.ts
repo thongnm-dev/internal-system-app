@@ -108,6 +108,12 @@ export const appRoutes: AppRoute[] = [
     subtitle: "Compare differences between two files (Markdown, Excel, Word, Text).",
   },
   {
+    key: "vnJpSync",
+    path: "/vn-jp-sync",
+    title: "VN → JP Sync",
+    subtitle: "Đồng bộ tài liệu thiết kế chi tiết từ tiếng Việt sang tiếng Nhật.",
+  },
+  {
     key: "cloudS3",
     path: "/cloud/s3",
     title: "S3 Browser",
@@ -388,6 +394,11 @@ export const vueRoutes: RouteRecordRaw[] = [
     path: "/file-compare",
     component: () => import("@/features/tools/components/FileComparePage.vue"),
     meta: { key: "fileCompare" as MenuKey },
+  },
+  {
+    path: "/vn-jp-sync",
+    component: () => import("@/features/tools/components/VnJpSyncPage.vue"),
+    meta: { key: "vnJpSync" as MenuKey },
   },
   {
     path: "/cloud/s3",

@@ -56,6 +56,14 @@ UPDATE role_menu_permissions SET menu_key = 'excelHelper' WHERE menu_key = 'resi
 UPDATE user_menu_permissions SET menu_key = 'excelHelper' WHERE menu_key = 'resizeEvidence';
 UPDATE menu_configs SET key = 'excelHelper', path = '/excel-helper' WHERE key = 'resizeEvidence';
 
+-- Migration: thêm menu VN → JP Sync (2026-08-16)
+INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, display_order)
+VALUES ('vnJpSync', 'VN → JP Sync', '/vn-jp-sync', 'pi-sync', 'Tools', TRUE, 35)
+ON CONFLICT (key) DO NOTHING;
+INSERT INTO role_menu_permissions (role_id, menu_key)
+SELECT r.id, 'vnJpSync' FROM roles r WHERE r.name = 'admin'
+ON CONFLICT (role_id, menu_key) DO NOTHING;
+
 -- Menu configuration
 INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, display_order) VALUES
     ('overview',        'Overview',          '/overview',          'pi-home',       '—',          TRUE, 0),
@@ -72,6 +80,7 @@ INSERT INTO menu_configs (key, title, path, icon, menu_group, is_visible, displa
     ('excelHelper',     'Excel Helper',      '/excel-helper',      'pi-images',     'Tools',      TRUE, 32),
     ('fileSplit',       'File Split',        '/file-split',        'pi-file-export','Tools',      TRUE, 33),
     ('fileCompare',     'File Compare',      '/file-compare',      'pi-arrow-right-arrow-left','Tools', TRUE, 34),
+    ('vnJpSync',        'VN → JP Sync',      '/vn-jp-sync',        'pi-sync',       'Tools',      TRUE, 35),
     ('git',             'Git Desktop',       '/git',               'pi-github',     'Tools',      TRUE, 10),
     ('cloudS3',         'S3 Browser',        '/cloud/s3',          'pi-folder-open','Cloud',      TRUE, 10),
     ('cloudS3Upload',   'S3 Upload',         '/cloud/s3-upload',   'pi-upload',     'Cloud',      TRUE, 11),

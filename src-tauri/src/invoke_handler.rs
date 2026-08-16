@@ -18,6 +18,7 @@ use commands::backlog_commands::*;
 use commands::excel2md_commands::*;
 use commands::excel_helper_commands::*;
 use commands::file_compare_commands::*;
+use commands::vnjp_sync_commands::*;
 use commands::file_split_commands::*;
 use commands::issue_csv_commands::*;
 use commands::sync_commands::*;
@@ -75,6 +76,11 @@ fn build_invoke_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + S
         // === File compare (text/markdown/word/excel diff) command ===
         file_compare_run,
         file_compare_export,
+        // === VN→JP document sync commands ===
+        vnjp_sync_analyze,
+        vnjp_sync_translate,
+        vnjp_sync_export_report,
+        vnjp_sync_apply,
         // === Resize evidence images command ===
         list_excel_sheet_names,
         resize_excel_images,

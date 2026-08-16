@@ -63,4 +63,6 @@ mod models {
     pub mod ai_task;
     /// Model cho màn hình Git Desktop (repo, status, diff, commit, branch, stash).
     pub mod git;
+    /// Model cho công cụ đồng bộ tài liệu VN → JP (TKCT).
+    pub mod vnjp_sync;
 }

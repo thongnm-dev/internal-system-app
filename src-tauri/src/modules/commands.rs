@@ -15,6 +15,8 @@ mod commands {
     pub mod file_split_commands;
     /// Commands cho công cụ so sánh khác biệt giữa 2 file.
     pub mod file_compare_commands;
+    /// Commands cho công cụ đồng bộ tài liệu thiết kế chi tiết VN → JP.
+    pub mod vnjp_sync_commands;
     /// Commands cho resize ảnh evidence (hardcopy) trong Excel.
     pub mod excel_helper_commands;
     /// Commands cho import CSV báo cáo tháng.

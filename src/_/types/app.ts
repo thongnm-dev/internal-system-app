@@ -14,6 +14,7 @@ export type MenuKey =
   | "checkMonthlyReport"
   | "fileSplit"
   | "fileCompare"
+  | "vnJpSync"
   | "cloudS3"
   | "cloudS3Upload"
   | "cloudS3Download"
