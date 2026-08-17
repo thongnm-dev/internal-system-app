@@ -131,6 +131,9 @@ export interface ConfirmedInsert {
   sheet: string;
   jpInsertAfterRow: number;
   insertCount: number;
+  /** Phạm vi dòng VN (1-based) của group cần clone nguyên vào JP. Bỏ trống ⇒ chỉ chèn dòng trống. */
+  vnRowStart?: number;
+  vnRowEnd?: number;
 }
 
 export interface RowInsertResult {

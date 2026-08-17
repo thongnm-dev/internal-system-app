@@ -172,6 +172,12 @@ pub struct ConfirmedInsert {
     pub sheet: String,
     pub jp_insert_after_row: usize,
     pub insert_count: usize,
+    /// Dòng VN (1-based) bắt đầu/kết thúc của group cần CLONE nguyên vào JP (nội dung + định dạng
+    /// + merge). `None` (strategy neo cũ) ⇒ chỉ chèn dòng trống. Cả hai phải cùng có mặt.
+    #[serde(default)]
+    pub vn_row_start: Option<usize>,
+    #[serde(default)]
+    pub vn_row_end: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

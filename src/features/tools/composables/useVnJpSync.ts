@@ -325,6 +325,8 @@ export function useVnJpSync() {
         sheet: s.sheet,
         jpInsertAfterRow: s.jpInsertAfterRow,
         insertCount: s.insertCount,
+        vnRowStart: s.vnRowStart,
+        vnRowEnd: s.vnRowEnd,
       }));
     if (inserts.length === 0) return;
     try {
@@ -337,7 +339,12 @@ export function useVnJpSync() {
       if (!outPath) return;
       insertingRows.value = true;
 
-      const result = await vnjpSyncInsertRows(jpPath.value, outPath, inserts);
+      const result = await vnjpSyncInsertRows(
+        jpPath.value,
+        vnPath.value,
+        outPath,
+        inserts,
+      );
       toast.success(
         `Đã chèn ${result.rowsInserted} dòng vào ${result.sheetsModified.length} sheet. Đã chuyển sang dùng file JP mới, hãy Phân tích lại.`,
       );

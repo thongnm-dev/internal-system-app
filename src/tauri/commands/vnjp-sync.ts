@@ -51,11 +51,13 @@ export function vnjpSyncAnalyzeRowAlignment(
 
 export function vnjpSyncInsertRows(
   jpPath: string,
+  vnPath: string,
   outputPath: string,
   inserts: ConfirmedInsert[],
 ): Promise<RowInsertResult> {
   return safeInvoke<RowInsertResult>("vnjp_sync_insert_rows", {
     jpPath,
+    vnPath,
     outputPath,
     inserts,
   });

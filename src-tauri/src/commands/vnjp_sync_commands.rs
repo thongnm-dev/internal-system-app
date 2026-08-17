@@ -64,10 +64,11 @@ pub fn vnjp_sync_analyze_row_alignment(
 #[tauri::command]
 pub fn vnjp_sync_insert_rows(
     jp_path: String,
+    vn_path: String,
     output_path: String,
     inserts: Vec<ConfirmedInsert>,
 ) -> Result<RowInsertResult, String> {
-    vnjp_sync_service::insert_rows(&jp_path, &output_path, &inserts).map_err(log_err)
+    vnjp_sync_service::insert_rows(&jp_path, &vn_path, &output_path, &inserts).map_err(log_err)
 }
 
 /// Dịch VN→JP hàng loạt cho các ô đỏ CHỈ để so sánh (không ghi vào tài liệu), rồi so độ
