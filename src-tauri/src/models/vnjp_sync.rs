@@ -103,4 +103,83 @@ pub struct ApplyResult {
     pub applied_count: usize,
     pub skipped_count: usize,
     pub sheets_modified: Vec<String>,
+    pub strike_removed_count: usize,
+    pub red_blackened_count: usize,
+    pub cleanup_skipped_count: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupResult {
+    pub output_path: String,
+    pub sheets_modified: Vec<String>,
+    pub strike_removed_count: usize,
+    pub red_blackened_count: usize,
+    pub skipped_count: usize,
+}
+
+/// Một vị trí VN có dòng mà JP chưa có (lệch dòng), đề xuất chèn thêm dòng trống vào JP.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RowAlignmentSuggestion {
+    pub sheet: String,
+    /// Số dòng JP (1-based) mà dòng mới sẽ được chèn NGAY SAU đó. 0 = chèn ở đầu sheet.
+    pub jp_insert_after_row: usize,
+    pub insert_count: usize,
+    pub vn_row_start: usize,
+    pub vn_row_end: usize,
+    pub sample_vn_text: Vec<String>,
+    pub has_red: bool,
+    pub has_strike: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RowAlignmentReport {
+    pub suggestions: Vec<RowAlignmentSuggestion>,
+}
+
+/// Một đề xuất chèn dòng đã được TL xác nhận, gửi lại để tool thực hiện chèn thật.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmedInsert {
+    pub sheet: String,
+    pub jp_insert_after_row: usize,
+    pub insert_count: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RowInsertResult {
+    pub output_path: String,
+    pub sheets_modified: Vec<String>,
+    pub rows_inserted: usize,
+}
+
+/// Gợi ý vị trí JP khác có độ tương đồng cao hơn hẳn so với vị trí đang xét — dấu hiệu lệch dòng.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BetterMatch {
+    pub row: usize,
+    pub col: usize,
+    pub similarity: f32,
+}
+
+/// Kết quả kiểm tra AI cho 1 ô đỏ: dịch VN→JP (chỉ dùng để so sánh, không ghi vào tài liệu)
+/// rồi so độ tương đồng với nội dung JP hiện có.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RedCellVerification {
+    pub sheet: String,
+    pub row: usize,
+    pub col: usize,
+    pub ai_translation: String,
+    pub similarity_same_pos: f32,
+    pub better_match: Option<BetterMatch>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RedCellVerificationReport {
+    pub items: Vec<RedCellVerification>,
 }

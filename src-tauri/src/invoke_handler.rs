@@ -81,6 +81,10 @@ fn build_invoke_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + S
         vnjp_sync_translate,
         vnjp_sync_export_report,
         vnjp_sync_apply,
+        vnjp_sync_cleanup,
+        vnjp_sync_analyze_row_alignment,
+        vnjp_sync_insert_rows,
+        vnjp_sync_verify_red_cells_ai,
         // === Resize evidence images command ===
         list_excel_sheet_names,
         resize_excel_images,

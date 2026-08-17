@@ -81,4 +81,63 @@ export interface ApplyResult {
   appliedCount: number;
   skippedCount: number;
   sheetsModified: string[];
+  strikeRemovedCount: number;
+  redBlackenedCount: number;
+  cleanupSkippedCount: number;
+}
+
+export interface CleanupResult {
+  outputPath: string;
+  sheetsModified: string[];
+  strikeRemovedCount: number;
+  redBlackenedCount: number;
+  skippedCount: number;
+}
+
+export interface RowAlignmentSuggestion {
+  sheet: string;
+  /** Số dòng JP (1-based) mà dòng mới sẽ chèn NGAY SAU đó. 0 = chèn ở đầu sheet. */
+  jpInsertAfterRow: number;
+  insertCount: number;
+  vnRowStart: number;
+  vnRowEnd: number;
+  sampleVnText: string[];
+  hasRed: boolean;
+  hasStrike: boolean;
+}
+
+export interface RowAlignmentReport {
+  suggestions: RowAlignmentSuggestion[];
+}
+
+export interface ConfirmedInsert {
+  sheet: string;
+  jpInsertAfterRow: number;
+  insertCount: number;
+}
+
+export interface RowInsertResult {
+  outputPath: string;
+  sheetsModified: string[];
+  rowsInserted: number;
+}
+
+export interface BetterMatch {
+  row: number;
+  col: number;
+  similarity: number;
+}
+
+export interface RedCellVerification {
+  sheet: string;
+  row: number;
+  col: number;
+  /** Bản dịch VN→JP do AI tạo — CHỈ dùng để so sánh, không ghi vào tài liệu. */
+  aiTranslation: string;
+  similaritySamePos: number;
+  betterMatch: BetterMatch | null;
+}
+
+export interface RedCellVerificationReport {
+  items: RedCellVerification[];
 }

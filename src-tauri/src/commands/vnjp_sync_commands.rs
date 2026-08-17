@@ -1,7 +1,10 @@
 //! Tauri command handlers cho công cụ đồng bộ tài liệu VN → JP.
 
 use crate::app::error::log_err;
-use crate::models::vnjp_sync::{ApplyResult, SyncAnalysis, TranslateBatchRequest, TranslateItemResult};
+use crate::models::vnjp_sync::{
+    ApplyResult, CleanupResult, ConfirmedInsert, RedCell, RedCellVerificationReport,
+    RowAlignmentReport, RowInsertResult, SyncAnalysis, TranslateBatchRequest, TranslateItemResult,
+};
 use crate::services::vnjp_sync_service;
 
 /// Phân tích sự khác biệt giữa file Excel VN và JP.
@@ -30,8 +33,8 @@ pub fn vnjp_sync_export_report(
     vnjp_sync_service::export_report(&analysis, &output_path).map_err(log_err)
 }
 
-/// Áp dụng thay đổi từ VN → JP: ghi nội dung VN (giữ nguyên tiếng Việt, tô đỏ) vào
-/// đúng vị trí ô tương ứng trong file JP, lưu ra output_path.
+/// Áp dụng thay đổi từ VN → JP: dọn dẹp strikethrough/chữ đỏ cũ tồn đọng trên file JP,
+/// rồi ghi nội dung VN (giữ nguyên tiếng Việt, tô đỏ) vào đúng vị trí ô tương ứng, lưu ra output_path.
 #[tauri::command]
 pub fn vnjp_sync_apply(
     vn_path: String,
@@ -39,4 +42,44 @@ pub fn vnjp_sync_apply(
     output_path: String,
 ) -> Result<ApplyResult, String> {
     vnjp_sync_service::apply_changes(&vn_path, &jp_path, &output_path).map_err(log_err)
+}
+
+/// Dọn dẹp file JP: xóa hẳn nội dung strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ
+/// bản tablet cũ, trên mọi sheet — không phản ánh chữ đỏ VN. Lưu ra output_path.
+#[tauri::command]
+pub fn vnjp_sync_cleanup(jp_path: String, output_path: String) -> Result<CleanupResult, String> {
+    vnjp_sync_service::cleanup_jp(&jp_path, &output_path).map_err(log_err)
+}
+
+/// Phát hiện các vị trí VN có dòng mà JP chưa có (lệch dòng), để TL xác nhận trước khi chèn.
+#[tauri::command]
+pub fn vnjp_sync_analyze_row_alignment(
+    vn_path: String,
+    jp_path: String,
+) -> Result<RowAlignmentReport, String> {
+    vnjp_sync_service::analyze_row_alignment(&vn_path, &jp_path).map_err(log_err)
+}
+
+/// Chèn dòng trống vào file JP tại các vị trí TL đã xác nhận (đánh số lại row/cell/merge liên quan).
+#[tauri::command]
+pub fn vnjp_sync_insert_rows(
+    jp_path: String,
+    output_path: String,
+    inserts: Vec<ConfirmedInsert>,
+) -> Result<RowInsertResult, String> {
+    vnjp_sync_service::insert_rows(&jp_path, &output_path, &inserts).map_err(log_err)
+}
+
+/// Dịch VN→JP hàng loạt cho các ô đỏ CHỈ để so sánh (không ghi vào tài liệu), rồi so độ
+/// tương đồng với nội dung JP hiện có — cảnh báo ô có thể không thật sự thay đổi hoặc lệch dòng.
+#[tauri::command]
+pub async fn vnjp_sync_verify_red_cells_ai(
+    jp_path: String,
+    red_cells: Vec<RedCell>,
+    provider: String,
+    model: String,
+) -> Result<RedCellVerificationReport, String> {
+    vnjp_sync_service::verify_red_cells_with_ai(&jp_path, &red_cells, &provider, &model)
+        .await
+        .map_err(log_err)
 }
