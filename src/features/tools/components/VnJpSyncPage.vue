@@ -171,6 +171,7 @@ function tabColorStyle(color: string | null | undefined): string {
         </div>
       </div>
 
+      <!-- Actions -->
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <Button
           label="Phân tích"
@@ -180,9 +181,26 @@ function tabColorStyle(color: string | null | undefined): string {
           @click="ctrl.analyze()"
         />
         <Button
+          label="Áp dụng vào file JP"
+          icon="pi pi-file-import"
+          severity="primary"
+          :loading="ctrl.applying.value"
+          :disabled="!ctrl.canApply.value"
+          v-tooltip.top="'Dọn dẹp strikethrough/chữ đỏ cũ tồn đọng rồi ghi VN text (đỏ) vào đúng vị trí trong file JP, lưu file mới'"
+          @click="ctrl.applyChanges()"
+        />
+        <Button
+          label="Xuất báo cáo"
+          icon="pi pi-file-excel"
+          severity="secondary"
+          :loading="ctrl.exporting.value"
+          :disabled="!ctrl.canExport.value"
+          @click="ctrl.exportReport()"
+        />
+        <Button
           label="Dọn dẹp file JP"
           icon="pi pi-eraser"
-          severity="secondary"
+          severity="danger"
           outlined
           :loading="ctrl.cleaning.value"
           :disabled="!ctrl.canCleanup.value"
@@ -192,7 +210,7 @@ function tabColorStyle(color: string | null | undefined): string {
         <Button
           label="Kiểm tra khớp dòng"
           icon="pi pi-align-justify"
-          severity="secondary"
+          severity="warn"
           outlined
           :loading="ctrl.checkingAlignment.value"
           :disabled="!ctrl.canCheckAlignment.value"
@@ -221,6 +239,41 @@ function tabColorStyle(color: string | null | undefined): string {
           <strong>{{ ctrl.cleanupResult.value.redBlackenedCount }}</strong> ô chữ đỏ cũ.
           <span v-if="ctrl.cleanupResult.value.skippedCount > 0" class="text-amber-600 dark:text-amber-400">
             ({{ ctrl.cleanupResult.value.skippedCount }} ô cần tự kiểm tra thủ công)
+          </span>
+          <span v-if="ctrl.cleanupResult.value.delSheetCount > 0">
+            ({{ ctrl.cleanupResult.value.delSheetCount }} sheet "(DEL)" chỉ bỏ màu chữ về đen)
+          </span>
+        </span>
+      </div>
+
+      <!-- Apply result banner -->
+      <div
+        v-if="ctrl.applyResult.value"
+        class="mt-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+      >
+        <i class="pi pi-check-circle" />
+        <span>
+          Đã dọn dẹp (xóa <strong>{{ ctrl.applyResult.value.strikeRemovedCount }}</strong> ô strikethrough, tô đen
+          <strong>{{ ctrl.applyResult.value.redBlackenedCount }}</strong> ô chữ đỏ cũ) rồi ghi
+          <strong>{{ ctrl.applyResult.value.appliedCount }}</strong> ô VN vào
+          <strong>{{ ctrl.applyResult.value.sheetsModified.length }}</strong> sheet.
+          <span v-if="ctrl.applyResult.value.shapeAppliedCount > 0">
+            (kèm <strong>{{ ctrl.applyResult.value.shapeAppliedCount }}</strong> đoạn văn trong textbox/shape)
+          </span>
+          <span v-if="ctrl.applyResult.value.clonedSheetCount > 0" class="text-emerald-800 dark:text-emerald-300">
+            ({{ ctrl.applyResult.value.clonedSheetCount }} sheet mới clone từ VN sang JP)
+          </span>
+          <span v-if="ctrl.applyResult.value.delSheetCount > 0">
+            ({{ ctrl.applyResult.value.delSheetCount }} sheet "(DEL)" chỉ bỏ màu chữ về đen)
+          </span>
+          <span v-if="ctrl.applyResult.value.columnCorrectedCount > 0" class="text-sky-600 dark:text-sky-400">
+            ({{ ctrl.applyResult.value.columnCorrectedCount }} ô tự sửa lệch cột theo nội dung khớp cùng dòng)
+          </span>
+          <span
+            v-if="ctrl.applyResult.value.skippedCount > 0 || ctrl.applyResult.value.cleanupSkippedCount > 0 || ctrl.applyResult.value.shapeSkippedCount > 0"
+            class="text-amber-600 dark:text-amber-400"
+          >
+            ({{ ctrl.applyResult.value.skippedCount }} ô VN bỏ qua, {{ ctrl.applyResult.value.cleanupSkippedCount }} ô cần tự kiểm tra thủ công<span v-if="ctrl.applyResult.value.shapeSkippedCount > 0">, {{ ctrl.applyResult.value.shapeSkippedCount }} đoạn shape không tìm thấy shape cùng tên ở JP</span>)
           </span>
         </span>
       </div>
@@ -308,55 +361,6 @@ function tabColorStyle(color: string | null | undefined): string {
 
     <!-- ═══════════ Kết quả phân tích ═══════════ -->
     <template v-if="ctrl.analysis.value">
-    
-
-      <!-- ═══════════ Actions ═══════════ -->
-      <section class="shrink-0 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm">
-        <div class="flex flex-wrap items-center gap-3">
-          <Button
-            label="Áp dụng vào file JP"
-            icon="pi pi-file-import"
-            severity="primary"
-            :loading="ctrl.applying.value"
-            :disabled="!ctrl.canApply.value"
-            v-tooltip.top="'Ghi VN text (đỏ) vào đúng vị trí trong file JP, lưu file mới'"
-            @click="ctrl.applyChanges()"
-          />
-          <Button
-            label="Xuất báo cáo"
-            icon="pi pi-file-excel"
-            severity="secondary"
-            :loading="ctrl.exporting.value"
-            :disabled="!ctrl.canExport.value"
-            @click="ctrl.exportReport()"
-          />
-          <!-- Apply result banner -->
-          <div
-            v-if="ctrl.applyResult.value"
-            class="ml-auto flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-          >
-            <i class="pi pi-check-circle" />
-            <span>
-              Đã dọn dẹp (xóa <strong>{{ ctrl.applyResult.value.strikeRemovedCount }}</strong> ô strikethrough, tô đen
-              <strong>{{ ctrl.applyResult.value.redBlackenedCount }}</strong> ô chữ đỏ cũ) rồi ghi
-              <strong>{{ ctrl.applyResult.value.appliedCount }}</strong> ô VN vào
-              <strong>{{ ctrl.applyResult.value.sheetsModified.length }}</strong> sheet.
-              <span v-if="ctrl.applyResult.value.columnCorrectedCount > 0" class="text-sky-600 dark:text-sky-400">
-                ({{ ctrl.applyResult.value.columnCorrectedCount }} ô tự sửa lệch cột theo nội dung khớp cùng dòng)
-              </span>
-              <span
-                v-if="ctrl.applyResult.value.skippedCount > 0 || ctrl.applyResult.value.cleanupSkippedCount > 0"
-                class="text-amber-600 dark:text-amber-400"
-              >
-                ({{ ctrl.applyResult.value.skippedCount }} ô VN bỏ qua, {{ ctrl.applyResult.value.cleanupSkippedCount }} ô cần tự kiểm tra thủ công)
-              </span>
-            </span>
-          </div>
-        </div>
-        <p class="mt-1.5 text-xs text-muted">
-          <strong>Áp dụng:</strong> dọn dẹp strikethrough/chữ đỏ cũ tồn đọng trong file JP, rồi tạo file JP mới với nội dung VN (màu đỏ) ở các vị trí thay đổi — mở file mới rồi dùng skill dịch thuật để dịch từng ô đỏ.
-        </p>
-      </section>
       <!-- Summary cards -->
       <div class="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
         <div
@@ -500,13 +504,14 @@ function tabColorStyle(color: string | null | undefined): string {
               <tbody>
                 <tr
                   v-for="(cell, idx) in ctrl.analysis.value.redCells"
-                  :key="`${cell.sheet}-${cell.row}-${cell.col}`"
+                  :key="`${cell.sheet}-${cell.row}-${cell.col}-${idx}`"
                   class="border-b border-divider/50 hover:bg-canvas/50"
                 >
                   <td class="px-3 py-2 text-xs text-muted">{{ idx + 1 }}</td>
                   <td class="px-3 py-2 text-xs font-medium">{{ cell.sheet }}</td>
                   <td class="px-3 py-2 text-center text-xs font-mono text-muted">
                     {{ colLabel(cell.col) }}{{ cell.row }}
+                    <Tag v-if="cell.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
                   </td>
                   <td class="max-w-[260px] px-3 py-2">
                     <span class="line-clamp-3 whitespace-pre-wrap break-words text-red-600">{{ cell.vnText }}</span>
@@ -569,13 +574,14 @@ function tabColorStyle(color: string | null | undefined): string {
               <tbody>
                 <tr
                   v-for="(cell, idx) in ctrl.analysis.value.strikeCells"
-                  :key="`${cell.sheet}-${cell.row}-${cell.col}`"
+                  :key="`${cell.sheet}-${cell.row}-${cell.col}-${idx}`"
                   class="border-b border-divider/50 hover:bg-canvas/50"
                 >
                   <td class="px-4 py-2 text-xs text-muted">{{ idx + 1 }}</td>
                   <td class="px-4 py-2 text-xs font-medium">{{ cell.sheet }}</td>
                   <td class="px-4 py-2 text-center text-xs font-mono text-muted">
                     {{ colLabel(cell.col) }}{{ cell.row }}
+                    <Tag v-if="cell.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
                   </td>
                   <td class="max-w-xs px-4 py-2">
                     <span class="line-through text-muted">{{ cell.text }}</span>
@@ -622,6 +628,7 @@ function tabColorStyle(color: string | null | undefined): string {
                   <td class="px-4 py-2 text-xs font-medium">{{ issue.sheet }}</td>
                   <td class="px-4 py-2 text-center text-xs font-mono text-muted">
                     {{ colLabel(issue.col) }}{{ issue.row }}
+                    <Tag v-if="issue.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
                   </td>
                   <td class="px-4 py-2">
                     <Tag

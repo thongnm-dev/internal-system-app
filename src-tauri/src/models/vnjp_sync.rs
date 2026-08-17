@@ -20,6 +20,10 @@ pub struct RedCell {
     pub vn_text: String,
     pub jp_text: String,
     pub translation: Option<String>,
+    /// `true` nếu ô này thực chất là 1 shape/textbox nổi (không phải cell) — khi đó
+    /// `row`/`col` là vị trí Ô NEO (anchor) của shape, không phải nội dung cell thật.
+    #[serde(default)]
+    pub is_shape: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,6 +33,9 @@ pub struct StrikeCell {
     pub row: usize,
     pub col: usize,
     pub text: String,
+    /// `true` nếu ô này thực chất là 1 shape/textbox nổi — xem `RedCell::is_shape`.
+    #[serde(default)]
+    pub is_shape: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,6 +47,9 @@ pub struct QualityIssue {
     pub issue_type: String,
     pub content: String,
     pub description: String,
+    /// `true` nếu vấn đề này nằm trong 1 shape/textbox nổi — xem `RedCell::is_shape`.
+    #[serde(default)]
+    pub is_shape: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -107,6 +117,18 @@ pub struct ApplyResult {
     pub red_blackened_count: usize,
     pub cleanup_skipped_count: usize,
     pub column_corrected_count: usize,
+    /// Số đoạn văn trong textbox/shape nổi đã ghi được vào đúng shape JP tương ứng (khớp theo tên shape).
+    #[serde(default)]
+    pub shape_applied_count: usize,
+    /// Số đoạn văn shape VN bị bỏ qua vì không tìm thấy shape cùng tên trong JP.
+    #[serde(default)]
+    pub shape_skipped_count: usize,
+    /// Số sheet chỉ có ở VN (tab màu quy ước) đã được clone nguyên trạng sang JP.
+    #[serde(default)]
+    pub cloned_sheet_count: usize,
+    /// Số sheet JP có hậu tố "(DEL)" đã được xử lý (chỉ bỏ màu chữ về đen, không đụng gì khác).
+    #[serde(default)]
+    pub del_sheet_count: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -117,6 +139,9 @@ pub struct CleanupResult {
     pub strike_removed_count: usize,
     pub red_blackened_count: usize,
     pub skipped_count: usize,
+    /// Số sheet JP có hậu tố "(DEL)" đã được xử lý (chỉ bỏ màu chữ về đen, không đụng gì khác).
+    #[serde(default)]
+    pub del_sheet_count: usize,
 }
 
 /// Một vị trí VN có dòng mà JP chưa có (lệch dòng), đề xuất chèn thêm dòng trống vào JP.

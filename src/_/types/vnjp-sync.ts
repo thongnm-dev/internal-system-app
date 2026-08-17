@@ -14,6 +14,8 @@ export interface RedCell {
   vnText: string;
   jpText: string;
   translation: string | null;
+  /** `true` nếu đây là 1 shape/textbox nổi (không phải cell) — `row`/`col` là ô neo của shape. */
+  isShape: boolean;
 }
 
 export interface StrikeCell {
@@ -21,6 +23,8 @@ export interface StrikeCell {
   row: number;
   col: number;
   text: string;
+  /** `true` nếu đây là 1 shape/textbox nổi — xem `RedCell.isShape`. */
+  isShape: boolean;
 }
 
 export interface QualityIssue {
@@ -30,6 +34,8 @@ export interface QualityIssue {
   issueType: string;
   content: string;
   description: string;
+  /** `true` nếu vấn đề này nằm trong 1 shape/textbox nổi — xem `RedCell.isShape`. */
+  isShape: boolean;
 }
 
 export interface SheetCompare {
@@ -85,6 +91,14 @@ export interface ApplyResult {
   redBlackenedCount: number;
   cleanupSkippedCount: number;
   columnCorrectedCount: number;
+  /** Số đoạn văn shape/textbox nổi đã ghi được vào đúng shape JP tương ứng (khớp theo tên shape). */
+  shapeAppliedCount: number;
+  /** Số đoạn văn shape VN bị bỏ qua vì không tìm thấy shape cùng tên trong JP. */
+  shapeSkippedCount: number;
+  /** Số sheet chỉ có ở VN (tab màu quy ước) đã được clone nguyên trạng sang JP. */
+  clonedSheetCount: number;
+  /** Số sheet JP có hậu tố "(DEL)" đã được xử lý (chỉ bỏ màu chữ về đen, không đụng gì khác). */
+  delSheetCount: number;
 }
 
 export interface CleanupResult {
@@ -93,6 +107,8 @@ export interface CleanupResult {
   strikeRemovedCount: number;
   redBlackenedCount: number;
   skippedCount: number;
+  /** Số sheet JP có hậu tố "(DEL)" đã được xử lý (chỉ bỏ màu chữ về đen, không đụng gì khác). */
+  delSheetCount: number;
 }
 
 export interface RowAlignmentSuggestion {
