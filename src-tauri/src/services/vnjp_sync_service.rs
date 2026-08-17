@@ -1982,29 +1982,96 @@ fn make_cell_with_style(
 // Áp dụng thay đổi: ghi VN text (đỏ) vào đúng vị trí ô trong file JP xlsx
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Độ dài tối thiểu (số ký tự) của nội dung JP để được xem là 1 điểm khớp hợp lệ khi tìm cột
+/// đúng — tránh khớp nhầm với nội dung quá ngắn/chung (vd "）", số thứ tự...).
+const MIN_COLUMN_MATCH_LEN: usize = 3;
+
+/// Nếu ô JP tại đúng (row, col) như VN không khớp nội dung (rỗng hoặc không phải substring của
+/// vn_text), tìm cột khác trong CÙNG DÒNG của JP có nội dung là substring của vn_text (ưu tiên
+/// khớp dài nhất) và dùng cột đó làm đích ghi thay vào. Xử lý trường hợp cột bị lệch giữa VN/JP
+/// dù cùng dòng, cùng nội dung (ví dụ JP có thêm/thiếu cột ở đoạn khác làm lệch vị trí so với VN).
+/// Trả về `(cột đích 0-based, có bị điều chỉnh hay không)`.
+fn resolve_target_col(
+    jp_grid: &HashMap<String, Vec<Vec<String>>>,
+    sheet: &str,
+    row_0: usize,
+    col_0: usize,
+    vn_text: &str,
+) -> (usize, bool) {
+    let Some(row_vec) = jp_grid.get(sheet).and_then(|g| g.get(row_0)) else {
+        return (col_0, false);
+    };
+
+    let same_col_ok = row_vec
+        .get(col_0)
+        .map(|t| {
+            let t = t.trim();
+            !t.is_empty() && vn_text.contains(t)
+        })
+        .unwrap_or(false);
+    if same_col_ok {
+        return (col_0, false);
+    }
+
+    let mut best: Option<(usize, usize)> = None; // (col, độ dài match theo số ký tự)
+    for (c, text) in row_vec.iter().enumerate() {
+        let t = text.trim();
+        if t.chars().count() < MIN_COLUMN_MATCH_LEN {
+            continue;
+        }
+        if vn_text.contains(t) {
+            let len = t.chars().count();
+            if best.map_or(true, |(_, best_len)| len > best_len) {
+                best = Some((c, len));
+            }
+        }
+    }
+
+    match best {
+        Some((c, _)) if c != col_0 => (c, true),
+        _ => (col_0, false),
+    }
+}
+
 /// Phân tích VN file, lấy danh sách ô đỏ, rồi ghi VN text (in đỏ) vào đúng vị trí
 /// tương ứng trong JP file. Kết quả lưu ra `output_path`.
 /// Nội dung VN được giữ nguyên (không dịch) và tô màu đỏ để reviewer kiểm tra.
 pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResult<ApplyResult> {
     let analysis = analyze(vn_path, jp_path)?;
     let vn_styles = find_red_cells_with_style_xlsx(vn_path);
+    let jp_grid_for_column_check = read_workbook_grid(jp_path)?;
 
     // Group red cells by sheet: sheet_name → Vec<(row_0, col_0, vn_text, style)>
     // `style` giữ lại màu chữ/bold/italic/strikethrough gốc của ô đỏ VN để tái tạo đúng khi ghi sang JP.
+    // `col_0` là cột ĐÍCH trong JP — có thể khác cột của VN nếu phát hiện lệch cột cùng dòng
+    // (xem resolve_target_col): style vẫn tra theo cột GỐC của VN, chỉ vị trí ghi mới đổi.
     let mut cells_by_sheet: HashMap<String, Vec<(usize, usize, String, Option<CellStyleSource>)>> =
         HashMap::new();
+    let mut column_corrected_count = 0usize;
     for rc in &analysis.red_cells {
         if rc.vn_text.trim().is_empty() {
             continue;
         }
+        let vn_row_0 = rc.row - 1;
+        let vn_col_0 = rc.col - 1;
+        let (target_col_0, corrected) = resolve_target_col(
+            &jp_grid_for_column_check,
+            &rc.sheet,
+            vn_row_0,
+            vn_col_0,
+            &rc.vn_text,
+        );
+        if corrected {
+            column_corrected_count += 1;
+        }
         let style = vn_styles
             .get(&rc.sheet)
-            .and_then(|m| m.get(&(rc.row - 1, rc.col - 1)))
+            .and_then(|m| m.get(&(vn_row_0, vn_col_0)))
             .cloned();
         cells_by_sheet
             .entry(rc.sheet.clone())
             .or_default()
-            .push((rc.row - 1, rc.col - 1, rc.vn_text.clone(), style));
+            .push((vn_row_0, target_col_0, rc.vn_text.clone(), style));
     }
 
     if cells_by_sheet.is_empty() {
@@ -2104,6 +2171,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResu
         strike_removed_count,
         red_blackened_count,
         cleanup_skipped_count,
+        column_corrected_count,
     })
 }
 

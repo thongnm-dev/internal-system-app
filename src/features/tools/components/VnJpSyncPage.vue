@@ -341,6 +341,9 @@ function tabColorStyle(color: string | null | undefined): string {
               <strong>{{ ctrl.applyResult.value.redBlackenedCount }}</strong> ô chữ đỏ cũ) rồi ghi
               <strong>{{ ctrl.applyResult.value.appliedCount }}</strong> ô VN vào
               <strong>{{ ctrl.applyResult.value.sheetsModified.length }}</strong> sheet.
+              <span v-if="ctrl.applyResult.value.columnCorrectedCount > 0" class="text-sky-600 dark:text-sky-400">
+                ({{ ctrl.applyResult.value.columnCorrectedCount }} ô tự sửa lệch cột theo nội dung khớp cùng dòng)
+              </span>
               <span
                 v-if="ctrl.applyResult.value.skippedCount > 0 || ctrl.applyResult.value.cleanupSkippedCount > 0"
                 class="text-amber-600 dark:text-amber-400"

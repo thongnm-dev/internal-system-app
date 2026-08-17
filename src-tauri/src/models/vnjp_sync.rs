@@ -106,6 +106,7 @@ pub struct ApplyResult {
     pub strike_removed_count: usize,
     pub red_blackened_count: usize,
     pub cleanup_skipped_count: usize,
+    pub column_corrected_count: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

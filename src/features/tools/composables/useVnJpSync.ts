@@ -227,8 +227,12 @@ export function useVnJpSync() {
         result.strikeRemovedCount > 0 || result.redBlackenedCount > 0
           ? ` Đã dọn dẹp: xóa ${result.strikeRemovedCount} ô strikethrough cũ, tô đen ${result.redBlackenedCount} ô chữ đỏ cũ.`
           : "";
+      const columnNote =
+        result.columnCorrectedCount > 0
+          ? ` Đã tự sửa lệch cột theo nội dung khớp cùng dòng cho ${result.columnCorrectedCount} ô.`
+          : "";
       toast.success(
-        `Đã ghi ${result.appliedCount} ô VN vào file JP (${result.sheetsModified.length} sheet).${cleanupNote} Mở file để dịch từng ô đỏ.`,
+        `Đã ghi ${result.appliedCount} ô VN vào file JP (${result.sheetsModified.length} sheet).${cleanupNote}${columnNote} Mở file để dịch từng ô đỏ.`,
       );
     } catch (e) {
       error.value = friendlyError(e);

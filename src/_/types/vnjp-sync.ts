@@ -84,6 +84,7 @@ export interface ApplyResult {
   strikeRemovedCount: number;
   redBlackenedCount: number;
   cleanupSkippedCount: number;
+  columnCorrectedCount: number;
 }
 
 export interface CleanupResult {
