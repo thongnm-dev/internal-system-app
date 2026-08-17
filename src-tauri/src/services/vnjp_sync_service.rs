@@ -4037,8 +4037,22 @@ fn inject_cells_into_sheet_xml(
         cells_vec.sort_by_key(|(col, _)| *col);
     }
 
+    // Dedup theo (row_0, col_0) trước — nhiều ô đỏ VN có thể bị `resolve_target_col` tự sửa lệch
+    // cột trỏ về CÙNG 1 vị trí đích JP (vd 2 cột VN khác nhau cùng khớp nội dung JP ở 1 cột). Nếu
+    // không dedup, 2 cell trong `cells` cùng đích sẽ sinh 2 SurgeryEdit đè lên CÙNG 1 range, khiến
+    // `apply_surgery` cắt ghép sai byte (ghi đè xong lại ghi đè tiếp lên offset đã lệch) — làm
+    // hỏng cấu trúc XML, Excel báo "cần sửa chữa" khi mở file output dù `applied_count` vẫn đếm
+    // đủ (không cell nào bị coi là lỗi). Giữ lại bản ghi SAU CÙNG (theo thứ tự trong `cells`).
+    let mut dedup: HashMap<(usize, usize), (String, Option<CellStyleSource>)> = HashMap::new();
+    for (row_0, col_0, vn_text, style) in cells {
+        dedup.insert((*row_0, *col_0), (vn_text.clone(), style.clone()));
+    }
+
     // Sort input cells so same-position inserts accumulate in col order
-    let mut sorted_cells = cells.to_vec();
+    let mut sorted_cells: Vec<(usize, usize, String, Option<CellStyleSource>)> = dedup
+        .into_iter()
+        .map(|((row_0, col_0), (vn_text, style))| (row_0, col_0, vn_text, style))
+        .collect();
     sorted_cells.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
 
     let mut edits: Vec<SurgeryEdit> = Vec::new();
