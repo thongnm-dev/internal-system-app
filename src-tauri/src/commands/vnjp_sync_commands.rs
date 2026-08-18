@@ -33,15 +33,13 @@ pub fn vnjp_sync_export_report(
     vnjp_sync_service::export_report(&analysis, &output_path).map_err(log_err)
 }
 
-/// Áp dụng thay đổi từ VN → JP: dọn dẹp strikethrough/chữ đỏ cũ tồn đọng trên file JP,
-/// rồi ghi nội dung VN (giữ nguyên tiếng Việt, tô đỏ) vào đúng vị trí ô tương ứng, lưu ra output_path.
+/// Áp dụng thay đổi từ VN → JP: dọn dẹp strikethrough/chữ đỏ cũ tồn đọng trên file JP, đồng bộ
+/// cấu trúc sheet (clone sheet chỉ có ở VN, đánh dấu "(DEL)" sheet VN đã xóa), tự động canh dòng
+/// lệch, rồi ghi nội dung VN (giữ nguyên tiếng Việt, tô đỏ) vào đúng vị trí ô tương ứng. Kết quả
+/// lưu tự động vào thư mục Temp cạnh nơi cài đặt (không còn hộp thoại chọn nơi lưu).
 #[tauri::command]
-pub fn vnjp_sync_apply(
-    vn_path: String,
-    jp_path: String,
-    output_path: String,
-) -> Result<ApplyResult, String> {
-    vnjp_sync_service::apply_changes(&vn_path, &jp_path, &output_path).map_err(log_err)
+pub fn vnjp_sync_apply(vn_path: String, jp_path: String) -> Result<ApplyResult, String> {
+    vnjp_sync_service::apply_changes(&vn_path, &jp_path).map_err(log_err)
 }
 
 /// Dọn dẹp file JP: xóa hẳn nội dung strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ

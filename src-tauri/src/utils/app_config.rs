@@ -84,3 +84,20 @@ pub fn local_data_dir() -> PathBuf {
     let _ = std::fs::create_dir_all(&dir);
     dir
 }
+
+/// Thư mục `Temp` cùng cấp với thư mục `config`/`data` (kế bên .exe ở production, hoặc
+/// `src-tauri/Temp` ở development khi không lấy được exe path).
+///
+/// Dùng để ghi các file trung gian do công cụ tạo ra (vd kết quả merge VN→JP của
+/// `vnjp::sync_service::apply_changes`) — không phải dữ liệu người dùng lâu dài như
+/// [`local_data_dir`].
+///
+/// Tự tạo thư mục nếu chưa tồn tại.
+pub fn temp_dir() -> PathBuf {
+    let dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("Temp")))
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Temp"));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}

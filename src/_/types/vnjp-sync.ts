@@ -99,6 +99,8 @@ export interface ApplyResult {
   clonedSheetCount: number;
   /** Số sheet JP có hậu tố "(DEL)" đã được xử lý (chỉ bỏ màu chữ về đen, không đụng gì khác). */
   delSheetCount: number;
+  /** Số dòng đã được tự động chèn để canh khớp lệch dòng VN↔JP trước khi ghi nội dung. */
+  rowsInserted: number;
 }
 
 export interface CleanupResult {

@@ -24,12 +24,8 @@ export function vnjpSyncExportReport(
   return safeInvoke<string>("vnjp_sync_export_report", { analysis, outputPath });
 }
 
-export function vnjpSyncApply(
-  vnPath: string,
-  jpPath: string,
-  outputPath: string,
-): Promise<ApplyResult> {
-  return safeInvoke<ApplyResult>("vnjp_sync_apply", { vnPath, jpPath, outputPath });
+export function vnjpSyncApply(vnPath: string, jpPath: string): Promise<ApplyResult> {
+  return safeInvoke<ApplyResult>("vnjp_sync_apply", { vnPath, jpPath });
 }
 
 export function vnjpSyncCleanup(

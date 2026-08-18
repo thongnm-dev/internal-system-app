@@ -129,6 +129,9 @@ pub struct ApplyResult {
     /// Số sheet JP có hậu tố "(DEL)" đã được xử lý (chỉ bỏ màu chữ về đen, không đụng gì khác).
     #[serde(default)]
     pub del_sheet_count: usize,
+    /// Số dòng đã được tự động chèn để canh khớp lệch dòng VN↔JP trước khi ghi nội dung.
+    #[serde(default)]
+    pub rows_inserted: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

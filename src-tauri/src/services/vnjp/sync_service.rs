@@ -7,7 +7,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use calamine::{open_workbook_auto, Data, Reader};
@@ -1214,7 +1214,7 @@ const CHANGE_HISTORY_LAST_COL0: usize = 10;
 
 /// Loại tài liệu VN↔JP nhận diện qua tiền tố tên file — quyết định vùng cột nội dung áp dụng.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum DocType {
+pub(crate) enum DocType {
     /// C2.3.2 プログラム処理概要図 — nội dung cột A ~ AQ.
     C232,
     /// C2.3.3 イベント詳細設計書 — nội dung cột A ~ AR.
@@ -1243,7 +1243,7 @@ const DOC_TYPE_PREFIXES: &[(&str, DocType)] = &[
 ];
 
 /// Nhận diện loại tài liệu qua tên file VN hoặc JP (chấp nhận cả bản VN có hậu tố "..._VN.xlsx").
-fn detect_doc_type(vn_path: &str, jp_path: &str) -> DocType {
+pub(crate) fn detect_doc_type(vn_path: &str, jp_path: &str) -> DocType {
     for path in [vn_path, jp_path] {
         let Some(file_name) = Path::new(path).file_name().and_then(|n| n.to_str()) else {
             continue;
@@ -3124,30 +3124,81 @@ fn resolve_target_col(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sheet chỉ có ở VN sang JP: sheet VN tô tab màu quy ước (xem `CLONE_TAB_COLOR`) mà JP chưa có
-// sẽ được CLONE TRỰC TIẾP TỪ VN — toàn bộ nội dung (kể cả ô không đỏ, vd header), định dạng
-// (chiều cao dòng, wrap text, border, fill, merge cell), số dòng, và textbox/shape nổi (kèm ảnh
-// nhúng nếu có) đều lấy nguyên từ VN, để khớp 100% với VN. Vì font/fill/border/numFmt của VN
-// không tồn tại sẵn trong styles.xml JP, phải MERGE (chỉ APPEND, không sửa index hiện có — an
-// toàn cho các sheet JP khác) trước khi remap `s=` của sheet mới theo bảng đã merge.
+// Sheet chỉ có ở VN sang JP: BẤT KỲ sheet nào tồn tại ở VN mà JP chưa có (trừ sheet VN tự đánh
+// dấu đã xóa, xem `is_del_sheet_name` + `compute_del_renames` bên dưới) sẽ được CLONE TRỰC TIẾP
+// TỪ VN — toàn bộ nội dung (kể cả ô không đỏ, vd header), định dạng (chiều cao dòng, wrap text,
+// border, fill, merge cell), số dòng, và textbox/shape nổi (kèm ảnh nhúng nếu có) đều lấy nguyên
+// từ VN, để khớp 100% với VN. Vì font/fill/border/numFmt của VN không tồn tại sẵn trong
+// styles.xml JP, phải MERGE (chỉ APPEND, không sửa index hiện có — an toàn cho các sheet JP
+// khác) trước khi remap `s=` của sheet mới theo bảng đã merge.
 //
 // Sheet mới này KHÔNG đi qua `cleanup_sheet_xml`/`inject_cells_into_sheet_xml` như sheet thường
-// trong vòng lặp chính của `apply_changes` — nội dung (kể cả ô đỏ) đã đúng 100% từ VN ngay khi
-// clone, chạy lại 2 bước đó sẽ vô tình tô đen nhầm ô đỏ mới hoặc ghi đè mất style vừa merge.
+// trong vòng lặp chính — nội dung (kể cả ô đỏ) đã đúng 100% từ VN ngay khi clone, chạy lại 2
+// bước đó sẽ vô tình tô đen nhầm ô đỏ mới hoặc ghi đè mất style vừa merge.
 //
 // Việc này HOÀN TOÀN ĐỘC LẬP với xử lý sheet "(DEL)" (xem `is_del_sheet_name` — chỉ đơn giản là
 // 1 sheet JP sắp bị xóa, được bỏ màu chữ về đen như bình thường, không liên quan gì đến sheet mới
 // được tạo ở đây).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Mã màu tab (6 hex, không kèm alpha) quy ước của team cho "sheet mới chỉ có ở VN, cần tạo mới
-/// bên JP". Xác nhận từ team: #0070C0 (màu "Blue" chuẩn trong Standard Colors của Excel).
-const CLONE_TAB_COLOR: &str = "0070C0";
+/// Bỏ hậu tố "(DEL)" (xem `is_del_sheet_name`) khỏi tên sheet, trả về tên gốc. Không nhạy
+/// hoa/thường, cho phép có/không khoảng trắng trước dấu ngoặc.
+fn strip_del_suffix(name: &str) -> String {
+    let trimmed = name.trim();
+    let upper = trimmed.to_ascii_uppercase();
+    match upper.rfind("(DEL)") {
+        Some(idx) => trimmed[..idx].trim_end().to_string(),
+        None => trimmed.to_string(),
+    }
+}
 
-fn is_clone_tab_color(color: &str) -> bool {
-    let c = color.trim_start_matches('#').to_ascii_uppercase();
-    let hex6 = if c.len() == 8 { &c[2..] } else { c.as_str() };
-    hex6 == CLONE_TAB_COLOR
+/// Tính danh sách sheet JP cần đổi tên thêm hậu tố "(DEL)": VN đánh dấu 1 sheet đã bị xóa bằng
+/// cách đặt tên sheet đó kết thúc bằng "(DEL)" — nếu JP vẫn còn sheet tên GỐC (chưa đổi) thì đổi
+/// tên sheet đó trong JP cho khớp, KHÔNG xóa hẳn sheet. Trả về `Vec<(tên JP cũ, tên JP mới)>`.
+fn compute_del_renames(
+    vn_sheet_names: &[String],
+    jp_sheet_names: &HashSet<String>,
+) -> Vec<(String, String)> {
+    let mut renames = Vec::new();
+    for name in vn_sheet_names {
+        if !is_del_sheet_name(name) {
+            continue;
+        }
+        let base = strip_del_suffix(name);
+        if base.is_empty() {
+            continue;
+        }
+        if jp_sheet_names.contains(&base) {
+            renames.push((base.clone(), format!("{base} (DEL)")));
+        }
+    }
+    renames
+}
+
+/// Đổi tên 1 `<sheet>` trong `xl/workbook.xml` JP cho khớp `compute_del_renames`. Không đụng gì
+/// khác (rId, sheetId, thứ tự...) — xem `reorder_sheets_to_match_vn` cho bước sắp xếp lại sau đó.
+fn rename_sheet_in_workbook_xml(workbook_xml: &str, old_name: &str, new_name: &str) -> String {
+    let Ok(doc) = roxmltree::Document::parse(workbook_xml) else {
+        return workbook_xml.to_string();
+    };
+    let Some(sheet_node) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "sheet" && n.attribute("name") == Some(old_name))
+    else {
+        return workbook_xml.to_string();
+    };
+    let Some(name_attr) = sheet_node.attributes().find(|a| a.name() == "name") else {
+        return workbook_xml.to_string();
+    };
+    let r = name_attr.range_value();
+    apply_surgery(
+        workbook_xml,
+        vec![SurgeryEdit {
+            start: r.start,
+            end: r.end,
+            replacement: xml_escape(new_name),
+        }],
+    )
 }
 
 /// Đọc nhị phân 1 entry trong ZIP (dùng cho ảnh nhúng — không thể đọc dạng String như
@@ -4017,10 +4068,221 @@ fn reorder_sheets_to_match_vn(workbook_xml: &str, vn_sheet_order: &[String]) -> 
     )
 }
 
-/// Phân tích VN file, lấy danh sách ô đỏ, rồi ghi VN text (in đỏ) vào đúng vị trí
-/// tương ứng trong JP file. Kết quả lưu ra `output_path`.
-/// Nội dung VN được giữ nguyên (không dịch) và tô màu đỏ để reviewer kiểm tra.
-pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResult<ApplyResult> {
+/// Đường dẫn file JP kết quả của pipeline "Áp dụng" — `Temp/{tên JP gốc}_merged.{ext}`, thư mục
+/// `Temp` nằm cùng cấp với nơi cài đặt application (xem `app_config::temp_dir`). File này được
+/// GHI ĐÈ nhiều lần trong 1 lượt "Áp dụng" (`sync_structure` rồi `insert_rows` rồi `merge_content`
+/// — xem `apply_changes`), không dùng hộp thoại chọn nơi lưu như trước.
+pub(crate) fn merged_output_path(jp_path: &str) -> AppResult<PathBuf> {
+    let path = Path::new(jp_path);
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| AppError::new(format!("Tên file JP không hợp lệ: {jp_path}")))?;
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("xlsx");
+    Ok(app_config::temp_dir().join(format!("{stem}_merged.{ext}")))
+}
+
+/// Kết quả bước 1-2 của pipeline "Áp dụng" (xem `sync_structure`). Public trong crate vì mỗi
+/// `c23{2,3,4,5,6,8}_sync_service::apply_changes` tự lắp ráp pipeline, cần đọc trực tiếp các field.
+pub(crate) struct StructureSyncResult {
+    pub(crate) strike_removed_count: usize,
+    pub(crate) red_blackened_count: usize,
+    pub(crate) cleanup_skipped_count: usize,
+    /// Tên các sheet vừa clone trực tiếp từ VN — `merge_content` chạy sau phải BỎ QUA các sheet
+    /// này khi ghi nội dung ô đỏ (nội dung đã đúng 100% từ VN ngay khi clone).
+    pub(crate) cloned_names: HashSet<String>,
+    pub(crate) del_renamed_count: usize,
+    pub(crate) sheets_modified: Vec<String>,
+}
+
+/// Bước 1-2 của pipeline "Áp dụng" (xem `apply_changes`): dọn dẹp MỌI sheet JP (như
+/// `cleanup_jp`), clone sang JP mọi sheet chỉ tồn tại ở VN (trừ sheet VN tự đánh dấu đã xóa —
+/// xem `compute_del_renames`), đổi tên sheet JP còn sót lại thành "(DEL)" nếu VN đã đánh dấu xóa,
+/// rồi sắp xếp lại thứ tự sheet cho khớp VN. Ghi kết quả ra `output_path`. KHÔNG ghi nội dung ô
+/// đỏ VN — xem `merge_content`, chạy sau trên chính file này.
+pub(crate) fn sync_structure(vn_path: &str, jp_path: &str, output_path: &str) -> AppResult<StructureSyncResult> {
+    let analysis = analyze(vn_path, jp_path)?;
+    let doc_type = detect_doc_type(vn_path, jp_path);
+
+    let vn_sheet_names: Vec<String> = analysis
+        .sheet_compare
+        .iter()
+        .filter(|c| c.in_vn)
+        .map(|c| c.name.clone())
+        .collect();
+    let jp_sheet_names: HashSet<String> = analysis
+        .sheet_compare
+        .iter()
+        .filter(|c| c.in_jp)
+        .map(|c| c.name.clone())
+        .collect();
+    // Bất kỳ sheet nào chỉ có ở VN (trừ sheet tự đánh dấu đã xóa, xử lý riêng bên dưới) → clone.
+    let sheets_to_clone: Vec<String> = analysis
+        .sheet_compare
+        .iter()
+        .filter(|c| c.in_vn && !c.in_jp && !is_del_sheet_name(&c.name))
+        .map(|c| c.name.clone())
+        .collect();
+    let del_renames = compute_del_renames(&vn_sheet_names, &jp_sheet_names);
+    let del_renamed_count = del_renames.len();
+
+    let jp_file = File::open(jp_path)
+        .map_err(|e| AppError::new(format!("Không mở được file JP: {e}")))?;
+    let mut archive = zip::ZipArchive::new(jp_file)
+        .map_err(|e| AppError::new(format!("File JP không phải ZIP hợp lệ: {e}")))?;
+
+    // Bước 1: dọn dẹp — xóa hẳn strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ bản tablet cũ,
+    // trên MỌI sheet (xem TrinhTuDichThietKeChiTiet_HuongDan.xlsx, mục 3.1).
+    let ctx = build_cleanup_context(&mut archive);
+    let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
+    let (rich_ssi, plain_text, mut strike_removed_count, mut red_blackened_count) =
+        match cleanup_shared_strings(&mut archive) {
+            Some((new_xml, removed, blackened, rich_ssi, plain_text)) => {
+                if removed > 0 || blackened > 0 {
+                    replaced.insert("xl/sharedStrings.xml".to_string(), new_xml.into_bytes());
+                }
+                (rich_ssi, plain_text, removed, blackened)
+            }
+            None => (HashSet::new(), HashMap::new(), 0, 0),
+        };
+
+    let mut workbook_xml = read_zip_entry(&mut archive, "xl/workbook.xml")
+        .ok_or_else(|| AppError::new("Không tìm thấy xl/workbook.xml trong file JP."))?;
+    let rels_xml = read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels")
+        .ok_or_else(|| AppError::new("Không tìm thấy xl/_rels/workbook.xml.rels."))?;
+
+    // Bước 2 (đổi tên): sheet JP còn sót lại tên gốc mà VN đã đánh dấu xóa → thêm hậu tố "(DEL)".
+    // Đổi TRƯỚC khi resolve `sheet_path_map` để vòng lặp dọn dẹp bên dưới thấy đúng tên mới ngay,
+    // tự động chạy nhánh `is_del_sheet_name` (bỏ màu chữ về đen) mà không cần thêm branch riêng.
+    for (old_name, new_name) in &del_renames {
+        workbook_xml = rename_sheet_in_workbook_xml(&workbook_xml, old_name, new_name);
+    }
+    if !del_renames.is_empty() {
+        replaced.insert("xl/workbook.xml".to_string(), workbook_xml.clone().into_bytes());
+    }
+
+    let sheet_path_list = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
+    let mut sheet_path_map: HashMap<String, String> = sheet_path_list.iter().cloned().collect();
+
+    // Bước 2 (clone): sheet chỉ có ở VN → clone TRỰC TIẾP từ VN — xem ghi chú đầu mục "Sheet chỉ
+    // có ở VN sang JP". Thêm ngay vào `sheet_path_map` TRƯỚC vòng lặp dọn dẹp, nhưng đánh dấu để
+    // vòng lặp đó BỎ QUA sheet này (nội dung đã đúng 100% từ VN ngay khi clone).
+    let cloned = clone_missing_sheets_from_vn(&mut archive, vn_path, &sheets_to_clone, &mut replaced)?;
+    let cloned_names: HashSet<String> =
+        cloned.new_entries.iter().map(|(name, _)| name.clone()).collect();
+    for (name, path) in &cloned.new_entries {
+        sheet_path_map.insert(name.clone(), path.clone());
+    }
+
+    let mut cleanup_skipped_count = 0usize;
+    let mut sheets_modified: Vec<String> = Vec::new();
+
+    for (sheet_name, xml_path) in &sheet_path_map {
+        let Some(original_xml) = read_current(&mut archive, &replaced, xml_path) else {
+            continue;
+        };
+        let bounds = content_bounds_for(doc_type, sheet_name);
+
+        if cloned_names.contains(sheet_name) {
+            if !sheets_modified.contains(sheet_name) {
+                sheets_modified.push(sheet_name.clone());
+            }
+            continue;
+        }
+
+        // Sheet "(DEL)" (gốc sẵn có ở JP, hoặc vừa đổi tên ở trên): chỉ bỏ màu chữ về đen, KHÔNG
+        // dọn strikethrough, KHÔNG đụng shape — xem ghi chú đầu mục "Sheet JP có hậu tố (DEL)".
+        if is_del_sheet_name(sheet_name) {
+            let (new_xml, blackened, skip) = blacken_all_cells_sheet_xml(
+                &original_xml,
+                &ctx.colored_xf,
+                &plain_text,
+                &rich_ssi,
+                bounds,
+            );
+            cleanup_skipped_count += skip;
+            if blackened > 0 {
+                red_blackened_count += blackened;
+                replaced.insert(xml_path.clone(), new_xml.into_bytes());
+                sheets_modified.push(sheet_name.clone());
+            }
+            continue;
+        }
+
+        let drawing_path = resolve_drawing_path(&mut archive, &original_xml, xml_path);
+
+        let (cleaned_xml, s_removed, r_blackened, c_skip) =
+            cleanup_sheet_xml(&original_xml, &ctx, &rich_ssi, &plain_text, bounds);
+        cleanup_skipped_count += c_skip;
+        if s_removed > 0 || r_blackened > 0 {
+            strike_removed_count += s_removed;
+            red_blackened_count += r_blackened;
+            replaced.insert(xml_path.clone(), cleaned_xml.into_bytes());
+            sheets_modified.push(sheet_name.clone());
+        }
+
+        let Some(drawing_path) = drawing_path else {
+            continue;
+        };
+        let Some(drawing_xml) = read_zip_entry(&mut archive, &drawing_path) else {
+            continue;
+        };
+        let (cleaned_drawing, d_removed, d_blackened) = cleanup_drawing_xml(&drawing_xml);
+        if d_removed > 0 || d_blackened > 0 {
+            strike_removed_count += d_removed;
+            red_blackened_count += d_blackened;
+            replaced.insert(drawing_path, cleaned_drawing.into_bytes());
+            if !sheets_modified.contains(sheet_name) {
+                sheets_modified.push(sheet_name.clone());
+            }
+        }
+    }
+
+    // Sắp xếp lại thứ tự sheet JP cho khớp thứ tự sheet VN (xem `reorder_sheets_to_match_vn`) —
+    // đảm bảo sheet mới tạo (thường bị chèn cuối danh sách) nằm đúng vị trí như bên VN.
+    let vn_sheet_order: Vec<String> = {
+        let vn_file_for_order = File::open(vn_path)
+            .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
+        let mut vn_archive_for_order = zip::ZipArchive::new(vn_file_for_order)
+            .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
+        let vn_wb = read_zip_entry(&mut vn_archive_for_order, "xl/workbook.xml").unwrap_or_default();
+        let vn_rels =
+            read_zip_entry(&mut vn_archive_for_order, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+        resolve_sheet_xml_paths(&vn_wb, &vn_rels)
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect()
+    };
+    if let Some(current_workbook_xml) = read_current(&mut archive, &replaced, "xl/workbook.xml") {
+        let reordered = reorder_sheets_to_match_vn(&current_workbook_xml, &vn_sheet_order);
+        if reordered != current_workbook_xml {
+            replaced.insert("xl/workbook.xml".to_string(), reordered.into_bytes());
+        }
+    }
+
+    write_output_zip(&mut archive, &replaced, output_path)?;
+
+    Ok(StructureSyncResult {
+        strike_removed_count,
+        red_blackened_count,
+        cleanup_skipped_count,
+        cloned_names,
+        del_renamed_count,
+        sheets_modified,
+    })
+}
+
+/// Bước 5-6 của pipeline "Áp dụng" (xem `apply_changes`): ghi VN text (in đỏ) vào đúng vị trí
+/// tương ứng trong `jp_path` — vốn đã qua `sync_structure` (dọn dẹp/clone/đổi tên DEL/canh dòng)
+/// — rồi lưu ra `output_path`. Nội dung VN được giữ nguyên (không dịch) và tô màu đỏ để reviewer
+/// kiểm tra. `carried_cloned_names`: tên sheet đã được `sync_structure` clone trực tiếp từ VN
+/// trước đó — BỎ QUA các sheet này (nội dung đã đúng 100% từ VN rồi, không ghi/dọn lại).
+pub(crate) fn merge_content(
+    vn_path: &str,
+    jp_path: &str,
+    output_path: &str,
+    carried_cloned_names: &HashSet<String>,
+) -> AppResult<ApplyResult> {
     let analysis = analyze(vn_path, jp_path)?;
     let doc_type = detect_doc_type(vn_path, jp_path);
     // Ô "edit" của VN = ĐỎ hoặc XANH (xem `is_edit_color`) kèm style gốc (màu/bold/italic/strike).
@@ -4088,23 +4350,14 @@ pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResu
         }
     }
 
-    // Sheet chỉ có ở VN, tab màu quy ước (xem `CLONE_TAB_COLOR`), chưa có ở JP → cần clone sang.
+    // Sheet chỉ có ở VN chưa có ở JP — bình thường đã = 0 ở bước này vì `sync_structure` đã clone
+    // trước; chỉ khả thi nếu hàm này được gọi độc lập (jp_path không qua `sync_structure`).
     let sheets_to_clone: Vec<String> = analysis
         .sheet_compare
         .iter()
-        .filter(|c| {
-            c.in_vn
-                && !c.in_jp
-                && c.vn_tab_color.as_deref().map(is_clone_tab_color).unwrap_or(false)
-        })
+        .filter(|c| c.in_vn && !c.in_jp && !is_del_sheet_name(&c.name))
         .map(|c| c.name.clone())
         .collect();
-
-    if cells_by_sheet.is_empty() && shape_paragraphs_by_sheet.is_empty() && sheets_to_clone.is_empty() {
-        return Err(AppError::new(
-            "Không có ô đỏ nào trong file VN để áp dụng vào file JP.",
-        ));
-    }
 
     // Open JP file as ZIP
     let jp_file = File::open(jp_path)
@@ -4112,8 +4365,8 @@ pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResu
     let mut archive = zip::ZipArchive::new(jp_file)
         .map_err(|e| AppError::new(format!("File JP không phải ZIP hợp lệ: {e}")))?;
 
-    // Bước 1 (bắt buộc trước): dọn dẹp — xóa hẳn strikethrough cũ + tô đen chữ đỏ cũ tồn đọng
-    // từ bản tablet cũ, trên MỌI sheet (xem TrinhTuDichThietKeChiTiet_HuongDan.xlsx, mục 3.1).
+    // Dọn dẹp lại phòng khi hàm này được gọi độc lập trên 1 file JP chưa qua `sync_structure` —
+    // đã dọn rồi thì đây là no-op (không còn strikethrough/chữ đỏ cũ để tìm thấy).
     let ctx = build_cleanup_context(&mut archive);
     let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
     let (rich_ssi, plain_text, mut strike_removed_count, mut red_blackened_count) =
@@ -4135,17 +4388,14 @@ pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResu
     let sheet_path_list = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
     let mut sheet_path_map: HashMap<String, String> = sheet_path_list.iter().cloned().collect();
 
-    // Tạo sheet mới cho các sheet chỉ có ở VN (tab màu quy ước) bằng cách clone TRỰC TIẾP từ VN
-    // — xem ghi chú đầu mục "Sheet chỉ có ở VN sang JP". Thêm ngay vào `sheet_path_map` TRƯỚC
-    // vòng lặp chính, nhưng đánh dấu để vòng lặp đó BỎ QUA dọn dẹp/ghi ô đỏ cho sheet này (nội
-    // dung đã đúng 100% từ VN ngay khi clone — xem `newly_cloned_names` bên dưới).
     let cloned = clone_missing_sheets_from_vn(&mut archive, vn_path, &sheets_to_clone, &mut replaced)?;
-    let newly_cloned_names: HashSet<String> =
+    let mut newly_cloned_names: HashSet<String> =
         cloned.new_entries.iter().map(|(name, _)| name.clone()).collect();
     for (name, path) in &cloned.new_entries {
         sheet_path_map.insert(name.clone(), path.clone());
     }
     let cloned_sheet_count = cloned.new_entries.len();
+    newly_cloned_names.extend(carried_cloned_names.iter().cloned());
 
     // Bước 2: dọn dẹp mọi sheet, sau đó phản ánh chữ đỏ VN lên trên (chỉ các sheet có ô đỏ).
     let mut applied_count = 0usize;
@@ -4289,8 +4539,8 @@ pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResu
         }
     }
 
-    // Sắp xếp lại thứ tự sheet JP cho khớp thứ tự sheet VN (xem `reorder_sheets_to_match_vn`) —
-    // đảm bảo sheet mới tạo (thường bị chèn cuối danh sách) nằm đúng vị trí như bên VN.
+    // Sắp xếp lại thứ tự sheet JP cho khớp thứ tự sheet VN — nếu `sync_structure` đã sắp xếp
+    // trước thì đây là no-op; vẫn giữ lại phòng khi hàm này được gọi độc lập.
     let vn_sheet_order: Vec<String> = {
         let vn_file_for_order = File::open(vn_path)
             .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
@@ -4327,8 +4577,15 @@ pub fn apply_changes(vn_path: &str, jp_path: &str, output_path: &str) -> AppResu
         shape_skipped_count,
         cloned_sheet_count,
         del_sheet_count,
+        rows_inserted: 0,
     })
 }
+
+// Pipeline "Áp dụng" VN → JP KHÔNG còn nằm ở đây — mỗi `c23{2,3,4,5,6,8}_sync_service::apply_changes`
+// (xem module doc từng file) tự chạy đủ 6 bước (chấp nhận lặp code giữa các loại tài liệu), chỉ
+// gọi vào các hàm dùng chung bên dưới (`sync_structure`, `merge_content`, `analyze_row_alignment`,
+// `insert_rows`, `merged_output_path`). Dispatch theo `detect_doc_type` nằm ở
+// `services::vnjp_sync_service::apply_changes`.
 
 // ── Apply helpers ────────────────────────────────────────────────────────────
 
@@ -4606,6 +4863,14 @@ fn xml_escape(s: &str) -> String {
 
 /// Write a ZIP archive to `output_path`, substituting entries from `replaced`.
 /// All other entries are copied verbatim from `archive`.
+///
+/// `output_path` có thể TRÙNG với file đang mở trong `archive` (ghi đè in-place — xem pipeline
+/// "Áp dụng" ở `c23X_sync_service::apply_changes`, chạy `sync_structure` → `insert_rows` →
+/// `merge_content` liên tiếp trên CÙNG 1 file Temp). Vì vậy phải ĐỌC HẾT nội dung ZIP mới vào
+/// buffer trong bộ nhớ trước, rồi mới `File::create(output_path)` để ghi đè — nếu tạo/truncate
+/// file output ngay từ đầu (như trước đây) trong khi `archive` vẫn còn đang đọc từ CHÍNH file đó,
+/// dữ liệu trên đĩa bị ghi đè giữa chừng, khiến các entry đọc sau (vd `[Content_Types].xml`) lấy
+/// phải byte đã bị thay, gây lỗi "Invalid checksum".
 fn write_output_zip(
     archive: &mut zip::ZipArchive<File>,
     replaced: &HashMap<String, Vec<u8>>,
@@ -4622,9 +4887,7 @@ fn write_output_zip(
         }
     }
 
-    let output_file = File::create(output_path)
-        .map_err(|e| AppError::new(format!("Không tạo được file output: {e}")))?;
-    let mut writer = ZipWriter::new(output_file);
+    let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::<u8>::new()));
 
     for name in &entry_names {
         if name.ends_with('/') {
@@ -4669,9 +4932,14 @@ fn write_output_zip(
             .map_err(|e| AppError::new(format!("Lỗi ghi nội dung {name}: {e}")))?;
     }
 
-    writer
+    let cursor = writer
         .finish()
         .map_err(|e| AppError::new(format!("Lỗi hoàn tất ZIP: {e}")))?;
+
+    // Chỉ ghi ra đĩa SAU KHI đã đọc xong toàn bộ entry cần copy từ `archive` ở trên — an toàn cả
+    // khi `output_path` trùng với file `archive` đang mở (xem ghi chú đầu hàm).
+    std::fs::write(output_path, cursor.into_inner())
+        .map_err(|e| AppError::new(format!("Không ghi được file output: {e}")))?;
 
     Ok(())
 }

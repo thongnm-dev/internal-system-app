@@ -266,6 +266,9 @@ function tabColorStyle(color: string | null | undefined): string {
           <span v-if="ctrl.applyResult.value.columnCorrectedCount > 0" class="text-sky-600 dark:text-sky-400">
             ({{ ctrl.applyResult.value.columnCorrectedCount }} ô tự sửa lệch cột theo nội dung khớp cùng dòng)
           </span>
+          <span v-if="ctrl.applyResult.value.rowsInserted > 0" class="text-sky-600 dark:text-sky-400">
+            ({{ ctrl.applyResult.value.rowsInserted }} dòng tự động chèn để canh khớp lệch dòng)
+          </span>
           <span
             v-if="ctrl.applyResult.value.skippedCount > 0 || ctrl.applyResult.value.cleanupSkippedCount > 0 || ctrl.applyResult.value.shapeSkippedCount > 0"
             class="text-amber-600 dark:text-amber-400"
@@ -273,6 +276,14 @@ function tabColorStyle(color: string | null | undefined): string {
             ({{ ctrl.applyResult.value.skippedCount }} ô VN bỏ qua, {{ ctrl.applyResult.value.cleanupSkippedCount }} ô cần tự kiểm tra thủ công<span v-if="ctrl.applyResult.value.shapeSkippedCount > 0">, {{ ctrl.applyResult.value.shapeSkippedCount }} đoạn shape không tìm thấy shape cùng tên ở JP</span>)
           </span>
         </span>
+      </div>
+      <div
+        v-if="ctrl.applyResult.value"
+        class="mt-1 flex items-center gap-1.5 text-xs text-muted"
+      >
+        <i class="pi pi-folder-open" />
+        <span class="truncate">File kết quả: {{ ctrl.applyResult.value.outputPath }}</span>
+        <span class="shrink-0 font-medium text-brand underline" @click="explorerOpenFile(ctrl.applyResult.value.outputPath)">Mở file</span>
       </div>
 
       <p v-if="ctrl.error.value" class="mt-2 text-sm text-red-500">

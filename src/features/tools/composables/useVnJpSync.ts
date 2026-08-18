@@ -208,20 +208,9 @@ export function useVnJpSync() {
     if (!canUseTauriRuntime()) return;
     error.value = "";
     try {
-      const stem =
-        basename(jpPath.value).replace(/\.[^.]+$/, "") || "jp-updated";
-      const ext =
-        jpPath.value.split(".").pop()?.toLowerCase() === "xlsm"
-          ? "xlsm"
-          : "xlsx";
-      const outPath = await save({
-        defaultPath: `${stem}_updated.${ext}`,
-        filters: [{ name: "Excel", extensions: ["xlsx", "xlsm"] }],
-      });
-      if (!outPath) return;
       applying.value = true;
 
-      const result = await vnjpSyncApply(vnPath.value, jpPath.value, outPath);
+      const result = await vnjpSyncApply(vnPath.value, jpPath.value);
       applyResult.value = result;
       const cleanupNote =
         result.strikeRemovedCount > 0 || result.redBlackenedCount > 0
@@ -231,8 +220,12 @@ export function useVnJpSync() {
         result.columnCorrectedCount > 0
           ? ` Đã tự sửa lệch cột theo nội dung khớp cùng dòng cho ${result.columnCorrectedCount} ô.`
           : "";
+      const rowsNote =
+        result.rowsInserted > 0
+          ? ` Đã tự động chèn ${result.rowsInserted} dòng lệch.`
+          : "";
       toast.success(
-        `Đã ghi ${result.appliedCount} ô VN vào file JP (${result.sheetsModified.length} sheet).${cleanupNote}${columnNote} Mở file để dịch từng ô đỏ.`,
+        `Đã ghi ${result.appliedCount} ô VN vào file JP (${result.sheetsModified.length} sheet).${cleanupNote}${columnNote}${rowsNote} File kết quả: ${basename(result.outputPath)}.`,
       );
     } catch (e) {
       error.value = friendlyError(e);
