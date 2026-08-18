@@ -83,7 +83,7 @@ function tabColorStyle(color: string | null | undefined): string {
         <span class="text-xs text-muted">VN → JP · Excel (.xlsx / .xlsm)</span>
       </div>
 
-      <div class="grid gap-3 md:grid-cols-2">
+      <div class="relative grid gap-3 md:grid-cols-2">
         <!-- File VN -->
         <div class="space-y-1.5">
           <span class="text-xs font-bold uppercase tracking-wide text-muted">
@@ -91,39 +91,34 @@ function tabColorStyle(color: string | null | undefined): string {
           </span>
           <div
             ref="boxVnRef"
-            class="flex items-center gap-2 rounded-md border px-3 py-2 transition-colors"
-            :class="dragOverSlot === 'vn' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
+            class="rounded-lg border-2 border-dashed transition-colors"
+            :class="
+              dragOverSlot === 'vn'
+                ? 'border-brand bg-brand/5'
+                : 'border-emerald-300 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-900/10'
+            "
           >
-            <i class="pi pi-file-excel text-emerald-500" />
-            <div class="min-w-0 flex-1 truncate text-sm">
-              <span v-if="ctrl.vnName.value" class="font-medium">{{ ctrl.vnName.value }}</span>
-              <span v-else class="text-muted">Chưa chọn file… (kéo thả vào đây)</span>
-            </div>
-            <Button
-              v-if="ctrl.vnPath.value"
-              icon="pi pi-eye"
-              size="small"
-              text
-              severity="info"
-              v-tooltip.top="'Mở file'"
-              @click="explorerOpenFile(ctrl.vnPath.value)"
-            />
-            <Button
-              v-if="ctrl.vnPath.value"
-              icon="pi pi-times"
-              size="small"
-              text
-              severity="secondary"
-              @click="ctrl.clearFile('vn')"
-            />
-            <Button
-              icon="pi pi-folder-open"
-              size="small"
-              text
-              severity="secondary"
-              label="Chọn"
+            <div
+              class="flex cursor-pointer flex-col items-center justify-center gap-1.5 px-4 py-6 text-center"
               @click="ctrl.pickFile('vn')"
-            />
+            >
+              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-800/40">
+                <i :class="ctrl.vnPath.value ? 'pi pi-file-excel' : 'pi pi-upload'" class="text-lg" />
+              </span>
+              <span v-if="ctrl.vnPath.value" class="block w-full truncate text-sm font-semibold text-ink">
+                {{ ctrl.vnName.value }}
+              </span>
+              <span v-else class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
+              <span v-if="ctrl.vnPath.value" class="text-xs text-muted">
+                <span class="font-medium text-brand underline" @click.stop="explorerOpenFile(ctrl.vnPath.value)">Mở file</span>
+                <span class="mx-1">·</span>
+                <span class="font-medium text-red-500 underline" @click.stop="ctrl.clearFile('vn')">Xóa</span>
+              </span>
+              <span v-else class="text-xs text-muted">
+                hoặc <span class="font-medium text-brand underline">bấm để chọn</span> từ máy
+              </span>
+              <span v-if="!ctrl.vnPath.value" class="text-[11px] text-muted/70">.xlsx · .xlsm</span>
+            </div>
           </div>
         </div>
 
@@ -134,45 +129,47 @@ function tabColorStyle(color: string | null | undefined): string {
           </span>
           <div
             ref="boxJpRef"
-            class="flex items-center gap-2 rounded-md border px-3 py-2 transition-colors"
-            :class="dragOverSlot === 'jp' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
+            class="rounded-lg border-2 border-dashed transition-colors"
+            :class="
+              dragOverSlot === 'jp'
+                ? 'border-brand bg-brand/5'
+                : 'border-blue-300 bg-blue-50/70 dark:border-blue-700 dark:bg-blue-900/10'
+            "
           >
-            <i class="pi pi-file-excel text-blue-500" />
-            <div class="min-w-0 flex-1 truncate text-sm">
-              <span v-if="ctrl.jpName.value" class="font-medium">{{ ctrl.jpName.value }}</span>
-              <span v-else class="text-muted">Chưa chọn file… (kéo thả vào đây)</span>
-            </div>
-            <Button
-              v-if="ctrl.jpPath.value"
-              icon="pi pi-eye"
-              size="small"
-              text
-              severity="info"
-              v-tooltip.top="'Mở file'"
-              @click="explorerOpenFile(ctrl.jpPath.value)"
-            />
-            <Button
-              v-if="ctrl.jpPath.value"
-              icon="pi pi-times"
-              size="small"
-              text
-              severity="secondary"
-              @click="ctrl.clearFile('jp')"
-            />
-            <Button
-              icon="pi pi-folder-open"
-              size="small"
-              text
-              severity="secondary"
-              label="Chọn"
+            <div
+              class="flex cursor-pointer flex-col items-center justify-center gap-1.5 px-4 py-6 text-center"
               @click="ctrl.pickFile('jp')"
-            />
+            >
+              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-800/40">
+                <i :class="ctrl.jpPath.value ? 'pi pi-file-excel' : 'pi pi-upload'" class="text-lg" />
+              </span>
+              <span v-if="ctrl.jpPath.value" class="block w-full truncate text-sm font-semibold text-ink">
+                {{ ctrl.jpName.value }}
+              </span>
+              <span v-else class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
+              <span v-if="ctrl.jpPath.value" class="text-xs text-muted">
+                <span class="font-medium text-brand underline" @click.stop="explorerOpenFile(ctrl.jpPath.value)">Mở file</span>
+                <span class="mx-1">·</span>
+                <span class="font-medium text-red-500 underline" @click.stop="ctrl.clearFile('jp')">Xóa</span>
+              </span>
+              <span v-else class="text-xs text-muted">
+                hoặc <span class="font-medium text-brand underline">bấm để chọn</span> từ máy
+              </span>
+              <span v-if="!ctrl.jpPath.value" class="text-[11px] text-muted/70">.xlsx · .xlsm</span>
+            </div>
           </div>
+        </div>
+
+        <!-- Badge mũi tên VN → JP giữa 2 ô — absolute nên không chiếm cell của grid. -->
+        <div class="pointer-events-none absolute inset-0 hidden items-center justify-center md:flex">
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-sm ring-4 ring-panel">
+            <i class="pi pi-arrow-right text-sm" />
+          </span>
         </div>
       </div>
 
-      <!-- Actions -->
-      <div class="mt-3 flex flex-wrap items-center gap-2">
+      <!-- Actions — chỉ hiện khi đã chọn ít nhất 1 trong 2 file, tránh 1 dàn nút disabled vô nghĩa. -->
+      <div v-if="ctrl.vnPath.value || ctrl.jpPath.value" class="mt-3 flex flex-wrap items-center gap-2">
         <Button
           label="Phân tích"
           icon="pi pi-search"

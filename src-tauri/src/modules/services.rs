@@ -17,6 +17,9 @@ mod services {
     pub mod file_compare_service;
     /// Service cho công cụ đồng bộ tài liệu thiết kế chi tiết VN → JP.
     pub mod vnjp_sync_service;
+    /// Service con theo từng loại tài liệu cho công cụ đồng bộ VN → JP — xem `vnjp_sync_service`
+    /// cho API Tauri command.
+    pub mod vnjp;
     /// Service resize ảnh evidence (hardcopy) trong Excel (XML splicing trực tiếp).
     pub mod excel_helper_service;
     /// Đọc file CSV công việc (Shift-JIS) và parse thành `WorkRecord`.

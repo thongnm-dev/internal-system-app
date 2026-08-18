@@ -3712,7 +3712,7 @@ dependencies = [
 
 [[package]]
 name = "management_systems"
-version = "1.2.2"
+version = "1.2.3"
 dependencies = [
  "aws-config",
  "aws-credential-types",

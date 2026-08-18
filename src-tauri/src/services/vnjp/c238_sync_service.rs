@@ -1,0 +1,504 @@
+//! Method xử lý riêng cho C2.3.8 画面間インタフェース仕様書.
+//!
+//! Đây là loại tài liệu DUY NHẤT có thuật toán canh dòng khác biệt (canh dòng THEO GROUP) —
+//! xem ghi chú chi tiết ngay dưới. Các xử lý CHUNG (đọc file, quét ô đỏ/strikethrough, dọn dẹp,
+//! ghi ô đỏ, xuất báo cáo...) nằm ở `super::sync_service`.
+
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fs::File;
+use std::path::Path;
+
+use crate::app::result::AppResult;
+use crate::models::vnjp_sync::RowAlignmentSuggestion;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Canh dòng THEO GROUP cho tài liệu "画面間インタフェース仕様書" (VN → JP)
+//
+// Loại tài liệu này KHÔNG có ô "neo" số/mã ở header (cột A là chữ Nhật/Việt), nên strategy neo
+// chung không nhận diện được nhóm mới. Thay vào đó ta chia sheet thành các GROUP:
+//   • header = dòng có NỀN VÀNG NHẠT (indexed 43) ở cột A; header chữ XANH = nhóm MỚI so với JP.
+//   • chi tiết = các dòng ngay dưới header (tới header kế tiếp).
+// Đối ứng group VN↔JP bằng "chữ ký neo" (screen ID / mã kỹ thuật KHÔNG dịch trong dòng chi tiết —
+// dùng lại `is_anchor_cell`) để không phụ thuộc ngôn ngữ. Nhóm VN có header xanh VÀ chữ ký không
+// giao với bất kỳ group JP nào ⇒ nhóm mới thật sự ⇒ đề xuất chèn (clone nguyên group từ VN).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Prefix tên file của loại tài liệu áp dụng canh dòng theo group (nhận cả bản VN "..._VN.xlsx").
+pub(crate) const SCREEN_IF_DOC_PREFIX: &str = "C2.3.8 画面間インタフェース仕様書";
+
+/// Dòng dữ liệu bắt đầu (0-based) — bỏ vùng tiêu đề đầu (画面ID / 画面名称…). Group đầu tiên từ đây.
+const SCREEN_IF_DATA_START_ROW0: usize = 3;
+
+pub(crate) fn is_screen_interface_doc(path: &str) -> bool {
+    Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with(SCREEN_IF_DOC_PREFIX))
+        .unwrap_or(false)
+}
+
+fn is_argb_yellow(argb: &str) -> bool {
+    let Some((r, g, b)) = super::sync_service::parse_rgb_triplet(argb) else {
+        return false;
+    };
+    r > 0xE0 && g > 0xD0 && b < 0xC0 && r >= g
+}
+
+/// Parse styles.xml → tập fillId có nền vàng nhạt (indexed 43 = FFFF99, hoặc rgb vàng nhạt).
+fn parse_yellow_fill_ids(styles_xml: &str) -> HashSet<usize> {
+    let mut result = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(styles_xml) else {
+        return result;
+    };
+    let mut fill_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "fill"
+            && node.parent().map(|p| p.tag_name().name()) == Some("fills")
+        {
+            let is_yellow = node.descendants().any(|c| {
+                if c.tag_name().name() != "fgColor" {
+                    return false;
+                }
+                if c.attribute("indexed").and_then(|s| s.parse::<usize>().ok()) == Some(43) {
+                    return true;
+                }
+                c.attribute("rgb").map(is_argb_yellow).unwrap_or(false)
+            });
+            if is_yellow {
+                result.insert(fill_idx);
+            }
+            fill_idx += 1;
+        }
+    }
+    result
+}
+
+/// Parse styles.xml → tập cellXfs index có fill vàng (dòng header).
+fn parse_yellow_xf_indices(styles_xml: &str, yellow_fills: &HashSet<usize>) -> HashSet<usize> {
+    let mut result = HashSet::new();
+    if yellow_fills.is_empty() {
+        return result;
+    }
+    let Ok(doc) = roxmltree::Document::parse(styles_xml) else {
+        return result;
+    };
+    let mut xf_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "xf"
+            && node.parent().map(|p| p.tag_name().name()) == Some("cellXfs")
+        {
+            if let Some(fid) = node.attribute("fillId").and_then(|s| s.parse::<usize>().ok()) {
+                if yellow_fills.contains(&fid) {
+                    result.insert(xf_idx);
+                }
+            }
+            xf_idx += 1;
+        }
+    }
+    result
+}
+
+/// Parse styles.xml → tập cellXfs index dùng 1 trong các `font_ids` cho trước (dùng cho font xanh).
+/// KHÔNG bắt buộc `applyFont` (các công cụ WPS/Excel đặt cờ này không nhất quán; ta lấy font đã
+/// resolve của cell). Có xét kế thừa qua `xfId` → cellStyleXfs.
+fn parse_font_xf_indices(styles_xml: &str, font_ids: &HashSet<usize>) -> HashSet<usize> {
+    let mut result = HashSet::new();
+    if font_ids.is_empty() {
+        return result;
+    }
+    let Ok(doc) = roxmltree::Document::parse(styles_xml) else {
+        return result;
+    };
+
+    let mut style_xf_fonts: Vec<usize> = Vec::new();
+    for node in doc.descendants() {
+        if node.tag_name().name() == "xf"
+            && node.parent().map(|p| p.tag_name().name()) == Some("cellStyleXfs")
+        {
+            let fid = node
+                .attribute("fontId")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+            style_xf_fonts.push(fid);
+        }
+    }
+
+    let mut xf_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "xf"
+            && node.parent().map(|p| p.tag_name().name()) == Some("cellXfs")
+        {
+            let font_id = node
+                .attribute("fontId")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+            let direct = font_ids.contains(&font_id);
+            let inherited = node
+                .attribute("xfId")
+                .and_then(|s| s.parse::<usize>().ok())
+                .and_then(|xfid| style_xf_fonts.get(xfid).copied())
+                .map_or(false, |f| font_ids.contains(&f));
+            if direct || inherited {
+                result.insert(xf_idx);
+            }
+            xf_idx += 1;
+        }
+    }
+    result
+}
+
+/// Kiểm tra một run `<r>` có font xanh trong `<rPr><color rgb=".."/>`.
+fn has_blue_font_run(run_node: &roxmltree::Node) -> bool {
+    run_node.descendants().any(|child| {
+        child.tag_name().name() == "color"
+            && child.attribute("rgb").map(super::sync_service::is_argb_blue).unwrap_or(false)
+    })
+}
+
+/// shared strings có ÍT NHẤT 1 run màu xanh (dùng nhận header nhóm mới khi header là shared rich-text).
+fn parse_blue_shared_strings(sst_xml: &str) -> HashSet<usize> {
+    let mut result = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sst_xml) else {
+        return result;
+    };
+    let mut si_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "si" {
+            let has_blue = node
+                .children()
+                .filter(|c| c.tag_name().name() == "r")
+                .any(|r| has_blue_font_run(&r));
+            if has_blue {
+                result.insert(si_idx);
+            }
+            si_idx += 1;
+        }
+    }
+    result
+}
+
+/// Với mỗi sheet: tập dòng (0-based) có NỀN VÀNG (header) và tập dòng có CHỮ XANH ở cột A.
+fn find_group_style_rows(path: &str) -> HashMap<String, (HashSet<usize>, HashSet<usize>)> {
+    let mut result = HashMap::new();
+    let Ok(file) = File::open(path) else {
+        return result;
+    };
+    let Ok(mut archive) = zip::ZipArchive::new(file) else {
+        return result;
+    };
+
+    let styles_xml = super::sync_service::read_zip_entry(&mut archive, "xl/styles.xml").unwrap_or_default();
+    let yellow_xf = parse_yellow_xf_indices(&styles_xml, &parse_yellow_fill_ids(&styles_xml));
+    let blue_xf = parse_font_xf_indices(&styles_xml, &super::sync_service::parse_blue_font_ids(&styles_xml));
+
+    let sst_xml = super::sync_service::read_zip_entry(&mut archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (blue_ssi, all_rich_ssi) = if sst_xml.is_empty() {
+        (HashSet::new(), HashSet::new())
+    } else {
+        (
+            parse_blue_shared_strings(&sst_xml),
+            super::sync_service::parse_shared_strings_rich_info(&sst_xml).1,
+        )
+    };
+
+    let Some(workbook_xml) = super::sync_service::read_zip_entry(&mut archive, "xl/workbook.xml") else {
+        return result;
+    };
+    let Some(rels_xml) = super::sync_service::read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels") else {
+        return result;
+    };
+    for (name, xml_path) in super::sync_service::resolve_sheet_xml_paths(&workbook_xml, &rels_xml) {
+        if let Some(sheet_xml) = super::sync_service::read_zip_entry(&mut archive, &xml_path) {
+            let flags =
+                scan_col_a_style_rows(&sheet_xml, &yellow_xf, &blue_xf, &blue_ssi, &all_rich_ssi);
+            result.insert(name, flags);
+        }
+    }
+    result
+}
+
+/// Quét cột A của sheet: trả về (dòng header nền vàng, dòng chữ xanh) — cùng thứ tự ưu tiên
+/// rich-text như `find_red_cells_in_sheet`.
+fn scan_col_a_style_rows(
+    sheet_xml: &str,
+    yellow_xf: &HashSet<usize>,
+    blue_xf: &HashSet<usize>,
+    blue_ssi: &HashSet<usize>,
+    all_rich_ssi: &HashSet<usize>,
+) -> (HashSet<usize>, HashSet<usize>) {
+    let mut headers = HashSet::new();
+    let mut blues = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return (headers, blues);
+    };
+
+    for node in doc.descendants() {
+        if node.tag_name().name() != "c" {
+            continue;
+        }
+        let Some((row0, col0)) = node.attribute("r").and_then(super::sync_service::parse_cell_ref) else {
+            continue;
+        };
+        if col0 != 0 {
+            continue; // chỉ xét cột A
+        }
+        let s_idx = node.attribute("s").and_then(|s| s.parse::<usize>().ok());
+        if let Some(si) = s_idx {
+            if yellow_xf.contains(&si) {
+                headers.insert(row0);
+            }
+        }
+
+        let mut handled = false;
+        if node.attribute("t") == Some("s") {
+            if let Some(v) = node.descendants().find(|c| c.tag_name().name() == "v") {
+                if let Some(ssi) = v.text().and_then(|t| t.parse::<usize>().ok()) {
+                    if all_rich_ssi.contains(&ssi) {
+                        handled = true;
+                        if blue_ssi.contains(&ssi) {
+                            blues.insert(row0);
+                        }
+                    }
+                }
+            }
+        }
+        if !handled && node.attribute("t") == Some("inlineStr") {
+            if let Some(is_node) = node.children().find(|c| c.tag_name().name() == "is") {
+                let runs: Vec<_> = is_node
+                    .children()
+                    .filter(|c| c.tag_name().name() == "r")
+                    .collect();
+                if !runs.is_empty() {
+                    handled = true;
+                    if runs.iter().any(|r| has_blue_font_run(r)) {
+                        blues.insert(row0);
+                    }
+                }
+            }
+        }
+        if !handled {
+            if let Some(si) = s_idx {
+                if blue_xf.contains(&si) {
+                    blues.insert(row0);
+                }
+            }
+        }
+    }
+    (headers, blues)
+}
+
+/// 1 group trong tài liệu 画面間インタフェース: header + các dòng chi tiết bên dưới.
+struct DocGroup {
+    header_row0: usize,
+    end_row0: usize,
+    is_blue: bool,
+    header_text: String,
+    /// Chữ ký neo (screen ID / mã kỹ thuật KHÔNG dịch) rút từ các dòng chi tiết — dùng đối ứng VN↔JP.
+    sig: BTreeSet<String>,
+}
+
+fn last_content_row0(grid: &[Vec<String>]) -> Option<usize> {
+    (0..grid.len())
+        .rev()
+        .find(|&r| grid[r].iter().any(|c| !c.trim().is_empty()))
+}
+
+/// Chia grid thành các group theo dòng header (nền vàng). Chữ ký lấy từ ô neo của dòng chi tiết.
+fn build_doc_groups(
+    grid: &[Vec<String>],
+    header_rows: &HashSet<usize>,
+    blue_rows: &HashSet<usize>,
+    last_col0: usize,
+) -> Vec<DocGroup> {
+    let Some(last) = last_content_row0(grid) else {
+        return Vec::new();
+    };
+    let mut headers: Vec<usize> = header_rows
+        .iter()
+        .copied()
+        .filter(|&r| r >= SCREEN_IF_DATA_START_ROW0 && r <= last)
+        .collect();
+    headers.sort_unstable();
+
+    let mut groups = Vec::new();
+    for (i, &h) in headers.iter().enumerate() {
+        let end = headers.get(i + 1).map(|&n| n - 1).unwrap_or(last);
+        let mut sig = BTreeSet::new();
+        for r in (h + 1)..=end {
+            if let Some(row) = grid.get(r) {
+                for cell in row.iter().take(last_col0 + 1) {
+                    let t = cell.trim();
+                    if super::sync_service::is_anchor_cell(t) {
+                        sig.insert(t.to_string());
+                    }
+                }
+            }
+        }
+        let header_text = grid
+            .get(h)
+            .and_then(|r| r.first())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        groups.push(DocGroup {
+            header_row0: h,
+            end_row0: end,
+            is_blue: blue_rows.contains(&h),
+            header_text,
+            sig,
+        });
+    }
+    groups
+}
+
+/// Loại các token neo XUẤT HIỆN Ở QUÁ NỬA số group (vd screen ID nguồn cố định như MJDL020 có mặt
+/// gần như mọi dòng) — nếu giữ lại thì mọi group đều "giao" nhau, làm hỏng đối ứng.
+fn strip_ubiquitous_tokens(vn: &mut [DocGroup], jp: &mut [DocGroup]) {
+    let mut ubiq: HashSet<String> = HashSet::new();
+    for groups in [&*vn, &*jp] {
+        if groups.is_empty() {
+            continue;
+        }
+        let mut count: HashMap<&str, usize> = HashMap::new();
+        for g in groups.iter() {
+            for t in &g.sig {
+                *count.entry(t.as_str()).or_default() += 1;
+            }
+        }
+        let threshold = groups.len() / 2;
+        for (t, c) in count {
+            if c > threshold {
+                ubiq.insert(t.to_string());
+            }
+        }
+    }
+    for g in vn.iter_mut().chain(jp.iter_mut()) {
+        g.sig.retain(|t| !ubiq.contains(t));
+    }
+}
+
+fn sigs_intersect(a: &BTreeSet<String>, b: &BTreeSet<String>) -> bool {
+    a.iter().any(|t| b.contains(t))
+}
+
+/// LCS đối ứng các group VN (chỉ những index trong `vn_idx`) với group JP theo tiêu chí "chữ ký có
+/// giao nhau" — trả về map vn_group_index → jp_group_index.
+fn lcs_align_groups(
+    vn: &[DocGroup],
+    jp: &[DocGroup],
+    vn_idx: &[usize],
+) -> HashMap<usize, usize> {
+    let n = vn_idx.len();
+    let m = jp.len();
+    let mut dp = vec![vec![0u32; m + 1]; n + 1];
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            dp[i][j] = if sigs_intersect(&vn[vn_idx[i]].sig, &jp[j].sig) {
+                dp[i + 1][j + 1] + 1
+            } else {
+                dp[i + 1][j].max(dp[i][j + 1])
+            };
+        }
+    }
+    let mut pairs = HashMap::new();
+    let (mut i, mut j) = (0usize, 0usize);
+    while i < n && j < m {
+        if sigs_intersect(&vn[vn_idx[i]].sig, &jp[j].sig) {
+            pairs.insert(vn_idx[i], j);
+            i += 1;
+            j += 1;
+        } else if dp[i + 1][j] >= dp[i][j + 1] {
+            i += 1;
+        } else {
+            j += 1;
+        }
+    }
+    pairs
+}
+
+/// Canh dòng theo group: mỗi nhóm VN header xanh + chữ ký không có ở JP ⇒ đề xuất chèn (clone nguyên
+/// group). `jp_insert_after_row` = dòng JP cuối của group JP đối ứng ngay TRƯỚC nhóm mới.
+pub(crate) fn analyze_row_alignment_by_group(
+    vn_path: &str,
+    jp_path: &str,
+) -> AppResult<Vec<RowAlignmentSuggestion>> {
+    let vn_grid = super::sync_service::read_workbook_grid(vn_path)?;
+    let jp_grid = super::sync_service::read_workbook_grid(jp_path)?;
+    let vn_flags = find_group_style_rows(vn_path);
+    let jp_flags = find_group_style_rows(jp_path);
+    let empty = (HashSet::new(), HashSet::new());
+
+    let mut suggestions = Vec::new();
+
+    for (sheet, vn_rows) in &vn_grid {
+        let Some(jp_rows) = jp_grid.get(sheet) else {
+            continue;
+        };
+        let (vn_h, vn_b) = vn_flags.get(sheet).unwrap_or(&empty);
+        let (jp_h, _jp_b) = jp_flags.get(sheet).unwrap_or(&empty);
+        // Method xử lý riêng C2.3.8 (đây là loại tài liệu duy nhất dùng canh dòng theo group).
+        let last_col0 = content_bounds(sheet).last_col0;
+
+        let mut vn_groups = build_doc_groups(vn_rows, vn_h, vn_b, last_col0);
+        let mut jp_groups = build_doc_groups(jp_rows, jp_h, &HashSet::new(), last_col0);
+        if vn_groups.is_empty() || jp_groups.is_empty() {
+            continue;
+        }
+
+        strip_ubiquitous_tokens(&mut vn_groups, &mut jp_groups);
+
+        let jp_tokens: HashSet<&str> = jp_groups
+            .iter()
+            .flat_map(|g| g.sig.iter().map(|s| s.as_str()))
+            .collect();
+
+        // Nhóm mới = header xanh VÀ không token neo nào trùng bất kỳ group JP.
+        let is_new: Vec<bool> = vn_groups
+            .iter()
+            .map(|g| g.is_blue && g.sig.iter().all(|t| !jp_tokens.contains(t.as_str())))
+            .collect();
+
+        let non_new_idx: Vec<usize> = (0..vn_groups.len()).filter(|&i| !is_new[i]).collect();
+        let pairs = lcs_align_groups(&vn_groups, &jp_groups, &non_new_idx);
+
+        for (i, g) in vn_groups.iter().enumerate() {
+            if !is_new[i] {
+                continue;
+            }
+            // Group JP đối ứng của nhóm NON-NEW gần nhất phía trước → chèn ngay sau dòng cuối của nó.
+            let mut jp_insert_after_row = jp_groups
+                .first()
+                .map(|fg| fg.header_row0) // đầu sheet: chèn ngay TRƯỚC group JP đầu tiên
+                .unwrap_or(SCREEN_IF_DATA_START_ROW0);
+            for k in (0..i).rev() {
+                if let Some(&jp_idx) = pairs.get(&k) {
+                    jp_insert_after_row = jp_groups[jp_idx].end_row0 + 1; // 0-based end → 1-based row
+                    break;
+                }
+            }
+
+            suggestions.push(RowAlignmentSuggestion {
+                sheet: sheet.clone(),
+                jp_insert_after_row,
+                insert_count: g.end_row0 - g.header_row0 + 1,
+                vn_row_start: g.header_row0 + 1,
+                vn_row_end: g.end_row0 + 1,
+                sample_vn_text: vec![g.header_text.clone()],
+                has_red: true,
+                has_strike: false,
+            });
+        }
+    }
+
+    // Thứ tự ổn định để UI hiển thị nhất quán.
+    suggestions.sort_by(|a, b| {
+        a.sheet
+            .cmp(&b.sheet)
+            .then(a.jp_insert_after_row.cmp(&b.jp_insert_after_row))
+    });
+    Ok(suggestions)
+}
+
+/// Method xử lý riêng cho C2.3.8 画面間インタフェース仕様書 — nội dung cột A ~ K (0-based 10).
+pub fn content_bounds(sheet_name: &str) -> super::sync_service::ContentBounds {
+    super::sync_service::content_bounds_for_sheet(sheet_name, 10)
+}

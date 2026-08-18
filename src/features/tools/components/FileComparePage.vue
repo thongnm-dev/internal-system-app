@@ -79,16 +79,22 @@ onUnmounted(() => {
             <span class="text-xs text-muted">Markdown · Excel · Word · Text</span>
           </div>
 
-          <div class="mt-2 grid gap-3 md:grid-cols-2">
+          <div class="relative mt-2 grid gap-3 md:grid-cols-2">
             <!-- File A -->
             <div class="grid gap-1.5">
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File gốc (A)</span>
               <div
                 ref="boxARef"
-                class="flex items-center gap-3 rounded-md border px-3 py-2.5 transition-colors"
-                :class="dragOverSlot === 'a' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
+                class="rounded-lg border transition-colors"
+                :class="
+                  dragOverSlot === 'a'
+                    ? 'border-brand bg-brand/5'
+                    : ctrl.fileA.value
+                      ? 'border-divider bg-canvas'
+                      : 'border-2 border-dashed border-sky-300 bg-sky-50/70 dark:border-sky-700 dark:bg-sky-900/10'
+                "
               >
-                <template v-if="ctrl.fileA.value">
+                <div v-if="ctrl.fileA.value" class="flex items-center gap-3 px-3 py-2.5">
                   <i :class="[kindMeta[ctrl.fileA.value.kind].icon, kindMeta[ctrl.fileA.value.kind].color, 'text-lg']" />
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium">{{ ctrl.fileA.value.name }}</div>
@@ -99,14 +105,21 @@ onUnmounted(() => {
                   <Button icon="pi pi-eye" size="small" text severity="info" v-tooltip.top="'Mở file'" @click="explorerOpenFile(ctrl.fileA.value!.path)" />
                   <Button icon="pi pi-folder-open" size="small" text severity="secondary" v-tooltip.top="'Show in folder'" @click="explorerOpen(ctrl.fileA.value!.path)" />
                   <Button icon="pi pi-times" size="small" text severity="secondary" @click="ctrl.clearFile('a')" />
-                </template>
-                <template v-else>
-                  <div class="flex flex-1 items-center gap-2 text-sm text-muted">
-                    <i class="pi pi-file opacity-60" />
-                    <span>Chưa chọn file gốc — kéo thả vào đây</span>
-                  </div>
-                  <Button icon="pi pi-plus" label="Chọn" size="small" severity="secondary" outlined @click="ctrl.pickFile('a')" />
-                </template>
+                </div>
+                <div
+                  v-else
+                  class="flex cursor-pointer flex-col items-center justify-center gap-1.5 px-4 py-6 text-center"
+                  @click="ctrl.pickFile('a')"
+                >
+                  <span class="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-500 dark:bg-sky-800/40">
+                    <i class="pi pi-upload text-lg" />
+                  </span>
+                  <span class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
+                  <span class="text-xs text-muted">
+                    hoặc <span class="font-medium text-brand underline">bấm để chọn</span> từ máy
+                  </span>
+                  <span class="text-[11px] text-muted/70">.docx · .xlsx · .txt · .md</span>
+                </div>
               </div>
             </div>
 
@@ -115,10 +128,16 @@ onUnmounted(() => {
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File so sánh (B)</span>
               <div
                 ref="boxBRef"
-                class="flex items-center gap-3 rounded-md border px-3 py-2.5 transition-colors"
-                :class="dragOverSlot === 'b' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
+                class="rounded-lg border transition-colors"
+                :class="
+                  dragOverSlot === 'b'
+                    ? 'border-brand bg-brand/5'
+                    : ctrl.fileB.value
+                      ? 'border-divider bg-canvas'
+                      : 'border-2 border-dashed border-divider bg-canvas'
+                "
               >
-                <template v-if="ctrl.fileB.value">
+                <div v-if="ctrl.fileB.value" class="flex items-center gap-3 px-3 py-2.5">
                   <i :class="[kindMeta[ctrl.fileB.value.kind].icon, kindMeta[ctrl.fileB.value.kind].color, 'text-lg']" />
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium">{{ ctrl.fileB.value.name }}</div>
@@ -129,15 +148,29 @@ onUnmounted(() => {
                   <Button icon="pi pi-eye" size="small" text severity="info" v-tooltip.top="'Mở file'" @click="explorerOpenFile(ctrl.fileB.value!.path)" />
                   <Button icon="pi pi-folder-open" size="small" text severity="secondary" v-tooltip.top="'Show in folder'" @click="explorerOpen(ctrl.fileB.value!.path)" />
                   <Button icon="pi pi-times" size="small" text severity="secondary" @click="ctrl.clearFile('b')" />
-                </template>
-                <template v-else>
-                  <div class="flex flex-1 items-center gap-2 text-sm text-muted">
-                    <i class="pi pi-file opacity-60" />
-                    <span>Chưa chọn file so sánh — kéo thả vào đây</span>
-                  </div>
-                  <Button icon="pi pi-plus" label="Chọn" size="small" severity="secondary" outlined @click="ctrl.pickFile('b')" />
-                </template>
+                </div>
+                <div
+                  v-else
+                  class="flex cursor-pointer flex-col items-center justify-center gap-1.5 px-4 py-6 text-center"
+                  @click="ctrl.pickFile('b')"
+                >
+                  <span class="flex h-10 w-10 items-center justify-center rounded-full bg-panel text-muted">
+                    <i class="pi pi-upload text-lg" />
+                  </span>
+                  <span class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
+                  <span class="text-xs text-muted">
+                    hoặc <span class="font-medium text-brand underline">bấm để chọn</span> từ máy
+                  </span>
+                  <span class="text-[11px] text-muted/70">.docx · .xlsx · .txt · .md</span>
+                </div>
               </div>
+            </div>
+
+            <!-- Badge "VS" giữa 2 ô — absolute nên không chiếm cell của grid, chỉ hiện khi 2 ô đứng cạnh nhau (md+). -->
+            <div class="pointer-events-none absolute inset-0 hidden items-center justify-center md:flex">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white shadow-sm ring-4 ring-panel">
+                VS
+              </span>
             </div>
           </div>
 
