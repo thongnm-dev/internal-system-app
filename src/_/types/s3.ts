@@ -61,6 +61,7 @@ export interface UploadFileRequest {
   parentName: string;
   name: string;
   localPath: string;
+  subPath: string;
 }
 
 export interface ScannedFile {
@@ -69,6 +70,7 @@ export interface ScannedFile {
   filePath: string;
   fullPath: string;
   fileSize: number;
+  subPath: string;
 }
 
 export interface LocalFileEntry {

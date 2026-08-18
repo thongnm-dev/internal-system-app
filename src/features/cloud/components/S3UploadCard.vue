@@ -26,6 +26,50 @@ const isUploadable = computed(() => {
   return true;
 });
 
+// `!`-prefixed (Tailwind important) because PrimeVue's own .p-tree-node-icon
+// color rule is injected at runtime and otherwise wins the cascade.
+function fileIconClass(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["xlsx", "xls", "xlsm", "csv"].includes(ext)) return "pi pi-file-excel !text-green-600";
+  if (ext === "txt") return "pi pi-file-edit !text-muted";
+  return "pi pi-file !text-muted";
+}
+
+function buildSubfolderNodes(
+  entries: { file: ScannedFile; segments: string[] }[],
+  parentKey: string,
+): TreeNode[] {
+  const folderMap = new Map<string, { file: ScannedFile; segments: string[] }[]>();
+  const fileNodes: TreeNode[] = [];
+
+  for (const entry of entries) {
+    if (entry.segments.length === 0) {
+      fileNodes.push({
+        key: `file-${entry.file.filePath}`,
+        label: entry.file.name,
+        icon: fileIconClass(entry.file.name),
+        data: entry.file,
+      });
+      continue;
+    }
+    const [head, ...rest] = entry.segments;
+    if (!folderMap.has(head)) folderMap.set(head, []);
+    folderMap.get(head)!.push({ file: entry.file, segments: rest });
+  }
+
+  const folderNodes: TreeNode[] = Array.from(folderMap.entries()).map(([name, subEntries]) => {
+    const folderKey = `${parentKey}/${name}`;
+    return {
+      key: `subfolder-${folderKey}`,
+      label: name,
+      icon: "pi pi-folder !text-orange-500",
+      children: buildSubfolderNodes(subEntries, folderKey),
+    };
+  });
+
+  return [...folderNodes, ...fileNodes];
+}
+
 const treeNodes = computed<TreeNode[]>(() => {
   if (items.value.length === 0) return [];
 
@@ -38,23 +82,25 @@ const treeNodes = computed<TreeNode[]>(() => {
     {} as Record<string, ScannedFile[]>,
   );
 
-  const children: TreeNode[] = Object.entries(grouped).map(([folder, files]) => ({
-    key: `folder-${folder}`,
-    label: folder,
-    icon: "pi pi-folder",
-    children: files.map((f) => ({
-      key: `file-${f.filePath}`,
-      label: f.name,
-      icon: "pi pi-file",
-      data: f,
-    })),
-  }));
+  const children: TreeNode[] = Object.entries(grouped).map(([folder, files]) => {
+    const folderKey = `folder-${folder}`;
+    const entries = files.map((f) => ({
+      file: f,
+      segments: f.subPath ? f.subPath.split("/") : [],
+    }));
+    return {
+      key: folderKey,
+      label: folder,
+      icon: "pi pi-folder !text-orange-500",
+      children: buildSubfolderNodes(entries, folderKey),
+    };
+  });
 
   return [
     {
       key: "root",
       label: "Danh sách thư mục đã chọn",
-      icon: "pi pi-folder-open",
+      icon: "pi pi-folder-open !text-orange-500",
       children,
     },
   ];

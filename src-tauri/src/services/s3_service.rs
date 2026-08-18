@@ -545,30 +545,60 @@ pub async fn scan_upload_folder(dir_path: String) -> AppResult<Vec<ScannedFile>>
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
-            let sub_entries = std::fs::read_dir(&path)
-                .map_err(|e| AppError::new(format!("Failed to read sub-directory: {e}")))?;
-            for sub_entry in sub_entries.flatten() {
-                let sub_path = sub_entry.path();
-                if sub_path.is_file() {
-                    let name = sub_path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    let file_size = sub_path.metadata().map(|m| m.len()).unwrap_or(0);
-                    let full_path = sub_path.to_string_lossy().to_string();
-                    files.push(ScannedFile {
-                        parent_name: parent_name.clone(),
-                        name,
-                        file_path: full_path.clone(),
-                        full_path,
-                        file_size,
-                    });
-                }
-            }
+            collect_bug_folder_files(&path, &parent_name, "", &mut files)?;
         }
     }
 
     Ok(files)
+}
+
+/// Quét đệ quy toàn bộ file bên trong một thư mục phiếu bug, kể cả khi phiếu bug có
+/// subfolder (vd. bản backup/nháp) — `parent_name` luôn giữ nguyên là tên thư mục phiếu
+/// bug gốc, không phải tên subfolder, để logic lọc same-name/bug-pattern ở
+/// `scan_upload_folders` không bị ảnh hưởng bởi độ sâu thư mục. `rel_dir` theo dõi
+/// đường dẫn subfolder tương đối so với gốc phiếu bug (rỗng ở cấp gốc) để giữ nguyên
+/// cấu trúc thư mục con khi tải lên S3.
+fn collect_bug_folder_files(
+    dir: &Path,
+    parent_name: &str,
+    rel_dir: &str,
+    files: &mut Vec<ScannedFile>,
+) -> AppResult<()> {
+    let entries = std::fs::read_dir(dir)
+        .map_err(|e| AppError::new(format!("Failed to read sub-directory: {e}")))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let sub_name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let next_rel_dir = if rel_dir.is_empty() {
+                sub_name
+            } else {
+                format!("{rel_dir}/{sub_name}")
+            };
+            collect_bug_folder_files(&path, parent_name, &next_rel_dir, files)?;
+        } else if path.is_file() {
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let file_size = path.metadata().map(|m| m.len()).unwrap_or(0);
+            let full_path = path.to_string_lossy().to_string();
+            files.push(ScannedFile {
+                parent_name: parent_name.to_string(),
+                name,
+                file_path: full_path.clone(),
+                full_path,
+                file_size,
+                sub_path: rel_dir.to_string(),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<ScannedFile>> {
@@ -641,14 +671,24 @@ pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<Scanne
 
     let mut result = Vec::new();
     for (folder_name, folder_files) in &grouped {
-        let same_name: Vec<&ScannedFile> = folder_files.iter()
+        // The same-name/bug-pattern naming convention only makes sense for files that
+        // sit directly inside the bug folder. Files nested in a subfolder (e.g.
+        // `OUTPUT/`) are deliberate work artifacts placed there by the user and don't
+        // follow that naming convention — always include them.
+        let (direct, nested): (Vec<&ScannedFile>, Vec<&ScannedFile>) =
+            folder_files.iter().partition(|f| f.sub_path.is_empty());
+        result.extend(nested.into_iter().cloned());
+
+        let same_name: Vec<&ScannedFile> = direct.iter()
             .filter(|f| file_stem(&f.name) == *folder_name)
+            .cloned()
             .collect();
         if !same_name.is_empty() {
             result.extend(same_name.into_iter().cloned());
         } else {
-            let pattern_match: Vec<&ScannedFile> = folder_files.iter()
+            let pattern_match: Vec<&ScannedFile> = direct.iter()
                 .filter(|f| bug_pattern.is_match(&file_stem(&f.name)))
+                .cloned()
                 .collect();
             result.extend(pattern_match.into_iter().cloned());
         }
@@ -688,14 +728,21 @@ pub async fn upload_files(
     let base_prefix = format!("{}/{}/{}", work_folder, storage_name, subscribe);
 
     for file in &files {
+        // Preserve the local subfolder structure under the bug folder on S3
+        // (e.g. a local `OUTPUT/` subfolder becomes `.../{parent_name}/OUTPUT/...`).
+        let parent_prefix = if file.sub_path.is_empty() {
+            file.parent_name.clone()
+        } else {
+            format!("{}/{}", file.parent_name, file.sub_path)
+        };
         let s3_key = if create_folder_same_name {
             let stem = Path::new(&file.name)
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| file.name.clone());
-            format!("{}/{}/{}/{}", base_prefix, file.parent_name, stem, file.name)
+            format!("{}/{}/{}/{}", base_prefix, parent_prefix, stem, file.name)
         } else {
-            format!("{}/{}/{}", base_prefix, file.parent_name, file.name)
+            format!("{}/{}/{}", base_prefix, parent_prefix, file.name)
         };
         let path = Path::new(&file.local_path);
         if !path.exists() {

@@ -81,6 +81,7 @@ async function handleConfirm() {
     parentName: f.parentName,
     name: f.name,
     localPath: f.filePath,
+    subPath: f.subPath,
   }));
 
   openModal.value = false;

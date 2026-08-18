@@ -31,6 +31,9 @@ pub struct UploadFileRequest {
     pub parent_name: String,
     pub name: String,
     pub local_path: String,
+    /// Path of the file's containing subfolder relative to the bug folder root
+    /// (e.g. "OUTPUT"), empty when the file sits directly in the bug folder.
+    pub sub_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +44,9 @@ pub struct ScannedFile {
     pub file_path: String,
     pub full_path: String,
     pub file_size: u64,
+    /// Path of the file's containing subfolder relative to the bug folder root
+    /// (e.g. "OUTPUT"), empty when the file sits directly in the bug folder.
+    pub sub_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

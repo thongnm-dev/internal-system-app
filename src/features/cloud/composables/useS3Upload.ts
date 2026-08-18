@@ -48,7 +48,13 @@ export function useS3Upload() {
 
     loading.start();
     try {
-      return await s3ScanUploadFolders(paths);
+      const files = await s3ScanUploadFolders(paths);
+      if (files.length === 0) {
+        toast.info(
+          "Không tìm thấy tập tin hợp lệ trong thư mục đã chọn. Kiểm tra lại tên thư mục (F3.1_バグ管理表_XXXX) và tên tập tin bên trong.",
+        );
+      }
+      return files;
     } catch (e) {
       toast.error(friendlyError(e));
       return [];

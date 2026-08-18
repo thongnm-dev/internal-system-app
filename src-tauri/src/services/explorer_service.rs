@@ -422,9 +422,26 @@ pub fn paste_from_os_clipboard(dest_dir: &str) -> Result<usize, String> {
     Ok(sources.len())
 }
 
-pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String> {
+/// Các regex nhận diện mã số thư mục bug (vd. "1234" hoặc "BH005"), thử theo thứ tự — mỗi
+/// regex chỉ cần tìm thấy mã số (nhóm capture đầu tiên) ở bất kỳ đâu trong tên thư mục, nên
+/// các hậu tố ngoại lệ như （再）（急）, （特急）, （急）, （再） đứng sau mã số không ảnh
+/// hưởng. Thư mục bố trí theo đơn vị 100 luôn dùng tên thuần số 4 chữ số (vd. "0001～0100")
+/// — dù mã nguồn có prefix riêng (vd. "BH") thì prefix đó bị bỏ khi đặt tên thư mục bố trí,
+/// số được đệm đủ 4 chữ số để nằm chung hệ đánh số với các phiếu bug không prefix.
+///
+/// Để hỗ trợ pattern mới trong tương lai, chỉ cần thêm một regex vào danh sách bên dưới —
+/// các pattern có prefix cố định (vd. "BH") phải đứng TRƯỚC pattern số trần (không prefix),
+/// vì nếu không số trần có thể khớp nhầm vào một cụm số khác trong tên thư mục (vd. năm
+/// tháng) trước khi pattern có prefix kịp thử.
+fn bug_code_patterns() -> Vec<regex::Regex> {
     use regex::Regex;
+    vec![
+        Regex::new(r"BH(\d{3})").unwrap(),
+        Regex::new(r"(\d{4})").unwrap(),
+    ]
+}
 
+pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String> {
     let src = Path::new(source_dir);
     let dst = Path::new(dest_dir);
 
@@ -467,43 +484,63 @@ pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String
     let history_dir = ym_dir.join(&history_sub);
     fs::create_dir_all(&history_dir).map_err(|e| format!("Create history dir failed: {e}"))?;
 
-    let re = Regex::new(r"(\d{4})").unwrap();
+    let patterns = bug_code_patterns();
     let mut copied = 0u32;
+    let mut unmatched: Vec<String> = Vec::new();
 
     for entry in &entries {
         let folder_name = entry.file_name().to_string_lossy().to_string();
         let folder_path = entry.path();
 
-        if let Some(caps) = re.captures(&folder_name) {
-            let num: u32 = caps[1].parse().unwrap_or(0);
-            if num > 0 {
-                let start = ((num - 1) / 100) * 100 + 1;
-                let end = start + 99;
-                let range_name = format!("{:04}\u{FF5E}{:04}", start, end);
+        let matched = patterns.iter().find_map(|regex| {
+            regex
+                .captures(&folder_name)
+                .and_then(|caps| caps[1].parse::<u32>().ok())
+                .filter(|num| *num > 0)
+        });
 
-                let range_dir = dst.join(&range_name);
-                fs::create_dir_all(&range_dir)
-                    .map_err(|e| format!("Create range dir failed: {e}"))?;
-                let range_target = range_dir.join(&folder_name);
-                copy_dir_recursive(&folder_path, &range_target)?;
+        let Some(num) = matched else {
+            unmatched.push(folder_name);
+            continue;
+        };
 
-                let history_target = history_dir.join(&folder_name);
-                copy_dir_recursive(&folder_path, &history_target)?;
+        let width = 4;
+        let start = ((num - 1) / 100) * 100 + 1;
+        let end = start + 99;
+        let range_name = format!("{start:0width$}\u{FF5E}{end:0width$}");
 
-                copied += 1;
-            }
-        }
+        let range_dir = dst.join(&range_name);
+        fs::create_dir_all(&range_dir).map_err(|e| format!("Create range dir failed: {e}"))?;
+        let range_target = range_dir.join(&folder_name);
+        copy_dir_recursive(&folder_path, &range_target)?;
+
+        let history_target = history_dir.join(&folder_name);
+        copy_dir_recursive(&folder_path, &history_target)?;
+
+        copied += 1;
     }
 
     if copied == 0 {
-        return Err("Không tìm thấy thư mục nào có mã số 4 chữ số.".to_string());
+        return Err(
+            "Không tìm thấy thư mục nào khớp định dạng mã số (4 chữ số, hoặc BH+3 chữ số)."
+                .to_string(),
+        );
     }
 
-    Ok(format!(
+    let mut message = format!(
         "Đã copy {} thư mục thành công.\nLịch sử: {}",
         copied,
         history_dir.to_string_lossy()
-    ))
+    );
+    if !unmatched.is_empty() {
+        message.push_str(&format!(
+            "\nBỏ qua {} thư mục không khớp định dạng mã số: {}",
+            unmatched.len(),
+            unmatched.join(", ")
+        ));
+    }
+
+    Ok(message)
 }
 
 pub fn get_drives() -> Vec<String> {
