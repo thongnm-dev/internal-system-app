@@ -10,7 +10,7 @@
 
 use crate::app::result::AppResult;
 use crate::models::vnjp_sync::*;
-use crate::services::vnjp::sync_service::{self, DocType};
+use crate::services::vnjp::sync_service::{self, ContentBounds, DocType, content_bounds_for_sheet};
 use crate::services::vnjp::{
     c232_sync_service, c233_sync_service, c234_sync_service, c235_sync_service,
     c236_sync_service, c238_sync_service,
@@ -83,4 +83,18 @@ pub async fn verify_red_cells_with_ai(
     model: &str,
 ) -> AppResult<RedCellVerificationReport> {
     sync_service::verify_red_cells_with_ai(jp_path, red_cells, provider, model).await
+}
+
+/// Vùng nội dung hợp lệ của 1 sheet theo loại tài liệu — dispatch tới đúng method của từng loại.
+/// `None` nếu không nhận diện được loại tài liệu (`DocType::Unknown`) ⇒ không giới hạn cột.
+pub(crate) fn content_bounds_for(doc_type: DocType, sheet_name: &str) -> Option<ContentBounds> {
+    match doc_type {
+        DocType::C232 => Some(c232_sync_service::content_bounds(sheet_name)),
+        DocType::C233 => Some(c233_sync_service::content_bounds(sheet_name)),
+        DocType::C234 => Some(c234_sync_service::content_bounds(sheet_name)),
+        DocType::C235 => Some(c235_sync_service::content_bounds(sheet_name)),
+        DocType::C236 => Some(c236_sync_service::content_bounds(sheet_name)),
+        DocType::C238 => Some(content_bounds_for_sheet(sheet_name, 10)),
+        DocType::Unknown => None,
+    }
 }

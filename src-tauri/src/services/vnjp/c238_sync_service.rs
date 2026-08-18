@@ -9,11 +9,15 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::File;
-use std::path::Path;
-
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
-use crate::models::vnjp_sync::{ApplyResult, ConfirmedInsert, RowAlignmentSuggestion};
+use crate::models::vnjp_sync::{ApplyResult, RowAlignmentSuggestion};
+
+use super::sync_service::{
+    clone_vn_sheet_for_jp, extract_all_shared_strings, is_del_sheet_name, merged_output_path,
+    merge_vn_styles_into_jp, read_zip_entry, resolve_sheet_xml_paths, sync_structure,
+    write_output_zip,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Canh dòng THEO GROUP cho tài liệu "画面間インタフェース仕様書" (VN → JP)
@@ -32,14 +36,6 @@ pub(crate) const SCREEN_IF_DOC_PREFIX: &str = "C2.3.8 画面間インタフェ�
 
 /// Dòng dữ liệu bắt đầu (0-based) — bỏ vùng tiêu đề đầu (画面ID / 画面名称…). Group đầu tiên từ đây.
 const SCREEN_IF_DATA_START_ROW0: usize = 3;
-
-pub(crate) fn is_screen_interface_doc(path: &str) -> bool {
-    Path::new(path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.starts_with(SCREEN_IF_DOC_PREFIX))
-        .unwrap_or(false)
-}
 
 fn is_argb_yellow(argb: &str) -> bool {
     let Some((r, g, b)) = super::sync_service::parse_rgb_triplet(argb) else {
@@ -440,7 +436,7 @@ pub(crate) fn analyze_row_alignment_by_group(
         let (vn_h, vn_b) = vn_flags.get(sheet).unwrap_or(&empty);
         let (jp_h, _jp_b) = jp_flags.get(sheet).unwrap_or(&empty);
         // Method xử lý riêng C2.3.8 (đây là loại tài liệu duy nhất dùng canh dòng theo group).
-        let last_col0 = content_bounds(sheet).last_col0;
+        let last_col0 = 10usize; // C2.3.8 nội dung cột A~K
 
         let mut vn_groups = build_doc_groups(vn_rows, vn_h, vn_b, last_col0);
         let mut jp_groups = build_doc_groups(jp_rows, jp_h, &HashSet::new(), last_col0);
@@ -502,81 +498,136 @@ pub(crate) fn analyze_row_alignment_by_group(
     Ok(suggestions)
 }
 
-/// Method xử lý riêng cho C2.3.8 画面間インタフェース仕様書 — nội dung cột A ~ K (0-based 10).
-pub fn content_bounds(sheet_name: &str) -> super::sync_service::ContentBounds {
-    super::sync_service::content_bounds_for_sheet(sheet_name, 10)
-}
 
-/// Pipeline "Áp dụng" VN → JP cho C2.3.8. Chạy tuần tự trên cùng 1 file kết quả (`Temp/{tên JP
-/// gốc}_merged.{ext}`, xem `super::sync_service::merged_output_path`) — không có hộp thoại chọn
-/// nơi lưu:
-/// 1-2. `super::sync_service::sync_structure` — dọn dẹp JP, clone sheet chỉ có ở VN, đổi tên sheet
-///    JP bị VN đánh dấu xóa thành "(DEL)", sắp xếp lại thứ tự sheet. Ghi ra file Temp (bước 4).
-/// 3. Canh dòng: tự động phát hiện + chèn dòng lệch giữa VN/JP — dùng canh dòng THEO GROUP riêng
-///    của loại tài liệu này (`super::sync_service::analyze_row_alignment` tự dispatch qua
-///    `is_screen_interface_doc`), không cần xác nhận thủ công. Ghi đè vào chính file Temp ở trên.
-/// 5-6. `super::sync_service::merge_content` — ghi nội dung ô đỏ/shape VN vào file Temp đã canh
-///    dòng, ghi đè lần cuối.
+/// Pipeline "Áp dụng" VN → JP cho C2.3.8.
+///
+/// C2.3.8 KHÔNG có cột STT → không cần công thức cột A. Dùng cùng chiến lược với C2.3.4:
+/// clone TOÀN BỘ nội dung VN vào JP (remap style, inline string), giữ JP làm khung
+/// (drawing, sheetView, cols, page setup) để shapes header không bị mất.
+/// `formula_start_row1 = usize::MAX` → mọi dòng đều đi qua nhánh "clone nguyên vẹn".
 pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
-    let output_path = super::sync_service::merged_output_path(jp_path)?;
+    // ── 1. sync_structure ──────────────────────────────────────────────────────
+    let output_path = merged_output_path(jp_path)?;
     let output_path_str = output_path.to_string_lossy().to_string();
+    let structure = sync_structure(vn_path, jp_path, &output_path_str)?;
 
-    let structure = super::sync_service::sync_structure(vn_path, jp_path, &output_path_str)?;
+    // ── 2. Mở VN zip ──────────────────────────────────────────────────────────
+    let vn_file = File::open(vn_path)
+        .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
+    let mut vn_archive = zip::ZipArchive::new(vn_file)
+        .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
 
-    // Canh dòng tự động — tính theo file JP GỐC: sheet vừa clone ở bước trên chưa tồn tại trong
-    // JP gốc nên tự động bị `analyze_row_alignment` bỏ qua, đúng yêu cầu "không duyệt sheet mới
-    // clone". Số dòng của các sheet còn lại không đổi giữa JP gốc và file Temp (cleanup/clone/đổi
-    // tên không thêm/bớt dòng) nên vị trí chèn tính từ JP gốc vẫn áp dụng đúng lên file Temp.
-    let alignment = super::sync_service::analyze_row_alignment(vn_path, jp_path)?;
-    let rows_inserted = if alignment.suggestions.is_empty() {
-        0
-    } else {
-        let inserts: Vec<ConfirmedInsert> = alignment
-            .suggestions
-            .iter()
-            .map(|s| ConfirmedInsert {
-                sheet: s.sheet.clone(),
-                jp_insert_after_row: s.jp_insert_after_row,
-                insert_count: s.insert_count,
-                vn_row_start: Some(s.vn_row_start),
-                vn_row_end: Some(s.vn_row_end),
-            })
-            .collect();
-        super::sync_service::insert_rows(&output_path_str, vn_path, &output_path_str, &inserts)?
-            .rows_inserted
-    };
+    let vn_wb_xml = read_zip_entry(&mut vn_archive, "xl/workbook.xml").unwrap_or_default();
+    let vn_rels_xml =
+        read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let vn_sst_xml = read_zip_entry(&mut vn_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let vn_styles_xml = read_zip_entry(&mut vn_archive, "xl/styles.xml").unwrap_or_default();
+    let (vn_plain_ssi, vn_rich_ssi) = extract_all_shared_strings(&vn_sst_xml);
+    let vn_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&vn_wb_xml, &vn_rels_xml).into_iter().collect();
 
-    let mut result = super::sync_service::merge_content(
-        vn_path,
-        &output_path_str,
-        &output_path_str,
-        &structure.cloned_names,
-    )?;
-    result.strike_removed_count += structure.strike_removed_count;
-    result.red_blackened_count += structure.red_blackened_count;
-    // `cleanup_skipped_count`: KHÔNG cộng dồn — `merge_content` quét lại file đã dọn ở
-    // `sync_structure` nên chỉ tái phát hiện đúng những ô còn tồn đọng, không phải ô mới.
-    result.cleanup_skipped_count = result.cleanup_skipped_count.max(structure.cleanup_skipped_count);
-    result.cloned_sheet_count = structure.cloned_names.len();
-    result.rows_inserted = rows_inserted;
-    for sheet_name in &structure.sheets_modified {
-        if !result.sheets_modified.contains(sheet_name) {
-            result.sheets_modified.push(sheet_name.clone());
+    // ── 3. Mở JP output zip (sau sync_structure) ──────────────────────────────
+    let jp_file = File::open(&output_path_str)
+        .map_err(|e| AppError::new(format!("Không mở được file JP output: {e}")))?;
+    let mut jp_archive = zip::ZipArchive::new(jp_file)
+        .map_err(|e| AppError::new(format!("File JP output không phải ZIP hợp lệ: {e}")))?;
+
+    let jp_wb_xml = read_zip_entry(&mut jp_archive, "xl/workbook.xml").unwrap_or_default();
+    let jp_rels_xml =
+        read_zip_entry(&mut jp_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let jp_styles_xml = read_zip_entry(&mut jp_archive, "xl/styles.xml").unwrap_or_default();
+    let jp_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&jp_wb_xml, &jp_rels_xml).into_iter().collect();
+
+    // ── 4. Merge styles VN→JP ─────────────────────────────────────────────────
+    let style_result = merge_vn_styles_into_jp(&jp_styles_xml, &vn_styles_xml);
+
+    // ── 5. Sheet chung cần xử lý ──────────────────────────────────────────────
+    let cloned_names = &structure.cloned_names;
+    let mut common_sheets: Vec<String> = jp_sheet_map
+        .keys()
+        .filter(|name| {
+            vn_sheet_map.contains_key(*name)
+                && !cloned_names.contains(*name)
+                && !is_del_sheet_name(name)
+        })
+        .cloned()
+        .collect();
+    common_sheets.sort();
+
+    let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut applied_count = 0usize;
+    let mut sheets_modified: Vec<String> = structure.sheets_modified.clone();
+
+    replaced.insert(
+        "xl/styles.xml".to_string(),
+        style_result.new_styles_xml.into_bytes(),
+    );
+
+    // ── 6. Clone toàn bộ VN → JP (không có công thức cột A) ──────────────────
+    for sheet_name in &common_sheets {
+        let vn_xml_path = match vn_sheet_map.get(sheet_name) {
+            Some(p) => p.clone(),
+            None => continue,
+        };
+        let jp_xml_path = match jp_sheet_map.get(sheet_name) {
+            Some(p) => p.clone(),
+            None => continue,
+        };
+        let vn_sheet_xml = match read_zip_entry(&mut vn_archive, &vn_xml_path) {
+            Some(x) => x,
+            None => continue,
+        };
+        let jp_sheet_xml = match read_zip_entry(&mut jp_archive, &jp_xml_path) {
+            Some(x) => x,
+            None => continue,
+        };
+
+        // formula_start_row1 = usize::MAX → không dòng nào bị thay cột A bằng công thức
+        let new_sheet_xml = clone_vn_sheet_for_jp(
+            &vn_sheet_xml,
+            &jp_sheet_xml,
+            "",          // không dùng
+            0,           // không dùng
+            usize::MAX,  // tắt hoàn toàn logic công thức cột A
+            &style_result.xf_remap,
+            &vn_plain_ssi,
+            &vn_rich_ssi,
+        );
+
+        applied_count += 1;
+        replaced.insert(jp_xml_path, new_sheet_xml.into_bytes());
+        if !sheets_modified.contains(sheet_name) {
+            sheets_modified.push(sheet_name.clone());
         }
     }
 
-    let nothing_changed = result.applied_count == 0
-        && result.shape_applied_count == 0
-        && result.strike_removed_count == 0
-        && result.red_blackened_count == 0
+    // ── 7. Ghi output ─────────────────────────────────────────────────────────
+    write_output_zip(&mut jp_archive, &replaced, &output_path_str)?;
+
+    let nothing_changed = applied_count == 0
         && structure.cloned_names.is_empty()
         && structure.del_renamed_count == 0
-        && rows_inserted == 0;
+        && structure.strike_removed_count == 0;
     if nothing_changed {
         return Err(AppError::new(
             "Không có khác biệt nào giữa VN và JP để áp dụng.",
         ));
     }
 
-    Ok(result)
+    Ok(ApplyResult {
+        output_path: output_path_str,
+        applied_count,
+        skipped_count: 0,
+        sheets_modified,
+        strike_removed_count: structure.strike_removed_count,
+        red_blackened_count: structure.red_blackened_count,
+        cleanup_skipped_count: structure.cleanup_skipped_count,
+        column_corrected_count: 0,
+        shape_applied_count: 0,
+        shape_skipped_count: 0,
+        cloned_sheet_count: structure.cloned_names.len(),
+        del_sheet_count: structure.del_renamed_count,
+        rows_inserted: 0,
+    })
 }
