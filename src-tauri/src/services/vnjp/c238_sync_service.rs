@@ -14,9 +14,9 @@ use crate::app::result::AppResult;
 use crate::models::vnjp_sync::{ApplyResult, RowAlignmentSuggestion};
 
 use super::sync_service::{
-    clone_vn_sheet_for_jp, extract_all_shared_strings, is_del_sheet_name, merged_output_path,
-    merge_vn_styles_into_jp, read_zip_entry, resolve_sheet_xml_paths, sync_structure,
-    write_output_zip,
+    clone_vn_sheet_for_jp, extract_all_shared_strings, find_changed_style_cells_xlsx,
+    is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp, read_zip_entry,
+    resolve_sheet_xml_paths, sync_structure, write_output_zip,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -499,12 +499,18 @@ pub(crate) fn analyze_row_alignment_by_group(
 }
 
 
+/// Dòng dữ liệu bắt đầu (1-based) — bỏ vùng header cố định (row Excel 1~3), khớp
+/// `SCREEN_IF_DATA_START_ROW0 + 1`.
+const CONTENT_START_ROW1: usize = SCREEN_IF_DATA_START_ROW0 + 1;
+
 /// Pipeline "Áp dụng" VN → JP cho C2.3.8.
 ///
-/// C2.3.8 KHÔNG có cột STT → không cần công thức cột A. Dùng cùng chiến lược với C2.3.4:
-/// clone TOÀN BỘ nội dung VN vào JP (remap style, inline string), giữ JP làm khung
-/// (drawing, sheetView, cols, page setup) để shapes header không bị mất.
-/// `formula_start_row1 = usize::MAX` → mọi dòng đều đi qua nhánh "clone nguyên vẹn".
+/// C2.3.8 KHÔNG có cột STT → không cần công thức cột A (`use_col_a_formula = false`, cột A xử lý
+/// như cột thường). Dùng cùng chiến lược với C2.3.4: clone TOÀN BỘ nội dung VN vào JP (remap
+/// style, inline string), giữ JP làm khung (drawing, sheetView, cols, page setup) để shapes
+/// header không bị mất; riêng từng ô ở dòng dữ liệu — nếu ô đó KHÔNG "coi như đã thay đổi" (chữ
+/// đen, không strikethrough — xem `find_changed_style_cells_xlsx`) VÀ JP đã có ô tại đúng vị trí
+/// đó, GIỮ NGUYÊN ô JP thay vì ghi đè bằng VN.
 pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     // ── 1. sync_structure ──────────────────────────────────────────────────────
     let output_path = merged_output_path(jp_path)?;
@@ -541,6 +547,11 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
 
     // ── 4. Merge styles VN→JP ─────────────────────────────────────────────────
     let style_result = merge_vn_styles_into_jp(&jp_styles_xml, &vn_styles_xml);
+
+    // Ô VN "coi như đã thay đổi" (strikethrough hoặc màu chữ không phải đen) theo từng sheet — ô
+    // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
+    // vị trí khi clone (xem `clone_vn_sheet_for_jp`).
+    let vn_changed_cells = find_changed_style_cells_xlsx(vn_path);
 
     // ── 5. Sheet chung cần xử lý ──────────────────────────────────────────────
     let cloned_names = &structure.cloned_names;
@@ -583,16 +594,20 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             None => continue,
         };
 
-        // formula_start_row1 = usize::MAX → không dòng nào bị thay cột A bằng công thức
+        // use_col_a_formula = false → cột A xử lý như cột thường (không có công thức JP);
+        // vn_changed_cells.get(sheet_name) → ô chữ đen, không strikethrough (không đổi) giữ
+        // nguyên bản JP cùng vị trí.
         let new_sheet_xml = clone_vn_sheet_for_jp(
             &vn_sheet_xml,
             &jp_sheet_xml,
-            "",          // không dùng
-            0,           // không dùng
-            usize::MAX,  // tắt hoàn toàn logic công thức cột A
+            "", // không dùng vì use_col_a_formula = false
+            0,  // không dùng vì use_col_a_formula = false
+            CONTENT_START_ROW1,
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
+            vn_changed_cells.get(sheet_name),
+            false,
         );
 
         applied_count += 1;

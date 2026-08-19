@@ -8,12 +8,20 @@
 //! Pipeline `apply_changes`:
 //! 1. `sync_structure` — dọn dẹp JP, clone sheet chỉ có ở VN, đổi tên "(DEL)", sắp xếp sheet.
 //! 2. Merge styles VN→JP.
-//! 3. Vòng loop qua từng sheet chung (VN ∩ JP − cloned − DEL):
+//! 3. Quét toàn bộ ô VN "coi như đã thay đổi": strikethrough HOẶC màu chữ KHÔNG phải đen (bất kỳ
+//!    màu nào, không riêng đỏ/xanh) — `find_changed_style_cells_xlsx`.
+//! 4. Vòng loop qua từng sheet chung (VN ∩ JP − cloned − DEL):
 //!    a. Trích công thức cột A từ JP (`extract_jp_col_a_info`).
 //!    b. Clone toàn bộ sheet VN vào JP output (`clone_vn_sheet_for_jp`):
 //!       - Hàng header (row < 4): giữ nguyên (kể cả cột A).
-//!       - Hàng nội dung (row ≥ 4): remap style, inline string, thay cột A bằng công thức JP.
-//! 4. Ghi output.
+//!       - Hàng nội dung (row ≥ 4): remap style, inline string, thay cột A bằng công thức JP;
+//!         riêng từng ô (trừ cột A) — nếu ô đó KHÔNG nằm trong tập "đã thay đổi" ở bước 3 (chữ
+//!         đen, không strikethrough) VÀ JP đã có ô tại đúng vị trí đó, GIỮ NGUYÊN ô JP thay vì
+//!         ghi đè bằng VN.
+//!       - Riêng sheet "変更履歴" (`CHANGE_HISTORY_SHEET_NAME`): KHÔNG có cột STT tự đánh số —
+//!         `use_col_a_formula = false` nên cột A được xử lý như mọi cột thường (clone VN / giữ
+//!         JP nếu không đổi), không bị ghi đè bằng công thức JP.
+//! 5. Ghi output.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -23,9 +31,10 @@ use crate::app::result::AppResult;
 use crate::models::vnjp_sync::ApplyResult;
 
 use super::sync_service::{
-    clone_vn_sheet_for_jp, extract_all_shared_strings, extract_jp_col_a_info, is_del_sheet_name,
-    merged_output_path, merge_vn_styles_into_jp, read_zip_entry, resolve_sheet_xml_paths,
-    sync_structure, write_output_zip, ContentBounds,
+    clone_vn_sheet_for_jp, extract_all_shared_strings, extract_jp_col_a_info,
+    find_changed_style_cells_xlsx, is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp,
+    read_zip_entry, resolve_sheet_xml_paths, sync_structure, write_output_zip, ContentBounds,
+    CHANGE_HISTORY_SHEET_NAME,
 };
 
 /// Nội dung cột A ~ M (0-based 12).
@@ -71,6 +80,11 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
 
     // ── 4. Merge styles VN→JP ─────────────────────────────────────────────────
     let style_result = merge_vn_styles_into_jp(&jp_styles_xml, &vn_styles_xml);
+
+    // Ô VN "coi như đã thay đổi" (strikethrough hoặc màu chữ không phải đen) theo từng sheet — ô
+    // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
+    // vị trí khi clone (xem `clone_vn_sheet_for_jp`).
+    let vn_changed_cells = find_changed_style_cells_xlsx(vn_path);
 
     // ── 5. Chuẩn bị vòng loop ─────────────────────────────────────────────────
     let cloned_names = &structure.cloned_names;
@@ -123,8 +137,13 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         // (row đầu tiên CÓ công thức — bỏ qua "STT" và các ô header khác)
         let (jp_col_a_formula, jp_col_a_style, formula_start_row1) =
             extract_jp_col_a_info(&jp_sheet_xml, CONTENT_START_ROW1);
+        // Riêng sheet "変更履歴": KHÔNG có cột STT đánh số tự động — cột A là dữ liệu thật (ngày/số
+        // phiên bản...) nên phải giữ nguyên như mọi cột khác (clone VN / giữ JP nếu không đổi),
+        // không áp công thức JP.
+        let use_col_a_formula = sheet_name != CHANGE_HISTORY_SHEET_NAME;
 
-        // Clone toàn bộ VN sheet vào khung JP (shapes/drawing được giữ từ JP)
+        // Clone toàn bộ VN sheet vào khung JP (shapes/drawing được giữ từ JP); ô VN chữ đen và
+        // không strikethrough (không có trong `vn_changed_cells`) sẽ giữ nguyên bản JP cùng vị trí.
         let new_sheet_xml = clone_vn_sheet_for_jp(
             &vn_sheet_xml,
             &jp_sheet_xml,
@@ -134,6 +153,8 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
+            vn_changed_cells.get(sheet_name),
+            use_col_a_formula,
         );
 
         applied_count += 1;

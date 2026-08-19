@@ -1208,7 +1208,7 @@ fn build_alignment_suggestions(
 const CONTENT_START_ROW0: usize = 3;
 
 /// Tên sheet lịch sử thay đổi — luôn dùng cột A~K bất kể loại tài liệu đang xét.
-const CHANGE_HISTORY_SHEET_NAME: &str = "変更履歴";
+pub(crate) const CHANGE_HISTORY_SHEET_NAME: &str = "変更履歴";
 /// Cột cuối cùng (0-based, inclusive) của sheet "変更履歴" = K.
 const CHANGE_HISTORY_LAST_COL0: usize = 10;
 
@@ -2976,6 +2976,161 @@ pub(crate) fn find_red_cells_with_style_xlsx(path: &str) -> HashMap<String, Hash
 
         if !cells.is_empty() {
             result.insert(name, cells);
+        }
+    }
+
+    result
+}
+
+/// Run `<r>` có strikethrough HOẶC màu chữ KHÔNG phải đen (bất kỳ màu nào, không chỉ đỏ/xanh).
+/// Dùng để nhận diện ô "coi như đã thay đổi" dù nội dung text giống hệt JP — xem
+/// `find_changed_style_cells_xlsx`.
+fn has_changed_style_run(run_node: &roxmltree::Node) -> bool {
+    if has_strike_element(run_node) {
+        return true;
+    }
+    run_node.descendants().any(|child| {
+        child.tag_name().name() == "color"
+            && child.attribute("rgb").map(|c| !is_argb_black(c)).unwrap_or(false)
+    })
+}
+
+/// Giống `parse_shared_strings_rich_info` nhưng trả về ssi "coi như đã thay đổi" (strikethrough
+/// HOẶC màu không đen ở BẤT KỲ run nào) thay vì chỉ đỏ. Trả về `(mọi ssi rich-text, ssi đã đổi)`.
+fn parse_shared_strings_changed_info(sst_xml: &str) -> (HashSet<usize>, HashSet<usize>) {
+    let mut all_rich = HashSet::new();
+    let mut changed = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sst_xml) else {
+        return (all_rich, changed);
+    };
+    let mut si_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "si" {
+            let runs: Vec<_> = node.children().filter(|c| c.tag_name().name() == "r").collect();
+            if !runs.is_empty() {
+                all_rich.insert(si_idx);
+                if runs.iter().any(has_changed_style_run) {
+                    changed.insert(si_idx);
+                }
+            }
+            si_idx += 1;
+        }
+    }
+    (all_rich, changed)
+}
+
+/// Tìm trong 1 sheet XML các ô "coi như đã thay đổi": có strikethrough HOẶC màu chữ không phải
+/// đen — dù nội dung text không đổi so với JP, style khác biệt vẫn cần phản ánh sang JP thay vì
+/// giữ nguyên ô JP cũ. Rich-text run được ưu tiên trước style cấp-cell, giống `find_red_cells_in_sheet`.
+fn find_changed_style_cells_in_sheet(
+    sheet_xml: &str,
+    changed_xf: &HashSet<usize>,
+    changed_ssi: &HashSet<usize>,
+    all_rich_ssi: &HashSet<usize>,
+) -> HashSet<(usize, usize)> {
+    let mut result = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return result;
+    };
+
+    for node in doc.descendants() {
+        if node.tag_name().name() != "c" {
+            continue;
+        }
+        let Some(pos) = node.attribute("r").and_then(parse_cell_ref) else {
+            continue;
+        };
+
+        let mut handled_by_rich = false;
+
+        if node.attribute("t") == Some("s") {
+            if let Some(v) = node.descendants().find(|c| c.tag_name().name() == "v") {
+                if let Some(ssi) = v.text().and_then(|t| t.parse::<usize>().ok()) {
+                    if all_rich_ssi.contains(&ssi) {
+                        handled_by_rich = true;
+                        if changed_ssi.contains(&ssi) {
+                            result.insert(pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        if !handled_by_rich && node.attribute("t") == Some("inlineStr") {
+            if let Some(is_node) = node.children().find(|c| c.tag_name().name() == "is") {
+                let runs: Vec<_> = is_node
+                    .children()
+                    .filter(|c| c.tag_name().name() == "r")
+                    .collect();
+                if !runs.is_empty() {
+                    handled_by_rich = true;
+                    if runs.iter().any(has_changed_style_run) {
+                        result.insert(pos);
+                    }
+                }
+            }
+        }
+
+        if handled_by_rich {
+            continue;
+        }
+
+        if let Some(si) = node.attribute("s").and_then(|s| s.parse::<usize>().ok()) {
+            if changed_xf.contains(&si) {
+                result.insert(pos);
+            }
+        }
+    }
+
+    result
+}
+
+/// Quét toàn bộ file VN, trả về theo từng sheet tập vị trí ô "coi như đã thay đổi": có
+/// strikethrough HOẶC màu chữ KHÔNG phải đen (mọi màu, không riêng đỏ/xanh — bao trùm luôn
+/// `find_red_cells_with_style_xlsx` vì đỏ/xanh vốn không phải đen). Dùng bởi
+/// `clone_vn_sheet_for_jp` (qua `c234_sync_service`/`c238_sync_service`) để quyết định GIỮ
+/// NGUYÊN ô JP (khi ô KHÔNG nằm trong tập này) hay ghi đè bằng VN (khi CÓ trong tập này).
+pub(crate) fn find_changed_style_cells_xlsx(path: &str) -> HashMap<String, HashSet<(usize, usize)>> {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return HashMap::new(),
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return HashMap::new(),
+    };
+
+    let styles_xml = read_zip_entry(&mut archive, "xl/styles.xml").unwrap_or_default();
+    let font_infos = parse_font_infos(&styles_xml);
+    let colored_xf = parse_colored_xf_indices(&styles_xml, &font_infos);
+    let strike_xf = parse_strike_xf_indices(&styles_xml);
+    let changed_xf: HashSet<usize> = colored_xf.union(&strike_xf).copied().collect();
+
+    let sst_xml = read_zip_entry(&mut archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (all_rich_ssi, changed_ssi) = if sst_xml.is_empty() {
+        (HashSet::new(), HashSet::new())
+    } else {
+        parse_shared_strings_changed_info(&sst_xml)
+    };
+
+    let workbook_xml = match read_zip_entry(&mut archive, "xl/workbook.xml") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let rels_xml = match read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let sheet_paths = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
+
+    let mut result: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
+    for (name, xml_path) in sheet_paths {
+        if let Some(sheet_xml) = read_zip_entry(&mut archive, &xml_path) {
+            let cells =
+                find_changed_style_cells_in_sheet(&sheet_xml, &changed_xf, &changed_ssi, &all_rich_ssi);
+            if !cells.is_empty() {
+                result.insert(name, cells);
+            }
         }
     }
 
@@ -6478,10 +6633,16 @@ pub(crate) fn extract_jp_col_a_info(
 /// - JP được giữ làm khung (drawing, page setup, cols, sheetView, relationships) → shapes không mất
 /// - Chỉ thay thế `<sheetData>` và `<mergeCells>` của JP bằng nội dung từ VN
 /// - Hàng < `formula_start_row1` (header + cột tiêu đề): clone VN nguyên vẹn kể cả cột A
-/// - Hàng >= `formula_start_row1` (dòng dữ liệu): remap style, inline string, thay cột A bằng
-///   công thức JP (`MAX($A$2:OFFSET(...))+1`)
+/// - Hàng >= `formula_start_row1` (dòng dữ liệu): remap style, inline string; nếu
+///   `use_col_a_formula` = true thì thay cột A bằng công thức JP (`MAX($A$2:OFFSET(...))+1`) —
+///   đặt `false` cho sheet không có cột STT tự đánh số (vd "変更履歴"), khi đó cột A được xử lý
+///   như mọi cột khác bên dưới. Riêng từng ô (trừ cột A khi `use_col_a_formula` = true): nếu ô đó
+///   KHÔNG có trong `vn_changed_positions` (nghĩa là chữ đen VÀ không strikethrough — xem
+///   `find_changed_style_cells_xlsx`) VÀ JP đã có ô tại đúng vị trí đó, GIỮ NGUYÊN ô JP thay vì
+///   ghi đè bằng VN (xem yêu cầu tại `c234_sync_service`).
 ///
-/// Kết quả: số dòng / nội dung / style khớp VN, cột A là công thức JP, shapes header được giữ.
+/// Kết quả: số dòng / nội dung / style khớp VN, cột A là công thức JP, shapes header được giữ,
+/// ô không đổi ở VN giữ nguyên bản JP.
 pub(crate) fn clone_vn_sheet_for_jp(
     vn_sheet_xml: &str,
     jp_sheet_xml: &str,
@@ -6491,6 +6652,8 @@ pub(crate) fn clone_vn_sheet_for_jp(
     xf_remap: &[usize],
     vn_plain_ssi: &HashMap<usize, String>,
     vn_rich_ssi_raw: &HashMap<usize, String>,
+    vn_changed_positions: Option<&HashSet<(usize, usize)>>,
+    use_col_a_formula: bool,
 ) -> String {
     // ── 1. Xây sheetData mới từ VN ────────────────────────────────────────────
     let Ok(vn_doc) = roxmltree::Document::parse(vn_sheet_xml) else {
@@ -6499,6 +6662,31 @@ pub(crate) fn clone_vn_sheet_for_jp(
     let Some(vn_sd) = vn_doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
         return jp_sheet_xml.to_string();
     };
+
+    // Lookup ô JP theo (row1, col0) — dùng để giữ nguyên ô JP tại các vị trí VN không đánh dấu
+    // chỉnh sửa (chữ đen). Chỉ giữ offset trên `jp_sheet_xml` gốc nên không phụ thuộc lifetime
+    // của `Document` tạm thời này.
+    let mut jp_cell_lookup: HashMap<(usize, usize), &str> = HashMap::new();
+    if let Ok(jp_doc_lookup) = roxmltree::Document::parse(jp_sheet_xml) {
+        if let Some(jp_sd_lookup) =
+            jp_doc_lookup.descendants().find(|n| n.tag_name().name() == "sheetData")
+        {
+            for row in jp_sd_lookup.children().filter(|n| n.tag_name().name() == "row") {
+                let row1 = row
+                    .attribute("r")
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or(0);
+                if row1 == 0 {
+                    continue;
+                }
+                for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+                    if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
+                        jp_cell_lookup.insert((row1, col0), &jp_sheet_xml[cell.range()]);
+                    }
+                }
+            }
+        }
+    }
 
     // Phát hiện "dòng header nhóm": dòng trong vùng nội dung có merge bắt đầu từ cột A.
     // Ví dụ: <mergeCell ref="A16:M16"/> → row 16 là dòng tiêu đề nhóm, không đánh số thứ tự.
@@ -6541,11 +6729,16 @@ pub(crate) fn clone_vn_sheet_for_jp(
                 vn_rich_ssi_raw,
             ));
         } else {
-            // Dòng dữ liệu — bỏ cột A VN, thêm công thức JP
-            let col_a_cell = format!(
-                r#"<c r="A{row1}" s="{jp_col_a_style}"><f ca="1">{}</f></c>"#,
-                xml_escape(jp_col_a_formula)
-            );
+            // Dòng dữ liệu — bỏ cột A VN, thêm công thức JP (trừ khi `use_col_a_formula = false`,
+            // vd sheet "変更履歴" không có cột STT tự đánh số — cột A khi đó xử lý như cột thường).
+            let col_a_cell = if use_col_a_formula {
+                format!(
+                    r#"<c r="A{row1}" s="{jp_col_a_style}"><f ca="1">{}</f></c>"#,
+                    xml_escape(jp_col_a_formula)
+                )
+            } else {
+                String::new()
+            };
 
             let mut row_attrs = String::new();
             for a in row_node.attributes() {
@@ -6567,24 +6760,33 @@ pub(crate) fn clone_vn_sheet_for_jp(
                 }
             }
 
+            let vn_row0 = row1 - 1;
             let other_cells: String = row_node
                 .children()
                 .filter(|c| c.tag_name().name() == "c")
-                .filter(|c| {
-                    c.attribute("r")
-                        .and_then(parse_cell_ref)
-                        .map(|(_, col)| col != 0)
-                        .unwrap_or(true)
-                })
-                .map(|c| {
-                    clone_vn_cell_xml(
+                .filter_map(|c| {
+                    let col0 = c.attribute("r").and_then(parse_cell_ref).map(|(_, col)| col)?;
+                    if col0 == 0 && use_col_a_formula {
+                        return None; // cột A đã xử lý riêng ở trên (công thức JP)
+                    }
+                    // VN không coi là đã thay đổi (chữ đen, không strikethrough) tại ô này →
+                    // giữ nguyên ô JP cùng vị trí nếu có, thay vì ghi đè bằng nội dung VN.
+                    let is_edited = vn_changed_positions
+                        .map(|m| m.contains(&(vn_row0, col0)))
+                        .unwrap_or(true);
+                    if !is_edited {
+                        if let Some(jp_raw) = jp_cell_lookup.get(&(row1, col0)) {
+                            return Some((*jp_raw).to_string());
+                        }
+                    }
+                    Some(clone_vn_cell_xml(
                         c,
                         vn_sheet_xml,
                         row1,
                         xf_remap,
                         vn_plain_ssi,
                         vn_rich_ssi_raw,
-                    )
+                    ))
                 })
                 .collect();
 
