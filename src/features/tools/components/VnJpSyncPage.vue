@@ -41,6 +41,7 @@ function confirmClearTempFiles() {
 }
 
 const fieldsetCollapsed = ref(false);
+const resultsFieldsetCollapsed = ref(false);
 
 // Dialog copy file đã chọn sang thư mục đích do TL tự chọn.
 const showCopyDialog = ref(false);
@@ -132,7 +133,7 @@ function tabColorStyle(color: string | null | undefined): string {
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-1">
+  <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-1">
     <!-- ═══════════ Chọn file ═══════════ -->
     <Fieldset
       v-model:collapsed="fieldsetCollapsed"
@@ -383,10 +384,29 @@ function tabColorStyle(color: string | null | undefined): string {
     </section>
 
     <!-- ═══════════ Kết quả phân tích ═══════════ -->
-    <template v-if="ctrl.analysis.value">
+    <Fieldset
+      v-if="ctrl.analysis.value"
+      v-model:collapsed="resultsFieldsetCollapsed"
+      :class="[
+        'flex min-h-0 flex-col rounded-lg border border-divider bg-panel shadow-sm fieldset-nested',
+        resultsFieldsetCollapsed ? 'shrink-0' : 'flex-1',
+      ]"
+      :pt="{
+        contentContainer: { class: 'flex min-h-0 flex-1 flex-col' },
+        contentWrapper: { class: 'flex min-h-0 flex-1 flex-col' },
+        content: { class: 'flex h-full min-h-0 flex-1 flex-col p-0' },
+      }"
+    >
+      <template #legend="{ toggleCallback }">
+        <div class="flex cursor-pointer items-center gap-2 px-6 py-3" @click="toggleCallback">
+          <i :class="resultsFieldsetCollapsed ? 'pi pi-plus' : 'pi pi-minus'" class="text-xs text-muted" />
+          <h3 class="section-title">Kết quả phân tích</h3>
+        </div>
+      </template>
+
       <Tabs
         v-model:value="ctrl.activeTab.value"
-        class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm"
+        class="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <TabList>
           <Tab value="overview">Tổng quan</Tab>
@@ -600,7 +620,7 @@ function tabColorStyle(color: string | null | undefined): string {
           </TabPanel>
         </TabPanels>
       </Tabs>
-    </template>
+    </Fieldset>
 
     <!-- Empty state -->
     <div
