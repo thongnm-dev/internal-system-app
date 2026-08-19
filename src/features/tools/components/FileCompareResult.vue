@@ -48,18 +48,6 @@ function sheetLabel(s: SheetDiff) {
   return diff > 0 ? `${s.name} (${diff})` : s.name;
 }
 
-const axisClass: Record<string, string> = {
-  equal: "",
-  added: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
-  removed: "bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
-};
-const cellClass: Record<string, string> = {
-  equal: "",
-  changed: "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300",
-  added: "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-300",
-  removed: "bg-rose-100 text-rose-900 dark:bg-rose-500/20 dark:text-rose-300",
-};
-
 const activeSheet = ref<string | null>(null);
 const activeSheetData = computed(
   () => result.value?.excelDiff?.sheets.find((s) => s.name === activeSheet.value) ?? null,
@@ -79,6 +67,90 @@ watch(
 );
 
 const lineNo = (n: number | null) => (n === null ? "" : String(n));
+
+interface ExcelCellEntry {
+  position: string;
+  content: string;
+  tag: string;
+}
+
+const excelGroupA = computed<ExcelCellEntry[]>(() => {
+  const sheet = activeSheetData.value;
+  if (!sheet) return [];
+  const entries: ExcelCellEntry[] = [];
+  sheet.cells.forEach((row, r) => {
+    const rowMeta = sheet.rowsMeta[r];
+    row.forEach((cell, c) => {
+      const col = sheet.columns[c];
+      if (!col) return;
+      const position = `${col.label}${rowMeta.label}`;
+
+      if (rowMeta.tag === "added") return;
+      if (col.tag === "added") return;
+
+      let content = "";
+      let tag = "";
+
+      if (rowMeta.strikethrough || rowMeta.tag === "removed") {
+        content = cell.old || cell.new;
+        tag = "removed";
+      } else if (col.tag === "removed") {
+        content = cell.old;
+        tag = "removed";
+      } else if (cell.tag === "changed") {
+        content = cell.old;
+        tag = "changed";
+      } else if (cell.tag === "removed") {
+        content = cell.old;
+        tag = "removed";
+      } else {
+        return;
+      }
+
+      if (content) entries.push({ position, content, tag });
+    });
+  });
+  return entries;
+});
+
+const excelGroupB = computed<ExcelCellEntry[]>(() => {
+  const sheet = activeSheetData.value;
+  if (!sheet) return [];
+  const entries: ExcelCellEntry[] = [];
+  sheet.cells.forEach((row, r) => {
+    const rowMeta = sheet.rowsMeta[r];
+    row.forEach((cell, c) => {
+      const col = sheet.columns[c];
+      if (!col) return;
+      const position = `${col.label}${rowMeta.label}`;
+
+      if (rowMeta.strikethrough || rowMeta.tag === "removed") return;
+      if (col.tag === "removed") return;
+
+      let content = "";
+      let tag = "";
+
+      if (rowMeta.tag === "added") {
+        content = cell.new;
+        tag = "added";
+      } else if (col.tag === "added") {
+        content = cell.new;
+        tag = "added";
+      } else if (cell.tag === "changed") {
+        content = cell.new;
+        tag = "changed";
+      } else if (cell.tag === "added") {
+        content = cell.new;
+        tag = "added";
+      } else {
+        return;
+      }
+
+      if (content) entries.push({ position, content, tag });
+    });
+  });
+  return entries;
+});
 </script>
 
 <template>
@@ -120,6 +192,11 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
           Chỉ diff
         </label>
         <div v-if="result && !isExcel" class="flex items-center gap-3 text-[11px] font-medium">
+          <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-emerald-200" /> Thêm</span>
+          <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-rose-200" /> Xóa</span>
+        </div>
+        <div v-if="result && isExcel" class="flex items-center gap-3 text-[11px] font-medium">
+          <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-amber-200" /> Đổi</span>
           <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-emerald-200" /> Thêm</span>
           <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-rose-200" /> Xóa</span>
         </div>
@@ -223,7 +300,7 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
       </div>
     </template>
 
-    <!-- ── Excel (cell-by-cell, đã căn cột + dòng) ── -->
+    <!-- ── Excel (2 group: file gốc / file so sánh) ── -->
     <template v-else-if="isExcel && activeSheetData">
       <div
         v-if="activeSheetData.cells.length === 0 || activeSheetData.columns.length === 0"
@@ -231,49 +308,96 @@ const lineNo = (n: number | null) => (n === null ? "" : String(n));
       >
         Sheet trống.
       </div>
-      <div v-else class="mt-3 min-h-0 flex-1 overflow-auto rounded-md border border-divider">
-        <table class="border-collapse text-xs">
-          <thead class="sticky top-0 z-10 bg-canvas">
-            <tr>
-              <th class="sticky left-0 z-20 border border-divider bg-canvas px-2 py-1 text-muted">#</th>
-              <th
-                v-for="(col, c) in activeSheetData.columns"
-                :key="`h${c}`"
-                class="border border-divider px-2 py-1 text-center font-semibold"
-                :class="axisClass[col.tag]"
-                :title="col.tag === 'added' ? 'Cột thêm mới' : col.tag === 'removed' ? 'Cột bị xóa' : ''"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, r) in activeSheetData.cells" :key="`r${r}`">
-              <td
-                class="sticky left-0 z-10 border border-divider px-2 py-1 text-center"
-                :class="activeSheetData.rowsMeta[r].strikethrough
-                  ? 'bg-rose-50 text-rose-400 dark:bg-rose-500/20 dark:text-rose-400 line-through'
-                  : (axisClass[activeSheetData.rowsMeta[r].tag] || 'bg-canvas text-muted')"
-                :title="activeSheetData.rowsMeta[r].strikethrough ? 'Dòng bị strikethrough (xóa)' : activeSheetData.rowsMeta[r].tag === 'added' ? 'Dòng thêm mới' : activeSheetData.rowsMeta[r].tag === 'removed' ? 'Dòng bị xóa' : ''"
-              >
-                {{ activeSheetData.rowsMeta[r].label }}
-              </td>
-              <td
-                v-for="(cell, c) in row"
-                :key="`c${r}-${c}`"
-                class="max-w-[220px] truncate border border-divider px-2 py-1"
-                :class="activeSheetData.rowsMeta[r].strikethrough
-                  ? 'bg-rose-50 text-rose-400 dark:bg-rose-500/20 dark:text-rose-400 line-through'
-                  : cellClass[cell.tag]"
-                :title="activeSheetData.rowsMeta[r].strikethrough
-                  ? (cell.old || cell.new)
-                  : cell.tag === 'changed' ? `${cell.old} → ${cell.new}` : cell.tag === 'removed' ? cell.old : cell.new"
-              >
-                {{ activeSheetData.rowsMeta[r].strikethrough ? (cell.old || cell.new) : (cell.tag === "removed" ? cell.old : cell.new) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div
+        v-else-if="excelGroupA.length === 0 && excelGroupB.length === 0"
+        class="mt-3 flex flex-1 items-center justify-center text-sm text-muted"
+      >
+        Không có sự khác biệt.
+      </div>
+      <div v-else class="mt-3 grid min-h-0 flex-1 grid-cols-2 gap-3">
+        <!-- File gốc (A) -->
+        <div class="flex flex-col overflow-hidden rounded-md border border-divider">
+          <div class="border-b border-divider bg-canvas px-3 py-1.5 text-xs font-bold text-muted">
+            File gốc (A)
+            <span class="ml-2 font-normal text-muted/70">{{ excelGroupA.length }} cell</span>
+          </div>
+          <div class="min-h-0 flex-1 overflow-auto">
+            <table v-if="excelGroupA.length" class="w-full border-collapse text-xs">
+              <thead class="sticky top-0 z-10 bg-canvas">
+                <tr>
+                  <th class="w-20 border-b border-divider px-3 py-1.5 text-left font-semibold text-muted">Vị trí</th>
+                  <th class="border-b border-divider px-3 py-1.5 text-left font-semibold text-muted">Nội dung</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(entry, i) in excelGroupA"
+                  :key="`ea${i}`"
+                  :class="entry.tag === 'removed'
+                    ? 'bg-rose-50 dark:bg-rose-500/10'
+                    : entry.tag === 'changed'
+                      ? 'bg-amber-50 dark:bg-amber-500/10'
+                      : ''"
+                >
+                  <td class="border-b border-divider px-3 py-1 font-mono font-semibold text-muted">{{ entry.position }}</td>
+                  <td
+                    class="border-b border-divider px-3 py-1"
+                    :class="entry.tag === 'removed'
+                      ? 'text-rose-700 dark:text-rose-300'
+                      : entry.tag === 'changed'
+                        ? 'text-amber-800 dark:text-amber-300'
+                        : ''"
+                  >
+                    {{ entry.content }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="flex items-center justify-center py-8 text-xs text-muted">Không có</div>
+          </div>
+        </div>
+
+        <!-- File so sánh (B) -->
+        <div class="flex flex-col overflow-hidden rounded-md border border-divider">
+          <div class="border-b border-divider bg-canvas px-3 py-1.5 text-xs font-bold text-muted">
+            File so sánh (B)
+            <span class="ml-2 font-normal text-muted/70">{{ excelGroupB.length }} cell</span>
+          </div>
+          <div class="min-h-0 flex-1 overflow-auto">
+            <table v-if="excelGroupB.length" class="w-full border-collapse text-xs">
+              <thead class="sticky top-0 z-10 bg-canvas">
+                <tr>
+                  <th class="w-20 border-b border-divider px-3 py-1.5 text-left font-semibold text-muted">Vị trí</th>
+                  <th class="border-b border-divider px-3 py-1.5 text-left font-semibold text-muted">Nội dung</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(entry, i) in excelGroupB"
+                  :key="`eb${i}`"
+                  :class="entry.tag === 'added'
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10'
+                    : entry.tag === 'changed'
+                      ? 'bg-amber-50 dark:bg-amber-500/10'
+                      : ''"
+                >
+                  <td class="border-b border-divider px-3 py-1 font-mono font-semibold text-muted">{{ entry.position }}</td>
+                  <td
+                    class="border-b border-divider px-3 py-1"
+                    :class="entry.tag === 'added'
+                      ? 'text-emerald-700 dark:text-emerald-300'
+                      : entry.tag === 'changed'
+                        ? 'text-amber-800 dark:text-amber-300'
+                        : ''"
+                  >
+                    {{ entry.content }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="flex items-center justify-center py-8 text-xs text-muted">Không có</div>
+          </div>
+        </div>
       </div>
     </template>
   </div>

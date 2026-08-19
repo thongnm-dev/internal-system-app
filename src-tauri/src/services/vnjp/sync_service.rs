@@ -718,33 +718,8 @@ pub(crate) fn parse_rgb_triplet(argb: &str) -> Option<(u8, u8, u8)> {
     Some((r, g, b))
 }
 
-// ── Màu "chỉnh sửa" (edit) = ĐỎ hoặc XANH ─────────────────────────────────────
-// Tài liệu này dùng CẢ đỏ (FFFF0000) LẪN xanh (FF0070C0) để đánh dấu nội dung mới/đã sửa cần phản
-// ánh sang JP. Vì vậy khâu PHẢN ÁNH (find_red_cells_with_style_xlsx → apply_changes) coi cả hai màu
-// là "edit". Ngược lại, khâu DỌN DẸP (transform_rich_runs) CHỈ tô đen màu ĐỎ (hoàn tất bản cũ),
-// GIỮ NGUYÊN màu xanh — xem ghi chú tại 2 hàm đó.
-
-fn is_edit_color(argb: &str) -> bool {
-    is_argb_red(argb) || is_argb_blue(argb)
-}
-
-/// Run `<r>` có font màu edit (đỏ hoặc xanh) trong `<rPr><color rgb=".."/>`.
-fn has_edit_font_run(run_node: &roxmltree::Node) -> bool {
-    run_node.descendants().any(|child| {
-        child.tag_name().name() == "color"
-            && child.attribute("rgb").map(is_edit_color).unwrap_or(false)
-    })
-}
-
-/// Tập fontId có màu edit (đỏ ∪ xanh).
-fn parse_edit_font_ids(styles_xml: &str) -> HashSet<usize> {
-    let mut ids = parse_red_font_ids(styles_xml);
-    ids.extend(parse_blue_font_ids(styles_xml));
-    ids
-}
-
-/// Parse styles.xml → tập fontId có màu xanh (blue). Dùng chung bởi `parse_edit_font_ids` (đỏ ∪
-/// xanh) ở trên VÀ bởi `super::c238_sync_service` (nhận diện header nhóm mới màu xanh).
+/// Parse styles.xml → tập fontId có màu xanh (blue). Dùng bởi `super::c238_sync_service` (nhận
+/// diện header nhóm mới màu xanh).
 pub(crate) fn parse_blue_font_ids(styles_xml: &str) -> HashSet<usize> {
     let mut result = HashSet::new();
     let Ok(doc) = roxmltree::Document::parse(styles_xml) else {
@@ -766,38 +741,6 @@ pub(crate) fn parse_blue_font_ids(styles_xml: &str) -> HashSet<usize> {
         }
     }
     result
-}
-
-/// Giống `parse_shared_strings_rich_info` nhưng bắt cả run ĐỎ lẫn XANH: trả về
-/// `(map ssi→raw runs của si có ÍT NHẤT 1 run màu edit, tập MỌI ssi rich-text)`.
-fn parse_shared_strings_edit_info(sst_xml: &str) -> (HashMap<usize, String>, HashSet<usize>) {
-    let mut edit_rich = HashMap::new();
-    let mut all_rich = HashSet::new();
-    let Ok(doc) = roxmltree::Document::parse(sst_xml) else {
-        return (edit_rich, all_rich);
-    };
-    let mut si_idx = 0usize;
-    for node in doc.descendants() {
-        if node.tag_name().name() == "si" {
-            let runs: Vec<_> = node
-                .children()
-                .filter(|c| c.tag_name().name() == "r")
-                .collect();
-            if !runs.is_empty() {
-                all_rich.insert(si_idx);
-                if runs.iter().any(|r| has_edit_font_run(r)) {
-                    if let (Some(first), Some(last)) = (runs.first(), runs.last()) {
-                        let raw = sst_xml[first.range().start..last.range().end].to_string();
-                        // Đảm bảo tất cả run đều đỏ: run "label" không có rPr sẽ được thêm màu đỏ
-                        // để ô JP output không hiển thị màu đen lẫn với màu đỏ của nội dung mới.
-                        edit_rich.insert(si_idx, ensure_runs_red(&raw));
-                    }
-                }
-            }
-            si_idx += 1;
-        }
-    }
-    (edit_rich, all_rich)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1313,20 +1256,6 @@ fn filter_cells_by_bounds(
     cells
 }
 
-/// Như `filter_cells_by_bounds` nhưng cho kết quả có kèm style gốc (`find_red_cells_with_style_xlsx`).
-fn filter_styled_cells_by_bounds(
-    mut cells: HashMap<String, HashMap<(usize, usize), CellStyleSource>>,
-    doc_type: DocType,
-) -> HashMap<String, HashMap<(usize, usize), CellStyleSource>> {
-    cells.retain(|sheet_name, map| {
-        if let Some(bounds) = content_bounds_for(doc_type, sheet_name) {
-            map.retain(|&(r, c), _| bounds.contains(r, c));
-        }
-        !map.is_empty()
-    });
-    cells
-}
-
 /// Như `filter_cells_by_bounds` nhưng cho shape/textbox nổi — lọc theo vị trí Ô NEO (anchor).
 fn filter_shapes_by_bounds(
     mut shapes: HashMap<String, Vec<ShapeInfo>>,
@@ -1651,8 +1580,6 @@ pub(crate) fn parse_cell_ref(cell_ref: &str) -> Option<(usize, usize)> {
 /// Một đoạn văn (`<a:p>`) trong textbox, cùng thuộc tính tổng hợp cần cho phát hiện.
 struct ShapeParagraph {
     text: String,
-    /// XML gốc nguyên văn của `<a:p>...</a:p>` — dùng để copy y nguyên định dạng khi ghi sang JP.
-    raw_xml: String,
     /// `true` nếu có ÍT NHẤT 1 run chữ đỏ (giống tiêu chí "any" của cell — xem `find_red_cells_in_sheet`).
     any_red: bool,
     /// `true` nếu có run và TOÀN BỘ run đều gạch bỏ (giống tiêu chí "all" của cell strikethrough).
@@ -1760,7 +1687,6 @@ fn parse_shapes_in_drawing(drawing_xml: &str) -> Vec<ShapeInfo> {
                 }
                 paragraphs.push(ShapeParagraph {
                     text,
-                    raw_xml: drawing_xml[p.range()].to_string(),
                     any_red,
                     all_struck: run_count > 0 && struck_count == run_count,
                 });
@@ -2031,6 +1957,82 @@ fn transform_rich_runs(parent: roxmltree::Node, src: &str) -> (String, usize, us
         }
     }
     (out, removed, blackened)
+}
+
+// ── XML surgery helper ───────────────────────────────────────────────────────
+// Áp nhiều thay đổi (thay/chèn/xóa theo byte range) lên 1 chuỗi XML gốc trong 1 lượt — sắp xếp
+// giảm dần theo `start` trước khi áp để offset các edit trước không bị lệch bởi edit sau.
+
+pub(crate) struct SurgeryEdit {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) replacement: String,
+}
+
+pub(crate) fn apply_surgery(xml: &str, mut edits: Vec<SurgeryEdit>) -> String {
+    if edits.is_empty() {
+        return xml.to_string();
+    }
+    edits.sort_by(|a, b| b.start.cmp(&a.start));
+    let mut result = xml.to_string();
+    for edit in edits {
+        result.replace_range(edit.start..edit.end, &edit.replacement);
+    }
+    result
+}
+
+/// Scan forward from `from` to find the byte position right after the first `>` of an XML tag,
+/// skipping over attribute values (handles quoted `>` inside attributes).
+fn find_tag_open_end(xml: &str, from: usize) -> usize {
+    let bytes = xml.as_bytes();
+    let mut i = from;
+    let mut in_quote: Option<u8> = None;
+    while i < bytes.len() {
+        let b = bytes[i];
+        match in_quote {
+            Some(q) if b == q => {
+                in_quote = None;
+            }
+            Some(_) => {}
+            None => {
+                if b == b'"' || b == b'\'' {
+                    in_quote = Some(b);
+                } else if b == b'>' {
+                    return i + 1;
+                }
+            }
+        }
+        i += 1;
+    }
+    from
+}
+
+/// Find byte position to insert a new `<row>` inside `<sheetData>`.
+fn find_row_insert_pos(
+    xml: &str,
+    sd_range: &std::ops::Range<usize>,
+    row_1s: &[usize],
+    new_row_1: usize,
+) -> usize {
+    // After last existing row with r < new_row_1
+    let last_smaller = row_1s
+        .iter()
+        .filter(|&&r| r < new_row_1)
+        .max()
+        .copied();
+    if let Some(prev_r) = last_smaller {
+        // Find that row's range by re-scanning
+        // (row_data ranges are not passed here, so we search the raw XML)
+        let tag = format!(r#"<row r="{prev_r}""#);
+        if let Some(start) = xml.find(&tag) {
+            // Find the matching </row>
+            if let Some(close) = xml[start..].find("</row>") {
+                return start + close + "</row>".len();
+            }
+        }
+    }
+    // No preceding rows → insert just after opening <sheetData> tag
+    find_tag_open_end(xml, sd_range.start)
 }
 
 /// Đọc `xl/sharedStrings.xml`, tô đen/xóa các `<si>` rich-text; trả về:
@@ -2304,72 +2306,6 @@ fn cleanup_drawing_xml(drawing_xml: &str) -> (String, usize, usize) {
     }
 
     (apply_surgery(drawing_xml, edits), strike_removed, red_blackened)
-}
-
-/// Chèn các đoạn văn shape mới (nguyên xi XML gốc từ VN) vào đúng shape (khớp theo TÊN) trong 1
-/// file drawing JP, ngay trước `</xdr:txBody>` của shape đó. `paragraphs`: danh sách
-/// `(tên shape, XML gốc của <a:p>)`. Trả về `(new_xml, applied_count, skipped_count)` — skipped
-/// khi không tìm thấy shape cùng tên trong JP (vd shape chỉ có trong VN, chưa từng có ở JP).
-fn inject_shape_paragraphs(
-    drawing_xml: &str,
-    paragraphs: &[(String, String)],
-) -> (String, usize, usize) {
-    if paragraphs.is_empty() {
-        return (drawing_xml.to_string(), 0, 0);
-    }
-
-    let doc = match roxmltree::Document::parse(drawing_xml) {
-        Ok(d) => d,
-        Err(_) => return (drawing_xml.to_string(), 0, paragraphs.len()),
-    };
-
-    // Tên shape → vị trí byte ngay trước `</xdr:txBody>` (tìm bằng cách quét ngược '<' gần nhất
-    // trước điểm kết thúc range của node txBody — tránh phải biết trước độ dài chuỗi đóng thẻ).
-    let mut close_pos_by_name: HashMap<String, usize> = HashMap::new();
-    for sp in doc.descendants().filter(|n| n.tag_name().name() == "sp") {
-        let Some(name) = sp
-            .descendants()
-            .find(|n| n.tag_name().name() == "cNvPr")
-            .and_then(|n| n.attribute("name"))
-        else {
-            continue;
-        };
-        if name.is_empty() {
-            continue;
-        }
-        let Some(tx_body) = sp.children().find(|c| c.tag_name().name() == "txBody") else {
-            continue;
-        };
-        if let Some(open_lt) = drawing_xml[..tx_body.range().end].rfind('<') {
-            close_pos_by_name.entry(name.to_string()).or_insert(open_lt);
-        }
-    }
-
-    // Gom các đoạn văn cùng đích chèn lại rồi nối 1 lần (giữ đúng thứ tự), tránh việc chèn nhiều
-    // lần tại CÙNG 1 vị trí làm đảo ngược thứ tự — xem cách xử lý tương tự ở `pos_inserts`
-    // trong `inject_cells_into_sheet_xml`.
-    let mut pos_texts: HashMap<usize, Vec<String>> = HashMap::new();
-    let mut applied = 0usize;
-    let mut skipped = 0usize;
-    for (name, raw_p) in paragraphs {
-        if let Some(&pos) = close_pos_by_name.get(name) {
-            pos_texts.entry(pos).or_default().push(raw_p.clone());
-            applied += 1;
-        } else {
-            skipped += 1;
-        }
-    }
-
-    let edits: Vec<SurgeryEdit> = pos_texts
-        .into_iter()
-        .map(|(pos, texts)| SurgeryEdit {
-            start: pos,
-            end: pos,
-            replacement: texts.join(""),
-        })
-        .collect();
-
-    (apply_surgery(drawing_xml, edits), applied, skipped)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2699,20 +2635,6 @@ struct FontInfo {
     strike: bool,
 }
 
-/// Nguồn style của 1 ô đỏ VN — dùng để tái tạo lại đúng định dạng khi ghi sang JP.
-#[derive(Clone)]
-pub(crate) enum CellStyleSource {
-    /// Ô có rich-text run (nhiều `<r>`) — copy y nguyên XML gốc của các run này sang JP.
-    Rich(String),
-    /// Ô dùng font cấp-cell (không có rich-text run) — style lấy từ `<font>` trong styles.xml.
-    Uniform {
-        color: String,
-        bold: bool,
-        italic: bool,
-        strike: bool,
-    },
-}
-
 /// Parse styles.xml → FontInfo cho từng font, theo đúng thứ tự trong `<fonts>`.
 fn parse_font_infos(styles_xml: &str) -> Vec<FontInfo> {
     let mut result = Vec::new();
@@ -2753,58 +2675,6 @@ fn parse_font_infos(styles_xml: &str) -> Vec<FontInfo> {
     result
 }
 
-/// Giống `parse_red_xf_indices` nhưng trả về font_id tương ứng của từng xf đỏ
-/// (thay vì chỉ đánh dấu có/không), để tra cứu FontInfo đầy đủ (màu/bold/italic/strike).
-fn parse_red_xf_font_ids(styles_xml: &str, red_font_ids: &HashSet<usize>) -> HashMap<usize, usize> {
-    let mut result = HashMap::new();
-    if red_font_ids.is_empty() {
-        return result;
-    }
-    let Ok(doc) = roxmltree::Document::parse(styles_xml) else {
-        return result;
-    };
-
-    let mut style_xf_fonts: Vec<usize> = Vec::new();
-    for node in doc.descendants() {
-        if node.tag_name().name() == "xf"
-            && node.parent().map(|p| p.tag_name().name()) == Some("cellStyleXfs")
-        {
-            let fid = node
-                .attribute("fontId")
-                .and_then(|s| s.parse::<usize>().ok())
-                .unwrap_or(0);
-            style_xf_fonts.push(fid);
-        }
-    }
-
-    let mut xf_idx = 0usize;
-    for node in doc.descendants() {
-        if node.tag_name().name() == "xf"
-            && node.parent().map(|p| p.tag_name().name()) == Some("cellXfs")
-        {
-            let font_id = node
-                .attribute("fontId")
-                .and_then(|s| s.parse::<usize>().ok())
-                .unwrap_or(0);
-            let apply_font = node.attribute("applyFont").map_or(false, |v| v == "1" || v == "true");
-            let inherited_font = node
-                .attribute("xfId")
-                .and_then(|s| s.parse::<usize>().ok())
-                .and_then(|xfid| style_xf_fonts.get(xfid).copied());
-
-            if apply_font && red_font_ids.contains(&font_id) {
-                result.insert(xf_idx, font_id);
-            } else if let Some(f) = inherited_font {
-                if red_font_ids.contains(&f) {
-                    result.insert(xf_idx, f);
-                }
-            }
-            xf_idx += 1;
-        }
-    }
-    result
-}
-
 /// Giống `parse_red_shared_strings` nhưng lấy luôn XML thô của các run bên trong
 /// (thay vì chỉ đánh dấu index), để copy y nguyên khi ghi sang JP.
 /// Trả về (ssi có run đỏ → raw XML của các run, tập hợp MỌI ssi có rich-text run bất kể màu).
@@ -2839,147 +2709,6 @@ pub(crate) fn parse_shared_strings_rich_info(sst_xml: &str) -> (HashMap<usize, S
         }
     }
     (red_rich, all_rich)
-}
-
-/// Chuẩn hóa 1 mã màu (6 hoặc 8 hex) về dạng ARGB 8-hex dùng cho `<color rgb="...">`.
-fn normalize_argb(color: &str) -> String {
-    let c = color.trim_start_matches('#');
-    if c.len() == 6 {
-        format!("FF{c}")
-    } else {
-        c.to_string()
-    }
-}
-
-/// Quét toàn bộ file VN, với mỗi ô đỏ trả về `CellStyleSource` tương ứng — dùng riêng cho
-/// bước ghi (apply), tách biệt với `find_red_cells_xlsx` (dùng cho phân tích/đếm) để không
-/// ảnh hưởng logic phát hiện đã hoạt động ổn định.
-pub(crate) fn find_red_cells_with_style_xlsx(path: &str) -> HashMap<String, HashMap<(usize, usize), CellStyleSource>> {
-    let file = match File::open(path) {
-        Ok(f) => f,
-        Err(_) => return HashMap::new(),
-    };
-    let mut archive = match zip::ZipArchive::new(file) {
-        Ok(a) => a,
-        Err(_) => return HashMap::new(),
-    };
-
-    let styles_xml = read_zip_entry(&mut archive, "xl/styles.xml").unwrap_or_default();
-    // Bắt cả ô ĐỎ lẫn XANH (edit color) để phản ánh sang JP — xem `is_edit_color`.
-    let edit_font_ids = parse_edit_font_ids(&styles_xml);
-    let font_infos = parse_font_infos(&styles_xml);
-    let red_xf_font_ids = parse_red_xf_font_ids(&styles_xml, &edit_font_ids);
-
-    let sst_xml = read_zip_entry(&mut archive, "xl/sharedStrings.xml").unwrap_or_default();
-    let (red_ssi_rich, all_rich_ssi) = if sst_xml.is_empty() {
-        (HashMap::new(), HashSet::new())
-    } else {
-        parse_shared_strings_edit_info(&sst_xml)
-    };
-
-    // Lưu ý: KHÔNG early-return dù red_xf_font_ids/red_ssi_rich rỗng — ô inline string có thể
-    // mang màu đỏ nhúng trực tiếp trong run (case 3 bên dưới), không qua styles.xml/sharedStrings.xml.
-
-    let workbook_xml = match read_zip_entry(&mut archive, "xl/workbook.xml") {
-        Some(s) => s,
-        None => return HashMap::new(),
-    };
-    let rels_xml = match read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels") {
-        Some(s) => s,
-        None => return HashMap::new(),
-    };
-    let sheet_paths = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
-
-    let mut result: HashMap<String, HashMap<(usize, usize), CellStyleSource>> = HashMap::new();
-    for (name, xml_path) in sheet_paths {
-        let Some(sheet_xml) = read_zip_entry(&mut archive, &xml_path) else {
-            continue;
-        };
-        let Ok(doc) = roxmltree::Document::parse(&sheet_xml) else {
-            continue;
-        };
-        let mut cells: HashMap<(usize, usize), CellStyleSource> = HashMap::new();
-
-        for node in doc.descendants() {
-            if node.tag_name().name() != "c" {
-                continue;
-            }
-            let Some(pos) = node.attribute("r").and_then(parse_cell_ref) else {
-                continue;
-            };
-
-            // Rich-text run (nếu có) LUÔN được ưu tiên hơn style cấp-cell — đúng theo cách Excel
-            // hiển thị: định dạng trên từng run đè lên font mặc định của cell. Nếu không xử lý
-            // trước, 1 cell có base style đỏ (rất phổ biến) nhưng nội dung thật là rich-text đan
-            // xen (đỏ/đen/gạch bỏ) sẽ bị hiểu nhầm thành "toàn bộ ô 1 màu đỏ đồng nhất", làm mất
-            // hẳn phần gạch bỏ khi ghi sang JP.
-            let mut handled_by_rich = false;
-
-            // 1. Shared string rich-text (t="s")
-            if node.attribute("t") == Some("s") {
-                if let Some(v) = node.children().find(|c| c.tag_name().name() == "v") {
-                    if let Some(ssi) = v.text().and_then(|t| t.parse::<usize>().ok()) {
-                        if all_rich_ssi.contains(&ssi) {
-                            handled_by_rich = true;
-                            if let Some(raw) = red_ssi_rich.get(&ssi) {
-                                cells.insert(pos, CellStyleSource::Rich(raw.clone()));
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Inline string rich-text (t="inlineStr")
-            if !handled_by_rich && node.attribute("t") == Some("inlineStr") {
-                if let Some(is_node) = node.children().find(|c| c.tag_name().name() == "is") {
-                    let runs: Vec<_> = is_node
-                        .children()
-                        .filter(|c| c.tag_name().name() == "r")
-                        .collect();
-                    if !runs.is_empty() {
-                        handled_by_rich = true;
-                        if runs.iter().any(|r| has_edit_font_run(r)) {
-                            if let (Some(first), Some(last)) = (runs.first(), runs.last()) {
-                                let raw =
-                                    sheet_xml[first.range().start..last.range().end].to_string();
-                                cells.insert(pos, CellStyleSource::Rich(raw));
-                            }
-                        }
-                    }
-                }
-            }
-
-            if handled_by_rich {
-                continue;
-            }
-
-            // 3. Style cấp-cell (chỉ áp dụng khi ô KHÔNG có rich-text run nào)
-            if let Some(s_idx) = node.attribute("s").and_then(|s| s.parse::<usize>().ok()) {
-                if let Some(font_id) = red_xf_font_ids.get(&s_idx) {
-                    if let Some(info) = font_infos.get(*font_id) {
-                        cells.insert(
-                            pos,
-                            CellStyleSource::Uniform {
-                                color: info
-                                    .color
-                                    .clone()
-                                    .unwrap_or_else(|| "FFFF0000".to_string()),
-                                bold: info.bold,
-                                italic: info.italic,
-                                strike: info.strike,
-                            },
-                        );
-                    }
-                }
-            }
-        }
-
-        if !cells.is_empty() {
-            result.insert(name, cells);
-        }
-    }
-
-    result
 }
 
 /// Run `<r>` có strikethrough HOẶC màu chữ KHÔNG phải đen (bất kỳ màu nào, không chỉ đỏ/xanh).
@@ -3135,132 +2864,6 @@ pub(crate) fn find_changed_style_cells_xlsx(path: &str) -> HashMap<String, HashS
     }
 
     result
-}
-
-/// Tạo `<c>` mới cho ô cần ghi, giữ nguyên style gốc từ VN nếu có (`CellStyleSource`);
-/// nếu không xác định được style (fallback), dùng lại kiểu đỏ đậm mặc định như cũ.
-fn make_cell_with_style(
-    cell_ref: &str,
-    s_attr: &str,
-    vn_text: &str,
-    style: &Option<CellStyleSource>,
-) -> String {
-    match style {
-        Some(CellStyleSource::Rich(raw)) => {
-            let s_part = if !s_attr.is_empty() {
-                format!(" s=\"{s_attr}\"")
-            } else {
-                String::new()
-            };
-            format!(r#"<c r="{cell_ref}"{s_part} t="inlineStr"><is>{raw}</is></c>"#)
-        }
-        Some(CellStyleSource::Uniform {
-            color,
-            bold,
-            italic,
-            strike,
-        }) => {
-            let s_part = if !s_attr.is_empty() {
-                format!(" s=\"{s_attr}\"")
-            } else {
-                String::new()
-            };
-            let mut rpr = format!(r#"<color rgb="{}"/>"#, normalize_argb(color));
-            if *bold {
-                rpr.push_str("<b/>");
-            }
-            if *italic {
-                rpr.push_str("<i/>");
-            }
-            if *strike {
-                rpr.push_str("<strike/>");
-            }
-            format!(
-                r#"<c r="{cell_ref}"{s_part} t="inlineStr"><is><r><rPr>{rpr}</rPr><t xml:space="preserve">{}</t></r></is></c>"#,
-                xml_escape(vn_text)
-            )
-        }
-        None => make_vn_inline_cell(cell_ref, s_attr, vn_text),
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Áp dụng thay đổi: ghi VN text (đỏ) vào đúng vị trí ô trong file JP xlsx
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Độ dài tối thiểu (số ký tự) của nội dung JP để được xem là 1 điểm khớp hợp lệ khi tìm cột
-/// đúng — tránh khớp nhầm với nội dung quá ngắn/chung (vd "）", số thứ tự...).
-const MIN_COLUMN_MATCH_LEN: usize = 3;
-
-/// Độ dài (số ký tự) chuỗi con CHUNG DÀI NHẤT giữa 2 chuỗi — dùng đo mức "liên quan" nội dung
-/// JP↔VN mà không đòi hỏi chứa trọn (VN thường = JP + phần thêm, hoặc lệch dấu câu cuối).
-fn common_substr_len(a: &str, b: &str) -> usize {
-    let a: Vec<char> = a.chars().collect();
-    let b: Vec<char> = b.chars().collect();
-    if a.is_empty() || b.is_empty() {
-        return 0;
-    }
-    let mut prev = vec![0usize; b.len() + 1];
-    let mut best = 0usize;
-    for i in 1..=a.len() {
-        let mut cur = vec![0usize; b.len() + 1];
-        for j in 1..=b.len() {
-            if a[i - 1] == b[j - 1] {
-                cur[j] = prev[j - 1] + 1;
-                best = best.max(cur[j]);
-            }
-        }
-        prev = cur;
-    }
-    best
-}
-
-/// Xác định cột ĐÍCH trong JP để ghi ô VN. Mặc định giữ nguyên cột của VN; chỉ đổi sang cột khác
-/// khi cột đó khớp nội dung vn_text DÀI HƠN HẲN cột gốc (xử lý lệch cột do JP thêm/thiếu cột).
-/// Dùng chuỗi con chung dài nhất (không đòi hỏi chứa trọn) để cột gốc "dính" khi VN chỉ là JP +
-/// phần thêm — tránh chuyển nhầm sang cột có mã ngắn (vd "MJDL020") tình cờ nằm trong vn_text.
-/// Trả về `(cột đích 0-based, có bị điều chỉnh hay không)`.
-fn resolve_target_col(
-    jp_grid: &HashMap<String, Vec<Vec<String>>>,
-    sheet: &str,
-    row_0: usize,
-    col_0: usize,
-    vn_text: &str,
-    last_col0: Option<usize>,
-) -> (usize, bool) {
-    let Some(row_vec) = jp_grid.get(sheet).and_then(|g| g.get(row_0)) else {
-        return (col_0, false);
-    };
-    let vn = vn_text.trim();
-
-    let same_score = row_vec
-        .get(col_0)
-        .map(|t| common_substr_len(t.trim(), vn))
-        .unwrap_or(0);
-
-    let search_len = last_col0.map_or(row_vec.len(), |c| row_vec.len().min(c + 1));
-    let mut best_col = col_0;
-    let mut best_score = same_score;
-    for (c, text) in row_vec[..search_len].iter().enumerate() {
-        if c == col_0 {
-            continue;
-        }
-        let t = text.trim();
-        if t.chars().count() < MIN_COLUMN_MATCH_LEN {
-            continue;
-        }
-        let score = common_substr_len(t, vn);
-        if score > best_score {
-            best_score = score;
-            best_col = c;
-        }
-    }
-
-    if best_col != col_0 && best_score >= MIN_COLUMN_MATCH_LEN && best_score > same_score {
-        (best_col, true)
-    } else {
-        (col_0, false)
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4438,649 +4041,6 @@ pub(crate) fn sync_structure(vn_path: &str, jp_path: &str, output_path: &str) ->
         del_renamed_count,
         sheets_modified,
     })
-}
-
-/// Bước 5-6 của pipeline "Áp dụng" (xem `apply_changes`): ghi VN text (in đỏ) vào đúng vị trí
-/// tương ứng trong `jp_path` — vốn đã qua `sync_structure` (dọn dẹp/clone/đổi tên DEL/canh dòng)
-/// — rồi lưu ra `output_path`. Nội dung VN được giữ nguyên (không dịch) và tô màu đỏ để reviewer
-/// kiểm tra. `carried_cloned_names`: tên sheet đã được `sync_structure` clone trực tiếp từ VN
-/// trước đó — BỎ QUA các sheet này (nội dung đã đúng 100% từ VN rồi, không ghi/dọn lại).
-pub(crate) fn merge_content(
-    vn_path: &str,
-    jp_path: &str,
-    output_path: &str,
-    carried_cloned_names: &HashSet<String>,
-) -> AppResult<ApplyResult> {
-    let analysis = analyze(vn_path, jp_path)?;
-    let doc_type = detect_doc_type(vn_path, jp_path);
-    // Ô "edit" của VN = ĐỎ hoặc XANH (xem `is_edit_color`) kèm style gốc (màu/bold/italic/strike).
-    let vn_styles = filter_styled_cells_by_bounds(find_red_cells_with_style_xlsx(vn_path), doc_type);
-    let jp_grid_for_column_check = read_workbook_grid(jp_path)?;
-    let vn_grid = read_workbook_grid(vn_path)?;
-
-    // Group edit cells by sheet: sheet_name → Vec<(row_0, col_0, vn_text, style)>
-    // `style` giữ lại màu chữ/bold/italic/strikethrough gốc của ô VN để tái tạo đúng khi ghi sang JP
-    // (đỏ giữ đỏ, xanh giữ xanh). `col_0` là cột ĐÍCH trong JP — có thể khác cột VN nếu phát hiện
-    // lệch cột cùng dòng (xem resolve_target_col): style vẫn tra theo cột GỐC của VN, chỉ vị trí đổi.
-    let mut cells_by_sheet: HashMap<String, Vec<(usize, usize, String, Option<CellStyleSource>)>> =
-        HashMap::new();
-    let mut column_corrected_count = 0usize;
-    for (sheet, cell_styles) in &vn_styles {
-        for ((vn_row_0, vn_col_0), style) in cell_styles {
-            let vn_text = vn_grid
-                .get(sheet)
-                .and_then(|g| g.get(*vn_row_0))
-                .and_then(|row| row.get(*vn_col_0))
-                .cloned()
-                .unwrap_or_default();
-            if vn_text.trim().is_empty() {
-                continue;
-            }
-            let last_col0 = content_bounds_for(doc_type, sheet).map(|b| b.last_col0);
-            let (target_col_0, corrected) = resolve_target_col(
-                &jp_grid_for_column_check,
-                sheet,
-                *vn_row_0,
-                *vn_col_0,
-                &vn_text,
-                last_col0,
-            );
-            if corrected {
-                column_corrected_count += 1;
-            }
-            cells_by_sheet.entry(sheet.clone()).or_default().push((
-                *vn_row_0,
-                target_col_0,
-                vn_text,
-                Some(style.clone()),
-            ));
-        }
-    }
-
-    // Gom đoạn văn shape/textbox nổi có chữ đỏ từ VN theo sheet: sheet_name → Vec<(tên shape,
-    // XML gốc của <a:p>)>. Đối ứng theo TÊN shape (không theo neo) — xem ghi chú đầu mục
-    // "Xử lý textbox/shape nổi".
-    let vn_shapes = filter_shapes_by_bounds(find_shapes_xlsx(vn_path), doc_type);
-    let mut shape_paragraphs_by_sheet: HashMap<String, Vec<(String, String)>> = HashMap::new();
-    for (sheet_name, shapes) in &vn_shapes {
-        for shape in shapes {
-            if shape.name.is_empty() {
-                continue;
-            }
-            for p in &shape.paragraphs {
-                if p.any_red {
-                    shape_paragraphs_by_sheet
-                        .entry(sheet_name.clone())
-                        .or_default()
-                        .push((shape.name.clone(), p.raw_xml.clone()));
-                }
-            }
-        }
-    }
-
-    // Sheet chỉ có ở VN chưa có ở JP — bình thường đã = 0 ở bước này vì `sync_structure` đã clone
-    // trước; chỉ khả thi nếu hàm này được gọi độc lập (jp_path không qua `sync_structure`).
-    let sheets_to_clone: Vec<String> = analysis
-        .sheet_compare
-        .iter()
-        .filter(|c| c.in_vn && !c.in_jp && !is_del_sheet_name(&c.name))
-        .map(|c| c.name.clone())
-        .collect();
-
-    // Open JP file as ZIP
-    let jp_file = File::open(jp_path)
-        .map_err(|e| AppError::new(format!("Không mở được file JP: {e}")))?;
-    let mut archive = zip::ZipArchive::new(jp_file)
-        .map_err(|e| AppError::new(format!("File JP không phải ZIP hợp lệ: {e}")))?;
-
-    // Dọn dẹp lại phòng khi hàm này được gọi độc lập trên 1 file JP chưa qua `sync_structure` —
-    // đã dọn rồi thì đây là no-op (không còn strikethrough/chữ đỏ cũ để tìm thấy).
-    let ctx = build_cleanup_context(&mut archive);
-    let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
-    let (rich_ssi, plain_text, mut strike_removed_count, mut red_blackened_count) =
-        match cleanup_shared_strings(&mut archive) {
-            Some((new_xml, removed, blackened, rich_ssi, plain_text)) => {
-                if removed > 0 || blackened > 0 {
-                    replaced.insert("xl/sharedStrings.xml".to_string(), new_xml.into_bytes());
-                }
-                (rich_ssi, plain_text, removed, blackened)
-            }
-            None => (HashSet::new(), HashMap::new(), 0, 0),
-        };
-
-    // Resolve sheet name → XML path
-    let workbook_xml = read_zip_entry(&mut archive, "xl/workbook.xml")
-        .ok_or_else(|| AppError::new("Không tìm thấy xl/workbook.xml trong file JP."))?;
-    let rels_xml = read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels")
-        .ok_or_else(|| AppError::new("Không tìm thấy xl/_rels/workbook.xml.rels."))?;
-    let sheet_path_list = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
-    let mut sheet_path_map: HashMap<String, String> = sheet_path_list.iter().cloned().collect();
-
-    let cloned = clone_missing_sheets_from_vn(&mut archive, vn_path, &sheets_to_clone, &mut replaced)?;
-    let mut newly_cloned_names: HashSet<String> =
-        cloned.new_entries.iter().map(|(name, _)| name.clone()).collect();
-    for (name, path) in &cloned.new_entries {
-        sheet_path_map.insert(name.clone(), path.clone());
-    }
-    let cloned_sheet_count = cloned.new_entries.len();
-    newly_cloned_names.extend(carried_cloned_names.iter().cloned());
-
-    // Bước 2: dọn dẹp mọi sheet, sau đó phản ánh chữ đỏ VN lên trên (chỉ các sheet có ô đỏ).
-    let mut applied_count = 0usize;
-    let mut skipped_count = 0usize;
-    let mut cleanup_skipped_count = 0usize;
-    let mut shape_applied_count = 0usize;
-    let mut shape_skipped_count = 0usize;
-    let mut del_sheet_count = 0usize;
-    let mut sheets_modified: Vec<String> = Vec::new();
-
-    for (sheet_name, xml_path) in &sheet_path_map {
-        let Some(original_xml) = read_current(&mut archive, &replaced, xml_path) else {
-            if let Some(cells) = cells_by_sheet.get(sheet_name) {
-                skipped_count += cells.len();
-            }
-            if let Some(paragraphs) = shape_paragraphs_by_sheet.get(sheet_name) {
-                shape_skipped_count += paragraphs.len();
-            }
-            continue;
-        };
-        let bounds = content_bounds_for(doc_type, sheet_name);
-
-        // Sheet vừa clone trực tiếp từ VN (xem `clone_missing_sheets_from_vn`): nội dung/định
-        // dạng/shape đã đúng 100% từ VN ngay khi clone — KHÔNG chạy dọn dẹp hay ghi ô đỏ lại,
-        // tránh vô tình tô đen nhầm ô đỏ mới hoặc ghi đè mất style vừa merge.
-        if newly_cloned_names.contains(sheet_name) {
-            if !sheets_modified.contains(sheet_name) {
-                sheets_modified.push(sheet_name.clone());
-            }
-            continue;
-        }
-
-        // Sheet "(DEL)": chỉ bỏ màu chữ về đen, KHÔNG dọn strikethrough, KHÔNG ghi nội dung VN
-        // mới, KHÔNG đụng shape — xem ghi chú đầu mục "Sheet JP có hậu tố (DEL)".
-        if is_del_sheet_name(sheet_name) {
-            del_sheet_count += 1;
-            if let Some(cells) = cells_by_sheet.get(sheet_name) {
-                skipped_count += cells.len();
-            }
-            if let Some(paragraphs) = shape_paragraphs_by_sheet.get(sheet_name) {
-                shape_skipped_count += paragraphs.len();
-            }
-            let (new_xml, blackened, skip) = blacken_all_cells_sheet_xml(
-                &original_xml,
-                &ctx.colored_xf,
-                &plain_text,
-                &rich_ssi,
-                bounds,
-            );
-            cleanup_skipped_count += skip;
-            if blackened > 0 {
-                red_blackened_count += blackened;
-                replaced.insert(xml_path.clone(), new_xml.into_bytes());
-                sheets_modified.push(sheet_name.clone());
-            }
-            continue;
-        }
-
-        // Xác định drawing (nếu có) TRƯỚC khi original_xml có thể bị move ở dưới.
-        let drawing_path = resolve_drawing_path(&mut archive, &original_xml, xml_path);
-
-        let (cleaned_xml, s_removed, r_blackened, c_skip) =
-            cleanup_sheet_xml(&original_xml, &ctx, &rich_ssi, &plain_text, bounds);
-        cleanup_skipped_count += c_skip;
-        let cleaned = s_removed > 0 || r_blackened > 0;
-        if cleaned {
-            strike_removed_count += s_removed;
-            red_blackened_count += r_blackened;
-        }
-        let mut current_xml = if cleaned { cleaned_xml } else { original_xml };
-        let mut changed = cleaned;
-
-        if let Some(cells) = cells_by_sheet.get(sheet_name) {
-            let (new_xml, n_applied) = inject_cells_into_sheet_xml(&current_xml, cells);
-            let n_skipped = cells.len() - n_applied;
-            applied_count += n_applied;
-            skipped_count += n_skipped;
-            if n_applied > 0 {
-                current_xml = new_xml;
-                changed = true;
-            }
-        }
-
-        if changed {
-            replaced.insert(xml_path.clone(), current_xml.into_bytes());
-            sheets_modified.push(sheet_name.clone());
-        }
-
-        // Dọn dẹp + phản ánh textbox/shape nổi (nếu sheet có drawing).
-        let Some(drawing_path) = drawing_path else {
-            continue;
-        };
-        let Some(drawing_xml) = read_zip_entry(&mut archive, &drawing_path) else {
-            if let Some(paragraphs) = shape_paragraphs_by_sheet.get(sheet_name) {
-                shape_skipped_count += paragraphs.len();
-            }
-            continue;
-        };
-
-        let (cleaned_drawing, d_removed, d_blackened) = cleanup_drawing_xml(&drawing_xml);
-        let drawing_cleaned = d_removed > 0 || d_blackened > 0;
-        if drawing_cleaned {
-            strike_removed_count += d_removed;
-            red_blackened_count += d_blackened;
-        }
-        let mut current_drawing = if drawing_cleaned {
-            cleaned_drawing
-        } else {
-            drawing_xml
-        };
-        let mut drawing_changed = drawing_cleaned;
-
-        if let Some(paragraphs) = shape_paragraphs_by_sheet.get(sheet_name) {
-            let (new_drawing, n_applied, n_skipped) =
-                inject_shape_paragraphs(&current_drawing, paragraphs);
-            shape_applied_count += n_applied;
-            shape_skipped_count += n_skipped;
-            if n_applied > 0 {
-                current_drawing = new_drawing;
-                drawing_changed = true;
-            }
-        }
-
-        if drawing_changed {
-            replaced.insert(drawing_path, current_drawing.into_bytes());
-            if !sheets_modified.contains(sheet_name) {
-                sheets_modified.push(sheet_name.clone());
-            }
-        }
-    }
-
-    // Ô đỏ / đoạn shape VN trỏ tới sheet không tồn tại trong JP → bỏ qua, tính vào skipped_count.
-    for (sheet_name, cells) in &cells_by_sheet {
-        if !sheet_path_map.contains_key(sheet_name) {
-            skipped_count += cells.len();
-        }
-    }
-    for (sheet_name, paragraphs) in &shape_paragraphs_by_sheet {
-        if !sheet_path_map.contains_key(sheet_name) {
-            shape_skipped_count += paragraphs.len();
-        }
-    }
-
-    // Sắp xếp lại thứ tự sheet JP cho khớp thứ tự sheet VN — nếu `sync_structure` đã sắp xếp
-    // trước thì đây là no-op; vẫn giữ lại phòng khi hàm này được gọi độc lập.
-    let vn_sheet_order: Vec<String> = {
-        let vn_file_for_order = File::open(vn_path)
-            .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
-        let mut vn_archive_for_order = zip::ZipArchive::new(vn_file_for_order)
-            .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
-        let vn_wb = read_zip_entry(&mut vn_archive_for_order, "xl/workbook.xml").unwrap_or_default();
-        let vn_rels =
-            read_zip_entry(&mut vn_archive_for_order, "xl/_rels/workbook.xml.rels").unwrap_or_default();
-        resolve_sheet_xml_paths(&vn_wb, &vn_rels)
-            .into_iter()
-            .map(|(name, _)| name)
-            .collect()
-    };
-    if let Some(current_workbook_xml) = read_current(&mut archive, &replaced, "xl/workbook.xml") {
-        let reordered = reorder_sheets_to_match_vn(&current_workbook_xml, &vn_sheet_order);
-        if reordered != current_workbook_xml {
-            replaced.insert("xl/workbook.xml".to_string(), reordered.into_bytes());
-        }
-    }
-
-    // Write output ZIP (copy JP + swap modified sheet/sharedStrings/drawing XMLs + sheet mới tạo)
-    write_output_zip(&mut archive, &replaced, output_path)?;
-
-    Ok(ApplyResult {
-        output_path: output_path.to_string(),
-        applied_count,
-        skipped_count,
-        sheets_modified,
-        strike_removed_count,
-        red_blackened_count,
-        cleanup_skipped_count,
-        column_corrected_count,
-        shape_applied_count,
-        shape_skipped_count,
-        cloned_sheet_count,
-        del_sheet_count,
-        rows_inserted: 0,
-    })
-}
-
-// Pipeline "Áp dụng" VN → JP KHÔNG còn nằm ở đây — mỗi `c23{2,3,4,5,6,8}_sync_service::apply_changes`
-// (xem module doc từng file) tự chạy đủ 6 bước (chấp nhận lặp code giữa các loại tài liệu), chỉ
-// gọi vào các hàm dùng chung bên dưới (`sync_structure`, `merge_content`, `analyze_row_alignment`,
-// `insert_rows`, `merged_output_path`). Dispatch theo `detect_doc_type` nằm ở
-// `services::vnjp_sync_service::apply_changes`.
-
-// ── Apply helpers ────────────────────────────────────────────────────────────
-
-struct SurgeryEdit {
-    start: usize,
-    end: usize,
-    replacement: String,
-}
-
-fn apply_surgery(xml: &str, mut edits: Vec<SurgeryEdit>) -> String {
-    if edits.is_empty() {
-        return xml.to_string();
-    }
-    edits.sort_by(|a, b| b.start.cmp(&a.start));
-    let mut result = xml.to_string();
-    for edit in edits {
-        result.replace_range(edit.start..edit.end, &edit.replacement);
-    }
-    result
-}
-
-/// Đảm bảo tất cả các run `<r>` trong chuỗi raw runs XML đều mang màu đỏ (FFFF0000).
-/// Run chưa có `<rPr>` → thêm `<rPr><color rgb="FFFF0000"/></rPr>`.
-/// Run có `<rPr>` nhưng thiếu `<color>` → chèn `<color rgb="FFFF0000"/>` vào đầu `<rPr>`.
-/// Dùng khi ghi rich-text VN sang JP để toàn bộ ô hiển thị màu đỏ (không để run "label" đen lẫn).
-fn ensure_runs_red(raw_runs: &str) -> String {
-    let prefix = "<x>";
-    let suffix = "</x>";
-    let wrapped = format!("{}{}{}", prefix, raw_runs, suffix);
-    let Ok(doc) = roxmltree::Document::parse(&wrapped) else {
-        return raw_runs.to_string();
-    };
-
-    let mut edits: Vec<SurgeryEdit> = Vec::new();
-
-    for node in doc.descendants() {
-        if node.tag_name().name() != "r" {
-            continue;
-        }
-        let elem_children: Vec<_> = node.children().filter(|n| n.is_element()).collect();
-        let rpr = elem_children.iter().find(|n| n.tag_name().name() == "rPr");
-
-        match rpr {
-            None => {
-                // Không có rPr: chèn <rPr><color.../></rPr> trước phần tử con đầu tiên
-                if let Some(first) = elem_children.first() {
-                    let pos = first.range().start;
-                    edits.push(SurgeryEdit {
-                        start: pos,
-                        end: pos,
-                        replacement: r#"<rPr><color rgb="FFFF0000"/></rPr>"#.to_string(),
-                    });
-                }
-            }
-            Some(rpr_node) => {
-                // Có rPr nhưng chưa có <color>: chèn vào đầu nội dung rPr
-                if !rpr_node.children().any(|n| n.tag_name().name() == "color") {
-                    let rpr_elem_children: Vec<_> =
-                        rpr_node.children().filter(|n| n.is_element()).collect();
-                    let pos = if let Some(first_child) = rpr_elem_children.first() {
-                        first_child.range().start
-                    } else {
-                        let rpr_raw = &wrapped[rpr_node.range()];
-                        if rpr_raw.ends_with("/>") {
-                            // Self-closing <rPr/>: thay toàn bộ
-                            edits.push(SurgeryEdit {
-                                start: rpr_node.range().start,
-                                end: rpr_node.range().end,
-                                replacement: r#"<rPr><color rgb="FFFF0000"/></rPr>"#.to_string(),
-                            });
-                            continue;
-                        }
-                        // <rPr></rPr> rỗng: chèn trước </rPr>
-                        rpr_node.range().end - "</rPr>".len()
-                    };
-                    edits.push(SurgeryEdit {
-                        start: pos,
-                        end: pos,
-                        replacement: r#"<color rgb="FFFF0000"/>"#.to_string(),
-                    });
-                }
-            }
-        }
-    }
-
-    let result = apply_surgery(&wrapped, edits);
-    if result.starts_with(prefix) && result.ends_with(suffix) {
-        result[prefix.len()..result.len() - suffix.len()].to_string()
-    } else {
-        raw_runs.to_string()
-    }
-}
-
-/// Byte-surgery: inject VN text (red color) into specific cells of a sheet XML.
-/// Returns `(new_xml, applied_count)`.
-pub(crate) fn inject_cells_into_sheet_xml(
-    sheet_xml: &str,
-    cells: &[(usize, usize, String, Option<CellStyleSource>)], // (row_0, col_0, vn_text, style)
-) -> (String, usize) {
-    if cells.is_empty() {
-        return (sheet_xml.to_string(), 0);
-    }
-
-    let doc = match roxmltree::Document::parse(sheet_xml) {
-        Ok(d) => d,
-        Err(_) => return (sheet_xml.to_string(), 0),
-    };
-
-    // (row_0, col_0) → (node_range, s_attr)
-    let mut existing_cells: HashMap<(usize, usize), (std::ops::Range<usize>, String)> =
-        HashMap::new();
-    // Tập ô JP có công thức (<f>) — không được ghi đè bằng nội dung VN
-    let mut formula_cells: HashSet<(usize, usize)> = HashSet::new();
-    // row_1 → (row_range, sorted_cells_vec: [(col_0, cell_range)])
-    let mut row_data: HashMap<
-        usize,
-        (std::ops::Range<usize>, Vec<(usize, std::ops::Range<usize>)>),
-    > = HashMap::new();
-    let mut sheet_data_range: Option<std::ops::Range<usize>> = None;
-
-    for node in doc.descendants() {
-        match node.tag_name().name() {
-            "sheetData" => {
-                sheet_data_range = Some(node.range());
-            }
-            "row" => {
-                if let Some(r) = node.attribute("r").and_then(|s| s.parse::<usize>().ok()) {
-                    row_data.insert(r, (node.range(), Vec::new()));
-                }
-            }
-            "c" => {
-                if let Some((row_0, col_0)) = node.attribute("r").and_then(parse_cell_ref) {
-                    let s_attr = node.attribute("s").unwrap_or("").to_string();
-                    if node.children().any(|c| c.tag_name().name() == "f") {
-                        formula_cells.insert((row_0, col_0));
-                    }
-                    existing_cells.insert((row_0, col_0), (node.range(), s_attr));
-                    let row_1 = row_0 + 1;
-                    if let Some((_, cells_vec)) = row_data.get_mut(&row_1) {
-                        cells_vec.push((col_0, node.range()));
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    for (_, cells_vec) in row_data.values_mut() {
-        cells_vec.sort_by_key(|(col, _)| *col);
-    }
-
-    // Dedup theo (row_0, col_0) trước — nhiều ô đỏ VN có thể bị `resolve_target_col` tự sửa lệch
-    // cột trỏ về CÙNG 1 vị trí đích JP (vd 2 cột VN khác nhau cùng khớp nội dung JP ở 1 cột). Nếu
-    // không dedup, 2 cell trong `cells` cùng đích sẽ sinh 2 SurgeryEdit đè lên CÙNG 1 range, khiến
-    // `apply_surgery` cắt ghép sai byte (ghi đè xong lại ghi đè tiếp lên offset đã lệch) — làm
-    // hỏng cấu trúc XML, Excel báo "cần sửa chữa" khi mở file output dù `applied_count` vẫn đếm
-    // đủ (không cell nào bị coi là lỗi). Giữ lại bản ghi SAU CÙNG (theo thứ tự trong `cells`).
-    let mut dedup: HashMap<(usize, usize), (String, Option<CellStyleSource>)> = HashMap::new();
-    for (row_0, col_0, vn_text, style) in cells {
-        dedup.insert((*row_0, *col_0), (vn_text.clone(), style.clone()));
-    }
-
-    // Sort input cells so same-position inserts accumulate in col order
-    let mut sorted_cells: Vec<(usize, usize, String, Option<CellStyleSource>)> = dedup
-        .into_iter()
-        .map(|((row_0, col_0), (vn_text, style))| (row_0, col_0, vn_text, style))
-        .collect();
-    sorted_cells.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-
-    let mut edits: Vec<SurgeryEdit> = Vec::new();
-    // Accumulate same-position insertions to avoid collisions
-    let mut pos_inserts: HashMap<usize, Vec<String>> = HashMap::new();
-    // New rows: row_1 → [(col_0, vn_text, style)] — built separately to merge multi-cell rows
-    let mut new_rows: HashMap<usize, Vec<(usize, String, Option<CellStyleSource>)>> = HashMap::new();
-
-    let mut applied_count = 0usize;
-
-    for (row_0, col_0, vn_text, style) in &sorted_cells {
-        let row_1 = row_0 + 1;
-        let cell_ref = format!("{}{}", col_index_to_letter(*col_0), row_1);
-
-        if let Some((cell_range, s_attr)) = existing_cells.get(&(*row_0, *col_0)) {
-            // Không ghi đè ô có công thức — giữ nguyên formula JP (vd cột đánh số thứ tự)
-            if formula_cells.contains(&(*row_0, *col_0)) {
-                continue;
-            }
-            // Replace existing cell with VN text, giữ nguyên style gốc từ VN nếu có
-            edits.push(SurgeryEdit {
-                start: cell_range.start,
-                end: cell_range.end,
-                replacement: make_cell_with_style(&cell_ref, s_attr, vn_text, style),
-            });
-            applied_count += 1;
-        } else if let Some((row_range, cells_in_row)) = row_data.get(&row_1) {
-            // Insert into existing row
-            let insert_pos =
-                find_cell_insert_pos(sheet_xml, row_range, cells_in_row, *col_0);
-            pos_inserts
-                .entry(insert_pos)
-                .or_default()
-                .push(make_cell_with_style(&cell_ref, "", vn_text, style));
-            applied_count += 1;
-        } else {
-            // Need new row
-            new_rows
-                .entry(row_1)
-                .or_default()
-                .push((*col_0, vn_text.clone(), style.clone()));
-            applied_count += 1;
-        }
-    }
-
-    // Build new-row insertions (one <row> per row_1, all cells sorted by col)
-    if let Some(sd_range) = &sheet_data_range {
-        let row_keys: Vec<usize> = row_data.keys().copied().collect();
-        for (row_1, mut row_cells) in new_rows {
-            row_cells.sort_by_key(|(col, _, _)| *col);
-            let cells_xml: String = row_cells
-                .iter()
-                .map(|(col_0, vn_text, style)| {
-                    let cref = format!("{}{}", col_index_to_letter(*col_0), row_1);
-                    make_cell_with_style(&cref, "", vn_text, style)
-                })
-                .collect();
-            let row_xml = format!(r#"<row r="{row_1}">{cells_xml}</row>"#);
-            let insert_pos = find_row_insert_pos(sheet_xml, sd_range, &row_keys, row_1);
-            pos_inserts.entry(insert_pos).or_default().push(row_xml);
-        }
-    }
-
-    // Convert accumulated insertions into edits
-    for (pos, xmls) in pos_inserts {
-        edits.push(SurgeryEdit {
-            start: pos,
-            end: pos,
-            replacement: xmls.join(""),
-        });
-    }
-
-    (apply_surgery(sheet_xml, edits), applied_count)
-}
-
-/// Find byte position to insert a new `<c>` inside an existing `<row>`.
-fn find_cell_insert_pos(
-    xml: &str,
-    row_range: &std::ops::Range<usize>,
-    cells_in_row: &[(usize, std::ops::Range<usize>)], // sorted by col_0
-    new_col: usize,
-) -> usize {
-    // After last cell with col < new_col
-    if let Some((_, range)) = cells_in_row.iter().rev().find(|(col, _)| *col < new_col) {
-        return range.end;
-    }
-    // Before first cell (all have col >= new_col)
-    if let Some((_, range)) = cells_in_row.first() {
-        return range.start;
-    }
-    // Empty row: insert after the opening `<row ...>` tag
-    find_tag_open_end(xml, row_range.start)
-}
-
-/// Find byte position to insert a new `<row>` inside `<sheetData>`.
-fn find_row_insert_pos(
-    xml: &str,
-    sd_range: &std::ops::Range<usize>,
-    row_1s: &[usize],
-    new_row_1: usize,
-) -> usize {
-    // After last existing row with r < new_row_1
-    let last_smaller = row_1s
-        .iter()
-        .filter(|&&r| r < new_row_1)
-        .max()
-        .copied();
-    if let Some(prev_r) = last_smaller {
-        // Find that row's range by re-scanning
-        // (row_data ranges are not passed here, so we search the raw XML)
-        let tag = format!(r#"<row r="{prev_r}""#);
-        if let Some(start) = xml.find(&tag) {
-            // Find the matching </row>
-            if let Some(close) = xml[start..].find("</row>") {
-                return start + close + "</row>".len();
-            }
-        }
-    }
-    // No preceding rows → insert just after opening <sheetData> tag
-    find_tag_open_end(xml, sd_range.start)
-}
-
-/// Scan forward from `from` to find the byte position right after the first `>` of an XML tag,
-/// skipping over attribute values (handles quoted `>` inside attributes).
-fn find_tag_open_end(xml: &str, from: usize) -> usize {
-    let bytes = xml.as_bytes();
-    let mut i = from;
-    let mut in_quote: Option<u8> = None;
-    while i < bytes.len() {
-        let b = bytes[i];
-        match in_quote {
-            Some(q) if b == q => {
-                in_quote = None;
-            }
-            Some(_) => {}
-            None => {
-                if b == b'"' || b == b'\'' {
-                    in_quote = Some(b);
-                } else if b == b'>' {
-                    return i + 1;
-                }
-            }
-        }
-        i += 1;
-    }
-    from
-}
-
-/// Build an inline-string `<c>` element containing `vn_text` rendered in red bold.
-/// Keeps the original `s` (style) attribute if present so borders/alignment are preserved.
-fn make_vn_inline_cell(cell_ref: &str, s_attr: &str, vn_text: &str) -> String {
-    let s_part = if !s_attr.is_empty() {
-        format!(" s=\"{s_attr}\"")
-    } else {
-        String::new()
-    };
-    format!(
-        r#"<c r="{cell_ref}"{s_part} t="inlineStr"><is><r><rPr><color rgb="FFFF0000"/><b/></rPr><t xml:space="preserve">{}</t></r></is></c>"#,
-        xml_escape(vn_text)
-    )
 }
 
 /// Convert a 0-based column index to an Excel column letter (0→"A", 26→"AA", …).

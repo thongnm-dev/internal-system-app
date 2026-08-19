@@ -666,9 +666,8 @@ function tabColorStyle(color: string | null | undefined): string {
     <!-- Empty state -->
     <div
       v-if="!ctrl.analysis.value && !ctrl.analyzing.value"
-      class="flex flex-1 flex-col items-center justify-center gap-4 py-12 text-center text-muted"
+      class="flex flex-1 flex-col items-center justify-center gap-4 text-center text-muted"
     >
-      <i class="pi pi-sync text-6xl opacity-20" />
       <div>
         <p class="text-base font-medium">VN → JP 同期ツール</p>
         <p class="mt-1 text-sm">Chọn file VN và JP rồi nhấn <strong>Phân tích</strong> để bắt đầu</p>
