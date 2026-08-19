@@ -85,40 +85,38 @@ onUnmounted(() => {
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File gốc (A)</span>
               <div
                 ref="boxARef"
-                class="rounded-lg border transition-colors"
+                class="rounded-lg border-2 border-dashed transition-colors"
                 :class="
                   dragOverSlot === 'a'
                     ? 'border-brand bg-brand/5'
-                    : ctrl.fileA.value
-                      ? 'border-divider bg-canvas'
-                      : 'border-2 border-dashed border-sky-300 bg-sky-50/70 dark:border-sky-700 dark:bg-sky-900/10'
+                    : 'border-sky-300 bg-sky-50/70 dark:border-sky-700 dark:bg-sky-900/10'
                 "
               >
-                <div v-if="ctrl.fileA.value" class="flex items-center gap-3 px-3 py-2.5">
-                  <i :class="[kindMeta[ctrl.fileA.value.kind].icon, kindMeta[ctrl.fileA.value.kind].color, 'text-lg']" />
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm font-medium">{{ ctrl.fileA.value.name }}</div>
-                  </div>
-                  <span class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-                    {{ kindMeta[ctrl.fileA.value.kind].label }}
-                  </span>
-                  <Button icon="pi pi-eye" size="small" text severity="info" v-tooltip.top="'Mở file'" @click="explorerOpenFile(ctrl.fileA.value!.path)" />
-                  <Button icon="pi pi-folder-open" size="small" text severity="secondary" v-tooltip.top="'Show in folder'" @click="explorerOpen(ctrl.fileA.value!.path)" />
-                  <Button icon="pi pi-times" size="small" text severity="secondary" @click="ctrl.clearFile('a')" />
-                </div>
                 <div
-                  v-else
                   class="flex cursor-pointer flex-col items-center justify-center gap-1.5 px-4 py-6 text-center"
                   @click="ctrl.pickFile('a')"
                 >
                   <span class="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-500 dark:bg-sky-800/40">
-                    <i class="pi pi-upload text-lg" />
+                    <i :class="ctrl.fileA.value ? kindMeta[ctrl.fileA.value.kind].icon : 'pi pi-upload'" class="text-lg" />
                   </span>
-                  <span class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
-                  <span class="text-xs text-muted">
+                  <span v-if="ctrl.fileA.value" class="block w-full truncate text-sm font-semibold text-ink">
+                    {{ ctrl.fileA.value.name }}
+                  </span>
+                  <span v-else class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
+                  <span v-if="ctrl.fileA.value" class="text-xs text-muted">
+                    <span class="font-medium text-brand underline" @click.stop="explorerOpenFile(ctrl.fileA.value!.path)">Mở file</span>
+                    <span class="mx-1">·</span>
+                    <span class="font-medium text-muted underline" @click.stop="explorerOpen(ctrl.fileA.value!.path)">Show in folder</span>
+                    <span class="mx-1">·</span>
+                    <span class="font-medium text-red-500 underline" @click.stop="ctrl.clearFile('a')">Xóa</span>
+                  </span>
+                  <span v-else class="text-xs text-muted">
                     hoặc <span class="font-medium text-brand underline">bấm để chọn</span> từ máy
                   </span>
-                  <span class="text-[11px] text-muted/70">.docx · .xlsx · .txt · .md</span>
+                  <span v-if="!ctrl.fileA.value" class="text-[11px] text-muted/70">.docx · .xlsx · .txt · .md</span>
+                  <span v-else class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                    {{ kindMeta[ctrl.fileA.value.kind].label }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -128,40 +126,34 @@ onUnmounted(() => {
               <span class="text-xs font-bold uppercase tracking-wide text-muted">File so sánh (B)</span>
               <div
                 ref="boxBRef"
-                class="rounded-lg border transition-colors"
-                :class="
-                  dragOverSlot === 'b'
-                    ? 'border-brand bg-brand/5'
-                    : ctrl.fileB.value
-                      ? 'border-divider bg-canvas'
-                      : 'border-2 border-dashed border-divider bg-canvas'
-                "
+                class="rounded-lg border-2 border-dashed transition-colors"
+                :class="dragOverSlot === 'b' ? 'border-brand bg-brand/5' : 'border-divider bg-canvas'"
               >
-                <div v-if="ctrl.fileB.value" class="flex items-center gap-3 px-3 py-2.5">
-                  <i :class="[kindMeta[ctrl.fileB.value.kind].icon, kindMeta[ctrl.fileB.value.kind].color, 'text-lg']" />
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm font-medium">{{ ctrl.fileB.value.name }}</div>
-                  </div>
-                  <span class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-                    {{ kindMeta[ctrl.fileB.value.kind].label }}
-                  </span>
-                  <Button icon="pi pi-eye" size="small" text severity="info" v-tooltip.top="'Mở file'" @click="explorerOpenFile(ctrl.fileB.value!.path)" />
-                  <Button icon="pi pi-folder-open" size="small" text severity="secondary" v-tooltip.top="'Show in folder'" @click="explorerOpen(ctrl.fileB.value!.path)" />
-                  <Button icon="pi pi-times" size="small" text severity="secondary" @click="ctrl.clearFile('b')" />
-                </div>
                 <div
-                  v-else
                   class="flex cursor-pointer flex-col items-center justify-center gap-1.5 px-4 py-6 text-center"
                   @click="ctrl.pickFile('b')"
                 >
                   <span class="flex h-10 w-10 items-center justify-center rounded-full bg-panel text-muted">
-                    <i class="pi pi-upload text-lg" />
+                    <i :class="ctrl.fileB.value ? kindMeta[ctrl.fileB.value.kind].icon : 'pi pi-upload'" class="text-lg" />
                   </span>
-                  <span class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
-                  <span class="text-xs text-muted">
+                  <span v-if="ctrl.fileB.value" class="block w-full truncate text-sm font-semibold text-ink">
+                    {{ ctrl.fileB.value.name }}
+                  </span>
+                  <span v-else class="text-sm font-semibold text-ink">Kéo &amp; thả file vào đây</span>
+                  <span v-if="ctrl.fileB.value" class="text-xs text-muted">
+                    <span class="font-medium text-brand underline" @click.stop="explorerOpenFile(ctrl.fileB.value!.path)">Mở file</span>
+                    <span class="mx-1">·</span>
+                    <span class="font-medium text-muted underline" @click.stop="explorerOpen(ctrl.fileB.value!.path)">Show in folder</span>
+                    <span class="mx-1">·</span>
+                    <span class="font-medium text-red-500 underline" @click.stop="ctrl.clearFile('b')">Xóa</span>
+                  </span>
+                  <span v-else class="text-xs text-muted">
                     hoặc <span class="font-medium text-brand underline">bấm để chọn</span> từ máy
                   </span>
-                  <span class="text-[11px] text-muted/70">.docx · .xlsx · .txt · .md</span>
+                  <span v-if="!ctrl.fileB.value" class="text-[11px] text-muted/70">.docx · .xlsx · .txt · .md</span>
+                  <span v-else class="rounded bg-panel px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                    {{ kindMeta[ctrl.fileB.value.kind].label }}
+                  </span>
                 </div>
               </div>
             </div>
