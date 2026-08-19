@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import Button from "primevue/button";
-import Checkbox from "primevue/checkbox";
 import Tag from "primevue/tag";
 import { onMounted, onUnmounted, ref } from "vue";
 import { explorerOpenFile } from "@/tauri/commands/explorer";
@@ -171,76 +170,29 @@ function tabColorStyle(color: string | null | undefined): string {
       <!-- Actions — chỉ hiện khi đã chọn ít nhất 1 trong 2 file, tránh 1 dàn nút disabled vô nghĩa. -->
       <div v-if="ctrl.vnPath.value || ctrl.jpPath.value" class="mt-3 flex flex-wrap items-center gap-2">
         <Button
-          label="Phân tích"
-          icon="pi pi-search"
+          label="Phân tích & Áp dụng"
+          icon="pi pi-sync"
+          severity="warn"
           :loading="ctrl.analyzing.value"
-          :disabled="!ctrl.canAnalyze.value"
-          @click="ctrl.analyze()"
-        />
-        <Button
-          label="Áp dụng vào file JP"
-          icon="pi pi-file-import"
-          severity="primary"
-          :loading="ctrl.applying.value"
-          :disabled="!ctrl.canApply.value"
-          v-tooltip.top="'Dọn dẹp strikethrough/chữ đỏ cũ tồn đọng rồi ghi VN text (đỏ) vào đúng vị trí trong file JP, lưu file mới'"
-          @click="ctrl.applyChanges()"
+          :disabled="!ctrl.canAnalyzeAndApply.value"
+          @click="ctrl.analyzeAndApply()"
         />
         <Button
           label="Xuất báo cáo"
           icon="pi pi-file-excel"
-          severity="secondary"
+          severity="primary"
           :loading="ctrl.exporting.value"
           :disabled="!ctrl.canExport.value"
           @click="ctrl.exportReport()"
         />
         <Button
-          label="Dọn dẹp file JP"
-          icon="pi pi-eraser"
-          severity="danger"
-          outlined
-          :loading="ctrl.cleaning.value"
-          :disabled="!ctrl.canCleanup.value"
-          v-tooltip.top="'Xóa hẳn strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ bản tablet cũ trong file JP — xuất ra file riêng để xem trước, chưa phản ánh chữ đỏ VN'"
-          @click="ctrl.cleanupJp()"
-        />
-        <Button
-          label="Kiểm tra khớp dòng"
-          icon="pi pi-align-justify"
-          severity="warn"
-          outlined
-          :loading="ctrl.checkingAlignment.value"
-          :disabled="!ctrl.canCheckAlignment.value"
-          v-tooltip.top="'Phát hiện dòng VN có mà JP chưa có (dựa trên ô số/mã dùng làm điểm neo) — chỉ phát hiện, TL tự xác nhận từng vị trí trước khi chèn'"
-          @click="ctrl.checkRowAlignment()"
-        />
-        <Button
           v-if="ctrl.analysis.value"
           label="Làm mới"
-          icon="pi pi-refresh"
-          text
-          severity="secondary"
+          icon="pi pi-eraser"
+          outlined
+          severity="danger"
           @click="ctrl.reset()"
         />
-      </div>
-
-      <!-- Cleanup result banner -->
-      <div
-        v-if="ctrl.cleanupResult.value"
-        class="mt-2 flex items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-sm text-sky-700 dark:bg-sky-900/20 dark:text-sky-400"
-      >
-        <i class="pi pi-check-circle" />
-        <span>
-          Đã dọn dẹp <strong>{{ ctrl.cleanupResult.value.sheetsModified.length }}</strong> sheet: xóa
-          <strong>{{ ctrl.cleanupResult.value.strikeRemovedCount }}</strong> ô strikethrough cũ, tô đen
-          <strong>{{ ctrl.cleanupResult.value.redBlackenedCount }}</strong> ô chữ đỏ cũ.
-          <span v-if="ctrl.cleanupResult.value.skippedCount > 0" class="text-amber-600 dark:text-amber-400">
-            ({{ ctrl.cleanupResult.value.skippedCount }} ô cần tự kiểm tra thủ công)
-          </span>
-          <span v-if="ctrl.cleanupResult.value.delSheetCount > 0">
-            ({{ ctrl.cleanupResult.value.delSheetCount }} sheet "(DEL)" chỉ bỏ màu chữ về đen)
-          </span>
-        </span>
       </div>
 
       <!-- Apply result banner -->
@@ -289,82 +241,6 @@ function tabColorStyle(color: string | null | undefined): string {
       <p v-if="ctrl.error.value" class="mt-2 text-sm text-red-500">
         <i class="pi pi-exclamation-triangle mr-1" />{{ ctrl.error.value }}
       </p>
-    </section>
-
-    <!-- ═══════════ Đề xuất canh dòng VN↔JP ═══════════ -->
-    <section
-      v-if="ctrl.rowAlignment.value && ctrl.rowAlignment.value.suggestions.length > 0"
-      class="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm dark:border-amber-700 dark:bg-amber-900/10"
-    >
-      <div class="mb-2 flex items-center gap-2">
-        <i class="pi pi-exclamation-triangle text-lg text-amber-600" />
-        <h3 class="section-title">
-          Phát hiện {{ ctrl.rowAlignment.value.suggestions.length }} vị trí lệch dòng
-        </h3>
-        <span class="text-xs text-muted">Xem lại từng vị trí rồi tick xác nhận trước khi chèn</span>
-      </div>
-
-      <div class="overflow-auto rounded-md border border-divider">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
-              <th class="px-3 py-2 text-center" style="width: 40px"></th>
-              <th class="px-3 py-2 text-left">Sheet</th>
-              <th class="px-3 py-2 text-center">Dòng VN</th>
-              <th class="px-3 py-2 text-center">Chèn sau dòng JP</th>
-              <th class="px-3 py-2 text-center">Số dòng</th>
-              <th class="px-3 py-2 text-left">Loại</th>
-              <th class="px-3 py-2 text-left">Nội dung VN (xem trước)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(s, idx) in ctrl.rowAlignment.value.suggestions"
-              :key="`${s.sheet}-${s.jpInsertAfterRow}-${idx}`"
-              class="border-b border-divider/50 hover:bg-canvas/50"
-            >
-              <td class="px-3 py-2 text-center">
-                <Checkbox :model-value="ctrl.isConfirmed(s)" binary @change="ctrl.toggleConfirm(s)" />
-              </td>
-              <td class="px-3 py-2 text-xs font-medium">{{ s.sheet }}</td>
-              <td class="px-3 py-2 text-center text-xs font-mono text-muted">
-                {{ s.vnRowStart === s.vnRowEnd ? s.vnRowStart : `${s.vnRowStart}-${s.vnRowEnd}` }}
-              </td>
-              <td class="px-3 py-2 text-center text-xs font-mono text-muted">
-                {{ s.jpInsertAfterRow === 0 ? "Đầu sheet" : s.jpInsertAfterRow }}
-              </td>
-              <td class="px-3 py-2 text-center text-xs">{{ s.insertCount }}</td>
-              <td class="px-3 py-2">
-                <Tag v-if="s.hasRed" value="Đỏ (mới)" severity="danger" class="mr-1 text-xs" />
-                <Tag v-if="s.hasStrike" value="Gạch bỏ (xóa)" severity="warn" class="text-xs" />
-              </td>
-              <td class="max-w-[280px] px-3 py-2">
-                <span
-                  v-for="(t, i) in s.sampleVnText"
-                  :key="i"
-                  class="line-clamp-1 block truncate whitespace-pre-wrap break-words text-xs text-muted"
-                >
-                  {{ t }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="mt-3 flex items-center gap-2">
-        <Button
-          label="Chèn dòng đã xác nhận"
-          icon="pi pi-plus"
-          severity="warn"
-          :loading="ctrl.insertingRows.value"
-          :disabled="!ctrl.hasConfirmedInserts.value"
-          @click="ctrl.insertConfirmedRows()"
-        />
-        <span class="text-xs text-muted">
-          Tool sẽ tự đánh số lại dòng/ô/vùng gộp bên dưới vị trí chèn trong file JP, lưu ra file mới.
-        </span>
-      </div>
     </section>
 
     <!-- ═══════════ Kết quả phân tích ═══════════ -->
@@ -670,15 +546,17 @@ function tabColorStyle(color: string | null | undefined): string {
     >
       <div>
         <p class="text-base font-medium">VN → JP 同期ツール</p>
-        <p class="mt-1 text-sm">Chọn file VN và JP rồi nhấn <strong>Phân tích</strong> để bắt đầu</p>
+        <p class="mt-1 text-sm">Chọn file VN và JP rồi nhấn <strong>Phân tích &amp; Áp dụng</strong> để bắt đầu</p>
       </div>
       <div class="max-w-lg rounded-lg border border-divider bg-panel p-4 text-left text-xs">
         <p class="mb-2 font-semibold text-ink">Quy trình:</p>
         <ol class="list-inside list-decimal space-y-1">
           <li>Chọn file VN (bản đã chỉnh sửa, nội dung mới được đánh dấu chữ <span class="font-bold text-red-500">đỏ</span>)</li>
           <li>Chọn file JP (bản gốc tiếng Nhật, nội dung cần xóa có <span class="line-through">gạch ngang</span>)</li>
-          <li>Nhấn <strong>Phân tích</strong> → xem danh sách ô đỏ, strikethrough, quality issues</li>
-          <li>Nhấn <strong>Áp dụng vào file JP</strong> → tạo file JP mới với VN text (đỏ) đúng vị trí</li>
+          <li>
+            Nhấn <strong>Phân tích &amp; Áp dụng</strong> → tool tự phân tích khác biệt (danh sách ô đỏ,
+            strikethrough, quality issues) rồi ghi luôn VN text vào file JP mới
+          </li>
           <li>Mở file JP mới, dùng <strong>skill dịch thuật</strong> để dịch từng ô đỏ sang tiếng Nhật</li>
         </ol>
       </div>

@@ -1,5 +1,5 @@
 import type {
-  ApplyResult,
+  AnalyzeAndApplyResult,
   CleanupResult,
   ConfirmedInsert,
   RedCell,
@@ -10,11 +10,15 @@ import type {
 } from "@/_/types/vnjp-sync";
 import { safeInvoke } from "./_base";
 
-export function vnjpSyncAnalyze(
+/** Gộp "Phân tích" + "Áp dụng" thành 1 lệnh gọi backend duy nhất — xem `vnjp_sync_analyze_and_apply`. */
+export function vnjpSyncAnalyzeAndApply(
   vnPath: string,
   jpPath: string,
-): Promise<SyncAnalysis> {
-  return safeInvoke<SyncAnalysis>("vnjp_sync_analyze", { vnPath, jpPath });
+): Promise<AnalyzeAndApplyResult> {
+  return safeInvoke<AnalyzeAndApplyResult>("vnjp_sync_analyze_and_apply", {
+    vnPath,
+    jpPath,
+  });
 }
 
 export function vnjpSyncExportReport(
@@ -22,10 +26,6 @@ export function vnjpSyncExportReport(
   outputPath: string,
 ): Promise<string> {
   return safeInvoke<string>("vnjp_sync_export_report", { analysis, outputPath });
-}
-
-export function vnjpSyncApply(vnPath: string, jpPath: string): Promise<ApplyResult> {
-  return safeInvoke<ApplyResult>("vnjp_sync_apply", { vnPath, jpPath });
 }
 
 export function vnjpSyncCleanup(

@@ -106,6 +106,15 @@ pub struct TranslateItemResult {
     pub error: Option<String>,
 }
 
+/// Kết quả gộp "Phân tích" + "Áp dụng" — trả về trong 1 lượt gọi duy nhất từ frontend (xem
+/// `services::vnjp_sync_service::analyze_and_apply`).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyzeAndApplyResult {
+    pub analysis: SyncAnalysis,
+    pub apply: ApplyResult,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplyResult {

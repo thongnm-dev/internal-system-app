@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { ref, onMounted } from "vue";
+import Popover from "primevue/popover";
 import { useAuthStore } from "@/app/stores/auth";
+import { useSettings } from "@/features/settings/composables/useSettings";
 import { useAppUpdater } from "@/shared/composables/useAppUpdater";
 import type { SystemInfo } from "@/_/types/system";
 
@@ -8,13 +10,31 @@ const props = defineProps<{
   info: SystemInfo;
 }>();
 
-const auth = useAuthStore();
+const emit = defineEmits<{
+  logout: [];
+}>();
 
+const auth = useAuthStore();
+const { settings, updateTheme } = useSettings();
 const updater = useAppUpdater();
+const userMenu = ref<InstanceType<typeof Popover>>();
 
 onMounted(() => {
   updater.startPolling();
 });
+
+function toggleUserMenu(event: Event): void {
+  userMenu.value?.toggle(event);
+}
+
+function toggleTheme(): void {
+  updateTheme(settings.value.theme === "dark" ? "light" : "dark");
+}
+
+function handleLogout(): void {
+  userMenu.value?.hide();
+  emit("logout");
+}
 
 function onUpdateClick(): void {
   if (updater.status.value === "ready") {
@@ -46,10 +66,29 @@ function formatDateTime(value: string): string {
   <footer
     class="flex items-center gap-6 overflow-hidden border-t border-divider px-4 py-2 text-sm text-muted"
   >
-    <span class="status-item flex items-center gap-2" title="Login">
+    <button
+      type="button"
+      class="status-item flex cursor-pointer items-center gap-2 rounded hover:text-brand"
+      title="User menu"
+      @click="toggleUserMenu"
+    >
       <i class="pi pi-user shrink-0 text-brand" />
       <strong class="min-w-0 truncate text-ink">{{ auth.user?.full_name || auth.user?.username || '-' }}</strong>
-    </span>
+    </button>
+
+    <Popover ref="userMenu">
+      <div class="flex min-w-[160px] flex-col gap-0.5 py-1">
+        <button type="button" class="ctx-menu-item" @click="toggleTheme">
+          <i :class="['pi', settings.theme === 'dark' ? 'pi-sun' : 'pi-moon']" />
+          <span>{{ settings.theme === 'dark' ? 'Light mode' : 'Dark mode' }}</span>
+        </button>
+        <button type="button" class="ctx-menu-item-danger" @click="handleLogout">
+          <i class="pi pi-sign-out" />
+          <span>Logout</span>
+        </button>
+      </div>
+    </Popover>
+
     <span class="status-item flex items-center gap-2" title="Date time">
       <i class="pi pi-clock shrink-0 text-brand" />
       <strong class="min-w-0 truncate text-ink">{{ formatDateTime(props.info.timestamp) }}</strong>

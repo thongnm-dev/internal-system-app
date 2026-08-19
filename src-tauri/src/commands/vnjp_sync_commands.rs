@@ -2,17 +2,10 @@
 
 use crate::app::error::log_err;
 use crate::models::vnjp_sync::{
-    ApplyResult, CleanupResult, ConfirmedInsert, RedCell, RedCellVerificationReport,
+    AnalyzeAndApplyResult, CleanupResult, ConfirmedInsert, RedCell, RedCellVerificationReport,
     RowAlignmentReport, RowInsertResult, SyncAnalysis, TranslateBatchRequest, TranslateItemResult,
 };
 use crate::services::vnjp_sync_service;
-
-/// Phân tích sự khác biệt giữa file Excel VN và JP.
-/// Trả về SyncAnalysis đầy đủ bao gồm ô đỏ, ô strikethrough và vấn đề chất lượng.
-#[tauri::command]
-pub fn vnjp_sync_analyze(vn_path: String, jp_path: String) -> Result<SyncAnalysis, String> {
-    vnjp_sync_service::analyze(&vn_path, &jp_path).map_err(log_err)
-}
 
 /// Dịch hàng loạt các đoạn văn VN → JP qua AI (Gemini hoặc Groq).
 #[tauri::command]
@@ -33,13 +26,18 @@ pub fn vnjp_sync_export_report(
     vnjp_sync_service::export_report(&analysis, &output_path).map_err(log_err)
 }
 
-/// Áp dụng thay đổi từ VN → JP: dọn dẹp strikethrough/chữ đỏ cũ tồn đọng trên file JP, đồng bộ
-/// cấu trúc sheet (clone sheet chỉ có ở VN, đánh dấu "(DEL)" sheet VN đã xóa), tự động canh dòng
-/// lệch, rồi ghi nội dung VN (giữ nguyên tiếng Việt, tô đỏ) vào đúng vị trí ô tương ứng. Kết quả
-/// lưu tự động vào thư mục Temp cạnh nơi cài đặt (không còn hộp thoại chọn nơi lưu).
+/// Phân tích sự khác biệt VN/JP RỒI áp dụng luôn trong cùng 1 lượt gọi (frontend gộp 2 nút
+/// "Phân tích" + "Áp dụng" thành 1): dọn dẹp strikethrough/chữ đỏ cũ tồn đọng trên file JP, đồng
+/// bộ cấu trúc sheet (clone sheet chỉ có ở VN, đánh dấu "(DEL)" sheet VN đã xóa), tự động canh
+/// dòng lệch, rồi ghi nội dung VN (giữ nguyên tiếng Việt, tô đỏ) vào đúng vị trí ô tương ứng. Kết
+/// quả lưu tự động vào thư mục Temp cạnh nơi cài đặt (không còn hộp thoại chọn nơi lưu). Trả về cả
+/// `SyncAnalysis` (để hiển thị tab tổng quan/ô đỏ/strikethrough/quality issues) lẫn `ApplyResult`.
 #[tauri::command]
-pub fn vnjp_sync_apply(vn_path: String, jp_path: String) -> Result<ApplyResult, String> {
-    vnjp_sync_service::apply_changes(&vn_path, &jp_path).map_err(log_err)
+pub fn vnjp_sync_analyze_and_apply(
+    vn_path: String,
+    jp_path: String,
+) -> Result<AnalyzeAndApplyResult, String> {
+    vnjp_sync_service::analyze_and_apply(&vn_path, &jp_path).map_err(log_err)
 }
 
 /// Dọn dẹp file JP: xóa hẳn nội dung strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ

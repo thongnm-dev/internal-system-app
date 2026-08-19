@@ -103,6 +103,12 @@ export interface ApplyResult {
   rowsInserted: number;
 }
 
+/** Kết quả gộp "Phân tích" + "Áp dụng" — trả về trong 1 lệnh gọi backend duy nhất. */
+export interface AnalyzeAndApplyResult {
+  analysis: SyncAnalysis;
+  apply: ApplyResult;
+}
+
 export interface CleanupResult {
   outputPath: string;
   sheetsModified: string[];

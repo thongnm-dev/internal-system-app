@@ -53,6 +53,17 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     }
 }
 
+/// Gộp "Phân tích" + "Áp dụng" thành 1 lượt gọi duy nhất — tránh frontend phải gọi 2 command
+/// riêng rồi tự nối kết quả. Phân tích trước để có dữ liệu hiển thị (tab tổng quan/ô đỏ/
+/// strikethrough/quality issues) VÀ áp dụng luôn ngay sau đó trên cùng cặp file; nếu bước áp
+/// dụng lỗi (vd không có gì khác biệt để áp dụng), trả lỗi đó nhưng phần phân tích coi như không
+/// tồn tại — frontend không cần xử lý riêng trường hợp "có analysis mà không có apply".
+pub fn analyze_and_apply(vn_path: &str, jp_path: &str) -> AppResult<AnalyzeAndApplyResult> {
+    let analysis = analyze(vn_path, jp_path)?;
+    let apply = apply_changes(vn_path, jp_path)?;
+    Ok(AnalyzeAndApplyResult { analysis, apply })
+}
+
 /// Dọn dẹp file JP: xóa hẳn nội dung strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ
 /// bản tablet cũ, trên MỌI sheet. Kết quả lưu ra `output_path`.
 pub fn cleanup_jp(jp_path: &str, output_path: &str) -> AppResult<CleanupResult> {

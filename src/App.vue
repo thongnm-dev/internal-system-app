@@ -123,13 +123,9 @@ watch(
         @toggle-collapse="shell.toggleSidebar()"
       />
 
-      <section class="min-h-0 overflow-hidden px-6 py-2">
+      <section class="min-h-0 overflow-hidden px-6 py-4">
         <div class="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
-          <AppHeader
-            :route="currentAppRoute"
-            :username="auth.user?.username"
-            @logout="handleLogout"
-          />
+          <AppHeader :route="currentAppRoute" />
 
           <AppTabBar
             v-if="tabNav.tabMode.value && tabNav.tabs.value.length > 0"
@@ -149,7 +145,7 @@ watch(
       </section>
     </section>
 
-    <AppBottomBar :info="shell.systemInfo.value" />
+    <AppBottomBar :info="shell.systemInfo.value" @logout="handleLogout" />
 
     <!-- Floating toggle bubble -->
     <button

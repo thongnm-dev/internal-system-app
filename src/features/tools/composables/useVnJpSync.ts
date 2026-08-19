@@ -1,23 +1,11 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { computed, ref } from "vue";
-import type {
-  ApplyResult,
-  CleanupResult,
-  ConfirmedInsert,
-  RedCellVerification,
-  RowAlignmentReport,
-  RowAlignmentSuggestion,
-  SyncAnalysis,
-} from "@/_/types/vnjp-sync";
+import type { ApplyResult, RedCellVerification, SyncAnalysis } from "@/_/types/vnjp-sync";
 import { useToast } from "@/shared/composables/useToast";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import {
-  vnjpSyncAnalyze,
-  vnjpSyncAnalyzeRowAlignment,
-  vnjpSyncApply,
-  vnjpSyncCleanup,
+  vnjpSyncAnalyzeAndApply,
   vnjpSyncExportReport,
-  vnjpSyncInsertRows,
   vnjpSyncVerifyRedCellsAi,
 } from "@/tauri/commands/vnjp-sync";
 
@@ -40,37 +28,21 @@ export function useVnJpSync() {
   const jpPath = ref("");
   const analysis = ref<SyncAnalysis | null>(null);
   const analyzing = ref(false);
-  const applying = ref(false);
   const exporting = ref(false);
-  const cleaning = ref(false);
   const error = ref("");
   const activeTab = ref<ActiveTab>("overview");
   const applyResult = ref<ApplyResult | null>(null);
-  const cleanupResult = ref<CleanupResult | null>(null);
-  const rowAlignment = ref<RowAlignmentReport | null>(null);
-  const checkingAlignment = ref(false);
-  const insertingRows = ref(false);
-  const confirmedInserts = ref<Set<string>>(new Set());
   const verifyingAi = ref(false);
   const redCellVerifications = ref<Map<string, RedCellVerification>>(new Map());
 
   const vnName = computed(() => (vnPath.value ? basename(vnPath.value) : ""));
   const jpName = computed(() => (jpPath.value ? basename(jpPath.value) : ""));
-  const canAnalyze = computed(
+  // Dùng cho nút gộp "Phân tích & Áp dụng" — backend chạy cả 2 bước trong 1 lệnh gọi duy nhất
+  // (xem `vnjp_sync_analyze_and_apply`).
+  const canAnalyzeAndApply = computed(
     () => vnPath.value !== "" && jpPath.value !== "" && !analyzing.value,
   );
-  const canApply = computed(
-    () =>
-      analysis.value !== null &&
-      analysis.value.redCells.length > 0 &&
-      !applying.value,
-  );
   const canExport = computed(() => analysis.value !== null && !exporting.value);
-  const canCleanup = computed(() => jpPath.value !== "" && !cleaning.value);
-  const canCheckAlignment = computed(
-    () => vnPath.value !== "" && jpPath.value !== "" && !checkingAlignment.value,
-  );
-  const hasConfirmedInserts = computed(() => confirmedInserts.value.size > 0);
 
   const totalRedCells = computed(() => analysis.value?.redCells.length ?? 0);
   const totalStrikeCells = computed(
@@ -97,9 +69,6 @@ export function useVnJpSync() {
       }
       analysis.value = null;
       applyResult.value = null;
-      cleanupResult.value = null;
-      rowAlignment.value = null;
-      confirmedInserts.value = new Set();
       redCellVerifications.value = new Map();
     } catch (e) {
       error.value = friendlyError(e);
@@ -121,9 +90,6 @@ export function useVnJpSync() {
     }
     analysis.value = null;
     applyResult.value = null;
-    cleanupResult.value = null;
-    rowAlignment.value = null;
-    confirmedInserts.value = new Set();
   }
 
   function clearFile(slot: "vn" | "jp") {
@@ -134,32 +100,53 @@ export function useVnJpSync() {
     }
     analysis.value = null;
     applyResult.value = null;
-    cleanupResult.value = null;
-    rowAlignment.value = null;
-    confirmedInserts.value = new Set();
     redCellVerifications.value = new Map();
     error.value = "";
   }
 
-  async function analyze() {
-    if (!canAnalyze.value) return;
+  /**
+   * Phân tích khác biệt VN/JP RỒI áp dụng luôn trong cùng 1 lệnh gọi backend duy nhất (xem
+   * `vnjp_sync_analyze_and_apply`) — không còn 2 bước/2 command riêng ở frontend.
+   */
+  async function analyzeAndApply() {
+    if (!canAnalyzeAndApply.value) return;
+    if (!canUseTauriRuntime()) return;
     error.value = "";
     analyzing.value = true;
     applyResult.value = null;
     redCellVerifications.value = new Map();
     try {
-      analysis.value = await vnjpSyncAnalyze(vnPath.value, jpPath.value);
+      const result = await vnjpSyncAnalyzeAndApply(vnPath.value, jpPath.value);
+      analysis.value = result.analysis;
+      applyResult.value = result.apply;
       activeTab.value = "overview";
+
+      const cleanupNote =
+        result.apply.strikeRemovedCount > 0 || result.apply.redBlackenedCount > 0
+          ? ` Đã dọn dẹp: xóa ${result.apply.strikeRemovedCount} ô strikethrough cũ, tô đen ${result.apply.redBlackenedCount} ô chữ đỏ cũ.`
+          : "";
+      const columnNote =
+        result.apply.columnCorrectedCount > 0
+          ? ` Đã tự sửa lệch cột theo nội dung khớp cùng dòng cho ${result.apply.columnCorrectedCount} ô.`
+          : "";
+      const rowsNote =
+        result.apply.rowsInserted > 0
+          ? ` Đã tự động chèn ${result.apply.rowsInserted} dòng lệch.`
+          : "";
       toast.success(
-        `Phân tích xong: ${analysis.value.redCells.length} ô đỏ, ${analysis.value.strikeCells.length} ô strikethrough`,
+        `Phân tích xong: ${result.analysis.redCells.length} ô đỏ, ${result.analysis.strikeCells.length} ô strikethrough. ` +
+          `Đã ghi ${result.apply.appliedCount} ô VN vào file JP (${result.apply.sheetsModified.length} sheet).${cleanupNote}${columnNote}${rowsNote} ` +
+          `File kết quả: ${basename(result.apply.outputPath)}.`,
       );
-      if (analysis.value.redCells.length > 0) {
-        // Chạy nền, không chặn nút Phân tích — kết quả điền dần vào badge ở tab Ô đỏ.
+
+      if (result.analysis.redCells.length > 0) {
+        // Chạy nền, không chặn nút — kết quả điền dần vào badge ở tab Ô đỏ.
         void verifyRedCellsAi();
       }
     } catch (e) {
       error.value = friendlyError(e);
       analysis.value = null;
+      applyResult.value = null;
       toast.error(error.value);
     } finally {
       analyzing.value = false;
@@ -203,159 +190,6 @@ export function useVnJpSync() {
     }
   }
 
-  async function applyChanges() {
-    if (!canApply.value) return;
-    if (!canUseTauriRuntime()) return;
-    error.value = "";
-    try {
-      applying.value = true;
-
-      const result = await vnjpSyncApply(vnPath.value, jpPath.value);
-      applyResult.value = result;
-      const cleanupNote =
-        result.strikeRemovedCount > 0 || result.redBlackenedCount > 0
-          ? ` Đã dọn dẹp: xóa ${result.strikeRemovedCount} ô strikethrough cũ, tô đen ${result.redBlackenedCount} ô chữ đỏ cũ.`
-          : "";
-      const columnNote =
-        result.columnCorrectedCount > 0
-          ? ` Đã tự sửa lệch cột theo nội dung khớp cùng dòng cho ${result.columnCorrectedCount} ô.`
-          : "";
-      const rowsNote =
-        result.rowsInserted > 0
-          ? ` Đã tự động chèn ${result.rowsInserted} dòng lệch.`
-          : "";
-      toast.success(
-        `Đã ghi ${result.appliedCount} ô VN vào file JP (${result.sheetsModified.length} sheet).${cleanupNote}${columnNote}${rowsNote} File kết quả: ${basename(result.outputPath)}.`,
-      );
-    } catch (e) {
-      error.value = friendlyError(e);
-      toast.error(error.value);
-    } finally {
-      applying.value = false;
-    }
-  }
-
-  /** Dọn dẹp file JP (xóa strikethrough cũ, tô đen chữ đỏ cũ) mà không phản ánh chữ đỏ VN — dùng để xem trước/kiểm tra riêng bước dọn dẹp. */
-  async function cleanupJp() {
-    if (!canCleanup.value) return;
-    if (!canUseTauriRuntime()) return;
-    error.value = "";
-    try {
-      const stem = basename(jpPath.value).replace(/\.[^.]+$/, "") || "jp-cleaned";
-      const ext = jpPath.value.split(".").pop()?.toLowerCase() === "xlsm" ? "xlsm" : "xlsx";
-      const outPath = await save({
-        defaultPath: `${stem}_cleaned.${ext}`,
-        filters: [{ name: "Excel", extensions: ["xlsx", "xlsm"] }],
-      });
-      if (!outPath) return;
-      cleaning.value = true;
-
-      const result = await vnjpSyncCleanup(jpPath.value, outPath);
-      cleanupResult.value = result;
-      toast.success(
-        `Đã dọn dẹp file JP: xóa ${result.strikeRemovedCount} ô strikethrough cũ, tô đen ${result.redBlackenedCount} ô chữ đỏ cũ (${result.sheetsModified.length} sheet).`,
-      );
-    } catch (e) {
-      error.value = friendlyError(e);
-      toast.error(error.value);
-    } finally {
-      cleaning.value = false;
-    }
-  }
-
-  function insertKey(s: { sheet: string; jpInsertAfterRow: number }): string {
-    return `${s.sheet}::${s.jpInsertAfterRow}`;
-  }
-
-  function isConfirmed(s: RowAlignmentSuggestion): boolean {
-    return confirmedInserts.value.has(insertKey(s));
-  }
-
-  function toggleConfirm(s: RowAlignmentSuggestion) {
-    const key = insertKey(s);
-    const next = new Set(confirmedInserts.value);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
-      next.add(key);
-    }
-    confirmedInserts.value = next;
-  }
-
-  /** Kiểm tra lệch dòng VN↔JP (dòng VN có mà JP chưa có) — dùng ô neo số/mã để canh dòng, không tự chèn. */
-  async function checkRowAlignment() {
-    if (!canCheckAlignment.value) return;
-    if (!canUseTauriRuntime()) return;
-    error.value = "";
-    checkingAlignment.value = true;
-    confirmedInserts.value = new Set();
-    try {
-      rowAlignment.value = await vnjpSyncAnalyzeRowAlignment(vnPath.value, jpPath.value);
-      if (rowAlignment.value.suggestions.length === 0) {
-        toast.success("Không phát hiện lệch dòng nào giữa VN và JP.");
-      } else {
-        toast.success(
-          `Phát hiện ${rowAlignment.value.suggestions.length} vị trí lệch dòng — vui lòng xem lại và xác nhận trước khi chèn.`,
-        );
-      }
-    } catch (e) {
-      error.value = friendlyError(e);
-      rowAlignment.value = null;
-      toast.error(error.value);
-    } finally {
-      checkingAlignment.value = false;
-    }
-  }
-
-  /** Chèn dòng trống vào file JP tại các vị trí đã được TL xác nhận (checkbox), lưu ra file mới và chuyển sang dùng file đó. */
-  async function insertConfirmedRows() {
-    if (!rowAlignment.value || confirmedInserts.value.size === 0) return;
-    if (!canUseTauriRuntime()) return;
-    error.value = "";
-    const inserts: ConfirmedInsert[] = rowAlignment.value.suggestions
-      .filter((s) => isConfirmed(s))
-      .map((s) => ({
-        sheet: s.sheet,
-        jpInsertAfterRow: s.jpInsertAfterRow,
-        insertCount: s.insertCount,
-        vnRowStart: s.vnRowStart,
-        vnRowEnd: s.vnRowEnd,
-      }));
-    if (inserts.length === 0) return;
-    try {
-      const stem = basename(jpPath.value).replace(/\.[^.]+$/, "") || "jp-aligned";
-      const ext = jpPath.value.split(".").pop()?.toLowerCase() === "xlsm" ? "xlsm" : "xlsx";
-      const outPath = await save({
-        defaultPath: `${stem}_aligned.${ext}`,
-        filters: [{ name: "Excel", extensions: ["xlsx", "xlsm"] }],
-      });
-      if (!outPath) return;
-      insertingRows.value = true;
-
-      const result = await vnjpSyncInsertRows(
-        jpPath.value,
-        vnPath.value,
-        outPath,
-        inserts,
-      );
-      toast.success(
-        `Đã chèn ${result.rowsInserted} dòng vào ${result.sheetsModified.length} sheet. Đã chuyển sang dùng file JP mới, hãy Phân tích lại.`,
-      );
-      jpPath.value = outPath;
-      rowAlignment.value = null;
-      confirmedInserts.value = new Set();
-      analysis.value = null;
-      applyResult.value = null;
-      cleanupResult.value = null;
-      redCellVerifications.value = new Map();
-    } catch (e) {
-      error.value = friendlyError(e);
-      toast.error(error.value);
-    } finally {
-      insertingRows.value = false;
-    }
-  }
-
   async function exportReport() {
     if (!canExport.value || !analysis.value) return;
     if (!canUseTauriRuntime()) return;
@@ -384,9 +218,6 @@ export function useVnJpSync() {
     jpPath.value = "";
     analysis.value = null;
     applyResult.value = null;
-    cleanupResult.value = null;
-    rowAlignment.value = null;
-    confirmedInserts.value = new Set();
     redCellVerifications.value = new Map();
     error.value = "";
     activeTab.value = "overview";
@@ -399,36 +230,20 @@ export function useVnJpSync() {
     jpName,
     analysis,
     analyzing,
-    applying,
     exporting,
-    cleaning,
-    checkingAlignment,
     verifyingAi,
-    insertingRows,
     error,
     activeTab,
     applyResult,
-    cleanupResult,
-    rowAlignment,
-    hasConfirmedInserts,
     totalRedCells,
     totalStrikeCells,
     totalQualityIssues,
-    canAnalyze,
-    canApply,
+    canAnalyzeAndApply,
     canExport,
-    canCleanup,
-    canCheckAlignment,
     pickFile,
     dropFile,
     clearFile,
-    analyze,
-    applyChanges,
-    cleanupJp,
-    checkRowAlignment,
-    insertConfirmedRows,
-    isConfirmed,
-    toggleConfirm,
+    analyzeAndApply,
     getVerification,
     exportReport,
     reset,
