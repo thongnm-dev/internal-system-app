@@ -605,7 +605,7 @@ pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<Scanne
     use regex::Regex;
 
     let bug_pattern = Regex::new(
-        r"^F3\.1_バグ管理表_\d{4}(?:（再）（急）|（特急）|（急）|（再）)?$"
+        r"^F3\.1_バグ管理表_[A-Za-z]*\d+(?:（再）（急）|（特急）|（急）|（再）)?$"
     ).unwrap();
 
     let paths = &dir_paths;
@@ -680,7 +680,7 @@ pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<Scanne
         result.extend(nested.into_iter().cloned());
 
         let same_name: Vec<&ScannedFile> = direct.iter()
-            .filter(|f| file_stem(&f.name) == *folder_name)
+            .filter(|f| file_stem(&f.name).starts_with(folder_name.as_str()))
             .cloned()
             .collect();
         if !same_name.is_empty() {
