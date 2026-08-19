@@ -40,6 +40,14 @@ function confirmClearTempFiles() {
   }
 }
 
+function confirmDeleteSelectedTempFiles() {
+  const count = ctrl.selectedTempFiles.value.length;
+  if (count === 0) return;
+  if (window.confirm(`Xóa ${count} file đã chọn? Không thể hoàn tác.`)) {
+    void ctrl.deleteSelectedTempFiles();
+  }
+}
+
 const fieldsetCollapsed = ref(false);
 const resultsFieldsetCollapsed = ref(false);
 
@@ -313,6 +321,16 @@ function tabColorStyle(color: string | null | undefined): string {
             text
             :disabled="!ctrl.hasSelectedTempFiles.value"
             @click="openCopyDialog"
+          />
+          <Button
+            v-if="ctrl.hasSelectedTempFiles.value"
+            label="Xóa file đã chọn"
+            icon="pi pi-trash"
+            size="small"
+            text
+            severity="danger"
+            :loading="ctrl.clearingTempFiles.value"
+            @click="confirmDeleteSelectedTempFiles"
           />
           <Button
             label="Xóa toàn bộ"

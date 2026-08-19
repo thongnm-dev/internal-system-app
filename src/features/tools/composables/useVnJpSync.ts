@@ -205,6 +205,25 @@ export function useVnJpSync() {
     }
   }
 
+  /** Xóa các file đang được chọn (checkbox) trong thư mục Temp. */
+  async function deleteSelectedTempFiles() {
+    if (selectedTempFilePaths.value.size === 0) return;
+    if (!canUseTauriRuntime()) return;
+    error.value = "";
+    clearingTempFiles.value = true;
+    try {
+      const paths = [...selectedTempFilePaths.value];
+      await explorerDelete(paths);
+      toast.success(`Đã xóa ${paths.length} file đã chọn.`);
+      await refreshTempFiles();
+    } catch (e) {
+      error.value = friendlyError(e);
+      toast.error(error.value);
+    } finally {
+      clearingTempFiles.value = false;
+    }
+  }
+
   /** Copy các file đang được chọn (checkbox) sang thư mục đích do TL tự chọn. */
   async function copySelectedTempFiles(destDir: string) {
     if (!destDir || selectedTempFilePaths.value.size === 0) return;
@@ -324,6 +343,7 @@ export function useVnJpSync() {
     analyzeAndApply,
     refreshTempFiles,
     clearAllTempFiles,
+    deleteSelectedTempFiles,
     isTempFileSelected,
     toggleTempFileSelection,
     copySelectedTempFiles,
