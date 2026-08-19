@@ -16,6 +16,15 @@ use crate::services::vnjp::{
     c236_sync_service, c238_sync_service,
 };
 
+/// Đường dẫn thư mục `Temp` — nơi lưu file kết quả của pipeline "Áp dụng" (xem
+/// `sync_service::merged_output_path`). Dùng để frontend liệt kê các file đã tạo ra, cho TL tự
+/// mở/copy sang thư mục làm việc khác.
+pub fn temp_dir_path() -> String {
+    crate::utils::app_config::temp_dir()
+        .to_string_lossy()
+        .to_string()
+}
+
 /// Phân tích 2 file Excel VN + JP, trả về SyncAnalysis đầy đủ.
 pub fn analyze(vn_path: &str, jp_path: &str) -> AppResult<SyncAnalysis> {
     sync_service::analyze(vn_path, jp_path)

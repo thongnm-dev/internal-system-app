@@ -78,6 +78,7 @@ fn build_invoke_handler() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + S
         file_compare_export,
         // === VN→JP document sync commands ===
         vnjp_sync_analyze_and_apply,
+        vnjp_sync_temp_dir,
         vnjp_sync_translate,
         vnjp_sync_export_report,
         vnjp_sync_cleanup,

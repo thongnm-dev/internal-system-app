@@ -21,6 +21,11 @@ export function vnjpSyncAnalyzeAndApply(
   });
 }
 
+/** Đường dẫn thư mục Temp — nơi lưu file kết quả của "Áp dụng" — để liệt kê danh sách file đã tạo. */
+export function vnjpSyncTempDir(): Promise<string> {
+  return safeInvoke<string>("vnjp_sync_temp_dir");
+}
+
 export function vnjpSyncExportReport(
   analysis: SyncAnalysis,
   outputPath: string,

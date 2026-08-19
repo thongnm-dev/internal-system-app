@@ -3,9 +3,12 @@ import { computed, ref } from "vue";
 import type { ApplyResult, RedCellVerification, SyncAnalysis } from "@/_/types/vnjp-sync";
 import { useToast } from "@/shared/composables/useToast";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
+import type { FileEntry } from "@/tauri/commands/explorer";
+import { explorerDelete, explorerPaste, explorerReadDir } from "@/tauri/commands/explorer";
 import {
   vnjpSyncAnalyzeAndApply,
   vnjpSyncExportReport,
+  vnjpSyncTempDir,
   vnjpSyncVerifyRedCellsAi,
 } from "@/tauri/commands/vnjp-sync";
 
@@ -13,7 +16,7 @@ import {
 const AI_VERIFY_PROVIDER = "gemini";
 const AI_VERIFY_MODEL = "gemini-3.1-flash-lite";
 
-export type ActiveTab = "overview" | "red-cells" | "strike-cells" | "quality";
+export type ActiveTab = "overview" | "red-cells" | "quality";
 
 const XLSX_FILTER = [{ name: "Excel", extensions: ["xlsx", "xlsm"] }];
 
@@ -34,6 +37,14 @@ export function useVnJpSync() {
   const applyResult = ref<ApplyResult | null>(null);
   const verifyingAi = ref(false);
   const redCellVerifications = ref<Map<string, RedCellVerification>>(new Map());
+  // Thư mục Temp chứa mọi file kết quả đã tạo ra (không chỉ lượt Áp dụng gần nhất) — để TL tự mở
+  // hoặc copy sang thư mục làm việc khác. Đường dẫn cache lại sau lần đọc đầu tiên.
+  const tempDirPath = ref("");
+  const tempFiles = ref<FileEntry[]>([]);
+  const loadingTempFiles = ref(false);
+  const clearingTempFiles = ref(false);
+  const copyingTempFiles = ref(false);
+  const selectedTempFilePaths = ref<Set<string>>(new Set());
 
   const vnName = computed(() => (vnPath.value ? basename(vnPath.value) : ""));
   const jpName = computed(() => (jpPath.value ? basename(jpPath.value) : ""));
@@ -43,11 +54,12 @@ export function useVnJpSync() {
     () => vnPath.value !== "" && jpPath.value !== "" && !analyzing.value,
   );
   const canExport = computed(() => analysis.value !== null && !exporting.value);
+  const selectedTempFiles = computed(() =>
+    tempFiles.value.filter((f) => selectedTempFilePaths.value.has(f.path)),
+  );
+  const hasSelectedTempFiles = computed(() => selectedTempFilePaths.value.size > 0);
 
   const totalRedCells = computed(() => analysis.value?.redCells.length ?? 0);
-  const totalStrikeCells = computed(
-    () => analysis.value?.strikeCells.length ?? 0,
-  );
   const totalQualityIssues = computed(
     () => analysis.value?.qualityIssues.length ?? 0,
   );
@@ -121,28 +133,11 @@ export function useVnJpSync() {
       applyResult.value = result.apply;
       activeTab.value = "overview";
 
-      const cleanupNote =
-        result.apply.strikeRemovedCount > 0 || result.apply.redBlackenedCount > 0
-          ? ` Đã dọn dẹp: xóa ${result.apply.strikeRemovedCount} ô strikethrough cũ, tô đen ${result.apply.redBlackenedCount} ô chữ đỏ cũ.`
-          : "";
-      const columnNote =
-        result.apply.columnCorrectedCount > 0
-          ? ` Đã tự sửa lệch cột theo nội dung khớp cùng dòng cho ${result.apply.columnCorrectedCount} ô.`
-          : "";
-      const rowsNote =
-        result.apply.rowsInserted > 0
-          ? ` Đã tự động chèn ${result.apply.rowsInserted} dòng lệch.`
-          : "";
-      toast.success(
-        `Phân tích xong: ${result.analysis.redCells.length} ô đỏ, ${result.analysis.strikeCells.length} ô strikethrough. ` +
-          `Đã ghi ${result.apply.appliedCount} ô VN vào file JP (${result.apply.sheetsModified.length} sheet).${cleanupNote}${columnNote}${rowsNote} ` +
-          `File kết quả: ${basename(result.apply.outputPath)}.`,
-      );
-
       if (result.analysis.redCells.length > 0) {
         // Chạy nền, không chặn nút — kết quả điền dần vào badge ở tab Ô đỏ.
         void verifyRedCellsAi();
       }
+      void refreshTempFiles();
     } catch (e) {
       error.value = friendlyError(e);
       analysis.value = null;
@@ -150,6 +145,83 @@ export function useVnJpSync() {
       toast.error(error.value);
     } finally {
       analyzing.value = false;
+    }
+  }
+
+  /** Liệt kê file trong thư mục Temp (nơi lưu kết quả "Áp dụng") — cho TL tự mở/copy sang nơi khác. */
+  async function refreshTempFiles() {
+    if (!canUseTauriRuntime()) return;
+    loadingTempFiles.value = true;
+    try {
+      if (!tempDirPath.value) {
+        tempDirPath.value = await vnjpSyncTempDir();
+      }
+      const result = await explorerReadDir(tempDirPath.value);
+      tempFiles.value = result.entries
+        .filter((e) => !e.is_dir)
+        .sort((a, b) => b.modified.localeCompare(a.modified));
+      // Bỏ chọn các file không còn tồn tại sau khi làm mới (đã bị xóa/di chuyển).
+      const stillThere = new Set(tempFiles.value.map((f) => f.path));
+      selectedTempFilePaths.value = new Set(
+        [...selectedTempFilePaths.value].filter((p) => stillThere.has(p)),
+      );
+    } catch {
+      // Im lặng bỏ qua — chỉ là danh sách hỗ trợ, không phải hành động TL chủ động bấm.
+    } finally {
+      loadingTempFiles.value = false;
+    }
+  }
+
+  function isTempFileSelected(path: string): boolean {
+    return selectedTempFilePaths.value.has(path);
+  }
+
+  function toggleTempFileSelection(path: string) {
+    const next = new Set(selectedTempFilePaths.value);
+    if (next.has(path)) {
+      next.delete(path);
+    } else {
+      next.add(path);
+    }
+    selectedTempFilePaths.value = next;
+  }
+
+  /** Xóa toàn bộ file đang liệt kê trong thư mục Temp — dùng khi TL muốn dọn sạch trước khi bắt đầu lượt mới. */
+  async function clearAllTempFiles() {
+    if (tempFiles.value.length === 0) return;
+    if (!canUseTauriRuntime()) return;
+    error.value = "";
+    clearingTempFiles.value = true;
+    try {
+      const paths = tempFiles.value.map((f) => f.path);
+      await explorerDelete(paths);
+      toast.success(`Đã xóa ${paths.length} file trong thư mục Temp.`);
+      await refreshTempFiles();
+    } catch (e) {
+      error.value = friendlyError(e);
+      toast.error(error.value);
+    } finally {
+      clearingTempFiles.value = false;
+    }
+  }
+
+  /** Copy các file đang được chọn (checkbox) sang thư mục đích do TL tự chọn. */
+  async function copySelectedTempFiles(destDir: string) {
+    if (!destDir || selectedTempFilePaths.value.size === 0) return;
+    if (!canUseTauriRuntime()) return;
+    error.value = "";
+    copyingTempFiles.value = true;
+    try {
+      const paths = [...selectedTempFilePaths.value];
+      await explorerPaste(paths, destDir, false);
+      toast.success(`Đã copy ${paths.length} file sang ${destDir}.`);
+      selectedTempFilePaths.value = new Set();
+    } catch (e) {
+      error.value = friendlyError(e);
+      toast.error(error.value);
+      throw e;
+    } finally {
+      copyingTempFiles.value = false;
     }
   }
 
@@ -235,8 +307,14 @@ export function useVnJpSync() {
     error,
     activeTab,
     applyResult,
+    tempDirPath,
+    tempFiles,
+    loadingTempFiles,
+    clearingTempFiles,
+    copyingTempFiles,
+    selectedTempFiles,
+    hasSelectedTempFiles,
     totalRedCells,
-    totalStrikeCells,
     totalQualityIssues,
     canAnalyzeAndApply,
     canExport,
@@ -244,6 +322,11 @@ export function useVnJpSync() {
     dropFile,
     clearFile,
     analyzeAndApply,
+    refreshTempFiles,
+    clearAllTempFiles,
+    isTempFileSelected,
+    toggleTempFileSelection,
+    copySelectedTempFiles,
     getVerification,
     exportReport,
     reset,

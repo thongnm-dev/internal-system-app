@@ -1,12 +1,70 @@
 <script setup lang="ts">
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open } from "@tauri-apps/plugin-dialog";
 import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import Dialog from "primevue/dialog";
+import Fieldset from "primevue/fieldset";
+import InputGroup from "primevue/inputgroup";
+import InputText from "primevue/inputtext";
+import Tab from "primevue/tab";
+import TabList from "primevue/tablist";
+import TabPanel from "primevue/tabpanel";
+import TabPanels from "primevue/tabpanels";
+import Tabs from "primevue/tabs";
 import Tag from "primevue/tag";
 import { onMounted, onUnmounted, ref } from "vue";
 import { explorerOpenFile } from "@/tauri/commands/explorer";
+import DialogFooter from "@/shared/components/DialogFooter.vue";
 import { useVnJpSync } from "../composables/useVnJpSync";
 
 const ctrl = useVnJpSync();
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIdx = 0;
+  while (value >= 1024 && unitIdx < units.length - 1) {
+    value /= 1024;
+    unitIdx += 1;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unitIdx]}`;
+}
+
+function confirmClearTempFiles() {
+  const count = ctrl.tempFiles.value.length;
+  if (count === 0) return;
+  if (window.confirm(`Xóa toàn bộ ${count} file trong thư mục Temp? Không thể hoàn tác.`)) {
+    void ctrl.clearAllTempFiles();
+  }
+}
+
+const fieldsetCollapsed = ref(false);
+
+// Dialog copy file đã chọn sang thư mục đích do TL tự chọn.
+const showCopyDialog = ref(false);
+const copyDestPath = ref("");
+
+function openCopyDialog() {
+  if (!ctrl.hasSelectedTempFiles.value) return;
+  copyDestPath.value = "";
+  showCopyDialog.value = true;
+}
+
+async function chooseCopyDest() {
+  const dir = await open({ directory: true, title: "Chọn thư mục đích" });
+  if (dir) copyDestPath.value = dir as string;
+}
+
+async function handleCopyTempFiles() {
+  try {
+    await ctrl.copySelectedTempFiles(copyDestPath.value);
+    showCopyDialog.value = false;
+  } catch {
+    // Giữ dialog mở khi copy lỗi — toast lỗi đã hiển thị từ composable, TL tự sửa đường dẫn rồi thử lại.
+  }
+}
 
 // Kéo-thả file từ ngoài vào ô VN/JP — Tauri webview drag-drop chỉ báo 1 tọa độ chung cho cả cửa sổ
 // (không phải HTML5 drop event trên từng element), nên phải tự so tọa độ đó với bounding rect của
@@ -32,6 +90,7 @@ function slotAtPoint(physicalX: number, physicalY: number): "vn" | "jp" | null {
 }
 
 onMounted(async () => {
+  void ctrl.refreshTempFiles();
   try {
     unlistenDrop = await getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
@@ -75,12 +134,17 @@ function tabColorStyle(color: string | null | undefined): string {
 <template>
   <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-1">
     <!-- ═══════════ Chọn file ═══════════ -->
-    <section class="shrink-0 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm">
-      <div class="mb-2 flex items-center gap-2">
-        <i class="pi pi-sync text-xl text-brand" />
-        <h3 class="section-title">Chọn tài liệu cần đồng bộ</h3>
-        <span class="text-xs text-muted">VN → JP · Excel (.xlsx / .xlsm)</span>
-      </div>
+    <Fieldset
+      v-model:collapsed="fieldsetCollapsed"
+      class="shrink-0 rounded-lg border border-divider bg-panel shadow-sm fieldset-nested"
+      toggleable
+    >
+      <template #legend="{ toggleCallback }">
+        <div class="flex cursor-pointer items-center gap-2 px-6 py-3" @click="toggleCallback">
+          <i :class="fieldsetCollapsed ? 'pi pi-plus' : 'pi pi-minus'" class="text-xs text-muted" />
+          <h3 class="section-title">Đồng bộ tài liệu</h3>
+        </div>
+      </template>
 
       <div class="relative grid gap-3 md:grid-cols-2">
         <!-- File VN -->
@@ -229,314 +293,313 @@ function tabColorStyle(color: string | null | undefined): string {
           </span>
         </span>
       </div>
-      <div
-        v-if="ctrl.applyResult.value"
-        class="mt-1 flex items-center gap-1.5 text-xs text-muted"
-      >
-        <i class="pi pi-folder-open" />
-        <span class="truncate">File kết quả: {{ ctrl.applyResult.value.outputPath }}</span>
-        <span class="shrink-0 font-medium text-brand underline" @click="explorerOpenFile(ctrl.applyResult.value.outputPath)">Mở file</span>
-      </div>
-
       <p v-if="ctrl.error.value" class="mt-2 text-sm text-red-500">
         <i class="pi pi-exclamation-triangle mr-1" />{{ ctrl.error.value }}
       </p>
+    </Fieldset>
+
+    <!-- ═══════════ Danh sách file trong thư mục Temp ═══════════ -->
+    <section class="shrink-0 rounded-lg border border-divider bg-panel px-4 py-3 shadow-sm">
+      <div class="mb-2 flex items-center gap-2">
+        <i class="pi pi-folder text-lg text-brand" />
+        <h3 class="section-title">Thư mục Temp</h3>
+        <span class="text-xs text-muted">File kết quả các lượt Áp dụng — mở hoặc copy sang thư mục làm việc khác</span>
+        <div class="ml-auto flex items-center gap-2">
+          <Button
+            label="Copy"
+            icon="pi pi-copy"
+            size="small"
+            text
+            :disabled="!ctrl.hasSelectedTempFiles.value"
+            @click="openCopyDialog"
+          />
+          <Button
+            label="Xóa toàn bộ"
+            icon="pi pi-eraser"
+            size="small"
+            text
+            severity="danger"
+            :loading="ctrl.clearingTempFiles.value"
+            :disabled="ctrl.tempFiles.value.length === 0"
+            @click="confirmClearTempFiles"
+          />
+          <Button
+            icon="pi pi-refresh"
+            size="small"
+            text
+            severity="secondary"
+            :loading="ctrl.loadingTempFiles.value"
+            v-tooltip.top="'Làm mới danh sách'"
+            @click="ctrl.refreshTempFiles()"
+          />
+        </div>
+      </div>
+
+      <div v-if="ctrl.tempFiles.value.length > 0" class="max-h-56 overflow-auto rounded-md border border-divider">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
+              <th class="px-3 py-2 text-center" style="width: 40px"></th>
+              <th class="px-3 py-2 text-left">Tên file</th>
+              <th class="px-3 py-2 text-center">Kích thước</th>
+              <th class="px-3 py-2 text-center">Thời gian</th>
+              <th class="px-3 py-2 text-center">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="f in ctrl.tempFiles.value"
+              :key="f.path"
+              class="border-b border-divider/50 hover:bg-canvas/50"
+            >
+              <td class="px-3 py-2 text-center">
+                <Checkbox
+                  :model-value="ctrl.isTempFileSelected(f.path)"
+                  binary
+                  @change="ctrl.toggleTempFileSelection(f.path)"
+                />
+              </td>
+              <td class="max-w-[280px] truncate px-3 py-2 font-medium" v-tooltip.top="f.name">{{ f.name }}</td>
+              <td class="px-3 py-2 text-center text-xs text-muted">{{ formatFileSize(f.size) }}</td>
+              <td class="px-3 py-2 text-center text-xs text-muted">{{ f.modified }}</td>
+              <td class="px-3 py-2 text-center text-xs">
+                <Button
+                  icon="pi pi-eye"
+                  size="small"
+                  text
+                  rounded
+                  v-tooltip.top="'Mở file'"
+                  @click="explorerOpenFile(f.path)"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="rounded-md border border-dashed border-divider px-3 py-4 text-center text-xs text-muted">
+        <span v-if="ctrl.loadingTempFiles.value">Đang tải…</span>
+        <span v-else>Chưa có file kết quả nào trong thư mục Temp.</span>
+      </div>
     </section>
 
     <!-- ═══════════ Kết quả phân tích ═══════════ -->
     <template v-if="ctrl.analysis.value">
-      <!-- Summary cards -->
-      <div class="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
-        <div
-          class="flex cursor-pointer flex-col gap-1 rounded-lg border bg-panel px-4 py-3 shadow-sm transition hover:border-brand"
-          :class="ctrl.activeTab.value === 'overview' ? 'border-brand' : 'border-divider'"
-          @click="ctrl.activeTab.value = 'overview'"
-        >
-          <span class="text-xs text-muted">Sheet</span>
-          <span class="text-2xl font-bold text-ink">{{ ctrl.analysis.value.sheetCompare.length }}</span>
-          <span class="text-xs text-muted">tổng cộng</span>
-        </div>
-        <div
-          class="flex cursor-pointer flex-col gap-1 rounded-lg border bg-panel px-4 py-3 shadow-sm transition hover:border-red-400"
-          :class="ctrl.activeTab.value === 'red-cells' ? 'border-red-400' : 'border-divider'"
-          @click="ctrl.activeTab.value = 'red-cells'"
-        >
-          <span class="text-xs text-muted">Ô đỏ (VN)</span>
-          <span class="text-2xl font-bold text-red-500">{{ ctrl.totalRedCells.value }}</span>
-          <span class="text-xs text-muted">cần phản ánh sang JP</span>
-        </div>
-        <div
-          class="flex cursor-pointer flex-col gap-1 rounded-lg border bg-panel px-4 py-3 shadow-sm transition hover:border-amber-400"
-          :class="ctrl.activeTab.value === 'strike-cells' ? 'border-amber-400' : 'border-divider'"
-          @click="ctrl.activeTab.value = 'strike-cells'"
-        >
-          <span class="text-xs text-muted">Strikethrough (JP)</span>
-          <span class="text-2xl font-bold text-amber-600">{{ ctrl.totalStrikeCells.value }}</span>
-          <span class="text-xs text-muted">cần xóa</span>
-        </div>
-        <div
-          class="flex cursor-pointer flex-col gap-1 rounded-lg border bg-panel px-4 py-3 shadow-sm transition hover:border-orange-400"
-          :class="ctrl.activeTab.value === 'quality' ? 'border-orange-400' : 'border-divider'"
-          @click="ctrl.activeTab.value = 'quality'"
-        >
-          <span class="text-xs text-muted">Quality Issues</span>
-          <span class="text-2xl font-bold text-orange-500">{{ ctrl.totalQualityIssues.value }}</span>
-          <span class="text-xs text-muted">vấn đề chất lượng</span>
-        </div>
-      </div>
+      <Tabs
+        v-model:value="ctrl.activeTab.value"
+        class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm"
+      >
+        <TabList>
+          <Tab value="overview">Tổng quan</Tab>
+          <Tab value="red-cells">Chi tiết</Tab>
+          <Tab value="quality">Quality Issues</Tab>
+        </TabList>
+        <TabPanels class="min-h-0 flex-1 overflow-hidden p-0">
+          <!-- Tab: Overview -->
+          <TabPanel value="overview" class="flex h-full min-h-0 flex-col">
+            <div class="shrink-0 border-b border-divider px-4 py-2">
+              <h4 class="font-semibold text-ink">So sánh Sheet (VN vs JP)</h4>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
+                    <th class="px-4 py-2 text-left">Tên Sheet</th>
+                    <th class="px-4 py-2 text-center">Tab VN</th>
+                    <th class="px-4 py-2 text-center">Tab JP</th>
+                    <th class="px-4 py-2 text-center">VN (rows)</th>
+                    <th class="px-4 py-2 text-center">JP (rows)</th>
+                    <th class="px-4 py-2 text-center">Ô đỏ</th>
+                    <th class="px-4 py-2 text-center">Strikethrough</th>
+                    <th class="px-4 py-2 text-center">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="sc in ctrl.analysis.value.sheetCompare"
+                    :key="sc.name"
+                    class="border-b border-divider/50 hover:bg-canvas/50"
+                  >
+                    <td class="px-4 py-2 font-medium">{{ sc.name }}</td>
+                    <td class="px-4 py-2 text-center">
+                      <span
+                        v-if="sc.vnTabColor"
+                        class="inline-block h-4 w-8 rounded border border-divider/50"
+                        :style="tabColorStyle(sc.vnTabColor)"
+                        v-tooltip.top="sc.vnTabColor"
+                      />
+                      <span v-else class="text-xs text-muted">—</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <span
+                        v-if="sc.jpTabColor"
+                        class="inline-block h-4 w-8 rounded border border-divider/50"
+                        :style="tabColorStyle(sc.jpTabColor)"
+                        v-tooltip.top="sc.jpTabColor"
+                      />
+                      <span v-else class="text-xs text-muted">—</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <span v-if="sc.inVn">{{ sc.vnRows }}</span>
+                      <span v-else class="text-xs text-muted">—</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <span v-if="sc.inJp">{{ sc.jpRows }}</span>
+                      <span v-else class="text-xs text-muted">—</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <span v-if="sc.vnRedCount > 0" class="font-bold text-red-500">{{ sc.vnRedCount }}</span>
+                      <span v-else class="text-xs text-muted">0</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <span v-if="sc.jpStrikeCount > 0" class="font-bold text-amber-600">{{ sc.jpStrikeCount }}</span>
+                      <span v-else class="text-xs text-muted">0</span>
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <Tag v-if="!sc.inVn" value="JP only" severity="warn" class="text-xs" />
+                      <Tag v-else-if="!sc.inJp" value="VN only" severity="danger" class="text-xs" />
+                      <Tag v-else-if="sc.vnTabColor !== sc.jpTabColor" value="Màu tab khác" severity="warn" class="text-xs" />
+                      <Tag v-else value="OK" severity="success" class="text-xs" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </TabPanel>
 
-      <!-- Tab content -->
-      <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-divider bg-panel shadow-sm">
-        <!-- Tab: Overview -->
-        <template v-if="ctrl.activeTab.value === 'overview'">
-          <div class="shrink-0 border-b border-divider px-4 py-2">
-            <h4 class="font-semibold text-ink">So sánh Sheet (VN vs JP)</h4>
-          </div>
-          <div class="min-h-0 flex-1 overflow-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
-                  <th class="px-4 py-2 text-left">Tên Sheet</th>
-                  <th class="px-4 py-2 text-center">Tab VN</th>
-                  <th class="px-4 py-2 text-center">Tab JP</th>
-                  <th class="px-4 py-2 text-center">VN (rows)</th>
-                  <th class="px-4 py-2 text-center">JP (rows)</th>
-                  <th class="px-4 py-2 text-center">Ô đỏ</th>
-                  <th class="px-4 py-2 text-center">Strikethrough</th>
-                  <th class="px-4 py-2 text-center">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="sc in ctrl.analysis.value.sheetCompare"
-                  :key="sc.name"
-                  class="border-b border-divider/50 hover:bg-canvas/50"
-                >
-                  <td class="px-4 py-2 font-medium">{{ sc.name }}</td>
-                  <td class="px-4 py-2 text-center">
-                    <span
-                      v-if="sc.vnTabColor"
-                      class="inline-block h-4 w-8 rounded border border-divider/50"
-                      :style="tabColorStyle(sc.vnTabColor)"
-                      v-tooltip.top="sc.vnTabColor"
-                    />
-                    <span v-else class="text-xs text-muted">—</span>
-                  </td>
-                  <td class="px-4 py-2 text-center">
-                    <span
-                      v-if="sc.jpTabColor"
-                      class="inline-block h-4 w-8 rounded border border-divider/50"
-                      :style="tabColorStyle(sc.jpTabColor)"
-                      v-tooltip.top="sc.jpTabColor"
-                    />
-                    <span v-else class="text-xs text-muted">—</span>
-                  </td>
-                  <td class="px-4 py-2 text-center">
-                    <span v-if="sc.inVn">{{ sc.vnRows }}</span>
-                    <span v-else class="text-xs text-muted">—</span>
-                  </td>
-                  <td class="px-4 py-2 text-center">
-                    <span v-if="sc.inJp">{{ sc.jpRows }}</span>
-                    <span v-else class="text-xs text-muted">—</span>
-                  </td>
-                  <td class="px-4 py-2 text-center">
-                    <span v-if="sc.vnRedCount > 0" class="font-bold text-red-500">{{ sc.vnRedCount }}</span>
-                    <span v-else class="text-xs text-muted">0</span>
-                  </td>
-                  <td class="px-4 py-2 text-center">
-                    <span v-if="sc.jpStrikeCount > 0" class="font-bold text-amber-600">{{ sc.jpStrikeCount }}</span>
-                    <span v-else class="text-xs text-muted">0</span>
-                  </td>
-                  <td class="px-4 py-2 text-center">
-                    <Tag v-if="!sc.inVn" value="JP only" severity="warn" class="text-xs" />
-                    <Tag v-else-if="!sc.inJp" value="VN only" severity="danger" class="text-xs" />
-                    <Tag v-else-if="sc.vnTabColor !== sc.jpTabColor" value="Màu tab khác" severity="warn" class="text-xs" />
-                    <Tag v-else value="OK" severity="success" class="text-xs" />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
+          <!-- Tab: Red Cells (VN) -->
+          <TabPanel value="red-cells" class="flex h-full min-h-0 flex-col">
+            <div class="shrink-0 border-b border-divider px-4 py-2">
+              <h4 class="font-semibold text-ink">
+                Ô đỏ cần phản ánh sang JP
+                <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalRedCells.value }} ô)</span>
+                <span v-if="ctrl.verifyingAi.value" class="ml-2 text-xs font-normal text-muted">
+                  <i class="pi pi-spin pi-spinner mr-1" />đang kiểm tra AI…
+                </span>
+              </h4>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
+                    <th class="px-3 py-2 text-left">#</th>
+                    <th class="px-3 py-2 text-left">Sheet</th>
+                    <th class="px-3 py-2 text-center">Vị trí</th>
+                    <th class="px-3 py-2 text-left">Nội dung VN (đỏ)</th>
+                    <th class="px-3 py-2 text-left">JP hiện tại</th>
+                    <th class="px-3 py-2 text-left">
+                      Kiểm tra AI
+                      <span class="normal-case font-normal text-muted/70">(VN→JP chỉ để so sánh)</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(cell, idx) in ctrl.analysis.value.redCells"
+                    :key="`${cell.sheet}-${cell.row}-${cell.col}-${idx}`"
+                    class="border-b border-divider/50 hover:bg-canvas/50"
+                  >
+                    <td class="px-3 py-2 text-xs text-muted">{{ idx + 1 }}</td>
+                    <td class="px-3 py-2 text-xs font-medium">{{ cell.sheet }}</td>
+                    <td class="px-3 py-2 text-center text-xs font-mono text-muted">
+                      {{ colLabel(cell.col) }}{{ cell.row }}
+                      <Tag v-if="cell.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
+                    </td>
+                    <td class="max-w-[260px] px-3 py-2">
+                      <span class="line-clamp-3 whitespace-pre-wrap break-words text-red-600">{{ cell.vnText }}</span>
+                    </td>
+                    <td class="max-w-[260px] px-3 py-2 text-muted">
+                      <span class="line-clamp-3 whitespace-pre-wrap break-words text-xs">{{ cell.jpText || "—" }}</span>
+                    </td>
+                    <td class="max-w-[220px] px-3 py-2">
+                      <template v-if="ctrl.getVerification(cell.sheet, cell.row, cell.col)">
+                        <div class="flex flex-col gap-1">
+                          <Tag
+                            :value="`Giống JP hiện tại: ${Math.round(ctrl.getVerification(cell.sheet, cell.row, cell.col)!.similaritySamePos)}%`"
+                            :severity="ctrl.getVerification(cell.sheet, cell.row, cell.col)!.similaritySamePos >= 70 ? 'warn' : 'secondary'"
+                            class="w-fit text-xs"
+                            v-tooltip.top="ctrl.getVerification(cell.sheet, cell.row, cell.col)!.aiTranslation"
+                          />
+                          <Tag
+                            v-if="ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch"
+                            :value="`⚠ Có thể lệch dòng — giống ${colLabel(ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch!.col)}${ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch!.row} hơn (${Math.round(ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch!.similarity)}%)`"
+                            severity="danger"
+                            class="w-fit text-xs"
+                          />
+                        </div>
+                      </template>
+                      <span v-else-if="ctrl.verifyingAi.value" class="text-xs text-muted">
+                        <i class="pi pi-spin pi-spinner" />
+                      </span>
+                      <span v-else class="text-xs text-muted">—</span>
+                    </td>
+                  </tr>
+                  <tr v-if="ctrl.analysis.value.redCells.length === 0">
+                    <td colspan="6" class="px-4 py-8 text-center text-muted">
+                      <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
+                      Không có ô đỏ nào trong file VN
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </TabPanel>
 
-        <!-- Tab: Red Cells (VN) -->
-        <template v-else-if="ctrl.activeTab.value === 'red-cells'">
-          <div class="shrink-0 border-b border-divider px-4 py-2">
-            <h4 class="font-semibold text-ink">
-              Ô đỏ cần phản ánh sang JP
-              <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalRedCells.value }} ô)</span>
-              <span v-if="ctrl.verifyingAi.value" class="ml-2 text-xs font-normal text-muted">
-                <i class="pi pi-spin pi-spinner mr-1" />đang kiểm tra AI…
-              </span>
-            </h4>
-          </div>
-          <div class="min-h-0 flex-1 overflow-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
-                  <th class="px-3 py-2 text-left">#</th>
-                  <th class="px-3 py-2 text-left">Sheet</th>
-                  <th class="px-3 py-2 text-center">Vị trí</th>
-                  <th class="px-3 py-2 text-left">Nội dung VN (đỏ)</th>
-                  <th class="px-3 py-2 text-left">JP hiện tại</th>
-                  <th class="px-3 py-2 text-left">
-                    Kiểm tra AI
-                    <span class="normal-case font-normal text-muted/70">(VN→JP chỉ để so sánh)</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(cell, idx) in ctrl.analysis.value.redCells"
-                  :key="`${cell.sheet}-${cell.row}-${cell.col}-${idx}`"
-                  class="border-b border-divider/50 hover:bg-canvas/50"
-                >
-                  <td class="px-3 py-2 text-xs text-muted">{{ idx + 1 }}</td>
-                  <td class="px-3 py-2 text-xs font-medium">{{ cell.sheet }}</td>
-                  <td class="px-3 py-2 text-center text-xs font-mono text-muted">
-                    {{ colLabel(cell.col) }}{{ cell.row }}
-                    <Tag v-if="cell.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
-                  </td>
-                  <td class="max-w-[260px] px-3 py-2">
-                    <span class="line-clamp-3 whitespace-pre-wrap break-words text-red-600">{{ cell.vnText }}</span>
-                  </td>
-                  <td class="max-w-[260px] px-3 py-2 text-muted">
-                    <span class="line-clamp-3 whitespace-pre-wrap break-words text-xs">{{ cell.jpText || "—" }}</span>
-                  </td>
-                  <td class="max-w-[220px] px-3 py-2">
-                    <template v-if="ctrl.getVerification(cell.sheet, cell.row, cell.col)">
-                      <div class="flex flex-col gap-1">
-                        <Tag
-                          :value="`Giống JP hiện tại: ${Math.round(ctrl.getVerification(cell.sheet, cell.row, cell.col)!.similaritySamePos)}%`"
-                          :severity="ctrl.getVerification(cell.sheet, cell.row, cell.col)!.similaritySamePos >= 70 ? 'warn' : 'secondary'"
-                          class="w-fit text-xs"
-                          v-tooltip.top="ctrl.getVerification(cell.sheet, cell.row, cell.col)!.aiTranslation"
-                        />
-                        <Tag
-                          v-if="ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch"
-                          :value="`⚠ Có thể lệch dòng — giống ${colLabel(ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch!.col)}${ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch!.row} hơn (${Math.round(ctrl.getVerification(cell.sheet, cell.row, cell.col)!.betterMatch!.similarity)}%)`"
-                          severity="danger"
-                          class="w-fit text-xs"
-                        />
-                      </div>
-                    </template>
-                    <span v-else-if="ctrl.verifyingAi.value" class="text-xs text-muted">
-                      <i class="pi pi-spin pi-spinner" />
-                    </span>
-                    <span v-else class="text-xs text-muted">—</span>
-                  </td>
-                </tr>
-                <tr v-if="ctrl.analysis.value.redCells.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center text-muted">
-                    <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
-                    Không có ô đỏ nào trong file VN
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
-
-        <!-- Tab: Strikethrough cells (JP) -->
-        <template v-else-if="ctrl.activeTab.value === 'strike-cells'">
-          <div class="shrink-0 border-b border-divider px-4 py-2">
-            <h4 class="font-semibold text-ink">
-              Ô Strikethrough cần xóa (JP)
-              <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalStrikeCells.value }} ô)</span>
-            </h4>
-          </div>
-          <div class="min-h-0 flex-1 overflow-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
-                  <th class="px-4 py-2 text-left">#</th>
-                  <th class="px-4 py-2 text-left">Sheet</th>
-                  <th class="px-4 py-2 text-center">Vị trí</th>
-                  <th class="px-4 py-2 text-left">Nội dung (cần xóa)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(cell, idx) in ctrl.analysis.value.strikeCells"
-                  :key="`${cell.sheet}-${cell.row}-${cell.col}-${idx}`"
-                  class="border-b border-divider/50 hover:bg-canvas/50"
-                >
-                  <td class="px-4 py-2 text-xs text-muted">{{ idx + 1 }}</td>
-                  <td class="px-4 py-2 text-xs font-medium">{{ cell.sheet }}</td>
-                  <td class="px-4 py-2 text-center text-xs font-mono text-muted">
-                    {{ colLabel(cell.col) }}{{ cell.row }}
-                    <Tag v-if="cell.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
-                  </td>
-                  <td class="max-w-xs px-4 py-2">
-                    <span class="line-through text-muted">{{ cell.text }}</span>
-                  </td>
-                </tr>
-                <tr v-if="ctrl.analysis.value.strikeCells.length === 0">
-                  <td colspan="4" class="px-4 py-8 text-center text-muted">
-                    <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
-                    Không có ô strikethrough nào trong file JP
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
-
-        <!-- Tab: Quality Check -->
-        <template v-else-if="ctrl.activeTab.value === 'quality'">
-          <div class="shrink-0 border-b border-divider px-4 py-2">
-            <h4 class="font-semibold text-ink">
-              Kiểm tra chất lượng (JP)
-              <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalQualityIssues.value }} vấn đề)</span>
-            </h4>
-          </div>
-          <div class="min-h-0 flex-1 overflow-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
-                  <th class="px-4 py-2 text-left">#</th>
-                  <th class="px-4 py-2 text-left">Sheet</th>
-                  <th class="px-4 py-2 text-center">Vị trí</th>
-                  <th class="px-4 py-2 text-left">Loại</th>
-                  <th class="px-4 py-2 text-left">Nội dung</th>
-                  <th class="px-4 py-2 text-left">Mô tả</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(issue, idx) in ctrl.analysis.value.qualityIssues"
-                  :key="idx"
-                  class="border-b border-divider/50 hover:bg-canvas/50"
-                >
-                  <td class="px-4 py-2 text-xs text-muted">{{ idx + 1 }}</td>
-                  <td class="px-4 py-2 text-xs font-medium">{{ issue.sheet }}</td>
-                  <td class="px-4 py-2 text-center text-xs font-mono text-muted">
-                    {{ colLabel(issue.col) }}{{ issue.row }}
-                    <Tag v-if="issue.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
-                  </td>
-                  <td class="px-4 py-2">
-                    <Tag
-                      :value="issue.issueType === 'vn_char' ? '文字' : issue.issueType"
-                      :severity="issue.issueType === 'vn_char' ? 'danger' : 'warn'"
-                      class="text-xs"
-                    />
-                  </td>
-                  <td class="max-w-xs px-4 py-2">
-                    <span class="line-clamp-2 break-words text-orange-600">{{ issue.content }}</span>
-                  </td>
-                  <td class="px-4 py-2 text-xs text-muted">{{ issue.description }}</td>
-                </tr>
-                <tr v-if="ctrl.analysis.value.qualityIssues.length === 0">
-                  <td colspan="6" class="px-4 py-8 text-center text-muted">
-                    <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
-                    Không phát hiện vấn đề chất lượng nào
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
-      </section>
+          <!-- Tab: Quality Check -->
+          <TabPanel value="quality" class="flex h-full min-h-0 flex-col">
+            <div class="shrink-0 border-b border-divider px-4 py-2">
+              <h4 class="font-semibold text-ink">
+                Kiểm tra chất lượng (JP)
+                <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalQualityIssues.value }} vấn đề)</span>
+              </h4>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
+                    <th class="px-4 py-2 text-left">#</th>
+                    <th class="px-4 py-2 text-left">Sheet</th>
+                    <th class="px-4 py-2 text-center">Vị trí</th>
+                    <th class="px-4 py-2 text-left">Loại</th>
+                    <th class="px-4 py-2 text-left">Nội dung</th>
+                    <th class="px-4 py-2 text-left">Mô tả</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(issue, idx) in ctrl.analysis.value.qualityIssues"
+                    :key="idx"
+                    class="border-b border-divider/50 hover:bg-canvas/50"
+                  >
+                    <td class="px-4 py-2 text-xs text-muted">{{ idx + 1 }}</td>
+                    <td class="px-4 py-2 text-xs font-medium">{{ issue.sheet }}</td>
+                    <td class="px-4 py-2 text-center text-xs font-mono text-muted">
+                      {{ colLabel(issue.col) }}{{ issue.row }}
+                      <Tag v-if="issue.isShape" value="Shape" severity="info" class="ml-1 text-xs" v-tooltip.top="'Textbox nổi, neo tại vị trí này'" />
+                    </td>
+                    <td class="px-4 py-2">
+                      <Tag
+                        :value="issue.issueType === 'vn_char' ? '文字' : issue.issueType"
+                        :severity="issue.issueType === 'vn_char' ? 'danger' : 'warn'"
+                        class="text-xs"
+                      />
+                    </td>
+                    <td class="max-w-xs px-4 py-2">
+                      <span class="line-clamp-2 break-words text-orange-600">{{ issue.content }}</span>
+                    </td>
+                    <td class="px-4 py-2 text-xs text-muted">{{ issue.description }}</td>
+                  </tr>
+                  <tr v-if="ctrl.analysis.value.qualityIssues.length === 0">
+                    <td colspan="6" class="px-4 py-8 text-center text-muted">
+                      <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
+                      Không phát hiện vấn đề chất lượng nào
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </template>
 
     <!-- Empty state -->
@@ -561,5 +624,50 @@ function tabColorStyle(color: string | null | undefined): string {
         </ol>
       </div>
     </div>
+
+    <!-- Dialog copy file Temp đã chọn sang thư mục đích -->
+    <Dialog
+      v-model:visible="showCopyDialog"
+      header="Copy file"
+      :modal="true"
+      :closable="true"
+      :style="{ width: '32rem' }"
+    >
+      <div class="space-y-3">
+        <div>
+          <h4 class="mb-1.5 text-sm font-semibold text-ink">
+            File đã chọn <span class="font-normal text-muted">({{ ctrl.selectedTempFiles.value.length }})</span>
+          </h4>
+          <div class="max-h-40 overflow-auto rounded-md border border-divider">
+            <div
+              v-for="f in ctrl.selectedTempFiles.value"
+              :key="f.path"
+              class="truncate border-b border-divider/50 px-3 py-1.5 text-sm last:border-b-0"
+              v-tooltip.top="f.name"
+            >
+              {{ f.name }}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="mb-1.5 text-sm font-semibold text-ink">Đường dẫn đích:</h4>
+          <InputGroup>
+            <InputText v-model="copyDestPath" placeholder="Chưa chọn thư mục đích" readonly />
+            <Button icon="pi pi-folder-open" severity="secondary" outlined title="Chọn thư mục đích" @click="chooseCopyDest" />
+          </InputGroup>
+        </div>
+      </div>
+      <template #footer>
+        <DialogFooter
+          confirm-label="Copy"
+          confirm-icon="pi pi-copy"
+          :confirm-disabled="!copyDestPath"
+          :busy="ctrl.copyingTempFiles.value"
+          @cancel="showCopyDialog = false"
+          @confirm="handleCopyTempFiles"
+        />
+      </template>
+    </Dialog>
   </section>
 </template>

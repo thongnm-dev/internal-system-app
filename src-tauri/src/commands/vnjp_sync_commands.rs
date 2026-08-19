@@ -40,6 +40,13 @@ pub fn vnjp_sync_analyze_and_apply(
     vnjp_sync_service::analyze_and_apply(&vn_path, &jp_path).map_err(log_err)
 }
 
+/// Đường dẫn thư mục Temp — nơi lưu file kết quả của "Áp dụng" — để frontend liệt kê các file đã
+/// tạo ra (TL tự mở/copy sang thư mục làm việc khác).
+#[tauri::command]
+pub fn vnjp_sync_temp_dir() -> String {
+    vnjp_sync_service::temp_dir_path()
+}
+
 /// Dọn dẹp file JP: xóa hẳn nội dung strikethrough cũ + tô đen chữ đỏ cũ tồn đọng từ
 /// bản tablet cũ, trên mọi sheet — không phản ánh chữ đỏ VN. Lưu ra output_path.
 #[tauri::command]
