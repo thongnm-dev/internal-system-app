@@ -4415,6 +4415,32 @@ pub(crate) fn clone_vn_cell_xml(
     }
 }
 
+/// Thay `s="X"` trong raw cell XML bằng giá trị mới; thêm nếu chưa có.
+fn restyle_raw_cell_xml(cell_xml: &str, new_s: usize) -> String {
+    let s_val = new_s.to_string();
+    // Tìm và thay s="..."
+    if let Some(s_start) = cell_xml.find(" s=\"") {
+        let val_start = s_start + 4; // sau ' s="'
+        if let Some(val_len) = cell_xml[val_start..].find('"') {
+            let mut r = String::with_capacity(cell_xml.len());
+            r.push_str(&cell_xml[..val_start]);
+            r.push_str(&s_val);
+            r.push_str(&cell_xml[val_start + val_len..]);
+            return r;
+        }
+    }
+    // Chưa có s= → thêm sau <c
+    if let Some(pos) = cell_xml.find("<c ") {
+        let insert = pos + 2; // sau "<c"
+        let mut r = String::with_capacity(cell_xml.len() + 8);
+        r.push_str(&cell_xml[..insert]);
+        r.push_str(&format!(" s=\"{s_val}\""));
+        r.push_str(&cell_xml[insert..]);
+        return r;
+    }
+    cell_xml.to_string()
+}
+
 /// Rút các mergeCell VN NẰM GỌN trong [vn_start0, vn_end0] (0-based), đổi số dòng về vùng đích theo
 /// `row_delta` (target_row1 - vn_row1). Cột giữ nguyên.
 fn cloned_merge_refs(
@@ -5695,6 +5721,7 @@ pub(crate) fn clone_vn_sheet_for_jp(
     vn_rich_ssi_raw: &HashMap<usize, String>,
     vn_changed_positions: Option<&HashSet<(usize, usize)>>,
     use_col_a_formula: bool,
+    jp_preserved_header_cells: Option<&HashSet<(usize, usize)>>,
 ) -> String {
     // ── 1. Xây sheetData mới từ VN ────────────────────────────────────────────
     let Ok(vn_doc) = roxmltree::Document::parse(vn_sheet_xml) else {
@@ -5759,15 +5786,58 @@ pub(crate) fn clone_vn_sheet_for_jp(
         }
 
         if row1 < formula_start_row1 || group_header_rows.contains(&row1) {
-            // Header row (kể cả "STT") hoặc dòng tiêu đề nhóm (merge từ cột A) — clone kể cả cột A
-            new_sd.push_str(&clone_vn_row_xml(
-                row_node,
-                vn_sheet_xml,
-                row1,
-                xf_remap,
-                vn_plain_ssi,
-                vn_rich_ssi_raw,
-            ));
+            // Header row (kể cả "STT") hoặc dòng tiêu đề nhóm (merge từ cột A) — clone kể cả cột A.
+            // Nếu có `jp_preserved_header_cells`, ô nào nằm trong set đó sẽ giữ nguyên bản JP.
+            let has_preserved = jp_preserved_header_cells
+                .map(|s| row_node.children().filter(|c| c.tag_name().name() == "c").any(|c| {
+                    c.attribute("r")
+                        .and_then(parse_cell_ref)
+                        .map(|(_, col0)| s.contains(&(row1, col0)))
+                        .unwrap_or(false)
+                }))
+                .unwrap_or(false);
+            if has_preserved {
+                let preserved = jp_preserved_header_cells.unwrap();
+                let mut row_attrs = String::new();
+                for a in row_node.attributes() {
+                    match a.name() {
+                        "r" => {}
+                        "s" => {
+                            let remapped = a.value().parse::<usize>().ok()
+                                .and_then(|o| xf_remap.get(o).copied());
+                            match remapped {
+                                Some(v) => row_attrs.push_str(&format!(" s=\"{v}\"")),
+                                None => row_attrs.push_str(&format!(" s=\"{}\"", a.value())),
+                            }
+                        }
+                        name => row_attrs.push_str(&format!(" {}=\"{}\"", name, xml_escape_attr(a.value()))),
+                    }
+                }
+                let cells: String = row_node.children()
+                    .filter(|c| c.tag_name().name() == "c")
+                    .map(|c| {
+                        let col0 = c.attribute("r").and_then(parse_cell_ref).map(|(_, col)| col);
+                        if let Some(col0) = col0 {
+                            if preserved.contains(&(row1, col0)) {
+                                if let Some(jp_raw) = jp_cell_lookup.get(&(row1, col0)) {
+                                    return (*jp_raw).to_string();
+                                }
+                            }
+                        }
+                        clone_vn_cell_xml(c, vn_sheet_xml, row1, xf_remap, vn_plain_ssi, vn_rich_ssi_raw)
+                    })
+                    .collect();
+                new_sd.push_str(&format!(r#"<row r="{row1}"{row_attrs}>{cells}</row>"#));
+            } else {
+                new_sd.push_str(&clone_vn_row_xml(
+                    row_node,
+                    vn_sheet_xml,
+                    row1,
+                    xf_remap,
+                    vn_plain_ssi,
+                    vn_rich_ssi_raw,
+                ));
+            }
         } else {
             // Dòng dữ liệu — bỏ cột A VN, thêm công thức JP (trừ khi `use_col_a_formula = false`,
             // vd sheet "変更履歴" không có cột STT tự đánh số — cột A khi đó xử lý như cột thường).
@@ -5810,13 +5880,20 @@ pub(crate) fn clone_vn_sheet_for_jp(
                         return None; // cột A đã xử lý riêng ở trên (công thức JP)
                     }
                     // VN không coi là đã thay đổi (chữ đen, không strikethrough) tại ô này →
-                    // giữ nguyên ô JP cùng vị trí nếu có, thay vì ghi đè bằng nội dung VN.
+                    // giữ nguyên NỘI DUNG ô JP cùng vị trí nếu có, nhưng dùng STYLE từ VN (đã
+                    // remap) để bảo toàn border/fill mà VN có thể đã thêm.
                     let is_edited = vn_changed_positions
                         .map(|m| m.contains(&(vn_row0, col0)))
                         .unwrap_or(true);
                     if !is_edited {
                         if let Some(jp_raw) = jp_cell_lookup.get(&(row1, col0)) {
-                            return Some((*jp_raw).to_string());
+                            let vn_s = c.attribute("s")
+                                .and_then(|s| s.parse::<usize>().ok())
+                                .and_then(|o| xf_remap.get(o).copied());
+                            return Some(match vn_s {
+                                Some(new_s) => restyle_raw_cell_xml(jp_raw, new_s),
+                                None => (*jp_raw).to_string(),
+                            });
                         }
                     }
                     Some(clone_vn_cell_xml(

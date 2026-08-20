@@ -229,6 +229,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &vn_rich_ssi,
             vn_changed_cells.get(sheet_name),
             false,
+            None,
         );
 
         let new_sheet_xml = inject_stt_group_formula(

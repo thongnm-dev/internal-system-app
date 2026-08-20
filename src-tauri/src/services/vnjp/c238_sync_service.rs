@@ -608,6 +608,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &vn_rich_ssi,
             vn_changed_cells.get(sheet_name),
             false,
+            None,
         );
 
         applied_count += 1;
