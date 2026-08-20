@@ -550,6 +550,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         cloned_names,
     );
 
+    let empty_changed: HashSet<(usize, usize)> = HashSet::new();
     let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
     let mut applied_count = 0usize;
     let mut sheets_modified: Vec<String> = structure.sheets_modified.clone();
@@ -606,7 +607,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
-            vn_changed_cells.get(sheet_name),
+            Some(vn_changed_cells.get(sheet_name).unwrap_or(&empty_changed)),
             false,
             if is_worksheet { Some(&preserved_cells) } else { None },
         );
