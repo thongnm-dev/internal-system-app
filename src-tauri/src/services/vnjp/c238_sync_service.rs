@@ -15,7 +15,7 @@ use crate::models::vnjp_sync::{ApplyResult, RowAlignmentSuggestion};
 
 use super::sync_service::{
     clone_vn_sheet_for_jp, extract_all_shared_strings, find_changed_style_cells_xlsx,
-    is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp, read_zip_entry,
+    is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry,
     resolve_sheet_xml_paths, sync_structure, write_output_zip,
 };
 
@@ -503,6 +503,112 @@ pub(crate) fn analyze_row_alignment_by_group(
 /// `SCREEN_IF_DATA_START_ROW0 + 1`.
 const CONTENT_START_ROW1: usize = SCREEN_IF_DATA_START_ROW0 + 1;
 
+/// Các ô header ROW 3 luôn lấy từ JP: A3, C3, E3, F3 — (row1, col0).
+fn jp_preserved_header_cells() -> HashSet<(usize, usize)> {
+    [
+        (3, 0), // A3
+        (3, 2), // C3
+        (3, 4), // E3
+        (3, 5), // F3
+    ]
+    .into_iter()
+    .collect()
+}
+
+/// Trích raw cell XML tại các vị trí `positions` từ sheet JP bất kỳ (sheet đầu tiên đọc được).
+fn extract_jp_header_cells(
+    jp_archive: &mut zip::ZipArchive<File>,
+    jp_sheet_map: &HashMap<String, String>,
+    positions: &HashSet<(usize, usize)>,
+) -> HashMap<(usize, usize), String> {
+    let mut result = HashMap::new();
+    for xml_path in jp_sheet_map.values() {
+        let Some(sheet_xml) = read_zip_entry(jp_archive, xml_path) else {
+            continue;
+        };
+        let Ok(doc) = roxmltree::Document::parse(&sheet_xml) else {
+            continue;
+        };
+        let Some(sd) = doc
+            .descendants()
+            .find(|n| n.tag_name().name() == "sheetData")
+        else {
+            continue;
+        };
+        for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+            let row1 = row
+                .attribute("r")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+            for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+                if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
+                    if positions.contains(&(row1, col0)) {
+                        result
+                            .entry((row1, col0))
+                            .or_insert_with(|| sheet_xml[cell.range()].to_string());
+                    }
+                }
+            }
+        }
+        if result.len() == positions.len() {
+            break;
+        }
+    }
+    result
+}
+
+/// Ghi đè các ô header trong sheet XML bằng nội dung JP đã trích.
+fn patch_header_cells_in_sheet(
+    sheet_xml: &str,
+    jp_cells: &HashMap<(usize, usize), String>,
+) -> String {
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return sheet_xml.to_string();
+    };
+    let Some(sd) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "sheetData")
+    else {
+        return sheet_xml.to_string();
+    };
+
+    struct Edit {
+        start: usize,
+        end: usize,
+        replacement: String,
+    }
+    let mut edits: Vec<Edit> = Vec::new();
+
+    for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+        let row1 = row
+            .attribute("r")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+            if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
+                if let Some(jp_raw) = jp_cells.get(&(row1, col0)) {
+                    edits.push(Edit {
+                        start: cell.range().start,
+                        end: cell.range().end,
+                        replacement: jp_raw.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    if edits.is_empty() {
+        return sheet_xml.to_string();
+    }
+
+    edits.sort_by(|a, b| b.start.cmp(&a.start));
+    let mut result = sheet_xml.to_string();
+    for edit in edits {
+        result.replace_range(edit.start..edit.end, &edit.replacement);
+    }
+    result
+}
+
 /// Pipeline "Áp dụng" VN → JP cho C2.3.8.
 ///
 /// C2.3.8 KHÔNG có cột STT → không cần công thức cột A (`use_col_a_formula = false`, cột A xử lý
@@ -511,6 +617,9 @@ const CONTENT_START_ROW1: usize = SCREEN_IF_DATA_START_ROW0 + 1;
 /// header không bị mất; riêng từng ô ở dòng dữ liệu — nếu ô đó KHÔNG "coi như đã thay đổi" (chữ
 /// đen, không strikethrough — xem `find_changed_style_cells_xlsx`) VÀ JP đã có ô tại đúng vị trí
 /// đó, GIỮ NGUYÊN ô JP thay vì ghi đè bằng VN.
+///
+/// Header row 3: các ô A3, C3, E3, F3 luôn lấy từ JP (`jp_preserved_header_cells`).
+/// Sheet clone trực tiếp từ VN: cũng ghi đè header cells bằng nội dung từ sheet JP bất kỳ.
 pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     // ── 1. sync_structure ──────────────────────────────────────────────────────
     let output_path = merged_output_path(jp_path)?;
@@ -566,6 +675,8 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         .collect();
     common_sheets.sort();
 
+    let preserved_cells = jp_preserved_header_cells();
+
     let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
     let mut applied_count = 0usize;
     let mut sheets_modified: Vec<String> = structure.sheets_modified.clone();
@@ -597,6 +708,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         // use_col_a_formula = false → cột A xử lý như cột thường (không có công thức JP);
         // vn_changed_cells.get(sheet_name) → ô chữ đen, không strikethrough (không đổi) giữ
         // nguyên bản JP cùng vị trí.
+        // A3, C3, E3, F3 luôn lấy từ JP (jp_preserved_header_cells).
         let new_sheet_xml = clone_vn_sheet_for_jp(
             &vn_sheet_xml,
             &jp_sheet_xml,
@@ -608,13 +720,37 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &vn_rich_ssi,
             vn_changed_cells.get(sheet_name),
             false,
-            None,
+            Some(&preserved_cells),
         );
 
         applied_count += 1;
         replaced.insert(jp_xml_path, new_sheet_xml.into_bytes());
         if !sheets_modified.contains(sheet_name) {
             sheets_modified.push(sheet_name.clone());
+        }
+    }
+
+    // ── 6b. Cloned sheets: ghi đè header cells JP ──────────────────────────
+    // Sheet clone trực tiếp từ VN không có bản JP tương ứng — lấy header cells từ sheet JP bất kỳ.
+    if !cloned_names.is_empty() {
+        let jp_header_cells =
+            extract_jp_header_cells(&mut jp_archive, &jp_sheet_map, &preserved_cells);
+        if !jp_header_cells.is_empty() {
+            for cloned_name in cloned_names {
+                let cloned_xml_path = match jp_sheet_map.get(cloned_name) {
+                    Some(p) => p.clone(),
+                    None => continue,
+                };
+                let cloned_xml = if let Some(bytes) = replaced.get(&cloned_xml_path) {
+                    String::from_utf8_lossy(bytes).to_string()
+                } else if let Some(xml) = read_zip_entry(&mut jp_archive, &cloned_xml_path) {
+                    xml
+                } else {
+                    continue;
+                };
+                let patched = patch_header_cells_in_sheet(&cloned_xml, &jp_header_cells);
+                replaced.insert(cloned_xml_path, patched.into_bytes());
+            }
         }
     }
 
