@@ -49,6 +49,82 @@ pub fn content_bounds(sheet_name: &str) -> ContentBounds {
 /// Row bắt đầu vùng nội dung (1-based) — bỏ vùng header cố định (row Excel 1~3).
 const CONTENT_START_ROW1: usize = 4;
 
+/// Tìm dòng cuối cùng có ít nhất 1 ô chứa nội dung thật (<v>, <is>, <f>) trong sheetData.
+fn find_last_content_row(sheet_xml: &str) -> usize {
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return usize::MAX;
+    };
+    let Some(sd) = doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
+        return usize::MAX;
+    };
+    let mut last = 0usize;
+    for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+        let row1 = row
+            .attribute("r")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        let has_content = row
+            .children()
+            .filter(|c| c.tag_name().name() == "c")
+            .any(|c| c.children().any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f")));
+        if has_content {
+            last = last.max(row1);
+        }
+    }
+    last
+}
+
+/// Xóa các `<row>` có r > `max_row1` khỏi sheetData và cập nhật `<dimension>`.
+fn strip_trailing_rows(sheet_xml: &str, max_row1: usize) -> String {
+    if max_row1 == 0 || max_row1 == usize::MAX {
+        return sheet_xml.to_string();
+    }
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return sheet_xml.to_string();
+    };
+    let Some(sd) = doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
+        return sheet_xml.to_string();
+    };
+
+    let mut edits: Vec<SurgeryEdit> = Vec::new();
+
+    for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+        let row1 = row
+            .attribute("r")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        if row1 > max_row1 {
+            edits.push(SurgeryEdit {
+                start: row.range().start,
+                end: row.range().end,
+                replacement: String::new(),
+            });
+        }
+    }
+
+    if let Some(dim) = doc.descendants().find(|n| n.tag_name().name() == "dimension") {
+        if let Some(ref_val) = dim.attribute("ref") {
+            if let Some((prefix, old_end)) = ref_val.rsplit_once(':') {
+                let col_part: String = old_end.chars().take_while(|c| c.is_ascii_alphabetic()).collect();
+                let new_ref = format!("{prefix}:{col_part}{max_row1}");
+                if let Some(attr) = dim.attributes().find(|a| a.name() == "ref") {
+                    edits.push(SurgeryEdit {
+                        start: attr.range_value().start,
+                        end: attr.range_value().end,
+                        replacement: new_ref,
+                    });
+                }
+            }
+        }
+    }
+
+    if edits.is_empty() {
+        return sheet_xml.to_string();
+    }
+
+    apply_surgery(sheet_xml, edits)
+}
+
 /// Số dòng Excel gộp thành 1 mã STT (không merge cell — 3 dòng rời, công thức chỉ ở dòng giữa).
 const STT_GROUP_SIZE: usize = 3;
 
@@ -232,8 +308,10 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             None,
         );
 
+        let vn_last_row = find_last_content_row(&vn_sheet_xml);
+        let stripped = strip_trailing_rows(&cloned_sheet_xml, vn_last_row);
         let new_sheet_xml = inject_stt_group_formula(
-            &cloned_sheet_xml,
+            &stripped,
             first_formula_row1,
             STT_GROUP_SIZE,
             jp_col_a_style,
