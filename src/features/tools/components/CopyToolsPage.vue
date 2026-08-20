@@ -69,7 +69,6 @@ const HELP: Record<string, string> = {
               </span>
               <InputGroup class="h-8">
                 <InputText
-                  readonly
                   placeholder="D:\OUTPUT"
                   :model-value="ctrl.config.value.input"
                   @update:model-value="ctrl.set('input', $event as string)"
@@ -86,7 +85,6 @@ const HELP: Record<string, string> = {
               </span>
               <InputGroup class="h-8">
                 <InputText
-                  readonly
                   placeholder="D:\OUTPUT_VN"
                   :model-value="ctrl.config.value.output"
                   @update:model-value="ctrl.set('output', $event as string)"
