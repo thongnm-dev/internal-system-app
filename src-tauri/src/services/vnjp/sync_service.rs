@@ -1868,7 +1868,7 @@ fn style_flag(s_attr: &str, ctx: &CleanupContext) -> StyleFlag {
 }
 
 /// Escape giá trị thuộc tính XML (`&`, `<`, `>`, `"`).
-fn xml_escape_attr(s: &str) -> String {
+pub(crate) fn xml_escape_attr(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -4044,7 +4044,7 @@ pub(crate) fn sync_structure(vn_path: &str, jp_path: &str, output_path: &str) ->
 }
 
 /// Convert a 0-based column index to an Excel column letter (0→"A", 26→"AA", …).
-fn col_index_to_letter(col_0: usize) -> String {
+pub(crate) fn col_index_to_letter(col_0: usize) -> String {
     let mut result: Vec<u8> = Vec::new();
     let mut c = col_0 + 1;
     while c > 0 {
@@ -4057,7 +4057,7 @@ fn col_index_to_letter(col_0: usize) -> String {
 }
 
 /// Escape XML text content (`&`, `<`, `>`).
-fn xml_escape(s: &str) -> String {
+pub(crate) fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -4358,7 +4358,7 @@ pub(crate) fn clone_vn_row_xml(
     format!(r#"<row r="{target_row1}"{attrs}>{cells}</row>"#)
 }
 
-fn clone_vn_cell_xml(
+pub(crate) fn clone_vn_cell_xml(
     cell: roxmltree::Node,
     vn_sheet_xml: &str,
     target_row1: usize,
@@ -5254,7 +5254,6 @@ fn write_quality_sheet(workbook: &mut Workbook, analysis: &SyncAnalysis) -> AppR
 // Per-sheet pipeline helpers — text-similarity row alignment (dự phòng cho doc type khác)
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[allow(dead_code)]
 /// Kết quả canh dòng theo nội dung cột B: cặp VN↔JP đã khớp và dòng VN không có JP đối ứng.
 pub struct ContentAlignment {
     /// (vn_row1, jp_row1) — khớp theo thứ tự tăng dần vn_row1
@@ -5263,7 +5262,6 @@ pub struct ContentAlignment {
     pub vn_only: Vec<usize>,
 }
 
-#[allow(dead_code)]
 /// Trích (row1, plain_text) cho cột `col0` (0-based) từ `sheet_xml`, bắt đầu từ `start_row1`.
 /// Bỏ qua ô rỗng / shared string không tồn tại trong `sst_plain`.
 pub(crate) fn extract_col_texts(
@@ -5315,7 +5313,6 @@ pub(crate) fn extract_col_texts(
     out
 }
 
-#[allow(dead_code)]
 /// Điểm tương đồng text VN↔JP (0.0–1.0), dành riêng cho canh dòng theo nội dung cột.
 /// VN B text thường có dạng "JP text\r\nVN translation" — lấy dòng đầu làm cơ sở so khớp.
 fn col_text_similarity(vn_raw: &str, jp_text: &str) -> f64 {
@@ -5347,9 +5344,9 @@ fn col_text_similarity(vn_raw: &str, jp_text: &str) -> f64 {
     }
 }
 
-#[allow(dead_code)]
 /// Canh dòng VN↔JP theo nội dung cột B thay vì row number.
 /// Greedy matching theo thứ tự — mỗi dòng VN tìm JP khớp nhất chưa được dùng, nằm sau JP đã match.
+#[allow(dead_code)]
 pub(crate) fn align_rows_by_col_text(
     vn_col: &[(usize, String)],
     jp_col: &[(usize, String)],
@@ -5393,6 +5390,85 @@ pub(crate) fn align_rows_by_col_text(
         .collect();
 
     ContentAlignment { matched, vn_only }
+}
+
+#[allow(dead_code)]
+/// Trích plain text của MỌI ô trong sheet, trả về map `(row1, col0) → text`.
+pub(crate) fn extract_cell_texts_map(
+    sheet_xml: &str,
+    sst_plain: &HashMap<usize, String>,
+) -> HashMap<(usize, usize), String> {
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return HashMap::new();
+    };
+    let mut map: HashMap<(usize, usize), String> = HashMap::new();
+    for cell in doc.descendants().filter(|n| n.tag_name().name() == "c") {
+        let Some(r_attr) = cell.attribute("r") else {
+            continue;
+        };
+        let Some((row0, col0)) = parse_cell_ref(r_attr) else {
+            continue;
+        };
+        let text = match cell.attribute("t") {
+            Some("s") => cell
+                .children()
+                .find(|n| n.tag_name().name() == "v")
+                .and_then(|v| v.text())
+                .and_then(|t| t.parse::<usize>().ok())
+                .and_then(|i| sst_plain.get(&i))
+                .cloned()
+                .unwrap_or_default(),
+            Some("inlineStr") => cell
+                .descendants()
+                .filter(|n| n.tag_name().name() == "t")
+                .filter_map(|n| n.text())
+                .collect::<Vec<_>>()
+                .join(""),
+            _ => cell
+                .children()
+                .find(|n| n.tag_name().name() == "v")
+                .and_then(|v| v.text())
+                .unwrap_or("")
+                .to_string(),
+        };
+        let text = text.trim().to_string();
+        if !text.is_empty() {
+            map.insert((row0 + 1, col0), text);
+        }
+    }
+    map
+}
+
+#[allow(dead_code)]
+/// Tìm ô có giá trị VN ≠ JP tại các dòng aligned, trả về `HashSet<(row0, col0)>` (vn_row0).
+/// Dùng để bổ sung vào `vn_changed_positions` khi VN thay đổi giá trị mà không đổi màu chữ.
+pub(crate) fn find_value_diff_cells(
+    vn_texts: &HashMap<(usize, usize), String>,
+    jp_texts: &HashMap<(usize, usize), String>,
+    matched: &[(usize, usize)],
+) -> HashSet<(usize, usize)> {
+    let mut result: HashSet<(usize, usize)> = HashSet::new();
+    for &(vn_r1, jp_r1) in matched {
+        let mut cols: HashSet<usize> = HashSet::new();
+        for &(r, c) in vn_texts.keys() {
+            if r == vn_r1 {
+                cols.insert(c);
+            }
+        }
+        for &(r, c) in jp_texts.keys() {
+            if r == jp_r1 {
+                cols.insert(c);
+            }
+        }
+        for col0 in cols {
+            let vn_val = vn_texts.get(&(vn_r1, col0)).map(String::as_str).unwrap_or("");
+            let jp_val = jp_texts.get(&(jp_r1, col0)).map(String::as_str).unwrap_or("");
+            if vn_val != jp_val {
+                result.insert((vn_r1 - 1, col0));
+            }
+        }
+    }
+    result
 }
 
 #[allow(dead_code)]
@@ -5603,6 +5679,11 @@ pub(crate) fn extract_jp_col_a_info(
 ///
 /// Kết quả: số dòng / nội dung / style khớp VN, cột A là công thức JP, shapes header được giữ,
 /// ô không đổi ở VN giữ nguyên bản JP.
+///
+/// `jp_to_vn_row` — ánh xạ (jp_row1 → vn_row1) cho trường hợp VN chèn/xóa dòng khiến vị trí lệch
+/// nhau. Khi có mapping, ô JP ở `jp_row1` được index theo `vn_row1` tương ứng trong lookup table,
+/// nhờ đó khi xử lý dòng VN tại `vn_row1`, lookup tìm đúng ô JP gốc (dù `jp_row1 ≠ vn_row1`).
+/// Truyền `None` để dùng ánh xạ 1:1 (vn_row = jp_row) như trước.
 pub(crate) fn clone_vn_sheet_for_jp(
     vn_sheet_xml: &str,
     jp_sheet_xml: &str,
@@ -5623,25 +5704,24 @@ pub(crate) fn clone_vn_sheet_for_jp(
         return jp_sheet_xml.to_string();
     };
 
-    // Lookup ô JP theo (row1, col0) — dùng để giữ nguyên ô JP tại các vị trí VN không đánh dấu
-    // chỉnh sửa (chữ đen). Chỉ giữ offset trên `jp_sheet_xml` gốc nên không phụ thuộc lifetime
-    // của `Document` tạm thời này.
+    // Lookup ô JP theo (row1, col0) — dùng để giữ nguyên ô JP tại các vị trí VN không đánh
+    // dấu chỉnh sửa (chữ đen).
     let mut jp_cell_lookup: HashMap<(usize, usize), &str> = HashMap::new();
     if let Ok(jp_doc_lookup) = roxmltree::Document::parse(jp_sheet_xml) {
         if let Some(jp_sd_lookup) =
             jp_doc_lookup.descendants().find(|n| n.tag_name().name() == "sheetData")
         {
             for row in jp_sd_lookup.children().filter(|n| n.tag_name().name() == "row") {
-                let row1 = row
+                let jp_row1 = row
                     .attribute("r")
                     .and_then(|s| s.parse::<usize>().ok())
                     .unwrap_or(0);
-                if row1 == 0 {
+                if jp_row1 == 0 {
                     continue;
                 }
                 for cell in row.children().filter(|n| n.tag_name().name() == "c") {
                     if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
-                        jp_cell_lookup.insert((row1, col0), &jp_sheet_xml[cell.range()]);
+                        jp_cell_lookup.insert((jp_row1, col0), &jp_sheet_xml[cell.range()]);
                     }
                 }
             }
