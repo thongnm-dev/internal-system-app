@@ -227,3 +227,13 @@ pub struct RedCellVerification {
 pub struct RedCellVerificationReport {
     pub items: Vec<RedCellVerification>,
 }
+
+/// Một ô có dữ liệu ở file này nhưng không có ở file kia (hoặc ngược lại).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CellDataMismatch {
+    pub sheet: String,
+    pub cell_ref: String,
+    pub vn_has_data: bool,
+    pub output_has_data: bool,
+}

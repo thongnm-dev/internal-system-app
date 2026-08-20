@@ -10,6 +10,9 @@
 //! 2. Merge styles VN→JP.
 //! 3. Quét toàn bộ ô VN "coi như đã thay đổi": strikethrough HOẶC màu chữ KHÔNG phải đen (bất kỳ
 //!    màu nào, không riêng đỏ/xanh) — `find_changed_style_cells_xlsx`.
+//!    Ngoại lệ: ô mà TẤT CẢ nội dung đều bị gạch bỏ VÀ có màu không đen (toàn bộ cell bị xóa)
+//!    — `find_fully_struck_colored_cells_xlsx` — được loại khỏi tập "đã thay đổi": giữ nội dung
+//!    JP nhưng format strike/color từ VN được áp qua cell style.
 //! 4. Vòng loop qua từng sheet chung (VN ∩ JP − cloned − DEL):
 //!    a. Trích công thức cột A từ JP (`extract_jp_col_a_info`).
 //!    b. Clone toàn bộ sheet VN vào JP output (`clone_vn_sheet_for_jp`):
@@ -39,11 +42,15 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::vnjp_sync::ApplyResult;
 
+use crate::models::vnjp_sync::CellDataMismatch;
+
 use super::sync_service::{
     apply_surgery, clone_vn_sheet_for_jp, extract_all_shared_strings, extract_jp_col_a_info,
-    find_changed_style_cells_xlsx, is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp,
-    parse_cell_ref, read_zip_entry, resolve_sheet_xml_paths, sync_structure, write_output_zip,
-    ContentBounds, SurgeryEdit, CHANGE_HISTORY_SHEET_NAME,
+    apply_replace_dictionary, build_replace_dictionary, find_changed_style_cells_xlsx,
+    find_fully_struck_colored_cells_xlsx, is_del_sheet_name, merged_output_path,
+    merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry, resolve_sheet_xml_paths,
+    sync_structure, verify_data_cells_between_files, write_output_zip, ContentBounds,
+    SurgeryEdit, CHANGE_HISTORY_SHEET_NAME,
 };
 
 /// Nội dung cột A ~ M (0-based 12).
@@ -107,6 +114,9 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
     // vị trí khi clone (xem `clone_vn_sheet_for_jp`).
     let vn_changed_cells = find_changed_style_cells_xlsx(vn_path);
+    // Ô VN mà TẤT CẢ nội dung đều bị gạch bỏ + màu không đen → coi như KHÔNG thay đổi nội dung
+    // (giữ JP) nhưng format strike/color được phản ánh qua cell style.
+    let vn_fully_struck = find_fully_struck_colored_cells_xlsx(vn_path);
 
     // ── 5. Chuẩn bị vòng loop ─────────────────────────────────────────────────
     let cloned_names = &structure.cloned_names;
@@ -173,8 +183,19 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         // không áp công thức JP.
         let use_col_a_formula = sheet_name != CHANGE_HISTORY_SHEET_NAME;
 
+        // Tập ô "đã thay đổi" hiệu dụng = changed − fully_struck_colored: ô mà TẤT CẢ nội dung
+        // bị gạch bỏ + màu không đen được loại khỏi tập "đã thay đổi" → giữ nội dung JP, chỉ áp
+        // style VN (strike + color) qua cell format.
+        let effective_changed: Option<HashSet<(usize, usize)>> =
+            vn_changed_cells.get(sheet_name).map(|changed| {
+                match vn_fully_struck.get(sheet_name) {
+                    Some(struck) => changed.difference(struck).copied().collect(),
+                    None => changed.clone(),
+                }
+            });
+
         // Clone toàn bộ VN sheet vào khung JP (shapes/drawing được giữ từ JP); ô VN chữ đen và
-        // không strikethrough (không có trong `vn_changed_cells`) sẽ giữ nguyên bản JP cùng vị trí.
+        // không strikethrough (không có trong effective changed set) sẽ giữ nguyên bản JP cùng vị trí.
         let cloned_xml = clone_vn_sheet_for_jp(
             &vn_sheet_xml,
             &jp_sheet_xml,
@@ -184,7 +205,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
-            vn_changed_cells.get(sheet_name),
+            effective_changed.as_ref(),
             use_col_a_formula,
             Some(&preserved_cells),
         );
@@ -530,6 +551,36 @@ fn normalize_rows_4_to_6(sheet_xml: &str, jp_ref_cells: &HashMap<usize, String>)
     }
 
     apply_surgery(sheet_xml, edits)
+}
+
+/// Kiểm tra output sau chuẩn hoá: so sánh sự có mặt của dữ liệu (có/không) tại từng ô
+/// giữa file VN và file output — không so sánh nội dung, chỉ kiểm tra cell có hoặc không
+/// dữ liệu tại cùng vị trí.
+pub fn verify_output(vn_path: &str, output_path: &str) -> AppResult<Vec<CellDataMismatch>> {
+    verify_data_cells_between_files(vn_path, output_path, |sheet_name| {
+        (7, content_bounds(sheet_name).last_col0)
+    })
+}
+
+/// Thu thập từ điển replace (vn_text → jp_text) từ các ô mà output đã giữ nội dung JP.
+pub fn build_dictionary(
+    vn_path: &str,
+    output_path: &str,
+) -> AppResult<HashMap<String, String>> {
+    build_replace_dictionary(vn_path, output_path, |sheet_name| {
+        (7, content_bounds(sheet_name).last_col0)
+    })
+}
+
+/// Áp dụng từ điển replace lên file — chỉ thay thế khi nội dung cell khớp chính xác.
+pub fn apply_dictionary(
+    file_path: &str,
+    output_path: &str,
+    dictionary: &HashMap<String, String>,
+) -> AppResult<usize> {
+    apply_replace_dictionary(file_path, output_path, dictionary, |sheet_name| {
+        (7, content_bounds(sheet_name).last_col0)
+    })
 }
 
 /// Ghi đè các ô header trong sheet XML bằng nội dung JP đã trích.
