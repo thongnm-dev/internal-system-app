@@ -47,12 +47,12 @@ use crate::models::vnjp_sync::ApplyResult;
 use crate::models::vnjp_sync::CellDataMismatch;
 
 use super::sync_service::{
-    apply_dictionary_and_verify_data, apply_surgery, clone_vn_sheet_for_jp,
+    align_vn_jp_row_map, apply_dictionary_and_verify_data, apply_surgery, clone_vn_sheet_for_jp,
     extract_all_shared_strings, extract_jp_col_a_info, build_replace_dictionary,
     find_changed_style_cells_xlsx, find_fully_struck_colored_cells_xlsx, is_del_sheet_name,
     merged_output_path, merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry,
-    resolve_sheet_xml_paths, sync_structure, write_output_zip, ContentBounds, SurgeryEdit,
-    CHANGE_HISTORY_SHEET_NAME,
+    resolve_sheet_xml_paths, sync_structure, write_output_zip, BorderUnionExtender, ContentBounds,
+    SurgeryEdit, CHANGE_HISTORY_SHEET_NAME,
 };
 
 /// Nội dung cột A ~ N (0-based 13).
@@ -517,11 +517,16 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     let jp_rels_xml =
         read_zip_entry(&mut jp_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
     let jp_styles_xml = read_zip_entry(&mut jp_archive, "xl/styles.xml").unwrap_or_default();
+    let jp_sst_xml = read_zip_entry(&mut jp_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (jp_plain_ssi, _jp_rich_ssi) = extract_all_shared_strings(&jp_sst_xml);
     let jp_sheet_paths = resolve_sheet_xml_paths(&jp_wb_xml, &jp_rels_xml);
     let jp_sheet_map: HashMap<String, String> = jp_sheet_paths.into_iter().collect();
 
     // ── 4. Merge styles VN→JP ─────────────────────────────────────────────────
     let style_result = merge_vn_styles_into_jp(&jp_styles_xml, &vn_styles_xml);
+    // Tích lũy border union JP+VN cho ô "không đổi" giữ nội dung JP (xem `BorderUnionExtender`) —
+    // ghép vào styles.xml đã merge sau khi clone xong toàn bộ sheet (bước 7).
+    let mut border_ext = BorderUnionExtender::new(&style_result);
 
     // Ô VN "coi như đã thay đổi" (strikethrough hoặc màu chữ không phải đen) theo từng sheet — ô
     // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
@@ -612,6 +617,27 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             }
         };
 
+        // Ánh xạ vn_row1 → jp_row1 theo ô neo — bù lệch dòng khi VN chèn/xóa dòng ở giữa sheet
+        // để tra đúng ô JP gốc khi giữ nội dung "không đổi" (xem `clone_vn_sheet_for_jp`). Rỗng
+        // nếu sheet không tìm được neo — khi đó giữ nguyên ánh xạ 1:1 như trước.
+        //
+        // Dùng `content_start` (row1 thật của dòng dữ liệu đầu tiên — 4 hoặc 7 tùy sheet, xem
+        // trên) làm mốc, KHÔNG dùng `content_bounds` chung (cố định row1 >= 4) — sheet "ﾜｰｸｼｰﾄ" có
+        // rows 4-6 là header phụ (xử lý riêng bởi `normalize_rows_4_to_6`), không thuộc vùng
+        // "danh sách STT" cần canh dòng.
+        let alignment_bounds = ContentBounds {
+            start_row0: content_start.saturating_sub(1),
+            last_col0: content_bounds(sheet_name).last_col0,
+        };
+        let vn_to_jp_row = align_vn_jp_row_map(
+            &vn_sheet_xml,
+            &jp_sheet_xml,
+            &vn_plain_ssi,
+            &jp_plain_ssi,
+            &effective_changed,
+            alignment_bounds,
+        );
+
         // Clone toàn bộ VN sheet vào khung JP.
         // use_col_a_formula = false — cột A xử lý như cột thường, công thức STT chèn riêng sau.
         // Sheet "ﾜｰｸｼｰﾄ": A3, C3, K3, M3 luôn lấy từ JP. Các sheet khác: không preserved.
@@ -624,9 +650,13 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
+            &jp_plain_ssi,
             Some(&effective_changed),
+            vn_fully_struck.get(sheet_name),
             false,
             if is_worksheet { Some(&preserved_cells) } else { None },
+            Some(&vn_to_jp_row),
+            &mut border_ext,
         );
 
         // Cleanup + STT + normalize — bỏ qua 変更履歴.
@@ -680,6 +710,13 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     }
 
     // ── 7. Ghi output ─────────────────────────────────────────────────────────
+    // Ghép border union (nếu có) vào styles.xml đã merge — phải làm SAU khi clone xong toàn bộ
+    // sheet (border_ext đã tích lũy đủ mọi <border>/<xf> union cần thêm).
+    if let Some(styles_bytes) = replaced.remove("xl/styles.xml") {
+        let updated = border_ext.finish(&String::from_utf8_lossy(&styles_bytes));
+        replaced.insert("xl/styles.xml".to_string(), updated.into_bytes());
+    }
+
     write_output_zip(&mut jp_archive, &replaced, &output_path_str)?;
 
     let nothing_changed = applied_count == 0

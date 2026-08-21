@@ -1,12 +1,18 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { computed, ref } from "vue";
-import type { ApplyResult, RedCellVerification, SyncAnalysis } from "@/_/types/vnjp-sync";
+import type {
+  ApplyResult,
+  RedCellVerification,
+  RowAlignmentReport,
+  SyncAnalysis,
+} from "@/_/types/vnjp-sync";
 import { useToast } from "@/shared/composables/useToast";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import type { FileEntry } from "@/tauri/commands/explorer";
 import { explorerDelete, explorerPaste, explorerReadDir } from "@/tauri/commands/explorer";
 import {
   vnjpSyncAnalyzeAndApply,
+  vnjpSyncAnalyzeRowAlignment,
   vnjpSyncExportReport,
   vnjpSyncTempDir,
   vnjpSyncVerifyRedCellsAi,
@@ -16,7 +22,7 @@ import {
 const AI_VERIFY_PROVIDER = "gemini";
 const AI_VERIFY_MODEL = "gemini-3.1-flash-lite";
 
-export type ActiveTab = "overview" | "red-cells" | "quality" | "data-mismatches";
+export type ActiveTab = "overview" | "red-cells" | "quality" | "data-mismatches" | "row-alignment";
 
 const XLSX_FILTER = [{ name: "Excel", extensions: ["xlsx", "xlsm"] }];
 
@@ -35,6 +41,9 @@ export function useVnJpSync() {
   const error = ref("");
   const activeTab = ref<ActiveTab>("overview");
   const applyResult = ref<ApplyResult | null>(null);
+  // Cảnh báo lệch dòng VN↔JP (tham khảo — pipeline "Áp dụng" đã tự bù lệch dòng theo ô neo khi
+  // clone, đây chỉ để TL biết sheet nào có nghi ngờ lệch dòng mà nên kiểm tra thủ công lại).
+  const rowAlignment = ref<RowAlignmentReport | null>(null);
   const verifyingAi = ref(false);
   const redCellVerifications = ref<Map<string, RedCellVerification>>(new Map());
   // Thư mục Temp chứa mọi file kết quả đã tạo ra (không chỉ lượt Áp dụng gần nhất) — để TL tự mở
@@ -66,6 +75,9 @@ export function useVnJpSync() {
   const totalDataMismatches = computed(
     () => applyResult.value?.dataMismatches.length ?? 0,
   );
+  const totalRowAlignmentWarnings = computed(
+    () => rowAlignment.value?.suggestions.length ?? 0,
+  );
 
   async function pickFile(slot: "vn" | "jp") {
     if (!canUseTauriRuntime()) return;
@@ -84,6 +96,7 @@ export function useVnJpSync() {
       }
       analysis.value = null;
       applyResult.value = null;
+      rowAlignment.value = null;
       redCellVerifications.value = new Map();
     } catch (e) {
       error.value = friendlyError(e);
@@ -105,6 +118,7 @@ export function useVnJpSync() {
     }
     analysis.value = null;
     applyResult.value = null;
+    rowAlignment.value = null;
   }
 
   function clearFile(slot: "vn" | "jp") {
@@ -115,6 +129,7 @@ export function useVnJpSync() {
     }
     analysis.value = null;
     applyResult.value = null;
+    rowAlignment.value = null;
     redCellVerifications.value = new Map();
     error.value = "";
   }
@@ -129,6 +144,7 @@ export function useVnJpSync() {
     error.value = "";
     analyzing.value = true;
     applyResult.value = null;
+    rowAlignment.value = null;
     redCellVerifications.value = new Map();
     try {
       const result = await vnjpSyncAnalyzeAndApply(vnPath.value, jpPath.value);
@@ -141,6 +157,15 @@ export function useVnJpSync() {
         void verifyRedCellsAi();
       }
       void refreshTempFiles();
+      // Chạy nền, không chặn nút — chỉ để tham khảo (pipeline Áp dụng đã tự bù lệch dòng theo ô
+      // neo). Lỗi ở đây không nghiêm trọng (không ảnh hưởng kết quả Áp dụng) nên bỏ qua âm thầm.
+      void vnjpSyncAnalyzeRowAlignment(vnPath.value, jpPath.value)
+        .then((report) => {
+          rowAlignment.value = report;
+        })
+        .catch(() => {
+          rowAlignment.value = null;
+        });
     } catch (e) {
       error.value = friendlyError(e);
       analysis.value = null;
@@ -312,6 +337,7 @@ export function useVnJpSync() {
     jpPath.value = "";
     analysis.value = null;
     applyResult.value = null;
+    rowAlignment.value = null;
     redCellVerifications.value = new Map();
     error.value = "";
     activeTab.value = "overview";
@@ -329,6 +355,7 @@ export function useVnJpSync() {
     error,
     activeTab,
     applyResult,
+    rowAlignment,
     tempDirPath,
     tempFiles,
     loadingTempFiles,
@@ -339,6 +366,7 @@ export function useVnJpSync() {
     totalRedCells,
     totalQualityIssues,
     totalDataMismatches,
+    totalRowAlignmentWarnings,
     canAnalyzeAndApply,
     canExport,
     pickFile,

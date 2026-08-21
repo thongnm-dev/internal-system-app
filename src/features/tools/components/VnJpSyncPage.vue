@@ -403,6 +403,7 @@ function tabColorStyle(color: string | null | undefined): string {
           <Tab value="red-cells">Chi tiết</Tab>
           <Tab value="quality">Quality Issues</Tab>
           <Tab value="data-mismatches">Ô lệch dữ liệu</Tab>
+          <Tab value="row-alignment">Nghi ngờ lệch dòng</Tab>
         </TabList>
         <TabPanels class="min-h-0 flex-1 overflow-hidden p-0">
           <!-- Tab: Overview -->
@@ -656,6 +657,64 @@ function tabColorStyle(color: string | null | undefined): string {
                     <td colspan="6" class="px-4 py-8 text-center text-muted">
                       <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
                       Không phát hiện ô lệch dữ liệu nào
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </TabPanel>
+
+          <!-- Tab: Row Alignment (tham khảo — pipeline Áp dụng đã tự bù lệch dòng theo ô neo) -->
+          <TabPanel value="row-alignment" class="flex h-full min-h-0 flex-col">
+            <div class="shrink-0 border-b border-divider px-4 py-2">
+              <h4 class="font-semibold text-ink">
+                Nghi ngờ lệch dòng VN ↔ JP
+                <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalRowAlignmentWarnings.value }} vị trí)</span>
+              </h4>
+              <p class="mt-0.5 text-xs text-muted">
+                Vị trí VN có nhiều dòng hơn JP theo ô neo (số/mã kỹ thuật) — pipeline "Áp dụng" đã tự bù lệch dòng
+                khi giữ nội dung ô không đổi, nhưng TL nên kiểm tra thủ công lại các vị trí này.
+              </p>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
+                    <th class="px-4 py-2 text-left">#</th>
+                    <th class="px-4 py-2 text-left">Sheet</th>
+                    <th class="px-4 py-2 text-center">Chèn sau dòng JP</th>
+                    <th class="px-4 py-2 text-center">Số dòng thiếu</th>
+                    <th class="px-4 py-2 text-center">Dòng VN</th>
+                    <th class="px-4 py-2 text-left">Mẫu nội dung VN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(sug, idx) in ctrl.rowAlignment.value?.suggestions ?? []"
+                    :key="`${sug.sheet}-${sug.jpInsertAfterRow}-${idx}`"
+                    class="border-b border-divider/50 hover:bg-canvas/50"
+                  >
+                    <td class="px-4 py-2 text-xs text-muted">{{ idx + 1 }}</td>
+                    <td class="px-4 py-2 text-xs font-medium">{{ sug.sheet }}</td>
+                    <td class="px-4 py-2 text-center text-xs font-mono text-muted">{{ sug.jpInsertAfterRow }}</td>
+                    <td class="px-4 py-2 text-center">
+                      <Tag :value="String(sug.insertCount)" severity="warn" class="text-xs" />
+                    </td>
+                    <td class="px-4 py-2 text-center text-xs font-mono text-muted">
+                      {{ sug.vnRowStart === sug.vnRowEnd ? sug.vnRowStart : `${sug.vnRowStart}-${sug.vnRowEnd}` }}
+                    </td>
+                    <td class="max-w-[360px] px-4 py-2">
+                      <span class="line-clamp-2 whitespace-pre-wrap break-words text-xs">
+                        {{ sug.sampleVnText.join(" · ") || "—" }}
+                      </span>
+                      <Tag v-if="sug.hasRed" value="Có ô đỏ" severity="danger" class="ml-1 text-xs" />
+                      <Tag v-if="sug.hasStrike" value="Có gạch bỏ" severity="secondary" class="ml-1 text-xs" />
+                    </td>
+                  </tr>
+                  <tr v-if="ctrl.totalRowAlignmentWarnings.value === 0">
+                    <td colspan="6" class="px-4 py-8 text-center text-muted">
+                      <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
+                      Không phát hiện nghi ngờ lệch dòng nào
                     </td>
                   </tr>
                 </tbody>

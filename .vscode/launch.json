@@ -1,0 +1,36 @@
+{
+  // Cần extension "CodeLLDB" (vadimcn.vscode-lldb) để debug Rust — xem .vscode/extensions.json.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Tauri Development Debug",
+      "cargo": {
+        "args": ["build", "--manifest-path=./src-tauri/Cargo.toml"]
+      },
+      "preLaunchTask": "ui:dev",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Rust lib unit tests",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--manifest-path=./src-tauri/Cargo.toml"
+        ],
+        "filter": {
+          "name": "app",
+          "kind": "lib"
+        }
+      },
+      // Đổi thành tên hàm test cụ thể để chỉ chạy 1 test (khớp cách `cargo test <name>` lọc theo tên).
+      "args": [],
+      "cwd": "${workspaceFolder}/src-tauri"
+    }
+  ]
+}

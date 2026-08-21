@@ -26,9 +26,10 @@ use crate::app::result::AppResult;
 use crate::models::vnjp_sync::ApplyResult;
 
 use super::sync_service::{
-    clone_vn_sheet_for_jp, extract_all_shared_strings, find_changed_style_cells_xlsx,
-    is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp, read_zip_entry,
-    resolve_sheet_xml_paths, sync_structure, write_output_zip, ContentBounds,
+    align_vn_jp_row_map, clone_vn_sheet_for_jp, extract_all_shared_strings,
+    find_changed_style_cells_xlsx, is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp,
+    read_zip_entry, resolve_sheet_xml_paths, sync_structure, write_output_zip, BorderUnionExtender,
+    ContentBounds,
 };
 
 /// Nội dung cột A ~ AQ (0-based 42).
@@ -72,11 +73,16 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     let jp_rels_xml =
         read_zip_entry(&mut jp_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
     let jp_styles_xml = read_zip_entry(&mut jp_archive, "xl/styles.xml").unwrap_or_default();
+    let jp_sst_xml = read_zip_entry(&mut jp_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (jp_plain_ssi, _jp_rich_ssi) = extract_all_shared_strings(&jp_sst_xml);
     let jp_sheet_paths = resolve_sheet_xml_paths(&jp_wb_xml, &jp_rels_xml);
     let jp_sheet_map: HashMap<String, String> = jp_sheet_paths.into_iter().collect();
 
     // ── 4. Merge styles VN→JP ─────────────────────────────────────────────────
     let style_result = merge_vn_styles_into_jp(&jp_styles_xml, &vn_styles_xml);
+    // Tích lũy border union JP+VN cho ô "không đổi" giữ nội dung JP (xem `BorderUnionExtender`) —
+    // ghép vào styles.xml đã merge sau khi clone xong toàn bộ sheet (bước 7).
+    let mut border_ext = BorderUnionExtender::new(&style_result);
 
     // Ô VN "coi như đã thay đổi" (strikethrough hoặc màu chữ không phải đen) theo từng sheet — ô
     // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
@@ -128,6 +134,21 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             None => continue,
         };
 
+        let changed_ref = vn_changed_cells.get(sheet_name).unwrap_or(&empty_changed);
+
+        // Ánh xạ vn_row1 → jp_row1 theo ô neo — bù lệch dòng khi VN chèn/xóa dòng ở giữa sheet
+        // (cùng chiến lược clone toàn sheet với C2.3.4) để tra đúng ô JP gốc khi giữ nội dung
+        // "không đổi" (xem `clone_vn_sheet_for_jp`). Rỗng nếu sheet không tìm được neo — khi đó
+        // giữ nguyên ánh xạ 1:1 như trước.
+        let vn_to_jp_row = align_vn_jp_row_map(
+            &vn_sheet_xml,
+            &jp_sheet_xml,
+            &vn_plain_ssi,
+            &jp_plain_ssi,
+            changed_ref,
+            content_bounds(sheet_name),
+        );
+
         // use_col_a_formula = false → C2.3.2 không có cột STT tự đánh số, cột A xử lý như cột
         // thường (clone VN / giữ JP nếu không đổi); ô VN chữ đen, không strikethrough (không có
         // trong `vn_changed_cells`) sẽ giữ nguyên bản JP cùng vị trí.
@@ -140,9 +161,13 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
-            Some(vn_changed_cells.get(sheet_name).unwrap_or(&empty_changed)),
+            &jp_plain_ssi,
+            Some(changed_ref),
+            None,
             false,
             None,
+            Some(&vn_to_jp_row),
+            &mut border_ext,
         );
 
         applied_count += 1;
@@ -153,6 +178,13 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     }
 
     // ── 7. Ghi output ─────────────────────────────────────────────────────────
+    // Ghép border union (nếu có) vào styles.xml đã merge — phải làm SAU khi clone xong toàn bộ
+    // sheet (border_ext đã tích lũy đủ mọi <border>/<xf> union cần thêm).
+    if let Some(styles_bytes) = replaced.remove("xl/styles.xml") {
+        let updated = border_ext.finish(&String::from_utf8_lossy(&styles_bytes));
+        replaced.insert("xl/styles.xml".to_string(), updated.into_bytes());
+    }
+
     write_output_zip(&mut jp_archive, &replaced, &output_path_str)?;
 
     let nothing_changed = applied_count == 0
