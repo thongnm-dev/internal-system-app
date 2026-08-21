@@ -3244,6 +3244,166 @@ pub(crate) fn find_fully_struck_colored_cells_xlsx(
     result
 }
 
+/// Tìm shared string indices mà TẤT CẢ runs đều "đã đổi" (strike HOẶC màu không đen — không cần
+/// cả 2 như `parse_shared_strings_fully_struck_colored`). Trả về `(mọi ssi rich-text, ssi mà MỌI
+/// run đều đã đổi)` — dùng cho rule "dòng hoàn toàn mới ở VN" (`compute_row_insertions`): một ô có
+/// run màu đen/không-gạch (dù chỉ 1 phần nội dung, ví dụ tên cũ bị gạch bỏ ghép với tên mới tô đỏ
+/// — phần "tên cũ" đó nếu KHÔNG gạch/không đổi màu vẫn là run đen) thì KHÔNG đủ điều kiện "toàn ô
+/// đã đổi", phân biệt với `find_changed_style_cells_xlsx` (ANY run đổi màu/gạch → coi cả ô đã đổi
+/// — dùng cho quyết định "giữ JP hay dùng VN", ngữ nghĩa khác, lỏng hơn).
+fn parse_shared_strings_fully_changed(
+    sst_xml: &str,
+    theme_colors: &[String],
+) -> (HashSet<usize>, HashSet<usize>) {
+    let mut all_rich = HashSet::new();
+    let mut fully_changed = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sst_xml) else {
+        return (all_rich, fully_changed);
+    };
+    let mut si_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "si" {
+            let runs: Vec<_> = node
+                .children()
+                .filter(|c| c.tag_name().name() == "r")
+                .collect();
+            if !runs.is_empty() {
+                all_rich.insert(si_idx);
+                if runs.iter().all(|r| has_changed_style_run(r, theme_colors)) {
+                    fully_changed.insert(si_idx);
+                }
+            }
+            si_idx += 1;
+        }
+    }
+    (all_rich, fully_changed)
+}
+
+/// Giống `find_fully_struck_colored_cells_in_sheet` nhưng dùng tiêu chí "toàn ô đã đổi" (xem
+/// `parse_shared_strings_fully_changed`).
+fn find_fully_changed_cells_in_sheet(
+    sheet_xml: &str,
+    changed_xf: &HashSet<usize>,
+    fully_changed_ssi: &HashSet<usize>,
+    all_rich_ssi: &HashSet<usize>,
+    theme_colors: &[String],
+) -> HashSet<(usize, usize)> {
+    let mut result = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return result;
+    };
+
+    for node in doc.descendants() {
+        if node.tag_name().name() != "c" {
+            continue;
+        }
+        let Some(pos) = node.attribute("r").and_then(parse_cell_ref) else {
+            continue;
+        };
+
+        let mut handled_by_rich = false;
+
+        if node.attribute("t") == Some("s") {
+            if let Some(v) = node.descendants().find(|c| c.tag_name().name() == "v") {
+                if let Some(ssi) = v.text().and_then(|t| t.parse::<usize>().ok()) {
+                    if all_rich_ssi.contains(&ssi) {
+                        handled_by_rich = true;
+                        if fully_changed_ssi.contains(&ssi) {
+                            result.insert(pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        if !handled_by_rich && node.attribute("t") == Some("inlineStr") {
+            if let Some(is_node) = node.children().find(|c| c.tag_name().name() == "is") {
+                let runs: Vec<_> = is_node
+                    .children()
+                    .filter(|c| c.tag_name().name() == "r")
+                    .collect();
+                if !runs.is_empty() {
+                    handled_by_rich = true;
+                    if runs.iter().all(|r| has_changed_style_run(r, theme_colors)) {
+                        result.insert(pos);
+                    }
+                }
+            }
+        }
+
+        if handled_by_rich {
+            continue;
+        }
+
+        if let Some(si) = node.attribute("s").and_then(|s| s.parse::<usize>().ok()) {
+            if changed_xf.contains(&si) {
+                result.insert(pos);
+            }
+        }
+    }
+
+    result
+}
+
+/// Quét file VN, trả về theo từng sheet tập vị trí ô mà TOÀN BỘ nội dung (mọi run, không phải chỉ
+/// 1 phần) đã đổi (đỏ/màu khác đen HOẶC gạch bỏ) — dùng cho rule "dòng hoàn toàn mới ở VN" của
+/// `compute_row_insertions`. Nghiêm ngặt hơn `find_changed_style_cells_xlsx` (ANY-based): một ô có
+/// LẪN run chữ đen bình thường (ví dụ tên cũ bị gạch bỏ ghép tên mới tô đỏ trong CÙNG 1 ô — phần
+/// tên cũ nếu không tự nó gạch/đổi màu) sẽ KHÔNG nằm trong tập này.
+pub(crate) fn find_fully_changed_cells_xlsx(path: &str) -> HashMap<String, HashSet<(usize, usize)>> {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return HashMap::new(),
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return HashMap::new(),
+    };
+
+    let theme_colors = read_theme_colors_from_archive(&mut archive);
+
+    let styles_xml = read_zip_entry(&mut archive, "xl/styles.xml").unwrap_or_default();
+    let font_infos = parse_font_infos(&styles_xml, &theme_colors);
+    let colored_xf = parse_colored_xf_indices(&styles_xml, &font_infos);
+    let strike_xf = parse_strike_xf_indices(&styles_xml);
+    let changed_xf: HashSet<usize> = colored_xf.union(&strike_xf).copied().collect();
+
+    let sst_xml = read_zip_entry(&mut archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (all_rich_ssi, fully_changed_ssi) = if sst_xml.is_empty() {
+        (HashSet::new(), HashSet::new())
+    } else {
+        parse_shared_strings_fully_changed(&sst_xml, &theme_colors)
+    };
+
+    let workbook_xml = match read_zip_entry(&mut archive, "xl/workbook.xml") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let rels_xml = match read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let sheet_paths = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
+
+    let mut result: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
+    for (name, xml_path) in sheet_paths {
+        if let Some(sheet_xml) = read_zip_entry(&mut archive, &xml_path) {
+            let cells = find_fully_changed_cells_in_sheet(
+                &sheet_xml,
+                &changed_xf,
+                &fully_changed_ssi,
+                &all_rich_ssi,
+                &theme_colors,
+            );
+            if !cells.is_empty() {
+                result.insert(name, cells);
+            }
+        }
+    }
+
+    result
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Verify data presence: so sánh sự có mặt của dữ liệu (có/không) tại từng ô giữa file VN và
 // file output — KHÔNG so sánh nội dung, chỉ kiểm tra ô có dữ liệu hay trống. Dùng để phát hiện
@@ -6585,6 +6745,13 @@ pub(crate) fn find_value_diff_cells(
 
 #[allow(dead_code)]
 /// Với dòng VN-only `vn_only_row1`, trả về JP row1 sẽ chèn SAU (0 = chèn trước dòng đầu tiên).
+///
+/// LƯU Ý: đã thử wire vào `c234_sync_service::apply_changes` (chèn thật dòng VN-only vào JP
+/// trước khi merge) rồi REVERT — với sheet thiếu neo đáng tin cậy (xem `align_vn_jp_row_map`),
+/// `alignment.matched` do `align_vn_jp_row_map` cung cấp có thể chứa cặp SAI (gap-fill không có
+/// neo thật), khiến chèn dòng SAI VỊ TRÍ rồi làm lệch toàn bộ cấu trúc JP phía sau — hậu quả NẶNG
+/// HƠN so với chỉ tra cứu ảo lúc clone (1 ô sai thay vì cả khối dòng sau đó sai). Chỉ nên dùng lại
+/// hàm này khi có nguồn `matched` đáng tin cậy hơn (vd canh dòng theo nội dung thay vì theo neo).
 pub(crate) fn vn_only_insert_after_jp(vn_only_row1: usize, matched: &[(usize, usize)]) -> usize {
     matched
         .iter()
@@ -6604,7 +6771,6 @@ pub(crate) fn count_inserts_before_jp(alignment: &ContentAlignment, jp_row1: usi
         .count()
 }
 
-#[allow(dead_code)]
 /// Clone 1 dòng VN (raw XML) sang JP với số dòng = `target_row1`, bỏ qua các cột `skip_col0s`.
 fn build_vn_row_skipping_cols(
     row_xml: &str,
@@ -6761,6 +6927,186 @@ fn extract_sheet_text_grid(sheet_xml: &str, plain_ssi: &HashMap<usize, String>) 
         }
     }
     grid
+}
+
+/// Nguồn nội dung cho 1 dòng được chèn vật lý vào JP — xem `compute_row_insertions`.
+#[derive(Clone, Copy)]
+pub(crate) enum RowInsertSource {
+    /// Clone nguyên dòng VN (row1) — dòng hoàn toàn mới ở VN (rule 1).
+    Vn(usize),
+    /// Dòng trống — VN không có gì tại vị trí này nhưng JP lại có dữ liệu (rule 3): chèn 1 dòng
+    /// trống để "đẩy" dữ liệu JP đó xuống, giữ đúng vị trí so sánh cho dòng VN kế tiếp.
+    Blank,
+}
+
+/// Tính danh sách các lượt CHÈN DÒNG VẬT LÝ vào JP trước khi merge nội dung, theo rule do người
+/// dùng chỉ định (không dựa vào neo/anchor — anchor như STT tự đánh số lại không cho tín hiệu gì
+/// khi có dòng chèn, xem doc `align_vn_jp_row_map`). Đi qua VN và JP bằng 2 con trỏ độc lập
+/// (`vn_row1`, `jp_row1`), trong phạm vi cột `bounds` (trừ các cột ở `skip_col0s`, ví dụ cột A/STT
+/// tự đánh số lại — luôn có dữ liệu và luôn đen nên phải loại khỏi việc xét "đã đổi"):
+///
+/// 1. Nếu dòng VN có ≥1 ô dữ liệu và MỌI ô dữ liệu đó đều "TOÀN Ô đã đổi" (`vn_fully_changed_positions`
+///    — MỌI run trong ô đều màu khác đen hoặc gạch bỏ, không còn run đen/thường nào, xem
+///    `find_fully_changed_cells_xlsx`) → dòng hoàn toàn mới ở VN → chèn 1 dòng clone từ VN vào JP
+///    ngay tại vị trí `jp_row1` hiện tại (đẩy JP xuống); chỉ `vn_row1` tăng — `jp_row1` GIỮ NGUYÊN
+///    vì dữ liệu JP tại đó chưa được dùng, sẽ so tiếp với dòng VN kế.
+///    Lưu ý: dùng tiêu chí NGHIÊM (toàn ô, không phải ANY-run như `find_changed_style_cells_xlsx`)
+///    — 1 ô "tên cũ gạch bỏ đen thường + tên mới tô đỏ" (dòng ĐỔI TÊN, không phải dòng MỚI) vẫn có
+///    run đen/thường (phần tên cũ, nếu tự nó không gạch/đổi màu) nên KHÔNG được tính là "đã đổi
+///    toàn ô" — nếu dùng tiêu chí ANY-based, các dòng đổi tên kiểu này sẽ bị nhận lầm thành "dòng
+///    mới" (đã xảy ra thực tế: dòng có 1 ghi chú tham khảo tô đỏ chèn thêm vào ô D bị nhận lầm).
+/// 2. Nếu dòng VN hoàn toàn trống (không ô nào có dữ liệu trong phạm vi):
+///    a. Dòng JP tại CÙNG `jp_row1` cũng trống toàn bộ → không chèn gì, 2 con trỏ cùng tăng.
+///    b. Dòng JP tại CÙNG `jp_row1` CÓ dữ liệu → chèn 1 dòng TRỐNG vào JP (đẩy dữ liệu JP đó
+///       xuống 1 dòng) để dòng VN kế tiếp so đúng với dữ liệu JP đó; `vn_row1` tăng, `jp_row1`
+///       GIỮ NGUYÊN (dữ liệu JP chưa được "dùng" bởi dòng VN nào).
+/// 3. Ngoài 2 trường hợp trên (dòng "thường" — có ô đã đổi lẫn ô chưa đổi, hoặc mọi ô chưa đổi)
+///    → KHÔNG chèn, coi dòng VN này khớp 1:1 với JP tại `jp_row1` hiện tại; 2 con trỏ cùng tăng.
+///
+/// Vòng lặp LUÔN tăng `vn_row1` mỗi bước nên chắc chắn kết thúc (không cần safety-net riêng).
+///
+/// Trả về `Vec<(jp_row1_gốc, source)>` theo thứ tự tăng dần — `jp_row1_gốc` là row1 GỐC (chưa
+/// shift bởi lượt chèn nào khác) của JP mà lượt chèn này diễn ra NGAY TRƯỚC, dùng trực tiếp làm
+/// `RowInsert::pos` (`pos` = "chèn sau row gốc pos", tức "chèn trước row gốc pos+1").
+pub(crate) fn compute_row_insertions(
+    vn_sheet_xml: &str,
+    jp_sheet_xml: &str,
+    vn_plain_ssi: &HashMap<usize, String>,
+    jp_plain_ssi: &HashMap<usize, String>,
+    vn_fully_changed_positions: &HashSet<(usize, usize)>,
+    bounds: ContentBounds,
+    skip_col0s: &[usize],
+) -> Vec<(usize, RowInsertSource)> {
+    let vn_grid = extract_sheet_text_grid(vn_sheet_xml, vn_plain_ssi);
+    let jp_grid = extract_sheet_text_grid(jp_sheet_xml, jp_plain_ssi);
+
+    let data_cols = |grid: &[Vec<String>], row1: usize| -> Vec<usize> {
+        let row0 = row1 - 1;
+        grid.get(row0)
+            .map(|row| {
+                row.iter()
+                    .enumerate()
+                    .filter(|&(c, text)| {
+                        c <= bounds.last_col0 && !skip_col0s.contains(&c) && !text.trim().is_empty()
+                    })
+                    .map(|(c, _)| c)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let mut result: Vec<(usize, RowInsertSource)> = Vec::new();
+    let mut vn_row1 = bounds.start_row0 + 1;
+    let mut jp_row1 = bounds.start_row0 + 1;
+    let vn_max_row1 = vn_grid.len();
+
+    while vn_row1 <= vn_max_row1 {
+        let vn_cols = data_cols(&vn_grid, vn_row1);
+
+        if vn_cols.is_empty() {
+            let jp_cols = data_cols(&jp_grid, jp_row1);
+            if jp_cols.is_empty() {
+                vn_row1 += 1;
+                jp_row1 += 1;
+            } else {
+                result.push((jp_row1 - 1, RowInsertSource::Blank));
+                vn_row1 += 1;
+            }
+            continue;
+        }
+
+        let all_changed = vn_cols
+            .iter()
+            .all(|&c| vn_fully_changed_positions.contains(&(vn_row1 - 1, c)));
+        if all_changed {
+            result.push((jp_row1 - 1, RowInsertSource::Vn(vn_row1)));
+            vn_row1 += 1;
+        } else {
+            vn_row1 += 1;
+            jp_row1 += 1;
+        }
+    }
+
+    result
+}
+
+/// Áp danh sách lượt chèn từ `compute_row_insertions` vào `jp_sheet_xml` — chèn vật lý (dịch
+/// row/cell-ref/mergeCell/dimension phía sau như `insert_rows_into_sheet_xml`), không phải ánh xạ
+/// ảo. Gom các lượt chèn CÙNG vị trí (`pos`) thành 1 nhóm liên tiếp để giữ đúng thứ tự.
+pub(crate) fn apply_row_insertions(
+    jp_sheet_xml: &str,
+    vn_sheet_xml: &str,
+    insertions: &[(usize, RowInsertSource)],
+    skip_col0s: &[usize],
+    xf_remap: &[usize],
+    plain_ssi: &HashMap<usize, String>,
+    rich_ssi_raw: &HashMap<usize, String>,
+) -> String {
+    if insertions.is_empty() {
+        return jp_sheet_xml.to_string();
+    }
+
+    let Ok(vn_doc) = roxmltree::Document::parse(vn_sheet_xml) else {
+        return jp_sheet_xml.to_string();
+    };
+    let vn_row_xmls: HashMap<usize, String> = vn_doc
+        .descendants()
+        .filter(|n| n.tag_name().name() == "row")
+        .filter_map(|n| {
+            n.attribute("r")
+                .and_then(|s| s.parse::<usize>().ok())
+                .map(|r1| (r1, vn_sheet_xml[n.range()].to_string()))
+        })
+        .collect();
+
+    // Gom theo vị trí chèn (BTreeMap để xử lý theo thứ tự tăng dần pos), giữ thứ tự trong nhóm.
+    let mut groups: std::collections::BTreeMap<usize, Vec<RowInsertSource>> =
+        std::collections::BTreeMap::new();
+    for &(pos, source) in insertions {
+        groups.entry(pos).or_default().push(source);
+    }
+
+    let mut row_inserts: Vec<RowInsert> = Vec::new();
+    for (pos, sources) in groups {
+        let count = sources.len();
+        let xf = xf_remap.to_vec();
+        let plain = plain_ssi.clone();
+        let rich = rich_ssi_raw.clone();
+        let skip = skip_col0s.to_vec();
+        let vn_rows = vn_row_xmls.clone();
+
+        row_inserts.push(RowInsert {
+            pos,
+            count,
+            build: Box::new(move |base| {
+                sources
+                    .iter()
+                    .enumerate()
+                    .map(|(i, src)| {
+                        let target_row1 = base + i + 1;
+                        match src {
+                            RowInsertSource::Blank => format!(r#"<row r="{target_row1}"/>"#),
+                            RowInsertSource::Vn(vn_r1) => vn_rows
+                                .get(vn_r1)
+                                .map(|row_xml| {
+                                    build_vn_row_skipping_cols(
+                                        row_xml,
+                                        target_row1,
+                                        &xf,
+                                        &plain,
+                                        &rich,
+                                        &skip,
+                                    )
+                                })
+                                .unwrap_or_else(|| format!(r#"<row r="{target_row1}"/>"#)),
+                        }
+                    })
+                    .collect()
+            }),
+        });
+    }
+
+    insert_rows_into_sheet_xml(jp_sheet_xml, &row_inserts)
 }
 
 /// Tính ánh xạ vn_row1 → jp_row1 ĐẦY ĐỦ cho mọi dòng có nội dung — không chỉ riêng các dòng "neo"

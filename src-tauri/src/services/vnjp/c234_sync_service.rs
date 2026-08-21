@@ -15,6 +15,16 @@
 //!    JP nhưng format strike/color từ VN được áp qua cell style.
 //! 4. Vòng loop qua từng sheet chung (VN ∩ JP − cloned − DEL):
 //!    a. Trích công thức cột A từ JP (`extract_jp_col_a_info`).
+//!    a2. CHÈN DÒNG VẬT LÝ vào JP theo rule cố định (không dựa anchor/neo) TRƯỚC khi clone —
+//!        `compute_row_insertions` + `apply_row_insertions`: dòng VN mà mọi ô dữ liệu đều "toàn ô
+//!        đã đổi" (`find_fully_changed_cells_xlsx`, trừ ô gạch+đổi màu toàn bộ vì đó là quy ước
+//!        "không đổi nội dung") coi là dòng hoàn toàn mới ở VN, và dòng VN trống trong khi JP tại
+//!        cùng vị trí còn dữ liệu đều được chèn thêm 1 dòng vào JP (nội dung VN hoặc trống) để
+//!        giữ đúng vị trí so sánh cho các dòng còn lại — thay thế cơ chế ánh xạ ảo dựa anchor cho
+//!        đúng trường hợp chèn/xóa dòng thật, xem doc `compute_row_insertions`.
+//!    a3. `align_vn_jp_row_map` chạy TRÊN cấu trúc JP đã chèn ở bước a2, chỉ còn vai trò bù lệch
+//!        còn lại (nếu có) — rỗng nếu không tìm được neo, khi đó rơi về ánh xạ 1:1 (đã đúng nhờ
+//!        bước a2).
 //!    b. Clone toàn bộ sheet VN vào JP output (`clone_vn_sheet_for_jp`):
 //!       - Hàng header (row < 7): giữ nguyên (kể cả cột A), NGOẠI TRỪ các ô A3, C3, E3, F3
 //!         luôn lấy từ JP (`jp_preserved_header_cells`).
@@ -45,9 +55,10 @@ use crate::models::vnjp_sync::ApplyResult;
 use crate::models::vnjp_sync::CellDataMismatch;
 
 use super::sync_service::{
-    align_vn_jp_row_map, apply_dictionary_and_verify_data, apply_surgery, clone_vn_sheet_for_jp,
-    extract_all_shared_strings, extract_jp_col_a_info, build_replace_dictionary,
-    find_changed_style_cells_xlsx, find_fully_struck_colored_cells_xlsx, is_del_sheet_name,
+    align_vn_jp_row_map, apply_dictionary_and_verify_data, apply_row_insertions, apply_surgery,
+    clone_vn_sheet_for_jp, compute_row_insertions, extract_all_shared_strings,
+    extract_jp_col_a_info, build_replace_dictionary, find_changed_style_cells_xlsx,
+    find_fully_changed_cells_xlsx, find_fully_struck_colored_cells_xlsx, is_del_sheet_name,
     merged_output_path, merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry,
     resolve_sheet_xml_paths, sync_structure, write_output_zip, BorderUnionExtender, ContentBounds,
     SurgeryEdit, CHANGE_HISTORY_SHEET_NAME,
@@ -122,6 +133,9 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     // Ô VN mà TẤT CẢ nội dung đều bị gạch bỏ + màu không đen → coi như KHÔNG thay đổi nội dung
     // (giữ JP) nhưng format strike/color được phản ánh qua cell style.
     let vn_fully_struck = find_fully_struck_colored_cells_xlsx(vn_path);
+    // Ô VN mà TOÀN BỘ nội dung (mọi run) đã đổi — dùng riêng cho rule "dòng hoàn toàn mới ở VN"
+    // (`compute_row_insertions`), nghiêm ngặt hơn `vn_changed_cells` (xem doc hàm đó).
+    let vn_fully_changed_cells = find_fully_changed_cells_xlsx(vn_path);
 
     // ── 5. Chuẩn bị vòng loop ─────────────────────────────────────────────────
     let cloned_names = &structure.cloned_names;
@@ -175,13 +189,15 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             Some(x) => x,
             None => continue,
         };
-        let jp_sheet_xml = match read_zip_entry(&mut jp_archive, &jp_xml_path) {
+        let mut jp_sheet_xml = match read_zip_entry(&mut jp_archive, &jp_xml_path) {
             Some(x) => x,
             None => continue,
         };
 
         // Trích công thức + style + row bắt đầu thực sự của cột A JP
-        // (row đầu tiên CÓ công thức — bỏ qua "STT" và các ô header khác)
+        // (row đầu tiên CÓ công thức — bỏ qua "STT" và các ô header khác). Công thức là mẫu
+        // tương đối theo ROW()/COLUMN() (xem `extract_jp_col_a_info`) — không phụ thuộc số dòng
+        // thật, nên trích TRƯỚC khi chèn dòng vật lý bên dưới vẫn đúng.
         let (jp_col_a_formula, jp_col_a_style, formula_start_row1) =
             extract_jp_col_a_info(&jp_sheet_xml, CONTENT_START_ROW1);
         // Riêng sheet "変更履歴": KHÔNG có cột STT đánh số tự động — cột A là dữ liệu thật (ngày/số
@@ -200,11 +216,6 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             None => empty_changed.clone(),
         };
 
-        // Ánh xạ vn_row1 → jp_row1 theo ô neo — bù lệch dòng khi VN chèn/xóa dòng ở giữa sheet
-        // (đặc trưng của C2.3.4, xem module doc) để tra đúng ô JP gốc khi giữ nội dung "không đổi"
-        // (xem `clone_vn_sheet_for_jp`). Rỗng nếu sheet không tìm được neo — khi đó hành vi giữ
-        // nguyên ánh xạ 1:1 như trước.
-        //
         // Dùng `formula_start_row1` (không phải `content_bounds` chung — cố định row1 >= 4) làm
         // mốc bắt đầu: C2.3.4 có thêm rows 4-6 là header phụ (xử lý riêng bởi
         // `normalize_rows_4_to_6`), KHÔNG thuộc vùng "danh sách STT" cần canh dòng — nếu dùng mốc
@@ -213,6 +224,54 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             start_row0: formula_start_row1.saturating_sub(1),
             last_col0: content_bounds(sheet_name).last_col0,
         };
+        // Cột bỏ qua khi xét rule chèn dòng / khi clone dòng VN-only: cột A (STT) tự đánh số lại,
+        // luôn có dữ liệu và luôn đen — không mang tín hiệu gì về việc chèn dòng (xem doc
+        // `compute_row_insertions`), và khi có công thức JP thì cột A của dòng chèn cũng phải để
+        // JP tự đánh số lại (không giữ số VN).
+        let skip_col0s: Vec<usize> = if use_col_a_formula { vec![0] } else { vec![] };
+
+        // Chèn dòng VẬT LÝ vào JP theo rule (không dựa anchor) TRƯỚC khi tính alignment/clone —
+        // xem doc `compute_row_insertions`: dòng VN hoàn toàn mới (mọi ô đã đổi) hoặc dòng VN
+        // trống trong khi JP còn dữ liệu đều được chèn thêm 1 dòng vào JP để giữ đúng vị trí so
+        // sánh cho các dòng còn lại.
+        // "Toàn ô đã đổi" NHƯNG loại trừ ô "gạch bỏ + đổi màu toàn bộ" (`vn_fully_struck`) — ô đó
+        // theo quy ước của tài liệu là "KHÔNG đổi nội dung, giữ JP, chỉ áp style" (xem module doc
+        // + `effective_changed`), không phải dấu hiệu "dòng mới". Không loại trừ sẽ nhận lầm các
+        // dòng bị đánh dấu xoá/gạch toàn dòng (đỏ + strike đồng thời) thành "dòng mới ở VN" — đã
+        // xảy ra thực tế với các dòng dùng style vừa đỏ vừa gạch cho CẢ NHÃN (không phải kiểu
+        // "tên cũ gạch đen + tên mới tô đỏ" của dòng đổi tên thông thường).
+        let vn_fully_changed_not_struck: HashSet<(usize, usize)> =
+            match vn_fully_changed_cells.get(sheet_name) {
+                Some(fully_changed) => match vn_fully_struck.get(sheet_name) {
+                    Some(struck) => fully_changed.difference(struck).copied().collect(),
+                    None => fully_changed.clone(),
+                },
+                None => HashSet::new(),
+            };
+        let row_insertions = compute_row_insertions(
+            &vn_sheet_xml,
+            &jp_sheet_xml,
+            &vn_plain_ssi,
+            &jp_plain_ssi,
+            &vn_fully_changed_not_struck,
+            alignment_bounds,
+            &skip_col0s,
+        );
+        if !row_insertions.is_empty() {
+            jp_sheet_xml = apply_row_insertions(
+                &jp_sheet_xml,
+                &vn_sheet_xml,
+                &row_insertions,
+                &skip_col0s,
+                &style_result.xf_remap,
+                &vn_plain_ssi,
+                &vn_rich_ssi,
+            );
+        }
+
+        // Ánh xạ vn_row1 → jp_row1 theo ô neo — bù lệch dòng còn lại (nếu có) sau khi đã chèn dòng
+        // vật lý ở trên (xem `clone_vn_sheet_for_jp`). Rỗng nếu sheet không tìm được neo — khi đó
+        // hành vi giữ nguyên ánh xạ 1:1 như trước.
         let vn_to_jp_row = align_vn_jp_row_map(
             &vn_sheet_xml,
             &jp_sheet_xml,
@@ -221,7 +280,6 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &effective_changed,
             alignment_bounds,
         );
-
         // Clone toàn bộ VN sheet vào khung JP (shapes/drawing được giữ từ JP); ô VN chữ đen và
         // không strikethrough (không có trong effective changed set) sẽ giữ nguyên bản JP cùng vị trí.
         let cloned_xml = clone_vn_sheet_for_jp(
