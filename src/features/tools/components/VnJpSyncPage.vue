@@ -266,54 +266,14 @@ function tabColorStyle(color: string | null | undefined): string {
           severity="danger"
           @click="ctrl.reset()"
         />
-      </div>
-
-      <!-- Apply result banner -->
-      <div
-        v-if="ctrl.applyResult.value"
-        class="mt-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-      >
-        <i class="pi pi-check-circle" />
-        <span>
-          Đã dọn dẹp (xóa <strong>{{ ctrl.applyResult.value.strikeRemovedCount }}</strong> ô strikethrough, tô đen
-          <strong>{{ ctrl.applyResult.value.redBlackenedCount }}</strong> ô chữ đỏ cũ) rồi ghi
-          <strong>{{ ctrl.applyResult.value.appliedCount }}</strong> ô VN vào
-          <strong>{{ ctrl.applyResult.value.sheetsModified.length }}</strong> sheet.
-          <span v-if="ctrl.applyResult.value.shapeAppliedCount > 0">
-            (kèm <strong>{{ ctrl.applyResult.value.shapeAppliedCount }}</strong> đoạn văn trong textbox/shape)
-          </span>
-          <span v-if="ctrl.applyResult.value.clonedSheetCount > 0" class="text-emerald-800 dark:text-emerald-300">
-            ({{ ctrl.applyResult.value.clonedSheetCount }} sheet mới clone từ VN sang JP)
-          </span>
-          <span v-if="ctrl.applyResult.value.delSheetCount > 0">
-            ({{ ctrl.applyResult.value.delSheetCount }} sheet "(DEL)" chỉ bỏ màu chữ về đen)
-          </span>
-          <span v-if="ctrl.applyResult.value.columnCorrectedCount > 0" class="text-sky-600 dark:text-sky-400">
-            ({{ ctrl.applyResult.value.columnCorrectedCount }} ô tự sửa lệch cột theo nội dung khớp cùng dòng)
-          </span>
-          <span v-if="ctrl.applyResult.value.rowsInserted > 0" class="text-sky-600 dark:text-sky-400">
-            ({{ ctrl.applyResult.value.rowsInserted }} dòng tự động chèn để canh khớp lệch dòng)
-          </span>
-          <span
-            v-if="ctrl.applyResult.value.dictionaryAppliedCount > 0"
-            class="text-emerald-800 dark:text-emerald-300"
-          >
-            ({{ ctrl.applyResult.value.dictionaryAppliedCount }} ô tự động điền theo từ điển đã học từ tài liệu trước)
-          </span>
-          <span
-            v-if="ctrl.applyResult.value.skippedCount > 0 || ctrl.applyResult.value.cleanupSkippedCount > 0 || ctrl.applyResult.value.shapeSkippedCount > 0"
-            class="text-amber-600 dark:text-amber-400"
-          >
-            ({{ ctrl.applyResult.value.skippedCount }} ô VN bỏ qua, {{ ctrl.applyResult.value.cleanupSkippedCount }} ô cần tự kiểm tra thủ công<span v-if="ctrl.applyResult.value.shapeSkippedCount > 0">, {{ ctrl.applyResult.value.shapeSkippedCount }} đoạn shape không tìm thấy shape cùng tên ở JP</span>)
-          </span>
-          <span
-            v-if="ctrl.applyResult.value.dataMismatches.length > 0"
-            class="text-red-600 dark:text-red-400"
-          >
-            ({{ ctrl.applyResult.value.dataMismatches.length }} ô lệch dữ liệu sau chuẩn hoá — cần TL kiểm tra lại)
-          </span>
+        <span
+          v-if="(ctrl.applyResult.value?.dataMismatches.length ?? 0) > 0"
+          class="text-sm text-red-600 dark:text-red-400"
+        >
+          Có sai lệch dữ liệu cần kiểm tra thủ công
         </span>
       </div>
+
       <p v-if="ctrl.error.value" class="mt-2 text-sm text-red-500">
         <i class="pi pi-exclamation-triangle mr-1" />{{ ctrl.error.value }}
       </p>
@@ -670,6 +630,7 @@ function tabColorStyle(color: string | null | undefined): string {
                     <th class="px-4 py-2 text-center">Vị trí</th>
                     <th class="px-4 py-2 text-center">VN có dữ liệu</th>
                     <th class="px-4 py-2 text-center">Output có dữ liệu</th>
+                    <th class="px-4 py-2 text-left">Nội dung bị lệch</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -687,9 +648,12 @@ function tabColorStyle(color: string | null | undefined): string {
                     <td class="px-4 py-2 text-center">
                       <Tag :value="mismatch.outputHasData ? 'Có' : 'Không'" :severity="mismatch.outputHasData ? 'success' : 'danger'" class="text-xs" />
                     </td>
+                    <td class="max-w-[320px] px-4 py-2">
+                      <span class="line-clamp-3 whitespace-pre-wrap break-words text-xs">{{ mismatch.content || "—" }}</span>
+                    </td>
                   </tr>
                   <tr v-if="ctrl.totalDataMismatches.value === 0">
-                    <td colspan="5" class="px-4 py-8 text-center text-muted">
+                    <td colspan="6" class="px-4 py-8 text-center text-muted">
                       <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
                       Không phát hiện ô lệch dữ liệu nào
                     </td>

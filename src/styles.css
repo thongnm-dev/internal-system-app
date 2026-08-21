@@ -368,6 +368,12 @@
 .p-fieldset .p-fieldset-legend {
   background: rgb(var(--color-panel));
   border-color: rgb(var(--color-border));
+  /* Fieldset roots that add `flex flex-col` (e.g. VnJpSyncPage's results fieldset) turn <legend>
+     into a flex item. WebKit (macOS/Tauri WKWebView) doesn't special-case <legend> out of flex
+     layout like Chromium/Firefox do, so the default align-items: stretch makes it fill the full
+     width there. Pin it back to content width on every engine. */
+  align-self: flex-start;
+  width: fit-content;
 }
 
 .p-fieldset .p-fieldset-toggle-button,

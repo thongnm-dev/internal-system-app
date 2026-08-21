@@ -245,4 +245,8 @@ pub struct CellDataMismatch {
     pub cell_ref: String,
     pub vn_has_data: bool,
     pub output_has_data: bool,
+    /// Nội dung text của ô ở phía ĐANG có dữ liệu (phía kia rỗng theo định nghĩa mismatch) —
+    /// rỗng nếu không trích được text (vd giá trị lỗi công thức).
+    #[serde(default)]
+    pub content: String,
 }

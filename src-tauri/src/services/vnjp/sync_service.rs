@@ -3029,40 +3029,8 @@ pub(crate) fn find_fully_struck_colored_cells_xlsx(
 // ─────────────────────────────────────────────────────────────────────────────
 // Verify data presence: so sánh sự có mặt của dữ liệu (có/không) tại từng ô giữa file VN và
 // file output — KHÔNG so sánh nội dung, chỉ kiểm tra ô có dữ liệu hay trống. Dùng để phát hiện
-// các ô bị mất dữ liệu sau quá trình chuẩn hoá / merge.
+// các ô bị mất dữ liệu sau quá trình chuẩn hoá / merge (xem `apply_dictionary_and_verify_data`).
 // ─────────────────────────────────────────────────────────────────────────────
-
-/// Trích tập vị trí ô có dữ liệu thật (chứa `<v>`, `<is>`, hoặc `<f>`) từ sheet XML.
-/// Trả về `HashSet<(row1, col0)>`.
-fn extract_data_cell_positions(sheet_xml: &str) -> HashSet<(usize, usize)> {
-    let mut result = HashSet::new();
-    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
-        return result;
-    };
-    let Some(sd) = doc
-        .descendants()
-        .find(|n| n.tag_name().name() == "sheetData")
-    else {
-        return result;
-    };
-    for row in sd.children().filter(|n| n.tag_name().name() == "row") {
-        let row1 = row
-            .attribute("r")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(0);
-        for cell in row.children().filter(|n| n.tag_name().name() == "c") {
-            if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
-                let has_data = cell
-                    .children()
-                    .any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f"));
-                if has_data {
-                    result.insert((row1, col0));
-                }
-            }
-        }
-    }
-    result
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Từ điển replace: thu thập cặp VN text → JP text từ các ô mà output đã giữ nguyên nội dung JP
@@ -3269,6 +3237,9 @@ pub(crate) fn apply_dictionary_and_verify_data(
         read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
     let vn_sheet_map: HashMap<String, String> =
         resolve_sheet_xml_paths(&vn_wb, &vn_rels).into_iter().collect();
+    let vn_sst_xml =
+        read_zip_entry(&mut vn_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (vn_plain_ssi, _) = extract_all_shared_strings(&vn_sst_xml);
 
     let file = File::open(file_path)
         .map_err(|e| AppError::new(format!("Không mở được file: {e}")))?;
@@ -3301,16 +3272,53 @@ pub(crate) fn apply_dictionary_and_verify_data(
         };
 
         let (start_row1, max_col0) = bounds_for_sheet(sheet_name);
-        let in_bounds = |&(r1, c0): &(usize, usize)| r1 >= start_row1 && c0 <= max_col0;
 
-        let vn_filtered: HashSet<(usize, usize)> = vn_sheet_map
+        // Vị trí + nội dung text (best-effort) của các ô VN có dữ liệu, trong vùng nội dung —
+        // dùng để so verify VÀ hiển thị nội dung ô bị lệch (ô output đang thiếu).
+        let mut vn_filtered: HashSet<(usize, usize)> = HashSet::new();
+        let mut vn_text: HashMap<(usize, usize), String> = HashMap::new();
+        if let Some(vn_xml) = vn_sheet_map
             .get(sheet_name.as_str())
             .and_then(|p| read_zip_entry(&mut vn_archive, p))
-            .map(|xml| extract_data_cell_positions(&xml))
-            .unwrap_or_default()
-            .into_iter()
-            .filter(in_bounds)
-            .collect();
+        {
+            if let Ok(vn_doc) = roxmltree::Document::parse(&vn_xml) {
+                if let Some(vn_sd) = vn_doc
+                    .descendants()
+                    .find(|n| n.tag_name().name() == "sheetData")
+                {
+                    for row in vn_sd.children().filter(|n| n.tag_name().name() == "row") {
+                        let row1 = row
+                            .attribute("r")
+                            .and_then(|s| s.parse::<usize>().ok())
+                            .unwrap_or(0);
+                        if row1 < start_row1 {
+                            continue;
+                        }
+                        for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+                            let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) else {
+                                continue;
+                            };
+                            if col0 > max_col0 {
+                                continue;
+                            }
+                            let has_data = cell
+                                .children()
+                                .any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f"));
+                            if !has_data {
+                                continue;
+                            }
+                            vn_filtered.insert((row1, col0));
+                            if let Some(text) = extract_cell_plain_text(cell, &vn_plain_ssi) {
+                                let trimmed = text.trim();
+                                if !trimmed.is_empty() {
+                                    vn_text.insert((row1, col0), trimmed.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let Ok(doc) = roxmltree::Document::parse(&sheet_xml) else {
             continue;
@@ -3324,6 +3332,11 @@ pub(crate) fn apply_dictionary_and_verify_data(
 
         let mut edits: Vec<SurgeryEdit> = Vec::new();
         let mut out_filtered: HashSet<(usize, usize)> = HashSet::new();
+        // Mọi ô <c> có mặt trong XML output, bất kể có dữ liệu hay không — dùng để xác định ô
+        // nào THỰC SỰ không tồn tại trong output (khác với ô có mặt nhưng rỗng, đã được đối chiếu
+        // ở vòng lặp chính bên dưới; nếu chỉ diff với out_filtered thì ô rỗng-nhưng-có-mặt sẽ bị
+        // tính mismatch 2 lần — 1 lần ở vòng lặp chính, 1 lần ở vòng lặp diff phía dưới).
+        let mut out_present: HashSet<(usize, usize)> = HashSet::new();
 
         for row in sd.children().filter(|n| n.tag_name().name() == "row") {
             let row1 = row
@@ -3340,6 +3353,7 @@ pub(crate) fn apply_dictionary_and_verify_data(
                 if col0 > max_col0 {
                     continue;
                 }
+                out_present.insert((row1, col0));
 
                 let has_data = cell
                     .children()
@@ -3375,11 +3389,20 @@ pub(crate) fn apply_dictionary_and_verify_data(
                 // 2. Kiểm tra output: so sự có mặt dữ liệu với VN tại đúng ô này.
                 let vn_has_data = vn_filtered.contains(&(row1, col0));
                 if vn_has_data != has_data {
+                    // Nội dung hiển thị lấy từ phía ĐANG có dữ liệu (phía kia rỗng theo định nghĩa).
+                    let content = if has_data {
+                        extract_cell_plain_text(cell, &plain_ssi)
+                            .map(|t| t.trim().to_string())
+                            .unwrap_or_default()
+                    } else {
+                        vn_text.get(&(row1, col0)).cloned().unwrap_or_default()
+                    };
                     mismatches.push(CellDataMismatch {
                         sheet: sheet_name.clone(),
                         cell_ref: format!("{}{}", col_index_to_letter(col0), row1),
                         vn_has_data,
                         output_has_data: has_data,
+                        content,
                     });
                 }
             }
@@ -3387,12 +3410,13 @@ pub(crate) fn apply_dictionary_and_verify_data(
 
         // Ô có dữ liệu ở VN nhưng không xuất hiện trong sheetData của output (không chỉ khác
         // nội dung — hoàn toàn không có ô này) — vòng lặp trên chỉ duyệt được ô CÓ MẶT ở output.
-        for &(r1, c0) in vn_filtered.difference(&out_filtered) {
+        for &(r1, c0) in vn_filtered.difference(&out_present) {
             mismatches.push(CellDataMismatch {
                 sheet: sheet_name.clone(),
                 cell_ref: format!("{}{}", col_index_to_letter(c0), r1),
                 vn_has_data: true,
                 output_has_data: false,
+                content: vn_text.get(&(r1, c0)).cloned().unwrap_or_default(),
             });
         }
 

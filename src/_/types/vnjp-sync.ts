@@ -113,6 +113,8 @@ export interface CellDataMismatch {
   cellRef: string;
   vnHasData: boolean;
   outputHasData: boolean;
+  /** Nội dung text của ô ở phía đang có dữ liệu (phía kia rỗng theo định nghĩa mismatch). */
+  content: string;
 }
 
 /** Kết quả gộp "Phân tích" + "Áp dụng" — trả về trong 1 lệnh gọi backend duy nhất. */
