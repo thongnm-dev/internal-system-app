@@ -105,6 +105,53 @@ pub async fn verify_red_cells_with_ai(
     sync_service::verify_red_cells_with_ai(jp_path, red_cells, provider, model).await
 }
 
+/// Kiểm tra output sau chuẩn hoá: so sánh sự có mặt của dữ liệu (có/không) tại từng ô giữa
+/// file VN và file output — không so sánh nội dung. DISPATCH theo `detect_doc_type` sang đúng
+/// `verify_output` của class xử lý tương ứng.
+pub fn verify_output(vn_path: &str, jp_path: &str, output_path: &str) -> AppResult<Vec<CellDataMismatch>> {
+    match sync_service::detect_doc_type(vn_path, jp_path) {
+        DocType::C234 => c234_sync_service::verify_output(vn_path, output_path),
+        DocType::C235 => c235_sync_service::verify_output(vn_path, output_path),
+        DocType::C236 => c236_sync_service::verify_output(vn_path, output_path),
+        DocType::C238 => c238_sync_service::verify_output(vn_path, output_path),
+        _ => Ok(Vec::new()),
+    }
+}
+
+/// Thu thập từ điển replace (vn_text → jp_text) từ các ô mà output đã giữ nội dung JP.
+/// Dùng sau bước verify_output, kết quả tái sử dụng cho các tài liệu khác.
+pub fn build_dictionary(
+    vn_path: &str,
+    jp_path: &str,
+    output_path: &str,
+) -> AppResult<std::collections::HashMap<String, String>> {
+    match sync_service::detect_doc_type(vn_path, jp_path) {
+        DocType::C234 => c234_sync_service::build_dictionary(vn_path, output_path),
+        DocType::C235 => c235_sync_service::build_dictionary(vn_path, output_path),
+        DocType::C236 => c236_sync_service::build_dictionary(vn_path, output_path),
+        DocType::C238 => c238_sync_service::build_dictionary(vn_path, output_path),
+        _ => Ok(std::collections::HashMap::new()),
+    }
+}
+
+/// Áp dụng từ điển replace lên file — chỉ thay thế khi nội dung cell khớp chính xác.
+/// Trả về số ô đã thay thế.
+pub fn apply_dictionary(
+    file_path: &str,
+    output_path: &str,
+    vn_path: &str,
+    jp_path: &str,
+    dictionary: &std::collections::HashMap<String, String>,
+) -> AppResult<usize> {
+    match sync_service::detect_doc_type(vn_path, jp_path) {
+        DocType::C234 => c234_sync_service::apply_dictionary(file_path, output_path, dictionary),
+        DocType::C235 => c235_sync_service::apply_dictionary(file_path, output_path, dictionary),
+        DocType::C236 => c236_sync_service::apply_dictionary(file_path, output_path, dictionary),
+        DocType::C238 => c238_sync_service::apply_dictionary(file_path, output_path, dictionary),
+        _ => Ok(0),
+    }
+}
+
 /// Vùng nội dung hợp lệ của 1 sheet theo loại tài liệu — dispatch tới đúng method của từng loại.
 /// `None` nếu không nhận diện được loại tài liệu (`DocType::Unknown`) ⇒ không giới hạn cột.
 pub(crate) fn content_bounds_for(doc_type: DocType, sheet_name: &str) -> Option<ContentBounds> {

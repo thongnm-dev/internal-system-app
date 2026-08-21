@@ -605,7 +605,7 @@ pub async fn scan_upload_folders(dir_paths: Vec<String>) -> AppResult<Vec<Scanne
     use regex::Regex;
 
     let bug_pattern = Regex::new(
-        r"^F3\.1_バグ管理表_[A-Za-z]*\d+(?:（再）（急）|（特急）|（急）|（再）)?$"
+        r"^F3\.1_バグ管理表_[A-Za-z]*\d+"
     ).unwrap();
 
     let paths = &dir_paths;

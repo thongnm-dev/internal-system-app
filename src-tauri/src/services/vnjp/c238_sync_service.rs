@@ -13,10 +13,14 @@ use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use crate::models::vnjp_sync::{ApplyResult, RowAlignmentSuggestion};
 
+use crate::models::vnjp_sync::CellDataMismatch;
+
 use super::sync_service::{
-    clone_vn_sheet_for_jp, extract_all_shared_strings, find_changed_style_cells_xlsx,
-    is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry,
-    resolve_sheet_xml_paths, sync_structure, write_output_zip,
+    apply_replace_dictionary, build_replace_dictionary, clone_vn_sheet_for_jp,
+    content_bounds_for_sheet, extract_all_shared_strings, find_changed_style_cells_xlsx,
+    find_fully_struck_colored_cells_xlsx, is_del_sheet_name, merged_output_path,
+    merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry, resolve_sheet_xml_paths,
+    sync_structure, verify_data_cells_between_files, write_output_zip,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -661,6 +665,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
     // vị trí khi clone (xem `clone_vn_sheet_for_jp`).
     let vn_changed_cells = find_changed_style_cells_xlsx(vn_path);
+    let vn_fully_struck = find_fully_struck_colored_cells_xlsx(vn_path);
 
     // ── 5. Sheet chung cần xử lý ──────────────────────────────────────────────
     let cloned_names = &structure.cloned_names;
@@ -706,9 +711,18 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             None => continue,
         };
 
+        // Tập ô "đã thay đổi" hiệu dụng = changed − fully_struck_colored.
+        let effective_changed: Option<HashSet<(usize, usize)>> =
+            vn_changed_cells.get(sheet_name).map(|changed| {
+                match vn_fully_struck.get(sheet_name) {
+                    Some(struck) => changed.difference(struck).copied().collect(),
+                    None => changed.clone(),
+                }
+            });
+
         // use_col_a_formula = false → cột A xử lý như cột thường (không có công thức JP);
-        // vn_changed_cells.get(sheet_name) → ô chữ đen, không strikethrough (không đổi) giữ
-        // nguyên bản JP cùng vị trí.
+        // effective_changed → ô chữ đen, không strikethrough (không đổi) giữ nguyên bản JP cùng
+        // vị trí; ô fully-struck-colored cũng giữ JP nhưng style VN (strike + color).
         // A3, C3, E3, F3 luôn lấy từ JP (jp_preserved_header_cells).
         let new_sheet_xml = clone_vn_sheet_for_jp(
             &vn_sheet_xml,
@@ -719,7 +733,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             &style_result.xf_remap,
             &vn_plain_ssi,
             &vn_rich_ssi,
-            Some(vn_changed_cells.get(sheet_name).unwrap_or(&empty_changed)),
+            effective_changed.as_ref().or(Some(vn_changed_cells.get(sheet_name).unwrap_or(&empty_changed))),
             false,
             Some(&preserved_cells),
         );
@@ -782,5 +796,38 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         cloned_sheet_count: structure.cloned_names.len(),
         del_sheet_count: structure.del_renamed_count,
         rows_inserted: 0,
+    })
+}
+
+/// Kiểm tra output sau chuẩn hoá: so sánh sự có mặt của dữ liệu (có/không) tại từng ô
+/// giữa file VN và file output — không so sánh nội dung, chỉ kiểm tra cell có hoặc không
+/// dữ liệu tại cùng vị trí.
+pub fn verify_output(vn_path: &str, output_path: &str) -> AppResult<Vec<CellDataMismatch>> {
+    verify_data_cells_between_files(vn_path, output_path, |sheet_name| {
+        let bounds = content_bounds_for_sheet(sheet_name, 10);
+        (CONTENT_START_ROW1, bounds.last_col0)
+    })
+}
+
+/// Thu thập từ điển replace (vn_text → jp_text) từ các ô mà output đã giữ nội dung JP.
+pub fn build_dictionary(
+    vn_path: &str,
+    output_path: &str,
+) -> AppResult<HashMap<String, String>> {
+    build_replace_dictionary(vn_path, output_path, |sheet_name| {
+        let bounds = content_bounds_for_sheet(sheet_name, 10);
+        (CONTENT_START_ROW1, bounds.last_col0)
+    })
+}
+
+/// Áp dụng từ điển replace lên file — chỉ thay thế khi nội dung cell khớp chính xác.
+pub fn apply_dictionary(
+    file_path: &str,
+    output_path: &str,
+    dictionary: &HashMap<String, String>,
+) -> AppResult<usize> {
+    apply_replace_dictionary(file_path, output_path, dictionary, |sheet_name| {
+        let bounds = content_bounds_for_sheet(sheet_name, 10);
+        (CONTENT_START_ROW1, bounds.last_col0)
     })
 }

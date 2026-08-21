@@ -2866,6 +2866,580 @@ pub(crate) fn find_changed_style_cells_xlsx(path: &str) -> HashMap<String, HashS
     result
 }
 
+/// Run `<r>` có CẢ HAI: strikethrough VÀ màu chữ KHÔNG phải đen.
+fn is_fully_struck_colored_run(run_node: &roxmltree::Node) -> bool {
+    has_strike_element(run_node)
+        && run_node.descendants().any(|child| {
+            child.tag_name().name() == "color"
+                && child
+                    .attribute("rgb")
+                    .map(|c| !is_argb_black(c))
+                    .unwrap_or(false)
+        })
+}
+
+/// Tìm shared string indices mà TẤT CẢ runs đều có cả strike lẫn màu không đen.
+/// Trả về `(mọi ssi rich-text, ssi fully-struck-colored)`.
+fn parse_shared_strings_fully_struck_colored(sst_xml: &str) -> (HashSet<usize>, HashSet<usize>) {
+    let mut all_rich = HashSet::new();
+    let mut fully_struck = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sst_xml) else {
+        return (all_rich, fully_struck);
+    };
+    let mut si_idx = 0usize;
+    for node in doc.descendants() {
+        if node.tag_name().name() == "si" {
+            let runs: Vec<_> = node
+                .children()
+                .filter(|c| c.tag_name().name() == "r")
+                .collect();
+            if !runs.is_empty() {
+                all_rich.insert(si_idx);
+                if runs.iter().all(|r| is_fully_struck_colored_run(r)) {
+                    fully_struck.insert(si_idx);
+                }
+            }
+            si_idx += 1;
+        }
+    }
+    (all_rich, fully_struck)
+}
+
+/// Tìm trong 1 sheet XML các ô mà TẤT CẢ nội dung đều bị gạch bỏ VÀ có màu không đen.
+fn find_fully_struck_colored_cells_in_sheet(
+    sheet_xml: &str,
+    struck_colored_xf: &HashSet<usize>,
+    fully_struck_ssi: &HashSet<usize>,
+    all_rich_ssi: &HashSet<usize>,
+) -> HashSet<(usize, usize)> {
+    let mut result = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return result;
+    };
+
+    for node in doc.descendants() {
+        if node.tag_name().name() != "c" {
+            continue;
+        }
+        let Some(pos) = node.attribute("r").and_then(parse_cell_ref) else {
+            continue;
+        };
+
+        let mut handled_by_rich = false;
+
+        if node.attribute("t") == Some("s") {
+            if let Some(v) = node.descendants().find(|c| c.tag_name().name() == "v") {
+                if let Some(ssi) = v.text().and_then(|t| t.parse::<usize>().ok()) {
+                    if all_rich_ssi.contains(&ssi) {
+                        handled_by_rich = true;
+                        if fully_struck_ssi.contains(&ssi) {
+                            result.insert(pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        if !handled_by_rich && node.attribute("t") == Some("inlineStr") {
+            if let Some(is_node) = node.children().find(|c| c.tag_name().name() == "is") {
+                let runs: Vec<_> = is_node
+                    .children()
+                    .filter(|c| c.tag_name().name() == "r")
+                    .collect();
+                if !runs.is_empty() {
+                    handled_by_rich = true;
+                    if runs.iter().all(|r| is_fully_struck_colored_run(r)) {
+                        result.insert(pos);
+                    }
+                }
+            }
+        }
+
+        if handled_by_rich {
+            continue;
+        }
+
+        if let Some(si) = node.attribute("s").and_then(|s| s.parse::<usize>().ok()) {
+            if struck_colored_xf.contains(&si) {
+                result.insert(pos);
+            }
+        }
+    }
+
+    result
+}
+
+/// Quét file VN, trả về theo từng sheet tập vị trí ô mà TẤT CẢ nội dung đều bị gạch bỏ (strike)
+/// VÀ có màu chữ KHÔNG phải đen. Các ô này được coi là "không thay đổi nội dung" — giữ nguyên
+/// nội dung JP nhưng format strike/color từ VN được phản ánh qua cell style.
+pub(crate) fn find_fully_struck_colored_cells_xlsx(
+    path: &str,
+) -> HashMap<String, HashSet<(usize, usize)>> {
+    let file = match File::open(path) {
+        Ok(f) => f,
+        Err(_) => return HashMap::new(),
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return HashMap::new(),
+    };
+
+    let styles_xml = read_zip_entry(&mut archive, "xl/styles.xml").unwrap_or_default();
+    let font_infos = parse_font_infos(&styles_xml);
+    let colored_xf = parse_colored_xf_indices(&styles_xml, &font_infos);
+    let strike_xf = parse_strike_xf_indices(&styles_xml);
+    let struck_colored_xf: HashSet<usize> = colored_xf.intersection(&strike_xf).copied().collect();
+
+    let sst_xml =
+        read_zip_entry(&mut archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (all_rich_ssi, fully_struck_ssi) = if sst_xml.is_empty() {
+        (HashSet::new(), HashSet::new())
+    } else {
+        parse_shared_strings_fully_struck_colored(&sst_xml)
+    };
+
+    let workbook_xml = match read_zip_entry(&mut archive, "xl/workbook.xml") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let rels_xml = match read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels") {
+        Some(s) => s,
+        None => return HashMap::new(),
+    };
+    let sheet_paths = resolve_sheet_xml_paths(&workbook_xml, &rels_xml);
+
+    let mut result: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
+    for (name, xml_path) in sheet_paths {
+        if let Some(sheet_xml) = read_zip_entry(&mut archive, &xml_path) {
+            let cells = find_fully_struck_colored_cells_in_sheet(
+                &sheet_xml,
+                &struck_colored_xf,
+                &fully_struck_ssi,
+                &all_rich_ssi,
+            );
+            if !cells.is_empty() {
+                result.insert(name, cells);
+            }
+        }
+    }
+
+    result
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Verify data presence: so sánh sự có mặt của dữ liệu (có/không) tại từng ô giữa file VN và
+// file output — KHÔNG so sánh nội dung, chỉ kiểm tra ô có dữ liệu hay trống. Dùng để phát hiện
+// các ô bị mất dữ liệu sau quá trình chuẩn hoá / merge.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Trích tập vị trí ô có dữ liệu thật (chứa `<v>`, `<is>`, hoặc `<f>`) từ sheet XML.
+/// Trả về `HashSet<(row1, col0)>`.
+fn extract_data_cell_positions(sheet_xml: &str) -> HashSet<(usize, usize)> {
+    let mut result = HashSet::new();
+    let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
+        return result;
+    };
+    let Some(sd) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "sheetData")
+    else {
+        return result;
+    };
+    for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+        let row1 = row
+            .attribute("r")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0);
+        for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+            if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
+                let has_data = cell
+                    .children()
+                    .any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f"));
+                if has_data {
+                    result.insert((row1, col0));
+                }
+            }
+        }
+    }
+    result
+}
+
+/// So sánh sự có mặt của dữ liệu giữa file VN và file output tại các sheet chung.
+///
+/// `bounds_for_sheet` trả về `(content_start_row1, max_col0)` cho từng sheet — chỉ kiểm tra
+/// ô trong vùng nội dung (row ≥ start, col ≤ max). Mỗi loại tài liệu (c234/c235/c236/c238)
+/// truyền closure riêng với giá trị phù hợp.
+pub(crate) fn verify_data_cells_between_files(
+    vn_path: &str,
+    output_path: &str,
+    bounds_for_sheet: impl Fn(&str) -> (usize, usize),
+) -> AppResult<Vec<CellDataMismatch>> {
+    use crate::models::vnjp_sync::CellDataMismatch;
+
+    let vn_file = File::open(vn_path)
+        .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
+    let mut vn_archive = zip::ZipArchive::new(vn_file)
+        .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
+
+    let out_file = File::open(output_path)
+        .map_err(|e| AppError::new(format!("Không mở được file output: {e}")))?;
+    let mut out_archive = zip::ZipArchive::new(out_file)
+        .map_err(|e| AppError::new(format!("File output không phải ZIP hợp lệ: {e}")))?;
+
+    let vn_wb = read_zip_entry(&mut vn_archive, "xl/workbook.xml").unwrap_or_default();
+    let vn_rels =
+        read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let vn_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&vn_wb, &vn_rels).into_iter().collect();
+
+    let out_wb = read_zip_entry(&mut out_archive, "xl/workbook.xml").unwrap_or_default();
+    let out_rels =
+        read_zip_entry(&mut out_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let out_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&out_wb, &out_rels).into_iter().collect();
+
+    let mut mismatches: Vec<CellDataMismatch> = Vec::new();
+
+    let mut sheet_names: Vec<&String> = vn_sheet_map.keys().collect();
+    sheet_names.sort();
+
+    for sheet_name in sheet_names {
+        if is_del_sheet_name(sheet_name) {
+            continue;
+        }
+        let Some(out_xml_path) = out_sheet_map.get(sheet_name.as_str()) else {
+            continue;
+        };
+        let vn_xml_path = &vn_sheet_map[sheet_name];
+
+        let Some(vn_xml) = read_zip_entry(&mut vn_archive, vn_xml_path) else {
+            continue;
+        };
+        let Some(out_xml) = read_zip_entry(&mut out_archive, out_xml_path) else {
+            continue;
+        };
+
+        let (start_row1, max_col0) = bounds_for_sheet(sheet_name);
+
+        let vn_cells = extract_data_cell_positions(&vn_xml);
+        let out_cells = extract_data_cell_positions(&out_xml);
+
+        let in_bounds = |&(r1, c0): &(usize, usize)| r1 >= start_row1 && c0 <= max_col0;
+
+        let vn_filtered: HashSet<_> = vn_cells.into_iter().filter(in_bounds).collect();
+        let out_filtered: HashSet<_> = out_cells.into_iter().filter(in_bounds).collect();
+
+        for &(r1, c0) in vn_filtered.difference(&out_filtered) {
+            mismatches.push(CellDataMismatch {
+                sheet: sheet_name.clone(),
+                cell_ref: format!("{}{}", col_index_to_letter(c0), r1),
+                vn_has_data: true,
+                output_has_data: false,
+            });
+        }
+        for &(r1, c0) in out_filtered.difference(&vn_filtered) {
+            mismatches.push(CellDataMismatch {
+                sheet: sheet_name.clone(),
+                cell_ref: format!("{}{}", col_index_to_letter(c0), r1),
+                vn_has_data: false,
+                output_has_data: true,
+            });
+        }
+    }
+
+    mismatches.sort_by(|a, b| a.sheet.cmp(&b.sheet).then(a.cell_ref.cmp(&b.cell_ref)));
+    Ok(mismatches)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Từ điển replace: thu thập cặp VN text → JP text từ các ô mà output đã giữ nguyên nội dung JP
+// (ô VN "không thay đổi" hoặc "fully struck colored") để tái sử dụng cho các tài liệu khác.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Trích plain text từ 1 cell XML bất kể loại (shared string / inline string / value).
+fn extract_cell_plain_text(
+    cell: roxmltree::Node,
+    plain_ssi: &HashMap<usize, String>,
+) -> Option<String> {
+    if cell.attribute("t") == Some("s") {
+        let v = cell.children().find(|c| c.tag_name().name() == "v")?;
+        let ssi = v.text()?.parse::<usize>().ok()?;
+        return plain_ssi.get(&ssi).cloned();
+    }
+    if cell.attribute("t") == Some("inlineStr") {
+        let is_node = cell.children().find(|c| c.tag_name().name() == "is")?;
+        let mut text = String::new();
+        for child in is_node.children() {
+            match child.tag_name().name() {
+                "t" => {
+                    if let Some(t) = child.text() {
+                        text.push_str(t);
+                    }
+                }
+                "r" => {
+                    if let Some(t) = child.children().find(|c| c.tag_name().name() == "t") {
+                        if let Some(txt) = t.text() {
+                            text.push_str(txt);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if text.is_empty() {
+            return None;
+        }
+        return Some(text);
+    }
+    let v = cell.children().find(|c| c.tag_name().name() == "v")?;
+    v.text().map(|s| s.to_string())
+}
+
+/// So sánh nội dung text giữa file VN và file output, thu thập các cặp (vn_text → jp_text)
+/// tại các ô mà nội dung khác nhau (output đã giữ bản JP thay vì dùng VN).
+/// Kết quả dùng làm từ điển replace cho tài liệu khác.
+pub(crate) fn build_replace_dictionary(
+    vn_path: &str,
+    output_path: &str,
+    bounds_for_sheet: impl Fn(&str) -> (usize, usize),
+) -> AppResult<HashMap<String, String>> {
+    let vn_file = File::open(vn_path)
+        .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
+    let mut vn_archive = zip::ZipArchive::new(vn_file)
+        .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
+
+    let out_file = File::open(output_path)
+        .map_err(|e| AppError::new(format!("Không mở được file output: {e}")))?;
+    let mut out_archive = zip::ZipArchive::new(out_file)
+        .map_err(|e| AppError::new(format!("File output không phải ZIP hợp lệ: {e}")))?;
+
+    let vn_sst_xml =
+        read_zip_entry(&mut vn_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (vn_plain_ssi, _) = extract_all_shared_strings(&vn_sst_xml);
+
+    let out_sst_xml =
+        read_zip_entry(&mut out_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (out_plain_ssi, _) = extract_all_shared_strings(&out_sst_xml);
+
+    let vn_wb = read_zip_entry(&mut vn_archive, "xl/workbook.xml").unwrap_or_default();
+    let vn_rels =
+        read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let vn_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&vn_wb, &vn_rels).into_iter().collect();
+
+    let out_wb = read_zip_entry(&mut out_archive, "xl/workbook.xml").unwrap_or_default();
+    let out_rels =
+        read_zip_entry(&mut out_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let out_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&out_wb, &out_rels).into_iter().collect();
+
+    let mut dict: HashMap<String, String> = HashMap::new();
+
+    let mut sheet_names: Vec<&String> = vn_sheet_map.keys().collect();
+    sheet_names.sort();
+
+    for sheet_name in sheet_names {
+        if is_del_sheet_name(sheet_name) {
+            continue;
+        }
+        let Some(out_xml_path) = out_sheet_map.get(sheet_name.as_str()) else {
+            continue;
+        };
+        let vn_xml_path = &vn_sheet_map[sheet_name];
+
+        let Some(vn_xml) = read_zip_entry(&mut vn_archive, vn_xml_path) else {
+            continue;
+        };
+        let Some(out_xml) = read_zip_entry(&mut out_archive, out_xml_path) else {
+            continue;
+        };
+
+        let (start_row1, max_col0) = bounds_for_sheet(sheet_name);
+
+        let Ok(out_doc) = roxmltree::Document::parse(&out_xml) else {
+            continue;
+        };
+        let mut out_text_map: HashMap<(usize, usize), String> = HashMap::new();
+        if let Some(sd) = out_doc
+            .descendants()
+            .find(|n| n.tag_name().name() == "sheetData")
+        {
+            for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+                let row1 = row
+                    .attribute("r")
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or(0);
+                if row1 < start_row1 {
+                    continue;
+                }
+                for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+                    if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
+                        if col0 > max_col0 {
+                            continue;
+                        }
+                        if let Some(text) = extract_cell_plain_text(cell, &out_plain_ssi) {
+                            let trimmed = text.trim().to_string();
+                            if !trimmed.is_empty() {
+                                out_text_map.insert((row1, col0), trimmed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let Ok(vn_doc) = roxmltree::Document::parse(&vn_xml) else {
+            continue;
+        };
+        if let Some(sd) = vn_doc
+            .descendants()
+            .find(|n| n.tag_name().name() == "sheetData")
+        {
+            for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+                let row1 = row
+                    .attribute("r")
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or(0);
+                if row1 < start_row1 {
+                    continue;
+                }
+                for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+                    if let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) {
+                        if col0 > max_col0 {
+                            continue;
+                        }
+                        if let Some(vn_text) = extract_cell_plain_text(cell, &vn_plain_ssi) {
+                            let vn_trimmed = vn_text.trim().to_string();
+                            if vn_trimmed.is_empty() {
+                                continue;
+                            }
+                            if let Some(out_text) = out_text_map.get(&(row1, col0)) {
+                                if &vn_trimmed != out_text {
+                                    dict.entry(vn_trimmed)
+                                        .or_insert_with(|| out_text.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(dict)
+}
+
+/// Áp dụng từ điển replace lên file xlsx: mỗi ô có nội dung text khớp chính xác (exact match)
+/// với 1 key trong `dictionary` sẽ được thay thế bằng value tương ứng.
+/// Trả về số ô đã thay thế.
+pub(crate) fn apply_replace_dictionary(
+    file_path: &str,
+    output_path: &str,
+    dictionary: &HashMap<String, String>,
+    bounds_for_sheet: impl Fn(&str) -> (usize, usize),
+) -> AppResult<usize> {
+    if dictionary.is_empty() {
+        std::fs::copy(file_path, output_path)
+            .map_err(|e| AppError::new(format!("Copy file thất bại: {e}")))?;
+        return Ok(0);
+    }
+
+    let file = File::open(file_path)
+        .map_err(|e| AppError::new(format!("Không mở được file: {e}")))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| AppError::new(format!("File không phải ZIP hợp lệ: {e}")))?;
+
+    let sst_xml =
+        read_zip_entry(&mut archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let (plain_ssi, _) = extract_all_shared_strings(&sst_xml);
+
+    let wb_xml = read_zip_entry(&mut archive, "xl/workbook.xml").unwrap_or_default();
+    let rels_xml =
+        read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&wb_xml, &rels_xml).into_iter().collect();
+
+    let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut total_count = 0usize;
+
+    let mut sheet_names: Vec<(&String, &String)> = sheet_map.iter().collect();
+    sheet_names.sort_by_key(|(name, _)| name.as_str());
+
+    for (sheet_name, xml_path) in sheet_names {
+        if is_del_sheet_name(sheet_name) {
+            continue;
+        }
+        let Some(sheet_xml) = read_zip_entry(&mut archive, xml_path) else {
+            continue;
+        };
+
+        let (start_row1, max_col0) = bounds_for_sheet(sheet_name);
+
+        let Ok(doc) = roxmltree::Document::parse(&sheet_xml) else {
+            continue;
+        };
+        let Some(sd) = doc
+            .descendants()
+            .find(|n| n.tag_name().name() == "sheetData")
+        else {
+            continue;
+        };
+
+        let mut edits: Vec<SurgeryEdit> = Vec::new();
+
+        for row in sd.children().filter(|n| n.tag_name().name() == "row") {
+            let row1 = row
+                .attribute("r")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+            if row1 < start_row1 {
+                continue;
+            }
+            for cell in row.children().filter(|n| n.tag_name().name() == "c") {
+                let Some((_, col0)) = cell.attribute("r").and_then(parse_cell_ref) else {
+                    continue;
+                };
+                if col0 > max_col0 {
+                    continue;
+                }
+                let Some(text) = extract_cell_plain_text(cell, &plain_ssi) else {
+                    continue;
+                };
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+
+                if let Some(jp_text) = dictionary.get(trimmed) {
+                    let cell_ref = cell.attribute("r").unwrap_or("");
+                    let s_attr = cell
+                        .attribute("s")
+                        .map(|s| format!(" s=\"{s}\""))
+                        .unwrap_or_default();
+                    let new_cell = format!(
+                        r#"<c r="{cell_ref}"{s_attr} t="inlineStr"><is><t xml:space="preserve">{}</t></is></c>"#,
+                        xml_escape(jp_text)
+                    );
+                    edits.push(SurgeryEdit {
+                        start: cell.range().start,
+                        end: cell.range().end,
+                        replacement: new_cell,
+                    });
+                    total_count += 1;
+                }
+            }
+        }
+
+        if !edits.is_empty() {
+            let new_xml = apply_surgery(&sheet_xml, edits);
+            replaced.insert(xml_path.clone(), new_xml.into_bytes());
+        }
+    }
+
+    write_output_zip(&mut archive, &replaced, output_path)?;
+    Ok(total_count)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Sheet chỉ có ở VN sang JP: BẤT KỲ sheet nào tồn tại ở VN mà JP chưa có (trừ sheet VN tự đánh
 // dấu đã xóa, xem `is_del_sheet_name` + `compute_del_renames` bên dưới) sẽ được CLONE TRỰC TIẾP
