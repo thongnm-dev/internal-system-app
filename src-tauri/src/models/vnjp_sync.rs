@@ -141,6 +141,15 @@ pub struct ApplyResult {
     /// Số dòng đã được tự động chèn để canh khớp lệch dòng VN↔JP trước khi ghi nội dung.
     #[serde(default)]
     pub rows_inserted: usize,
+    /// Các ô có dữ liệu ở VN nhưng mất ở output (hoặc ngược lại) sau chuẩn hoá — dấu hiệu lỗi
+    /// merge cần TL kiểm tra lại (xem `verify_output`). Rỗng nếu doc type không hỗ trợ kiểm tra.
+    #[serde(default)]
+    pub data_mismatches: Vec<CellDataMismatch>,
+    /// Số ô đã tự động điền theo từ điển replace học được từ các tài liệu trước (xem
+    /// `apply_dictionary_and_verify`) — nội dung VN ở các ô này ĐÃ được thay bằng bản dịch JP
+    /// đã biết, không cần TL dịch lại thủ công.
+    #[serde(default)]
+    pub dictionary_applied_count: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

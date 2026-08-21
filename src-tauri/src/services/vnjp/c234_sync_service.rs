@@ -45,12 +45,12 @@ use crate::models::vnjp_sync::ApplyResult;
 use crate::models::vnjp_sync::CellDataMismatch;
 
 use super::sync_service::{
-    apply_surgery, clone_vn_sheet_for_jp, extract_all_shared_strings, extract_jp_col_a_info,
-    apply_replace_dictionary, build_replace_dictionary, find_changed_style_cells_xlsx,
-    find_fully_struck_colored_cells_xlsx, is_del_sheet_name, merged_output_path,
-    merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry, resolve_sheet_xml_paths,
-    sync_structure, verify_data_cells_between_files, write_output_zip, ContentBounds,
-    SurgeryEdit, CHANGE_HISTORY_SHEET_NAME,
+    apply_dictionary_and_verify_data, apply_surgery, clone_vn_sheet_for_jp,
+    extract_all_shared_strings, extract_jp_col_a_info, build_replace_dictionary,
+    find_changed_style_cells_xlsx, find_fully_struck_colored_cells_xlsx, is_del_sheet_name,
+    merged_output_path, merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry,
+    resolve_sheet_xml_paths, sync_structure, write_output_zip, ContentBounds, SurgeryEdit,
+    CHANGE_HISTORY_SHEET_NAME,
 };
 
 /// Nội dung cột A ~ M (0-based 12).
@@ -284,6 +284,8 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         cloned_sheet_count: structure.cloned_names.len(),
         del_sheet_count: structure.del_renamed_count,
         rows_inserted: 0,
+        data_mismatches: Vec::new(),
+        dictionary_applied_count: 0,
     })
 }
 
@@ -554,15 +556,6 @@ fn normalize_rows_4_to_6(sheet_xml: &str, jp_ref_cells: &HashMap<usize, String>)
     apply_surgery(sheet_xml, edits)
 }
 
-/// Kiểm tra output sau chuẩn hoá: so sánh sự có mặt của dữ liệu (có/không) tại từng ô
-/// giữa file VN và file output — không so sánh nội dung, chỉ kiểm tra cell có hoặc không
-/// dữ liệu tại cùng vị trí.
-pub fn verify_output(vn_path: &str, output_path: &str) -> AppResult<Vec<CellDataMismatch>> {
-    verify_data_cells_between_files(vn_path, output_path, |sheet_name| {
-        (7, content_bounds(sheet_name).last_col0)
-    })
-}
-
 /// Thu thập từ điển replace (vn_text → jp_text) từ các ô mà output đã giữ nội dung JP.
 pub fn build_dictionary(
     vn_path: &str,
@@ -573,13 +566,16 @@ pub fn build_dictionary(
     })
 }
 
-/// Áp dụng từ điển replace lên file — chỉ thay thế khi nội dung cell khớp chính xác.
-pub fn apply_dictionary(
+/// Áp dụng từ điển replace lên file, ĐỒNG THỜI kiểm tra output sau chuẩn hoá (so sự có mặt dữ
+/// liệu — có/không — với file VN tại từng ô) trong CÙNG 1 lượt loop (xem
+/// `sync_service::apply_dictionary_and_verify`).
+pub fn apply_dictionary_and_verify(
     file_path: &str,
+    vn_path: &str,
     output_path: &str,
     dictionary: &HashMap<String, String>,
-) -> AppResult<usize> {
-    apply_replace_dictionary(file_path, output_path, dictionary, |sheet_name| {
+) -> AppResult<(usize, Vec<CellDataMismatch>)> {
+    apply_dictionary_and_verify_data(file_path, vn_path, output_path, dictionary, |sheet_name| {
         (7, content_bounds(sheet_name).last_col0)
     })
 }

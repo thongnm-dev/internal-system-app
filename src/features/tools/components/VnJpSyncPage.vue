@@ -295,10 +295,22 @@ function tabColorStyle(color: string | null | undefined): string {
             ({{ ctrl.applyResult.value.rowsInserted }} dòng tự động chèn để canh khớp lệch dòng)
           </span>
           <span
+            v-if="ctrl.applyResult.value.dictionaryAppliedCount > 0"
+            class="text-emerald-800 dark:text-emerald-300"
+          >
+            ({{ ctrl.applyResult.value.dictionaryAppliedCount }} ô tự động điền theo từ điển đã học từ tài liệu trước)
+          </span>
+          <span
             v-if="ctrl.applyResult.value.skippedCount > 0 || ctrl.applyResult.value.cleanupSkippedCount > 0 || ctrl.applyResult.value.shapeSkippedCount > 0"
             class="text-amber-600 dark:text-amber-400"
           >
             ({{ ctrl.applyResult.value.skippedCount }} ô VN bỏ qua, {{ ctrl.applyResult.value.cleanupSkippedCount }} ô cần tự kiểm tra thủ công<span v-if="ctrl.applyResult.value.shapeSkippedCount > 0">, {{ ctrl.applyResult.value.shapeSkippedCount }} đoạn shape không tìm thấy shape cùng tên ở JP</span>)
+          </span>
+          <span
+            v-if="ctrl.applyResult.value.dataMismatches.length > 0"
+            class="text-red-600 dark:text-red-400"
+          >
+            ({{ ctrl.applyResult.value.dataMismatches.length }} ô lệch dữ liệu sau chuẩn hoá — cần TL kiểm tra lại)
           </span>
         </span>
       </div>
@@ -430,6 +442,7 @@ function tabColorStyle(color: string | null | undefined): string {
           <Tab value="overview">Tổng quan</Tab>
           <Tab value="red-cells">Chi tiết</Tab>
           <Tab value="quality">Quality Issues</Tab>
+          <Tab value="data-mismatches">Ô lệch dữ liệu</Tab>
         </TabList>
         <TabPanels class="min-h-0 flex-1 overflow-hidden p-0">
           <!-- Tab: Overview -->
@@ -630,6 +643,55 @@ function tabColorStyle(color: string | null | undefined): string {
                     <td colspan="6" class="px-4 py-8 text-center text-muted">
                       <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
                       Không phát hiện vấn đề chất lượng nào
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </TabPanel>
+
+          <!-- Tab: Data Mismatches (sau bước Áp dụng) -->
+          <TabPanel value="data-mismatches" class="flex h-full min-h-0 flex-col">
+            <div class="shrink-0 border-b border-divider px-4 py-2">
+              <h4 class="font-semibold text-ink">
+                Ô lệch dữ liệu sau chuẩn hoá
+                <span class="ml-1 text-sm font-normal text-muted">({{ ctrl.totalDataMismatches.value }} ô)</span>
+              </h4>
+              <p class="mt-0.5 text-xs text-muted">
+                So sánh sự có mặt của dữ liệu (có/không) giữa file VN và file output sau khi "Áp dụng" — không so nội dung.
+              </p>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="sticky top-0 z-10 border-b border-divider bg-canvas text-xs uppercase tracking-wide text-muted">
+                    <th class="px-4 py-2 text-left">#</th>
+                    <th class="px-4 py-2 text-left">Sheet</th>
+                    <th class="px-4 py-2 text-center">Vị trí</th>
+                    <th class="px-4 py-2 text-center">VN có dữ liệu</th>
+                    <th class="px-4 py-2 text-center">Output có dữ liệu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(mismatch, idx) in ctrl.applyResult.value?.dataMismatches ?? []"
+                    :key="`${mismatch.sheet}-${mismatch.cellRef}-${idx}`"
+                    class="border-b border-divider/50 hover:bg-canvas/50"
+                  >
+                    <td class="px-4 py-2 text-xs text-muted">{{ idx + 1 }}</td>
+                    <td class="px-4 py-2 text-xs font-medium">{{ mismatch.sheet }}</td>
+                    <td class="px-4 py-2 text-center text-xs font-mono text-muted">{{ mismatch.cellRef }}</td>
+                    <td class="px-4 py-2 text-center">
+                      <Tag :value="mismatch.vnHasData ? 'Có' : 'Không'" :severity="mismatch.vnHasData ? 'success' : 'danger'" class="text-xs" />
+                    </td>
+                    <td class="px-4 py-2 text-center">
+                      <Tag :value="mismatch.outputHasData ? 'Có' : 'Không'" :severity="mismatch.outputHasData ? 'success' : 'danger'" class="text-xs" />
+                    </td>
+                  </tr>
+                  <tr v-if="ctrl.totalDataMismatches.value === 0">
+                    <td colspan="5" class="px-4 py-8 text-center text-muted">
+                      <i class="pi pi-check-circle mb-2 block text-3xl text-emerald-400" />
+                      Không phát hiện ô lệch dữ liệu nào
                     </td>
                   </tr>
                 </tbody>

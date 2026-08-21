@@ -179,5 +179,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         cloned_sheet_count: structure.cloned_names.len(),
         del_sheet_count: structure.del_renamed_count,
         rows_inserted: 0,
+        data_mismatches: Vec::new(),
+        dictionary_applied_count: 0,
     })
 }

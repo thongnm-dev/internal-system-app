@@ -41,4 +41,6 @@ mod database {
     pub mod ai_cowork_store;
     /// Lưu trữ cục bộ (JSON file) danh sách repository của màn hình Git Desktop.
     pub mod git_repo_store;
+    /// Lưu trữ cục bộ (JSON file) từ điển replace vn_text → jp_text của công cụ đồng bộ VN → JP.
+    pub mod vnjp_dictionary_store;
 }

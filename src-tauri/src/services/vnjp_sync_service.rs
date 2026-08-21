@@ -51,7 +51,7 @@ pub fn export_report(analysis: &SyncAnalysis, output_path: &str) -> AppResult<St
 /// đều gọi lại `detect_doc_type` trên chính 2 file đầu vào để tự xác định vùng cột nội dung, nên
 /// kết quả không phụ thuộc việc chọn class nào ở đây khi loại tài liệu là Unknown.
 pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
-    match sync_service::detect_doc_type(vn_path, jp_path) {
+    let mut result = match sync_service::detect_doc_type(vn_path, jp_path) {
         DocType::C232 => c232_sync_service::apply_changes(vn_path, jp_path),
         DocType::C233 => c233_sync_service::apply_changes(vn_path, jp_path),
         DocType::C234 => c234_sync_service::apply_changes(vn_path, jp_path),
@@ -59,7 +59,31 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         DocType::C236 => c236_sync_service::apply_changes(vn_path, jp_path),
         DocType::C238 => c238_sync_service::apply_changes(vn_path, jp_path),
         DocType::Unknown => c232_sync_service::apply_changes(vn_path, jp_path),
+    }?;
+
+    // Áp từ điển đã học từ các tài liệu khác lên output, ĐỒNG THỜI kiểm tra output sau chuẩn
+    // hoá (phát hiện ô có dữ liệu ở VN nhưng mất ở output, hoặc ngược lại) — cả 2 việc chạy
+    // trong CÙNG 1 lượt loop sheet → row → cell (xem `sync_service::apply_dictionary_and_verify_data`)
+    // thay vì 2 lượt scan riêng. Không làm hỏng kết quả "Áp dụng" nếu bước này lỗi.
+    let dictionary = crate::database::vnjp_dictionary_store::load().unwrap_or_default();
+    if let Ok((applied_count, mismatches)) = apply_dictionary_and_verify(
+        vn_path,
+        jp_path,
+        &result.output_path,
+        &result.output_path,
+        &dictionary,
+    ) {
+        result.dictionary_applied_count = applied_count;
+        result.data_mismatches = mismatches;
     }
+
+    // Thu thập thêm từ điển replace từ các ô output (đã áp từ điển ở trên) mà vẫn giữ nội dung
+    // JP, gộp vào từ điển tích luỹ cục bộ để tái sử dụng cho các tài liệu khác.
+    if let Ok(new_entries) = build_dictionary(vn_path, jp_path, &result.output_path) {
+        let _ = crate::database::vnjp_dictionary_store::merge(&new_entries);
+    }
+
+    Ok(result)
 }
 
 /// Gộp "Phân tích" + "Áp dụng" thành 1 lượt gọi duy nhất — tránh frontend phải gọi 2 command
@@ -105,19 +129,6 @@ pub async fn verify_red_cells_with_ai(
     sync_service::verify_red_cells_with_ai(jp_path, red_cells, provider, model).await
 }
 
-/// Kiểm tra output sau chuẩn hoá: so sánh sự có mặt của dữ liệu (có/không) tại từng ô giữa
-/// file VN và file output — không so sánh nội dung. DISPATCH theo `detect_doc_type` sang đúng
-/// `verify_output` của class xử lý tương ứng.
-pub fn verify_output(vn_path: &str, jp_path: &str, output_path: &str) -> AppResult<Vec<CellDataMismatch>> {
-    match sync_service::detect_doc_type(vn_path, jp_path) {
-        DocType::C234 => c234_sync_service::verify_output(vn_path, output_path),
-        DocType::C235 => c235_sync_service::verify_output(vn_path, output_path),
-        DocType::C236 => c236_sync_service::verify_output(vn_path, output_path),
-        DocType::C238 => c238_sync_service::verify_output(vn_path, output_path),
-        _ => Ok(Vec::new()),
-    }
-}
-
 /// Thu thập từ điển replace (vn_text → jp_text) từ các ô mà output đã giữ nội dung JP.
 /// Dùng sau bước verify_output, kết quả tái sử dụng cho các tài liệu khác.
 pub fn build_dictionary(
@@ -134,21 +145,31 @@ pub fn build_dictionary(
     }
 }
 
-/// Áp dụng từ điển replace lên file — chỉ thay thế khi nội dung cell khớp chính xác.
-/// Trả về số ô đã thay thế.
-pub fn apply_dictionary(
-    file_path: &str,
-    output_path: &str,
+/// Áp từ điển replace lên file, ĐỒNG THỜI kiểm tra output sau chuẩn hoá (so sự có mặt dữ liệu
+/// — có/không, không so nội dung — với `vn_path` tại từng ô) trong CÙNG 1 lượt loop
+/// sheet → row → cell — DISPATCH theo `detect_doc_type` sang đúng class xử lý tương ứng.
+/// Trả về `(số ô đã thay thế, danh sách mismatch)`.
+pub fn apply_dictionary_and_verify(
     vn_path: &str,
     jp_path: &str,
+    file_path: &str,
+    output_path: &str,
     dictionary: &std::collections::HashMap<String, String>,
-) -> AppResult<usize> {
+) -> AppResult<(usize, Vec<CellDataMismatch>)> {
     match sync_service::detect_doc_type(vn_path, jp_path) {
-        DocType::C234 => c234_sync_service::apply_dictionary(file_path, output_path, dictionary),
-        DocType::C235 => c235_sync_service::apply_dictionary(file_path, output_path, dictionary),
-        DocType::C236 => c236_sync_service::apply_dictionary(file_path, output_path, dictionary),
-        DocType::C238 => c238_sync_service::apply_dictionary(file_path, output_path, dictionary),
-        _ => Ok(0),
+        DocType::C234 => {
+            c234_sync_service::apply_dictionary_and_verify(file_path, vn_path, output_path, dictionary)
+        }
+        DocType::C235 => {
+            c235_sync_service::apply_dictionary_and_verify(file_path, vn_path, output_path, dictionary)
+        }
+        DocType::C236 => {
+            c236_sync_service::apply_dictionary_and_verify(file_path, vn_path, output_path, dictionary)
+        }
+        DocType::C238 => {
+            c238_sync_service::apply_dictionary_and_verify(file_path, vn_path, output_path, dictionary)
+        }
+        _ => Ok((0, Vec::new())),
     }
 }
 

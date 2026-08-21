@@ -16,7 +16,7 @@ import {
 const AI_VERIFY_PROVIDER = "gemini";
 const AI_VERIFY_MODEL = "gemini-3.1-flash-lite";
 
-export type ActiveTab = "overview" | "red-cells" | "quality";
+export type ActiveTab = "overview" | "red-cells" | "quality" | "data-mismatches";
 
 const XLSX_FILTER = [{ name: "Excel", extensions: ["xlsx", "xlsm"] }];
 
@@ -62,6 +62,9 @@ export function useVnJpSync() {
   const totalRedCells = computed(() => analysis.value?.redCells.length ?? 0);
   const totalQualityIssues = computed(
     () => analysis.value?.qualityIssues.length ?? 0,
+  );
+  const totalDataMismatches = computed(
+    () => applyResult.value?.dataMismatches.length ?? 0,
   );
 
   async function pickFile(slot: "vn" | "jp") {
@@ -335,6 +338,7 @@ export function useVnJpSync() {
     hasSelectedTempFiles,
     totalRedCells,
     totalQualityIssues,
+    totalDataMismatches,
     canAnalyzeAndApply,
     canExport,
     pickFile,

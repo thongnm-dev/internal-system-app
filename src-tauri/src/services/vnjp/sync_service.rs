@@ -3064,93 +3064,6 @@ fn extract_data_cell_positions(sheet_xml: &str) -> HashSet<(usize, usize)> {
     result
 }
 
-/// So sánh sự có mặt của dữ liệu giữa file VN và file output tại các sheet chung.
-///
-/// `bounds_for_sheet` trả về `(content_start_row1, max_col0)` cho từng sheet — chỉ kiểm tra
-/// ô trong vùng nội dung (row ≥ start, col ≤ max). Mỗi loại tài liệu (c234/c235/c236/c238)
-/// truyền closure riêng với giá trị phù hợp.
-pub(crate) fn verify_data_cells_between_files(
-    vn_path: &str,
-    output_path: &str,
-    bounds_for_sheet: impl Fn(&str) -> (usize, usize),
-) -> AppResult<Vec<CellDataMismatch>> {
-    use crate::models::vnjp_sync::CellDataMismatch;
-
-    let vn_file = File::open(vn_path)
-        .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
-    let mut vn_archive = zip::ZipArchive::new(vn_file)
-        .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
-
-    let out_file = File::open(output_path)
-        .map_err(|e| AppError::new(format!("Không mở được file output: {e}")))?;
-    let mut out_archive = zip::ZipArchive::new(out_file)
-        .map_err(|e| AppError::new(format!("File output không phải ZIP hợp lệ: {e}")))?;
-
-    let vn_wb = read_zip_entry(&mut vn_archive, "xl/workbook.xml").unwrap_or_default();
-    let vn_rels =
-        read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
-    let vn_sheet_map: HashMap<String, String> =
-        resolve_sheet_xml_paths(&vn_wb, &vn_rels).into_iter().collect();
-
-    let out_wb = read_zip_entry(&mut out_archive, "xl/workbook.xml").unwrap_or_default();
-    let out_rels =
-        read_zip_entry(&mut out_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
-    let out_sheet_map: HashMap<String, String> =
-        resolve_sheet_xml_paths(&out_wb, &out_rels).into_iter().collect();
-
-    let mut mismatches: Vec<CellDataMismatch> = Vec::new();
-
-    let mut sheet_names: Vec<&String> = vn_sheet_map.keys().collect();
-    sheet_names.sort();
-
-    for sheet_name in sheet_names {
-        if is_del_sheet_name(sheet_name) {
-            continue;
-        }
-        let Some(out_xml_path) = out_sheet_map.get(sheet_name.as_str()) else {
-            continue;
-        };
-        let vn_xml_path = &vn_sheet_map[sheet_name];
-
-        let Some(vn_xml) = read_zip_entry(&mut vn_archive, vn_xml_path) else {
-            continue;
-        };
-        let Some(out_xml) = read_zip_entry(&mut out_archive, out_xml_path) else {
-            continue;
-        };
-
-        let (start_row1, max_col0) = bounds_for_sheet(sheet_name);
-
-        let vn_cells = extract_data_cell_positions(&vn_xml);
-        let out_cells = extract_data_cell_positions(&out_xml);
-
-        let in_bounds = |&(r1, c0): &(usize, usize)| r1 >= start_row1 && c0 <= max_col0;
-
-        let vn_filtered: HashSet<_> = vn_cells.into_iter().filter(in_bounds).collect();
-        let out_filtered: HashSet<_> = out_cells.into_iter().filter(in_bounds).collect();
-
-        for &(r1, c0) in vn_filtered.difference(&out_filtered) {
-            mismatches.push(CellDataMismatch {
-                sheet: sheet_name.clone(),
-                cell_ref: format!("{}{}", col_index_to_letter(c0), r1),
-                vn_has_data: true,
-                output_has_data: false,
-            });
-        }
-        for &(r1, c0) in out_filtered.difference(&vn_filtered) {
-            mismatches.push(CellDataMismatch {
-                sheet: sheet_name.clone(),
-                cell_ref: format!("{}{}", col_index_to_letter(c0), r1),
-                vn_has_data: false,
-                output_has_data: true,
-            });
-        }
-    }
-
-    mismatches.sort_by(|a, b| a.sheet.cmp(&b.sheet).then(a.cell_ref.cmp(&b.cell_ref)));
-    Ok(mismatches)
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Từ điển replace: thu thập cặp VN text → JP text từ các ô mà output đã giữ nguyên nội dung JP
 // (ô VN "không thay đổi" hoặc "fully struck colored") để tái sử dụng cho các tài liệu khác.
@@ -3329,20 +3242,33 @@ pub(crate) fn build_replace_dictionary(
     Ok(dict)
 }
 
-/// Áp dụng từ điển replace lên file xlsx: mỗi ô có nội dung text khớp chính xác (exact match)
-/// với 1 key trong `dictionary` sẽ được thay thế bằng value tương ứng.
-/// Trả về số ô đã thay thế.
-pub(crate) fn apply_replace_dictionary(
+/// Áp dụng từ điển replace lên file xlsx, ĐỒNG THỜI kiểm tra sự có mặt dữ liệu (có/không) so
+/// với `vn_path` tại từng ô — gộp chung 1 lượt loop sheet → row → cell (thay vì 2 lượt scan
+/// riêng của "áp từ điển" và "kiểm tra output" trước đây) để tránh parse/duyệt lại cùng 1 sheet
+/// XML hai lần. Với mỗi ô trong vùng nội dung, theo đúng thứ tự:
+/// 1. Áp từ điển — nội dung text khớp chính xác (exact match) với 1 key trong `dictionary` thì
+///    thay bằng value tương ứng (đếm vào số ô đã thay thế).
+/// 2. Kiểm tra output — so sự có mặt dữ liệu (có/không, không so nội dung) với ô cùng vị trí ở
+///    `vn_path`, ghi nhận mismatch nếu khác nhau.
+///
+/// Trả về `(số ô đã thay thế, danh sách mismatch)`; ghi file đã áp dụng ra `output_path` (an
+/// toàn cả khi `output_path` trùng `file_path`, xem [`write_output_zip`]).
+pub(crate) fn apply_dictionary_and_verify_data(
     file_path: &str,
+    vn_path: &str,
     output_path: &str,
     dictionary: &HashMap<String, String>,
     bounds_for_sheet: impl Fn(&str) -> (usize, usize),
-) -> AppResult<usize> {
-    if dictionary.is_empty() {
-        std::fs::copy(file_path, output_path)
-            .map_err(|e| AppError::new(format!("Copy file thất bại: {e}")))?;
-        return Ok(0);
-    }
+) -> AppResult<(usize, Vec<CellDataMismatch>)> {
+    let vn_file = File::open(vn_path)
+        .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
+    let mut vn_archive = zip::ZipArchive::new(vn_file)
+        .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
+    let vn_wb = read_zip_entry(&mut vn_archive, "xl/workbook.xml").unwrap_or_default();
+    let vn_rels =
+        read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let vn_sheet_map: HashMap<String, String> =
+        resolve_sheet_xml_paths(&vn_wb, &vn_rels).into_iter().collect();
 
     let file = File::open(file_path)
         .map_err(|e| AppError::new(format!("Không mở được file: {e}")))?;
@@ -3360,7 +3286,8 @@ pub(crate) fn apply_replace_dictionary(
         resolve_sheet_xml_paths(&wb_xml, &rels_xml).into_iter().collect();
 
     let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
-    let mut total_count = 0usize;
+    let mut applied_count = 0usize;
+    let mut mismatches: Vec<CellDataMismatch> = Vec::new();
 
     let mut sheet_names: Vec<(&String, &String)> = sheet_map.iter().collect();
     sheet_names.sort_by_key(|(name, _)| name.as_str());
@@ -3374,6 +3301,16 @@ pub(crate) fn apply_replace_dictionary(
         };
 
         let (start_row1, max_col0) = bounds_for_sheet(sheet_name);
+        let in_bounds = |&(r1, c0): &(usize, usize)| r1 >= start_row1 && c0 <= max_col0;
+
+        let vn_filtered: HashSet<(usize, usize)> = vn_sheet_map
+            .get(sheet_name.as_str())
+            .and_then(|p| read_zip_entry(&mut vn_archive, p))
+            .map(|xml| extract_data_cell_positions(&xml))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(in_bounds)
+            .collect();
 
         let Ok(doc) = roxmltree::Document::parse(&sheet_xml) else {
             continue;
@@ -3386,6 +3323,7 @@ pub(crate) fn apply_replace_dictionary(
         };
 
         let mut edits: Vec<SurgeryEdit> = Vec::new();
+        let mut out_filtered: HashSet<(usize, usize)> = HashSet::new();
 
         for row in sd.children().filter(|n| n.tag_name().name() == "row") {
             let row1 = row
@@ -3402,32 +3340,60 @@ pub(crate) fn apply_replace_dictionary(
                 if col0 > max_col0 {
                     continue;
                 }
-                let Some(text) = extract_cell_plain_text(cell, &plain_ssi) else {
-                    continue;
-                };
-                let trimmed = text.trim();
-                if trimmed.is_empty() {
-                    continue;
+
+                let has_data = cell
+                    .children()
+                    .any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f"));
+                if has_data {
+                    out_filtered.insert((row1, col0));
                 }
 
-                if let Some(jp_text) = dictionary.get(trimmed) {
-                    let cell_ref = cell.attribute("r").unwrap_or("");
-                    let s_attr = cell
-                        .attribute("s")
-                        .map(|s| format!(" s=\"{s}\""))
-                        .unwrap_or_default();
-                    let new_cell = format!(
-                        r#"<c r="{cell_ref}"{s_attr} t="inlineStr"><is><t xml:space="preserve">{}</t></is></c>"#,
-                        xml_escape(jp_text)
-                    );
-                    edits.push(SurgeryEdit {
-                        start: cell.range().start,
-                        end: cell.range().end,
-                        replacement: new_cell,
+                // 1. Áp từ điển replace.
+                if let Some(text) = extract_cell_plain_text(cell, &plain_ssi) {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        if let Some(jp_text) = dictionary.get(trimmed) {
+                            let cell_ref = cell.attribute("r").unwrap_or("");
+                            let s_attr = cell
+                                .attribute("s")
+                                .map(|s| format!(" s=\"{s}\""))
+                                .unwrap_or_default();
+                            let new_cell = format!(
+                                r#"<c r="{cell_ref}"{s_attr} t="inlineStr"><is><t xml:space="preserve">{}</t></is></c>"#,
+                                xml_escape(jp_text)
+                            );
+                            edits.push(SurgeryEdit {
+                                start: cell.range().start,
+                                end: cell.range().end,
+                                replacement: new_cell,
+                            });
+                            applied_count += 1;
+                        }
+                    }
+                }
+
+                // 2. Kiểm tra output: so sự có mặt dữ liệu với VN tại đúng ô này.
+                let vn_has_data = vn_filtered.contains(&(row1, col0));
+                if vn_has_data != has_data {
+                    mismatches.push(CellDataMismatch {
+                        sheet: sheet_name.clone(),
+                        cell_ref: format!("{}{}", col_index_to_letter(col0), row1),
+                        vn_has_data,
+                        output_has_data: has_data,
                     });
-                    total_count += 1;
                 }
             }
+        }
+
+        // Ô có dữ liệu ở VN nhưng không xuất hiện trong sheetData của output (không chỉ khác
+        // nội dung — hoàn toàn không có ô này) — vòng lặp trên chỉ duyệt được ô CÓ MẶT ở output.
+        for &(r1, c0) in vn_filtered.difference(&out_filtered) {
+            mismatches.push(CellDataMismatch {
+                sheet: sheet_name.clone(),
+                cell_ref: format!("{}{}", col_index_to_letter(c0), r1),
+                vn_has_data: true,
+                output_has_data: false,
+            });
         }
 
         if !edits.is_empty() {
@@ -3436,8 +3402,9 @@ pub(crate) fn apply_replace_dictionary(
         }
     }
 
+    mismatches.sort_by(|a, b| a.sheet.cmp(&b.sheet).then(a.cell_ref.cmp(&b.cell_ref)));
     write_output_zip(&mut archive, &replaced, output_path)?;
-    Ok(total_count)
+    Ok((applied_count, mismatches))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

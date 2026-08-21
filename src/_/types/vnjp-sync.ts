@@ -101,6 +101,18 @@ export interface ApplyResult {
   delSheetCount: number;
   /** Số dòng đã được tự động chèn để canh khớp lệch dòng VN↔JP trước khi ghi nội dung. */
   rowsInserted: number;
+  /** Các ô có dữ liệu ở VN nhưng mất ở output (hoặc ngược lại) sau chuẩn hoá — cần TL kiểm tra lại. */
+  dataMismatches: CellDataMismatch[];
+  /** Số ô đã tự động điền theo từ điển replace học được từ các tài liệu trước — không cần TL dịch lại. */
+  dictionaryAppliedCount: number;
+}
+
+/** Một ô có dữ liệu ở file này nhưng không có ở file kia (hoặc ngược lại). */
+export interface CellDataMismatch {
+  sheet: string;
+  cellRef: string;
+  vnHasData: boolean;
+  outputHasData: boolean;
 }
 
 /** Kết quả gộp "Phân tích" + "Áp dụng" — trả về trong 1 lệnh gọi backend duy nhất. */
