@@ -26,10 +26,10 @@ use crate::app::result::AppResult;
 use crate::models::vnjp_sync::ApplyResult;
 
 use super::sync_service::{
-    align_vn_jp_row_map, clone_vn_sheet_for_jp, extract_all_shared_strings,
-    find_changed_style_cells_xlsx, is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp,
-    read_zip_entry, resolve_sheet_xml_paths, sync_structure, write_output_zip, BorderUnionExtender,
-    ContentBounds,
+    align_vn_jp_row_map, apply_row_insertions, clone_vn_sheet_for_jp, compute_row_insertions,
+    extract_all_shared_strings, find_changed_style_cells_xlsx, find_fully_changed_cells_xlsx,
+    is_del_sheet_name, merged_output_path, merge_vn_styles_into_jp, read_zip_entry,
+    resolve_sheet_xml_paths, sync_structure, write_output_zip, BorderUnionExtender, ContentBounds,
 };
 
 /// Nội dung cột A ~ AQ (0-based 42).
@@ -88,6 +88,11 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     // KHÔNG nằm trong set này (chữ đen, không strikethrough) sẽ được giữ nguyên bản JP tại đúng
     // vị trí khi clone (xem `clone_vn_sheet_for_jp`).
     let vn_changed_cells = find_changed_style_cells_xlsx(vn_path);
+    // Ô VN mà TOÀN BỘ nội dung (mọi run) đã đổi — dùng riêng cho rule "dòng hoàn toàn mới ở VN"
+    // (`compute_row_insertions`, xem doc hàm đó + `c234_sync_service`). C2.3.2 không có quy ước
+    // "gạch bỏ + đổi màu toàn bộ = giữ nguyên nội dung JP" (không dùng `find_fully_struck_colored_cells_xlsx`
+    // ở loại tài liệu này) nên không cần loại trừ thêm.
+    let vn_fully_changed_cells = find_fully_changed_cells_xlsx(vn_path);
 
     // ── 5. Chuẩn bị vòng loop ─────────────────────────────────────────────────
     let cloned_names = &structure.cloned_names;
@@ -129,16 +134,42 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
             Some(x) => x,
             None => continue,
         };
-        let jp_sheet_xml = match read_zip_entry(&mut jp_archive, &jp_xml_path) {
+        let mut jp_sheet_xml = match read_zip_entry(&mut jp_archive, &jp_xml_path) {
             Some(x) => x,
             None => continue,
         };
 
         let changed_ref = vn_changed_cells.get(sheet_name).unwrap_or(&empty_changed);
+        let fully_changed_ref = vn_fully_changed_cells
+            .get(sheet_name)
+            .unwrap_or(&empty_changed);
 
-        // Ánh xạ vn_row1 → jp_row1 theo ô neo — bù lệch dòng khi VN chèn/xóa dòng ở giữa sheet
-        // (cùng chiến lược clone toàn sheet với C2.3.4) để tra đúng ô JP gốc khi giữ nội dung
-        // "không đổi" (xem `clone_vn_sheet_for_jp`). Rỗng nếu sheet không tìm được neo — khi đó
+        // Chèn dòng VẬT LÝ vào JP theo rule (không dựa anchor) TRƯỚC khi tính alignment/clone —
+        // xem doc `compute_row_insertions` (C2.3.4). Không có cột STT tự đánh số ở loại tài liệu
+        // này (`use_col_a_formula = false`) nên không cần bỏ qua cột nào (`skip_col0s` rỗng).
+        let row_insertions = compute_row_insertions(
+            &vn_sheet_xml,
+            &jp_sheet_xml,
+            &vn_plain_ssi,
+            &jp_plain_ssi,
+            fully_changed_ref,
+            content_bounds(sheet_name),
+            &[],
+        );
+        if !row_insertions.is_empty() {
+            jp_sheet_xml = apply_row_insertions(
+                &jp_sheet_xml,
+                &vn_sheet_xml,
+                &row_insertions,
+                &[],
+                &style_result.xf_remap,
+                &vn_plain_ssi,
+                &vn_rich_ssi,
+            );
+        }
+
+        // Ánh xạ vn_row1 → jp_row1 theo ô neo — bù lệch dòng còn lại (nếu có) sau khi đã chèn dòng
+        // vật lý ở trên (xem `clone_vn_sheet_for_jp`). Rỗng nếu sheet không tìm được neo — khi đó
         // giữ nguyên ánh xạ 1:1 như trước.
         let vn_to_jp_row = align_vn_jp_row_map(
             &vn_sheet_xml,

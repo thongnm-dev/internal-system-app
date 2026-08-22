@@ -5326,6 +5326,20 @@ pub(crate) fn xml_escape(s: &str) -> String {
 /// file output ngay từ đầu (như trước đây) trong khi `archive` vẫn còn đang đọc từ CHÍNH file đó,
 /// dữ liệu trên đĩa bị ghi đè giữa chừng, khiến các entry đọc sau (vd `[Content_Types].xml`) lấy
 /// phải byte đã bị thay, gây lỗi "Invalid checksum".
+const CALC_CHAIN_PART: &str = "xl/calcChain.xml";
+
+/// Xóa `<Override PartName="/xl/calcChain.xml" .../>` khỏi `[Content_Types].xml`.
+fn strip_calc_chain_content_type(xml: &str) -> String {
+    let re = Regex::new(r#"<Override PartName="/xl/calcChain\.xml"[^>]*/>"#).unwrap();
+    re.replace(xml, "").to_string()
+}
+
+/// Xóa `<Relationship .../>` trỏ tới `calcChain.xml` khỏi `xl/_rels/workbook.xml.rels`.
+fn strip_calc_chain_relationship(xml: &str) -> String {
+    let re = Regex::new(r#"<Relationship[^>]*Target="calcChain\.xml"[^>]*/>"#).unwrap();
+    re.replace(xml, "").to_string()
+}
+
 pub(crate) fn write_output_zip(
     archive: &mut zip::ZipArchive<File>,
     replaced: &HashMap<String, Vec<u8>>,
@@ -5342,6 +5356,15 @@ pub(crate) fn write_output_zip(
         }
     }
 
+    // `xl/calcChain.xml` (cache tăng tốc tính công thức) không được cập nhật khi pipeline chèn/xóa
+    // dòng hoặc thay đổi vị trí công thức cột A — để nguyên sẽ tham chiếu sai vị trí ô, khiến Excel
+    // báo "found a problem with some content" và tự ý repair (xóa sheet/dòng). Bỏ hẳn part này khỏi
+    // output — hoàn toàn hợp lệ theo OOXML (tùy chọn), Excel tự tính lại khi mở file — kèm dọn luôn
+    // tham chiếu của nó trong `[Content_Types].xml` và `xl/_rels/workbook.xml.rels` để không còn
+    // part/relationship mồ côi.
+    let has_calc_chain = entry_names.iter().any(|n| n == CALC_CHAIN_PART);
+    entry_names.retain(|n| n != CALC_CHAIN_PART);
+
     let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::<u8>::new()));
 
     for name in &entry_names {
@@ -5357,24 +5380,43 @@ pub(crate) fn write_output_zip(
             .start_file(name.as_str(), options)
             .map_err(|e| AppError::new(format!("Lỗi bắt đầu entry {name}: {e}")))?;
 
-        if let Some(bytes) = replaced.get(name.as_str()) {
-            writer
-                .write_all(bytes)
-                .map_err(|e| AppError::new(format!("Lỗi ghi nội dung {name}: {e}")))?;
+        let mut bytes = if let Some(bytes) = replaced.get(name.as_str()) {
+            bytes.clone()
         } else {
             let mut entry = archive
                 .by_name(name)
                 .map_err(|e| AppError::new(format!("Lỗi đọc entry {name}: {e}")))?;
-            std::io::copy(&mut entry, &mut writer)
-                .map_err(|e| AppError::new(format!("Lỗi copy {name}: {e}")))?;
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut entry, &mut buf)
+                .map_err(|e| AppError::new(format!("Lỗi đọc entry {name}: {e}")))?;
+            buf
+        };
+
+        // Dọn tham chiếu tới `calcChain.xml` (đã bị bỏ khỏi output ở trên) trong CẢ 2 trường hợp —
+        // dù nội dung lấy từ `archive` gốc hay đã được `replaced` (vd `sync_structure` thêm sheet
+        // mới vào Content_Types/rels nhưng không biết gì về calcChain) — nếu không sẽ để lại
+        // Override/Relationship trỏ tới part không tồn tại, Excel vẫn coi là lỗi.
+        if has_calc_chain && (name == "[Content_Types].xml" || name == "xl/_rels/workbook.xml.rels")
+        {
+            let text = String::from_utf8_lossy(&bytes).to_string();
+            let cleaned = if name == "[Content_Types].xml" {
+                strip_calc_chain_content_type(&text)
+            } else {
+                strip_calc_chain_relationship(&text)
+            };
+            bytes = cleaned.into_bytes();
         }
+
+        writer
+            .write_all(&bytes)
+            .map_err(|e| AppError::new(format!("Lỗi ghi nội dung {name}: {e}")))?;
     }
 
     // Ghi thêm các part HOÀN TOÀN MỚI chưa tồn tại trong ZIP gốc (vd sheet vừa clone từ VN —
     // xem `clone_missing_sheets`) — vòng lặp trên chỉ xử lý entry đã có sẵn trong `archive`.
     let existing: HashSet<&str> = entry_names.iter().map(|s| s.as_str()).collect();
     for (name, bytes) in replaced {
-        if existing.contains(name.as_str()) {
+        if name == CALC_CHAIN_PART || existing.contains(name.as_str()) {
             continue;
         }
         let options =
@@ -5661,8 +5703,23 @@ pub(crate) fn clone_vn_cell_xml(
     }
 }
 
+/// Xóa override màu chữ cấp run (`<color .../>` bên trong `<rPr>`) khỏi 1 raw cell XML.
+///
+/// Ô "giữ nội dung JP" đi qua đây khi `cleanup_sheet_xml` (xem `make_black_inline_cell`) từng tô
+/// đen chữ đỏ tồn đọng bằng cách chèn `<rPr><color rgb="FF000000"/></rPr>` NGAY TRONG run, đồng
+/// thời giữ nguyên `s=` cũ (màu đỏ) — cố ý, vì lúc đó ô này chưa được restyle. Khi ô đó sau này
+/// được restyle theo style VN (strike/đỏ, xem `restyle_raw_cell_xml`), override `<color>` cấp run
+/// nói trên VẪN CÒN và đè lên màu của `s=` mới, khiến chữ hiển thị đen dù `s=` đã là đỏ/strike —
+/// đúng bug đã gặp thực tế (dòng "giữ nội dung JP" hiển thị chữ đen thay vì đỏ/gạch). Ô kept-JP
+/// phải để `s=` (style VN) quyết định toàn bộ màu/strike, không được override cấp run.
+fn strip_run_color_overrides(cell_xml: &str) -> String {
+    let re = Regex::new(r#"<color[^>]*/>"#).unwrap();
+    re.replace_all(cell_xml, "").to_string()
+}
+
 /// Thay `s="X"` trong raw cell XML bằng giá trị mới; thêm nếu chưa có.
 fn restyle_raw_cell_xml(cell_xml: &str, new_s: usize) -> String {
+    let cell_xml = &strip_run_color_overrides(cell_xml);
     let s_val = new_s.to_string();
     // Tìm và thay s="..."
     if let Some(s_start) = cell_xml.find(" s=\"") {
