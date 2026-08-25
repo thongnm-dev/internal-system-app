@@ -23,10 +23,45 @@ const emit = defineEmits<{
 
 const auth = useAuthStore();
 const menu = useMenuStore();
-const { settings, updateTheme, updateTabMode } = useSettings();
+const { settings, updateTheme, updateLanguage, updateTabMode } = useSettings();
+
+const languageOptions = [
+  { label: "Vietnamese", value: "vi" as const },
+  { label: "English", value: "en" as const },
+  { label: "Japanese", value: "ja" as const },
+];
 const updater = useAppUpdater();
 const network = useNetworkStatus();
 const userMenu = ref<InstanceType<typeof Popover>>();
+
+const langTrigger = ref<HTMLElement>();
+const langSubmenuOpen = ref(false);
+const langSubmenuStyle = ref({ top: "0px", left: "0px" });
+let langCloseTimer: number | undefined;
+
+function openLangSubmenu(): void {
+  if (langCloseTimer !== undefined) {
+    window.clearTimeout(langCloseTimer);
+    langCloseTimer = undefined;
+  }
+  const rect = langTrigger.value?.getBoundingClientRect();
+  if (!rect) return;
+  langSubmenuStyle.value = { top: `${rect.top}px`, left: `${rect.right + 4}px` };
+  langSubmenuOpen.value = true;
+}
+
+function scheduleCloseLangSubmenu(): void {
+  langCloseTimer = window.setTimeout(() => {
+    langSubmenuOpen.value = false;
+  }, 150);
+}
+
+function cancelCloseLangSubmenu(): void {
+  if (langCloseTimer !== undefined) {
+    window.clearTimeout(langCloseTimer);
+    langCloseTimer = undefined;
+  }
+}
 
 function onToggleAutoCheck(enabled: boolean): void {
   network.setAutoCheck(enabled);
@@ -56,6 +91,12 @@ function handleLogout(): void {
 function handleSettings(): void {
   userMenu.value?.hide();
   emit("menuChange", (menu.settingsMenu?.key ?? "settings") as MenuKey);
+}
+
+function selectLanguage(value: (typeof languageOptions)[number]["value"]): void {
+  langSubmenuOpen.value = false;
+  userMenu.value?.hide();
+  updateLanguage(value);
 }
 
 function onUpdateClick(): void {
@@ -217,7 +258,7 @@ function formatDateTime(value: string): string {
     </span>
   </footer>
   
-  <Popover ref="userMenu">
+  <Popover ref="userMenu" @hide="langSubmenuOpen = false">
     <div class="flex min-w-[160px] flex-col gap-0.5 py-1">
       <button v-if="menu.settingsMenu" type="button" class="ctx-menu-item" @click="handleSettings">
         <i :class="`pi ${menu.settingsMenu.icon}`" />
@@ -228,6 +269,20 @@ function formatDateTime(value: string): string {
         <i :class="['pi', settings.theme === 'dark' ? 'pi-sun' : 'pi-moon']" />
         <span>{{ settings.theme === 'dark' ? 'Light mode' : 'Dark mode' }}</span>
       </button>
+
+      <div
+        ref="langTrigger"
+        @mouseenter="openLangSubmenu"
+        @mouseleave="scheduleCloseLangSubmenu"
+      >
+        <button type="button" class="ctx-menu-item justify-between" :class="{ 'bg-canvas text-brand': langSubmenuOpen }">
+          <span class="flex items-center gap-2">
+            <i class="pi pi-language" />
+            <span>Language</span>
+          </span>
+          <i class="pi pi-angle-right text-xs" />
+        </button>
+      </div>
       <div class="my-1 border-t border-divider" />
       <button type="button" class="ctx-menu-item-danger" @click="handleLogout">
         <i class="pi pi-sign-out" />
@@ -236,4 +291,24 @@ function formatDateTime(value: string): string {
     </div>
   </Popover>
 
+  <Teleport to="body">
+    <div
+      v-if="langSubmenuOpen"
+      :style="{ position: 'fixed', top: langSubmenuStyle.top, left: langSubmenuStyle.left, zIndex: 99999 }"
+      class="flex min-w-[160px] flex-col gap-0.5 rounded-md border border-divider bg-panel py-1 shadow-lg"
+      @mouseenter="cancelCloseLangSubmenu"
+      @mouseleave="scheduleCloseLangSubmenu"
+    >
+      <button
+        v-for="opt in languageOptions"
+        :key="opt.value"
+        type="button"
+        class="ctx-menu-item"
+        @click="selectLanguage(opt.value)"
+      >
+        <i :class="['pi', settings.language === opt.value ? 'pi-check-circle text-brand' : 'pi-circle text-muted']" />
+        <span>{{ opt.label }}</span>
+      </button>
+    </div>
+  </Teleport>
 </template>

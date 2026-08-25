@@ -64,7 +64,7 @@ function tooltipOpts(label: string) {
         v-tooltip.right="tooltipOpts(item.title)"
         :class="[
           'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
-          isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
+          isCollapsed ? 'justify-center px-0' : 'gap-3 px-0 text-left',
           activeMenu === item.key
             ? 'bg-sidebar-active text-sidebar-text-active'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
@@ -96,7 +96,7 @@ function tooltipOpts(label: string) {
         <Button
           v-if="!isCollapsed"
           :class="[
-            'flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold transition',
+            'flex h-10 w-full items-center gap-3 rounded-md text-left text-sm font-semibold transition',
             isGroupActive(g.items)
               ? 'text-sidebar-text-active'
               : 'text-sidebar-text hover:text-sidebar-text-active',
@@ -116,7 +116,7 @@ function tooltipOpts(label: string) {
             v-tooltip.right="tooltipOpts(child.title)"
             :class="[
               'flex h-9 w-full items-center rounded-md text-sm font-semibold transition',
-              isCollapsed ? 'justify-center px-0' : 'gap-3 pl-9 pr-3 text-left',
+              isCollapsed ? 'justify-center px-0' : 'gap-3 px-1.5 text-left',
               activeMenu === child.key
                 ? 'bg-sidebar-active text-sidebar-text-active'
                 : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',

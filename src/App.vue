@@ -112,8 +112,8 @@ watch(
       :class="[
         'grid min-h-0 overflow-hidden transition-[grid-template-columns] duration-200',
         shell.isSidebarCollapsed.value
-          ? 'grid-cols-[72px_minmax(0,1fr)]'
-          : 'grid-cols-[240px_minmax(0,1fr)]',
+          ? 'grid-cols-[54px_minmax(0,1fr)]'
+          : 'grid-cols-[180px_minmax(0,1fr)]',
       ]"
     >
       <AppSidebar
