@@ -1,23 +1,40 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import Popover from "primevue/popover";
+import InputSwitch from "primevue/inputswitch";
 import { useAuthStore } from "@/app/stores/auth";
+import { useMenuStore } from "@/app/stores/menu";
 import { useSettings } from "@/features/settings/composables/useSettings";
 import { useAppUpdater } from "@/shared/composables/useAppUpdater";
+import { useNetworkStatus } from "@/shared/composables/useNetworkStatus";
+import type { MenuKey } from "@/_/types/app";
 import type { SystemInfo } from "@/_/types/system";
 
 const props = defineProps<{
   info: SystemInfo;
+  isSidebarCollapsed: boolean;
 }>();
 
 const emit = defineEmits<{
   logout: [];
+  toggleSidebar: [];
+  menuChange: [key: MenuKey];
 }>();
 
 const auth = useAuthStore();
-const { settings, updateTheme } = useSettings();
+const menu = useMenuStore();
+const { settings, updateTheme, updateTabMode } = useSettings();
 const updater = useAppUpdater();
+const network = useNetworkStatus();
 const userMenu = ref<InstanceType<typeof Popover>>();
+
+function onToggleAutoCheck(enabled: boolean): void {
+  network.setAutoCheck(enabled);
+}
+
+function onToggleTabMode(enabled: boolean): void {
+  updateTabMode(enabled);
+}
 
 onMounted(() => {
   updater.startPolling();
@@ -34,6 +51,11 @@ function toggleTheme(): void {
 function handleLogout(): void {
   userMenu.value?.hide();
   emit("logout");
+}
+
+function handleSettings(): void {
+  userMenu.value?.hide();
+  emit("menuChange", (menu.settingsMenu?.key ?? "settings") as MenuKey);
 }
 
 function onUpdateClick(): void {
@@ -69,6 +91,17 @@ function formatDateTime(value: string): string {
     <button
       type="button"
       class="status-item flex cursor-pointer items-center gap-2 rounded hover:text-brand"
+      :title="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+      @click="emit('toggleSidebar')"
+    >
+      <i :class="['pi shrink-0 text-brand', isSidebarCollapsed ? 'pi-chevron-right' : 'pi-chevron-left']" />
+    </button>
+
+    <div class="mx-0.5 h-4 w-px bg-divider" />
+
+    <button
+      type="button"
+      class="status-item flex cursor-pointer items-center gap-2 rounded hover:text-brand"
       title="User menu"
       @click="toggleUserMenu"
     >
@@ -76,26 +109,34 @@ function formatDateTime(value: string): string {
       <strong class="min-w-0 truncate text-ink">{{ auth.user?.full_name || auth.user?.username || '-' }}</strong>
     </button>
 
-    <Popover ref="userMenu">
-      <div class="flex min-w-[160px] flex-col gap-0.5 py-1">
-        <button type="button" class="ctx-menu-item" @click="toggleTheme">
-          <i :class="['pi', settings.theme === 'dark' ? 'pi-sun' : 'pi-moon']" />
-          <span>{{ settings.theme === 'dark' ? 'Light mode' : 'Dark mode' }}</span>
-        </button>
-        <button type="button" class="ctx-menu-item-danger" @click="handleLogout">
-          <i class="pi pi-sign-out" />
-          <span>Logout</span>
-        </button>
-      </div>
-    </Popover>
-
+    <div class="mx-0.5 h-4 w-px bg-divider" />
     <span class="status-item flex items-center gap-2" title="Date time">
       <i class="pi pi-clock shrink-0 text-brand" />
       <strong class="min-w-0 truncate text-ink">{{ formatDateTime(props.info.timestamp) }}</strong>
     </span>
-    <span class="status-item flex items-center gap-2" title="IP">
-      <i class="pi pi-globe shrink-0 text-brand" />
-      <strong class="min-w-0 truncate text-ink">{{ props.info.ip_address }}</strong>
+
+    <div class="mx-0.5 h-4 w-px bg-divider" />
+    
+    <span
+      class="status-item flex items-center gap-2"
+      title="Tự động kiểm tra kết nối mạng"
+    >
+      <InputSwitch
+        :model-value="network.autoCheckEnabled.value"
+        @update:model-value="onToggleAutoCheck"
+      />
+      <span class="min-w-0 truncate">Tự động kiểm tra mạng</span>
+    </span>
+
+    <span
+      class="status-item flex items-center gap-2"
+      title="Open pages in tabs to switch between them without losing state"
+    >
+      <InputSwitch
+        :model-value="settings.tabMode"
+        @update:model-value="onToggleTabMode"
+      />
+      <span class="min-w-0 truncate">Tabs</span>
     </span>
 
     <template v-if="updater.isTauri">
@@ -175,4 +216,24 @@ function formatDateTime(value: string): string {
       <strong class="min-w-0 truncate text-ink">{{ props.info.version }}</strong>
     </span>
   </footer>
+  
+  <Popover ref="userMenu">
+    <div class="flex min-w-[160px] flex-col gap-0.5 py-1">
+      <button v-if="menu.settingsMenu" type="button" class="ctx-menu-item" @click="handleSettings">
+        <i :class="`pi ${menu.settingsMenu.icon}`" />
+        <span>Profile</span>
+      </button>
+      <div class="my-1 border-t border-divider" />
+      <button type="button" class="ctx-menu-item" @click="toggleTheme">
+        <i :class="['pi', settings.theme === 'dark' ? 'pi-sun' : 'pi-moon']" />
+        <span>{{ settings.theme === 'dark' ? 'Light mode' : 'Dark mode' }}</span>
+      </button>
+      <div class="my-1 border-t border-divider" />
+      <button type="button" class="ctx-menu-item-danger" @click="handleLogout">
+        <i class="pi pi-sign-out" />
+        <span>Logout</span>
+      </button>
+    </div>
+  </Popover>
+
 </template>

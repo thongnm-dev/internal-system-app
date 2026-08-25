@@ -80,6 +80,6 @@ export function explorerPasteFromOsClipboard(destDir: string) {
   return safeInvoke<number>("explorer_paste_from_os_clipboard", { destDir });
 }
 
-export function explorerCopyBugs(sourceDir: string, destDir: string) {
-  return safeInvoke<string>("explorer_copy_bugs", { sourceDir, destDir });
+export function explorerCopyBugs(sourceDir: string, destDir: string, selectedNames: string[]) {
+  return safeInvoke<string>("explorer_copy_bugs", { sourceDir, destDir, selectedNames });
 }

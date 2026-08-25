@@ -441,7 +441,11 @@ fn bug_code_patterns() -> Vec<regex::Regex> {
     ]
 }
 
-pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String> {
+pub fn copy_bug_files(
+    source_dir: &str,
+    dest_dir: &str,
+    selected_names: &[String],
+) -> Result<String, String> {
     let src = Path::new(source_dir);
     let dst = Path::new(dest_dir);
 
@@ -460,6 +464,12 @@ pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String
 
     if entries.is_empty() {
         return Err("Không tìm thấy thư mục nào trong thư mục nguồn.".to_string());
+    }
+
+    let select_filter: std::collections::HashSet<&str> =
+        selected_names.iter().map(|s| s.as_str()).collect();
+    if select_filter.is_empty() {
+        return Err("Chưa chọn phiếu bug nào để copy.".to_string());
     }
 
     let now = chrono::Local::now();
@@ -490,6 +500,9 @@ pub fn copy_bug_files(source_dir: &str, dest_dir: &str) -> Result<String, String
 
     for entry in &entries {
         let folder_name = entry.file_name().to_string_lossy().to_string();
+        if !select_filter.contains(folder_name.as_str()) {
+            continue;
+        }
         let folder_path = entry.path();
 
         let matched = patterns.iter().find_map(|regex| {

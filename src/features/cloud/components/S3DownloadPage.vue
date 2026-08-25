@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import Dialog from "primevue/dialog";
 import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
 import InputText from "primevue/inputtext";
 import InputGroup from "primevue/inputgroup";
 import ProgressSpinner from "primevue/progressspinner";
@@ -55,10 +56,38 @@ const showS3ConfirmDialog = ref(false);
 const showBugFoldersDialog = ref(false);
 const showCopyDialog = ref(false);
 const copyEntries = ref<FileEntry[]>([]);
+const selectedCopyNames = ref<Set<string>>(new Set());
 const copyDestPath = ref("");
 const isCopying = ref(false);
 const copyHistoryId = ref<number | null>(null);
 const copySourcePath = ref("");
+
+const copyFolderEntries = computed(() => copyEntries.value.filter((e) => e.is_dir));
+const allCopyEntriesSelected = computed(
+  () =>
+    copyFolderEntries.value.length > 0 &&
+    copyFolderEntries.value.every((e) => selectedCopyNames.value.has(e.name)),
+);
+
+function isCopyEntrySelected(entry: FileEntry): boolean {
+  return selectedCopyNames.value.has(entry.name);
+}
+
+function toggleCopyEntrySelected(entry: FileEntry): void {
+  const next = new Set(selectedCopyNames.value);
+  if (next.has(entry.name)) {
+    next.delete(entry.name);
+  } else {
+    next.add(entry.name);
+  }
+  selectedCopyNames.value = next;
+}
+
+function toggleSelectAllCopyEntries(): void {
+  selectedCopyNames.value = allCopyEntriesSelected.value
+    ? new Set()
+    : new Set(copyFolderEntries.value.map((e) => e.name));
+}
 
 function handleDownloaded(path: string, historyId: number | null) {
   lastDownloadPath.value = path;
@@ -96,6 +125,7 @@ async function openCopyDialog() {
   } catch {
     copyEntries.value = [];
   }
+  selectedCopyNames.value = new Set(copyFolderEntries.value.map((e) => e.name));
   showCopyDialog.value = true;
 }
 
@@ -109,6 +139,7 @@ async function openCopyDialogForHistory(id: number, syncPath: string) {
   } catch {
     copyEntries.value = [];
   }
+  selectedCopyNames.value = new Set(copyFolderEntries.value.map((e) => e.name));
   showCopyDialog.value = true;
 }
 
@@ -121,11 +152,15 @@ async function chooseCopyDest() {
 }
 
 async function handleCopy() {
-  if (!copyDestPath.value || !copySourcePath.value) return;
+  if (!copyDestPath.value || !copySourcePath.value || selectedCopyNames.value.size === 0) return;
   isCopying.value = true;
   loading.start();
   try {
-    const msg = await explorerCopyBugs(copySourcePath.value, copyDestPath.value);
+    const msg = await explorerCopyBugs(
+      copySourcePath.value,
+      copyDestPath.value,
+      Array.from(selectedCopyNames.value),
+    );
     toast.success(msg);
     if (copyHistoryId.value !== null) {
       await updateMovedLocal(copyHistoryId.value, copyDestPath.value);
@@ -372,17 +407,36 @@ function formatTime(hms: string): string {
       <div class="flex flex-col gap-4">
         <!-- File list from download path -->
         <div>
-          <h4 class="mb-2 text-sm font-semibold text-ink">
-            Danh sách file đã tải:
-          </h4>
+          <div class="mb-2 flex items-center justify-between">
+            <h4 class="text-sm font-semibold text-ink">
+              Danh sách phiếu bug đã tải ({{ selectedCopyNames.size }}/{{ copyFolderEntries.length }} đã chọn):
+            </h4>
+            <label v-if="copyFolderEntries.length > 0" class="flex cursor-pointer items-center gap-1.5 text-xs text-secondary">
+              <Checkbox
+                :model-value="allCopyEntriesSelected"
+                :indeterminate="selectedCopyNames.size > 0 && !allCopyEntriesSelected"
+                binary
+                @change="toggleSelectAllCopyEntries"
+              />
+              Chọn tất cả
+            </label>
+          </div>
           <div
             class="max-h-52 overflow-y-auto rounded-lg border border-divider bg-canvas"
           >
-            <div
+            <label
               v-for="entry in copyEntries"
               :key="entry.path"
               class="flex items-center gap-2 border-b border-divider px-3 py-2 last:border-b-0"
+              :class="entry.is_dir ? 'cursor-pointer' : 'opacity-60'"
             >
+              <Checkbox
+                v-if="entry.is_dir"
+                :model-value="isCopyEntrySelected(entry)"
+                binary
+                @change="toggleCopyEntrySelected(entry)"
+              />
+              <span v-else class="w-[18px]" />
               <i
                 :class="[
                   'pi text-sm',
@@ -394,7 +448,7 @@ function formatTime(hms: string): string {
               <span class="truncate text-sm text-secondary">
                 {{ entry.name }}
               </span>
-            </div>
+            </label>
             <div
               v-if="copyEntries.length === 0"
               class="px-3 py-4 text-center text-sm text-muted"
@@ -438,7 +492,7 @@ function formatTime(hms: string): string {
           cancel-label="Đóng"
           confirm-label="Copy"
           confirm-icon="pi pi-copy"
-          :confirm-disabled="!copyDestPath"
+          :confirm-disabled="!copyDestPath || selectedCopyNames.size === 0"
           :busy="isCopying"
           @cancel="showCopyDialog = false"
           @confirm="handleCopy"

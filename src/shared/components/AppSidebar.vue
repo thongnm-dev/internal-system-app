@@ -11,7 +11,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   menuChange: [key: MenuKey];
-  toggleCollapse: [];
 }>();
 
 const menu = useMenuStore();
@@ -131,23 +130,5 @@ function tooltipOpts(label: string) {
         </template>
       </template>
     </nav>
-
-    <div v-if="menu.settingsMenu" :class="['border-t border-sidebar-border text-sm text-sidebar-text', isCollapsed ? 'p-2' : 'p-4']">
-      <Button
-        v-tooltip.right="tooltipOpts(menu.settingsMenu.title)"
-        :class="[
-          'flex h-10 w-full items-center rounded-md text-sm font-semibold transition',
-          isCollapsed ? 'justify-center px-0' : 'gap-3 px-3 text-left',
-          activeMenu === menu.settingsMenu.key
-            ? 'bg-sidebar-active text-sidebar-text-active'
-            : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active',
-        ]"
-        unstyled
-        @click="emit('menuChange', (menu.settingsMenu?.key ?? 'settings') as MenuKey)"
-      >
-        <i :class="`pi ${menu.settingsMenu.icon} shrink-0 text-sm`" />
-        <span v-if="!isCollapsed">{{ menu.settingsMenu.title }}</span>
-      </Button>
-    </div>
   </aside>
 </template>

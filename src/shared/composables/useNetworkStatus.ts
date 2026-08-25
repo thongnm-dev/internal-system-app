@@ -17,8 +17,25 @@ const isChecking = ref(false);
 // mid-session" (banner while keeping the current screen).
 const hasConnectedOnce = ref(false);
 
+const AUTO_CHECK_KEY = "msh.network.autoCheck";
+
+function loadAutoCheck(): boolean {
+  try {
+    const saved = window.localStorage.getItem(AUTO_CHECK_KEY);
+    return saved === null ? true : saved === "true";
+  } catch {
+    return true;
+  }
+}
+
+// User-facing toggle (settings UI) for whether connectivity is watched in the
+// background (poll timer + browser online/offline listeners). Disabling it
+// does not affect manual/one-off checks via retry().
+const autoCheckEnabled = ref(loadAutoCheck());
+
 let pollTimer: number | undefined;
 let started = false;
+let autoCheckAttached = false;
 // Shared promise for whatever probe is currently in flight. Any caller that
 // invokes check() while one is already running awaits this same result
 // instead of firing a second concurrent probe — otherwise overlapping probes
@@ -98,10 +115,54 @@ function handleBrowserOnline() {
   }, BROWSER_EVENT_DEBOUNCE_MS);
 }
 
+function attachAutoCheck() {
+  if (autoCheckAttached) return;
+  autoCheckAttached = true;
+  window.addEventListener("online", handleBrowserOnline);
+  window.addEventListener("offline", handleBrowserOffline);
+  pollTimer = window.setInterval(() => void check(), POLL_INTERVAL_MS);
+}
+
+function detachAutoCheck() {
+  if (!autoCheckAttached) return;
+  autoCheckAttached = false;
+  window.removeEventListener("online", handleBrowserOnline);
+  window.removeEventListener("offline", handleBrowserOffline);
+  if (pollTimer !== undefined) {
+    window.clearInterval(pollTimer);
+    pollTimer = undefined;
+  }
+}
+
 /**
- * Starts connectivity monitoring exactly once: an initial probe, browser
- * online/offline listeners for instant reaction, and periodic polling to catch
- * silent drops. Returns the promise of the initial check.
+ * Enables/disables background connectivity watching (poll timer + browser
+ * online/offline listeners) and persists the choice. Manual checks via
+ * retry() keep working either way.
+ */
+function setAutoCheck(enabled: boolean): void {
+  autoCheckEnabled.value = enabled;
+  try {
+    window.localStorage.setItem(AUTO_CHECK_KEY, String(enabled));
+  } catch {
+    // Private browsing / storage quota — the in-memory setting still applies
+    // for the rest of the session.
+  }
+
+  if (!started) return;
+
+  if (enabled) {
+    attachAutoCheck();
+    void check();
+  } else {
+    detachAutoCheck();
+  }
+}
+
+/**
+ * Starts connectivity monitoring exactly once: an initial probe, plus (when
+ * auto-check is enabled) browser online/offline listeners for instant
+ * reaction and periodic polling to catch silent drops. Returns the promise of
+ * the initial check.
  */
 function start(): Promise<boolean> {
   if (started) {
@@ -109,10 +170,9 @@ function start(): Promise<boolean> {
   }
   started = true;
 
-  window.addEventListener("online", handleBrowserOnline);
-  window.addEventListener("offline", handleBrowserOffline);
-
-  pollTimer = window.setInterval(() => void check(), POLL_INTERVAL_MS);
+  if (autoCheckEnabled.value) {
+    attachAutoCheck();
+  }
 
   return check();
 }
@@ -122,7 +182,9 @@ export function useNetworkStatus() {
     isOnline: readonly(isOnline),
     isChecking: readonly(isChecking),
     hasConnectedOnce: readonly(hasConnectedOnce),
+    autoCheckEnabled: readonly(autoCheckEnabled),
     start,
     retry: check,
+    setAutoCheck,
   };
 }

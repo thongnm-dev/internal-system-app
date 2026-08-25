@@ -120,7 +120,6 @@ watch(
         :active-menu="activeMenu"
         :is-collapsed="shell.isSidebarCollapsed.value"
         @menu-change="handleMenuChange"
-        @toggle-collapse="shell.toggleSidebar()"
       />
 
       <section class="min-h-0 overflow-hidden px-6 py-4">
@@ -145,23 +144,13 @@ watch(
       </section>
     </section>
 
-    <AppBottomBar :info="shell.systemInfo.value" @logout="handleLogout" />
-
-    <!-- Floating toggle bubble -->
-    <button
-      :style="{
-        position: 'fixed',
-        left: shell.isSidebarCollapsed.value ? '72px' : '240px',
-        top: shell.isSidebarCollapsed.value ? '10px' : '20px',
-        transform: 'translateX(-50%)',
-        zIndex: 9999,
-      }"
-      class="flex p-4 h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-text shadow-md transition-all duration-200 hover:bg-sidebar-hover hover:text-sidebar-text-active"
-      :title="shell.isSidebarCollapsed.value ? 'Expand sidebar' : 'Collapse sidebar'"
-      @click="shell.toggleSidebar()"
-    >
-      <i :class="['pi text-md p-10', shell.isSidebarCollapsed.value ? 'pi-chevron-right' : 'pi-chevron-left']" />
-    </button>
+    <AppBottomBar
+      :info="shell.systemInfo.value"
+      :is-sidebar-collapsed="shell.isSidebarCollapsed.value"
+      @logout="handleLogout"
+      @toggle-sidebar="shell.toggleSidebar()"
+      @menu-change="handleMenuChange"
+    />
 
     <div
       v-if="!network.isOnline.value"

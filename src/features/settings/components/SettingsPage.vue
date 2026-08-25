@@ -5,7 +5,7 @@ import ToggleChip from "@/shared/components/ToggleChip.vue";
 import { useSettings } from "../composables/useSettings";
 import type { UserSettings } from "../composables/useSettings";
 
-const { settings, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage, updateTabMode } =
+const { settings, isDirty, loading, error, save, discard, updateUser, updateTheme, updateLanguage } =
   useSettings();
 
 const userFields: { key: keyof UserSettings; label: string; type?: string; placeholder: string; disabled?: boolean }[] = [
@@ -106,29 +106,6 @@ const themeOptions = [
           >
             <option v-for="opt in languageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
-        </div>
-
-        <div>
-          <span class="text-xs font-bold text-muted">Navigation</span>
-          <div class="mt-1.5 grid grid-cols-2 rounded-md border border-divider bg-canvas p-1">
-            <ToggleChip
-              variant="segment"
-              :active="!settings.tabMode"
-              icon="pi-file"
-              label="Single"
-              @click="updateTabMode(false)"
-            />
-            <ToggleChip
-              variant="segment"
-              :active="settings.tabMode"
-              icon="pi-clone"
-              label="Tabs"
-              @click="updateTabMode(true)"
-            />
-          </div>
-          <p class="mt-1.5 text-xs text-muted">
-            Open pages in tabs to switch between them without losing state.
-          </p>
         </div>
       </section>
     </div>

@@ -68,9 +68,13 @@ pub fn explorer_ensure_dir(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn explorer_copy_bugs(source_dir: String, dest_dir: String) -> Result<String, String> {
+pub async fn explorer_copy_bugs(
+    source_dir: String,
+    dest_dir: String,
+    selected_names: Vec<String>,
+) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        explorer_service::copy_bug_files(&source_dir, &dest_dir)
+        explorer_service::copy_bug_files(&source_dir, &dest_dir, &selected_names)
     })
     .await
     .map_err(crate::app::error::log_err)?
