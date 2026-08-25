@@ -24,9 +24,8 @@ pub fn local_ip_address() -> String {
 
 /// Danh sách endpoint dùng để kiểm tra kết nối internet.
 /// Các URL này trả về `204 No Content` — nhẹ và nhanh.
-const CONNECTIVITY_PROBES: [&str; 2] = [
-    "https://clients3.google.com/generate_204",
-    "https://cp.cloudflare.com/generate_204",
+const CONNECTIVITY_PROBES: [&str; 1] = [
+    "http://www.msftconnecttest.com/connecttest.txt"
 ];
 
 /// Kiểm tra máy có thể kết nối internet hay không.
