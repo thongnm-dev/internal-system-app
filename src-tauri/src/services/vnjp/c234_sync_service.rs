@@ -56,10 +56,10 @@ use crate::models::vnjp_sync::CellDataMismatch;
 
 use super::sync_service::{
     align_vn_jp_row_map, apply_dictionary_and_verify_data, apply_row_insertions, apply_surgery,
-    clone_vn_sheet_for_jp, compute_row_insertions, extract_all_shared_strings,
-    extract_jp_col_a_info, build_replace_dictionary, find_changed_style_cells_xlsx,
+    build_replace_dictionary, clone_vn_sheet_for_jp, compute_row_insertions,
+    extract_all_shared_strings, extract_jp_col_a_info, find_changed_style_cells_xlsx,
     find_fully_changed_cells_xlsx, find_fully_struck_colored_cells_xlsx, is_del_sheet_name,
-    merged_output_path, merge_vn_styles_into_jp, parse_cell_ref, read_zip_entry,
+    merge_vn_styles_into_jp, merged_output_path, parse_cell_ref, read_zip_entry,
     resolve_sheet_xml_paths, sync_structure, write_output_zip, BorderUnionExtender, ContentBounds,
     SurgeryEdit, CHANGE_HISTORY_SHEET_NAME,
 };
@@ -90,16 +90,14 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     let structure = sync_structure(vn_path, jp_path, &output_path_str)?;
 
     // ── 2. Mở VN zip ──────────────────────────────────────────────────────────
-    let vn_file = File::open(vn_path)
-        .map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
+    let vn_file =
+        File::open(vn_path).map_err(|e| AppError::new(format!("Không mở được file VN: {e}")))?;
     let mut vn_archive = zip::ZipArchive::new(vn_file)
         .map_err(|e| AppError::new(format!("File VN không phải ZIP hợp lệ: {e}")))?;
 
     let vn_wb_xml = read_zip_entry(&mut vn_archive, "xl/workbook.xml").unwrap_or_default();
-    let vn_rels_xml =
-        read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
-    let vn_sst_xml =
-        read_zip_entry(&mut vn_archive, "xl/sharedStrings.xml").unwrap_or_default();
+    let vn_rels_xml = read_zip_entry(&mut vn_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let vn_sst_xml = read_zip_entry(&mut vn_archive, "xl/sharedStrings.xml").unwrap_or_default();
     let vn_styles_xml = read_zip_entry(&mut vn_archive, "xl/styles.xml").unwrap_or_default();
     let (vn_plain_ssi, vn_rich_ssi) = extract_all_shared_strings(&vn_sst_xml);
     let vn_sheet_paths = resolve_sheet_xml_paths(&vn_wb_xml, &vn_rels_xml);
@@ -112,8 +110,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         .map_err(|e| AppError::new(format!("File JP output không phải ZIP hợp lệ: {e}")))?;
 
     let jp_wb_xml = read_zip_entry(&mut jp_archive, "xl/workbook.xml").unwrap_or_default();
-    let jp_rels_xml =
-        read_zip_entry(&mut jp_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
+    let jp_rels_xml = read_zip_entry(&mut jp_archive, "xl/_rels/workbook.xml.rels").unwrap_or_default();
     let jp_styles_xml = read_zip_entry(&mut jp_archive, "xl/styles.xml").unwrap_or_default();
     let jp_sst_xml = read_zip_entry(&mut jp_archive, "xl/sharedStrings.xml").unwrap_or_default();
     let (jp_plain_ssi, _jp_rich_ssi) = extract_all_shared_strings(&jp_sst_xml);
@@ -157,11 +154,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     let preserved_cells = jp_preserved_header_cells();
 
     // Trích JP reference rows 4-6 (cells) trước khi xử lý — dùng để chuẩn hóa header sau.
-    let jp_ref_rows = extract_jp_ref_rows_4_to_6(
-        &mut jp_archive,
-        &jp_sheet_map,
-        cloned_names,
-    );
+    let jp_ref_rows = extract_jp_ref_rows_4_to_6(&mut jp_archive, &jp_sheet_map, cloned_names);
 
     let empty_changed: HashSet<(usize, usize)> = HashSet::new();
     let mut replaced: HashMap<String, Vec<u8>> = HashMap::new();
@@ -169,10 +162,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
     let mut sheets_modified: Vec<String> = structure.sheets_modified.clone();
 
     // Styles đã merge — ghi vào output
-    replaced.insert(
-        "xl/styles.xml".to_string(),
-        style_result.new_styles_xml.into_bytes(),
-    );
+    replaced.insert("xl/styles.xml".to_string(), style_result.new_styles_xml.into_bytes());
 
     // ── 6. Vòng loop sheet-by-sheet: clone toàn bộ VN → JP ───────────────────
     for sheet_name in &common_sheets {
@@ -198,8 +188,7 @@ pub fn apply_changes(vn_path: &str, jp_path: &str) -> AppResult<ApplyResult> {
         // (row đầu tiên CÓ công thức — bỏ qua "STT" và các ô header khác). Công thức là mẫu
         // tương đối theo ROW()/COLUMN() (xem `extract_jp_col_a_info`) — không phụ thuộc số dòng
         // thật, nên trích TRƯỚC khi chèn dòng vật lý bên dưới vẫn đúng.
-        let (jp_col_a_formula, jp_col_a_style, formula_start_row1) =
-            extract_jp_col_a_info(&jp_sheet_xml, CONTENT_START_ROW1);
+        let (jp_col_a_formula, jp_col_a_style, formula_start_row1) = extract_jp_col_a_info(&jp_sheet_xml, CONTENT_START_ROW1);
         // Riêng sheet "変更履歴": KHÔNG có cột STT đánh số tự động — cột A là dữ liệu thật (ngày/số
         // phiên bản...) nên phải giữ nguyên như mọi cột khác (clone VN / giữ JP nếu không đổi),
         // không áp công thức JP.
@@ -399,7 +388,10 @@ fn extract_jp_header_cells(
         let Ok(doc) = roxmltree::Document::parse(&sheet_xml) else {
             continue;
         };
-        let Some(sd) = doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
+        let Some(sd) = doc
+            .descendants()
+            .find(|n| n.tag_name().name() == "sheetData")
+        else {
             continue;
         };
         for row in sd.children().filter(|n| n.tag_name().name() == "row") {
@@ -430,7 +422,10 @@ fn find_last_content_row(sheet_xml: &str) -> usize {
     let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
         return usize::MAX;
     };
-    let Some(sd) = doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
+    let Some(sd) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "sheetData")
+    else {
         return usize::MAX;
     };
     let mut last = 0usize;
@@ -442,7 +437,10 @@ fn find_last_content_row(sheet_xml: &str) -> usize {
         let has_content = row
             .children()
             .filter(|c| c.tag_name().name() == "c")
-            .any(|c| c.children().any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f")));
+            .any(|c| {
+                c.children()
+                    .any(|ch| matches!(ch.tag_name().name(), "v" | "is" | "f"))
+            });
         if has_content {
             last = last.max(row1);
         }
@@ -458,7 +456,10 @@ fn strip_trailing_rows(sheet_xml: &str, max_row1: usize) -> String {
     let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
         return sheet_xml.to_string();
     };
-    let Some(sd) = doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
+    let Some(sd) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "sheetData")
+    else {
         return sheet_xml.to_string();
     };
 
@@ -479,11 +480,17 @@ fn strip_trailing_rows(sheet_xml: &str, max_row1: usize) -> String {
     }
 
     // Cập nhật <dimension> nếu tìm thấy
-    if let Some(dim) = doc.descendants().find(|n| n.tag_name().name() == "dimension") {
+    if let Some(dim) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "dimension")
+    {
         if let Some(ref_val) = dim.attribute("ref") {
             if let Some((prefix, old_end)) = ref_val.rsplit_once(':') {
                 // "A1:M45" → lấy col letter từ old_end, thay row bằng max_row1
-                let col_part: String = old_end.chars().take_while(|c| c.is_ascii_alphabetic()).collect();
+                let col_part: String = old_end
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphabetic())
+                    .collect();
                 let new_ref = format!("{prefix}:{col_part}{max_row1}");
                 if let Some(attr) = dim.attributes().find(|a| a.name() == "ref") {
                     edits.push(SurgeryEdit {
@@ -599,10 +606,7 @@ fn normalize_rows_4_to_6(sheet_xml: &str, jp_ref_cells: &HashMap<usize, String>)
         };
 
         let first_cell = row.children().find(|c| c.tag_name().name() == "c");
-        let last_cell = row
-            .children()
-            .filter(|c| c.tag_name().name() == "c")
-            .last();
+        let last_cell = row.children().filter(|c| c.tag_name().name() == "c").last();
 
         if let (Some(first), Some(last)) = (first_cell, last_cell) {
             edits.push(SurgeryEdit {
@@ -653,10 +657,7 @@ fn normalize_rows_4_to_6(sheet_xml: &str, jp_ref_cells: &HashMap<usize, String>)
 }
 
 /// Thu thập từ điển replace (vn_text → jp_text) từ các ô mà output đã giữ nội dung JP.
-pub fn build_dictionary(
-    vn_path: &str,
-    output_path: &str,
-) -> AppResult<HashMap<String, String>> {
+pub fn build_dictionary(vn_path: &str, output_path: &str) -> AppResult<HashMap<String, String>> {
     build_replace_dictionary(vn_path, output_path, |sheet_name| {
         (7, content_bounds(sheet_name).last_col0)
     })
@@ -684,7 +685,10 @@ fn patch_header_cells_in_sheet(
     let Ok(doc) = roxmltree::Document::parse(sheet_xml) else {
         return sheet_xml.to_string();
     };
-    let Some(sd) = doc.descendants().find(|n| n.tag_name().name() == "sheetData") else {
+    let Some(sd) = doc
+        .descendants()
+        .find(|n| n.tag_name().name() == "sheetData")
+    else {
         return sheet_xml.to_string();
     };
 
