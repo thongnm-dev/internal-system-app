@@ -2,13 +2,11 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { s3ListBugFolderTabs } from "@/tauri/commands/s3";
 import type { BugFolderTab } from "@/_/types/s3";
-import { useCloudGuard } from "./useCloudGuard";
 import { useToast } from "@/shared/composables/useToast";
 
 const POLL_INTERVAL = 5 * 60 * 1000;
 
 export function useS3BugFolders() {
-  const guard = useCloudGuard();
   const toast = useToast();
 
   const tabs = ref<BugFolderTab[]>([]);
@@ -27,7 +25,6 @@ export function useS3BugFolders() {
 
   async function loadAll() {
     if (!canUseTauriRuntime()) return;
-    if (!(await guard.ensureOnline())) return;
     isLoading.value = true;
     try {
       tabs.value = await s3ListBugFolderTabs();
@@ -39,7 +36,6 @@ export function useS3BugFolders() {
   }
 
   async function refresh() {
-    if (!(await guard.ensureOnline())) return;
     isRefreshing.value = true;
     try {
       tabs.value = await s3ListBugFolderTabs();
@@ -79,10 +75,6 @@ export function useS3BugFolders() {
     totalBugCount,
     isLoading,
     isRefreshing,
-
-    showOfflineDialog: guard.showOfflineDialog,
-    offlineMessage: guard.offlineMessage,
-    dismissOfflineDialog: guard.dismissOfflineDialog,
 
     refresh,
   };

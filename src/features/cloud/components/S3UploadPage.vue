@@ -26,9 +26,6 @@ const {
   deleteItems,
   deleteOptions,
   showDeleteDialog,
-  showOfflineDialog,
-  offlineMessage,
-  dismissOfflineDialog,
   scanFolder,
   uploadFiles,
   confirmDelete,
@@ -147,23 +144,6 @@ function handleCloseModal() {
     </div>
 
   </div>
-
-  <!-- Offline Dialog -->
-  <Dialog
-    v-model:visible="showOfflineDialog"
-    header="Lỗi kết nối"
-    :modal="true"
-    :closable="true"
-    :style="{ width: '28rem' }"
-  >
-    <div class="flex items-center gap-3">
-      <i class="pi pi-wifi text-3xl text-danger" />
-      <span class="text-sm">{{ offlineMessage }}</span>
-    </div>
-    <template #footer>
-      <Button label="Đóng" @click="dismissOfflineDialog()" />
-    </template>
-  </Dialog>
 
   <!-- Upload confirmation modal -->
   <Dialog

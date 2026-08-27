@@ -8,7 +8,6 @@ import TabPanel from "primevue/tabpanel";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Button from "primevue/button";
-import Dialog from "primevue/dialog";
 import ProgressSpinner from "primevue/progressspinner";
 import S3ConfigError from "./S3ConfigError.vue";
 import { useS3BugFolders } from "../composables/useS3BugFolders";
@@ -25,9 +24,6 @@ const {
   totalBugCount,
   isLoading,
   isRefreshing,
-  showOfflineDialog,
-  offlineMessage,
-  dismissOfflineDialog,
   refresh,
 } = useS3BugFolders();
 
@@ -146,22 +142,5 @@ function overflowCount(tab: BugFolderTab) {
         </span>
       </div>
     </template>
-
-    <!-- Offline Dialog -->
-    <Dialog
-      v-model:visible="showOfflineDialog"
-      header="Lỗi kết nối"
-      :modal="true"
-      :closable="true"
-      :style="{ width: '28rem' }"
-    >
-      <div class="flex items-center gap-3">
-        <i class="pi pi-wifi text-3xl text-red-500" />
-        <span class="text-sm text-secondary">{{ offlineMessage }}</span>
-      </div>
-      <template #footer>
-        <Button label="Đóng" @click="dismissOfflineDialog()" />
-      </template>
-    </Dialog>
   </div>
 </template>

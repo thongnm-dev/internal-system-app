@@ -5,10 +5,53 @@ use crate::utils::app_config;
 
 use aws_config::Region;
 use aws_credential_types::Credentials;
+use aws_sdk_s3::config::retry::RetryConfig;
+use aws_sdk_s3::config::timeout::TimeoutConfig;
+use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::Client;
 use ini::Ini;
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::Duration;
+
+// Total time budget (including all internal SDK retries) allowed for a single S3
+// request before it gives up. Bounds every S3 operation to at most this long when
+// the network is unreachable, instead of hanging indefinitely.
+const S3_OPERATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const S3_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+const S3_NETWORK_ERROR_MESSAGE: &str =
+    "Lỗi không thể kết nối mạng. Vui lòng kiểm tra kết nối internet!";
+
+/// True when an S3 SDK error means the request never reached AWS (timed out or
+/// failed to dispatch), i.e. a real connectivity problem rather than a service-side
+/// rejection (bad key, permission, etc.).
+fn is_connectivity_error<E, R>(err: &SdkError<E, R>) -> bool {
+    matches!(
+        err,
+        SdkError::TimeoutError(_) | SdkError::DispatchFailure(_)
+    )
+}
+
+/// Converts an S3 SDK error into an [`AppError`], substituting the friendly
+/// Vietnamese network-error message when the failure is a connectivity issue.
+fn s3_error<E, R>(context: &str, err: SdkError<E, R>) -> AppError {
+    if is_connectivity_error(&err) {
+        AppError::new(S3_NETWORK_ERROR_MESSAGE)
+    } else {
+        AppError::new(format!("{context}: {err}"))
+    }
+}
+
+/// Same as [`s3_error`] but returns plain text for accumulation into a per-item
+/// `errors` list instead of an [`AppError`].
+fn s3_error_text<E, R>(context: &str, err: &SdkError<E, R>) -> String {
+    if is_connectivity_error(err) {
+        S3_NETWORK_ERROR_MESSAGE.to_string()
+    } else {
+        format!("{context}: {err}")
+    }
+}
 
 pub(crate) fn load_config_from_ini() -> AppResult<S3Config> {
     let path = app_config::config_path();
@@ -42,7 +85,14 @@ fn build_client(config: &S3Config) -> AppResult<(Client, String)> {
     let mut builder = aws_sdk_s3::config::Builder::new()
         .region(region)
         .credentials_provider(credentials)
-        .behavior_version_latest();
+        .behavior_version_latest()
+        .retry_config(RetryConfig::standard().with_max_attempts(20))
+        .timeout_config(
+            TimeoutConfig::builder()
+                .connect_timeout(S3_CONNECT_TIMEOUT)
+                .operation_timeout(S3_OPERATION_TIMEOUT)
+                .build(),
+        );
 
     if let Some(ref endpoint) = config.endpoint_url {
         let ep = endpoint.trim();
@@ -122,7 +172,7 @@ pub async fn test_connection() -> AppResult<String> {
         .bucket(&bucket)
         .send()
         .await
-        .map_err(|e| AppError::new(format!("Connection failed: {e}")))?;
+        .map_err(|e| s3_error("Connection failed", e))?;
     Ok(format!("Connected to bucket '{bucket}' successfully."))
 }
 
@@ -142,7 +192,7 @@ pub async fn list_objects(prefix: String) -> AppResult<S3ListResult> {
     let output = request
         .send()
         .await
-        .map_err(|e| AppError::new(format!("Failed to list objects: {e}")))?;
+        .map_err(|e| s3_error("Failed to list objects", e))?;
 
     let mut objects: Vec<S3Object> = Vec::new();
 
@@ -270,7 +320,7 @@ pub async fn download_objects(
             }
             Err(e) => {
                 failed += 1;
-                errors.push(format!("{key}: download failed: {e}"));
+                errors.push(s3_error_text(&format!("{key}: download failed"), &e));
             }
         }
     }
@@ -313,7 +363,7 @@ async fn list_all_objects_recursive(
         let output = request
             .send()
             .await
-            .map_err(|e| AppError::new(format!("Failed to list objects under '{prefix}': {e}")))?;
+            .map_err(|e| s3_error(&format!("Failed to list objects under '{prefix}'"), e))?;
 
         for obj in output.contents() {
             if let Some(key) = obj.key() {
@@ -422,7 +472,7 @@ pub async fn upload_file(
         .body(body.into())
         .send()
         .await
-        .map_err(|e| AppError::new(format!("Upload failed: {e}")))?;
+        .map_err(|e| s3_error("Upload failed", e))?;
 
     Ok(S3OperationResult {
         success: true,
@@ -473,7 +523,7 @@ pub async fn delete_objects(
             Ok(_) => processed += 1,
             Err(e) => {
                 failed += 1;
-                errors.push(format!("{key}: {e}"));
+                errors.push(s3_error_text(key, &e));
             }
         }
     }
@@ -514,7 +564,7 @@ pub async fn create_folder(
         .body(Vec::new().into())
         .send()
         .await
-        .map_err(|e| AppError::new(format!("Failed to create folder: {e}")))?;
+        .map_err(|e| s3_error("Failed to create folder", e))?;
 
     Ok(S3OperationResult {
         success: true,
@@ -764,7 +814,7 @@ pub async fn upload_files(
                     Ok(_) => processed += 1,
                     Err(e) => {
                         failed += 1;
-                        errors.push(format!("{}: upload failed: {e}", file.name));
+                        errors.push(s3_error_text(&format!("{}: upload failed", file.name), &e));
                     }
                 }
             }
@@ -915,7 +965,7 @@ pub async fn upload_folder(
                     Ok(_) => processed += 1,
                     Err(e) => {
                         failed += 1;
-                        errors.push(format!("{}: upload failed: {e}", file.relative_path));
+                        errors.push(s3_error_text(&format!("{}: upload failed", file.relative_path), &e));
                     }
                 }
             }
@@ -998,7 +1048,7 @@ pub async fn get_download_list(code: String) -> AppResult<Vec<String>> {
         .delimiter("/")
         .send()
         .await
-        .map_err(|e| AppError::new(format!("Failed to list download items: {e}")))?;
+        .map_err(|e| s3_error("Failed to list download items", e))?;
 
     let items: Vec<String> = output
         .common_prefixes()
@@ -1092,7 +1142,7 @@ pub async fn download_by_storage(
                         },
                         Err(e) => {
                             failed += 1;
-                            errors.push(format!("{key}: download failed: {e}"));
+                            errors.push(s3_error_text(&format!("{key}: download failed"), &e));
                         }
                     }
                 }
@@ -1199,14 +1249,14 @@ pub async fn move_s3_objects(
                         Ok(_) => {
                             if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
                                 failed += 1;
-                                errors.push(format!("{key}: delete after copy failed: {e}"));
+                                errors.push(s3_error_text(&format!("{key}: delete after copy failed"), &e));
                             } else {
                                 processed += 1;
                             }
                         }
                         Err(e) => {
                             failed += 1;
-                            errors.push(format!("{key}: copy failed: {e}"));
+                            errors.push(s3_error_text(&format!("{key}: copy failed"), &e));
                         }
                     }
                 }
@@ -1269,7 +1319,7 @@ pub async fn delete_s3_objects_by_storage(
                     if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
                         failed += 1;
                         item_failed = true;
-                        errors.push(format!("{key}: {e}"));
+                        errors.push(s3_error_text(key, &e));
                     }
                 }
                 let _ = client.delete_object().bucket(&bucket).key(&item_prefix).send().await;
@@ -1339,14 +1389,14 @@ pub async fn move_browser_objects(
                             Ok(_) => {
                                 if let Err(e) = client.delete_object().bucket(&bucket).key(sub_key).send().await {
                                     failed += 1;
-                                    errors.push(format!("{sub_key}: delete after copy failed: {e}"));
+                                    errors.push(s3_error_text(&format!("{sub_key}: delete after copy failed"), &e));
                                 } else {
                                     processed += 1;
                                 }
                             }
                             Err(e) => {
                                 failed += 1;
-                                errors.push(format!("{sub_key}: copy failed: {e}"));
+                                errors.push(s3_error_text(&format!("{sub_key}: copy failed"), &e));
                             }
                         }
                     }
@@ -1377,14 +1427,14 @@ pub async fn move_browser_objects(
                 Ok(_) => {
                     if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
                         failed += 1;
-                        errors.push(format!("{key}: delete after copy failed: {e}"));
+                        errors.push(s3_error_text(&format!("{key}: delete after copy failed"), &e));
                     } else {
                         processed += 1;
                     }
                 }
                 Err(e) => {
                     failed += 1;
-                    errors.push(format!("{key}: copy failed: {e}"));
+                    errors.push(s3_error_text(&format!("{key}: copy failed"), &e));
                 }
             }
         }
@@ -1589,7 +1639,7 @@ pub async fn delete_uploaded_items(
                     if let Err(e) = client.delete_object().bucket(&bucket).key(key).send().await {
                         failed += 1;
                         item_failed = true;
-                        errors.push(format!("{}: {e}", key));
+                        errors.push(s3_error_text(key, &e));
                     }
                 }
                 let _ = client.delete_object().bucket(&bucket).key(&prefix).send().await;

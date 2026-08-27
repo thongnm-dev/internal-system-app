@@ -12,7 +12,6 @@ import { s3GetLocalSyncWorkdir } from "@/tauri/commands/s3";
 
 const props = defineProps<{
   awsStorage: AwsStorage;
-  ensureOnline: () => Promise<boolean>;
   getDownloadList: (code: string) => Promise<string[]>;
   selectFolder: () => Promise<string | null>;
   downloadFiles: (code: string, bugList: string[], localPath: string) => Promise<{ syncPath: string; historyId: number | null } | null>;
@@ -98,7 +97,6 @@ function savePath() {
 }
 
 async function loadItems() {
-  if (!(await props.ensureOnline())) return;
   isLoadingList.value = true;
   try {
     items.value = await props.getDownloadList(props.awsStorage.code);
@@ -112,8 +110,7 @@ async function handleRefresh() {
   emit("refreshed");
 }
 
-async function handleDownload() {
-  if (!(await props.ensureOnline())) return;
+function handleDownload() {
   if (hasDownloaded.value) {
     showRedownloadWarning.value = true;
     return;
@@ -136,8 +133,7 @@ function dismissRedownloadWarning() {
   showRedownloadWarning.value = false;
 }
 
-async function handleMove() {
-  if (!(await props.ensureOnline())) return;
+function handleMove() {
   selectedBugs.value = new Set(items.value);
   if (!hasDownloaded.value) {
     showMoveWarning.value = true;

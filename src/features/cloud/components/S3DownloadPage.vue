@@ -30,10 +30,6 @@ const {
   isReloading,
   hasDownloadable,
   downloadableStorages,
-  showOfflineDialog,
-  offlineMessage,
-  dismissOfflineDialog,
-  ensureOnline,
   refresh,
   getDownloadList,
   selectFolder,
@@ -212,7 +208,6 @@ function formatTime(hms: string): string {
           v-for="storage in downloadableStorages"
           :key="storage.code"
           :aws-storage="storage"
-          :ensure-online="ensureOnline"
           :get-download-list="getDownloadList"
           :select-folder="selectFolder"
           :download-files="downloadFiles"
@@ -351,23 +346,6 @@ function formatTime(hms: string): string {
         </Column>
       </DataTable>
     </div>
-
-    <!-- Offline Dialog -->
-    <Dialog
-      v-model:visible="showOfflineDialog"
-      header="Lỗi kết nối"
-      :modal="true"
-      :closable="true"
-      :style="{ width: '28rem' }"
-    >
-      <div class="flex items-center gap-3">
-        <i class="pi pi-wifi text-3xl text-danger" />
-        <span class="text-sm text-secondary">{{ offlineMessage }}</span>
-      </div>
-      <template #footer>
-        <Button label="Đóng" @click="dismissOfflineDialog()" />
-      </template>
-    </Dialog>
 
     <!-- S3 Status Confirm Dialog -->
     <Dialog

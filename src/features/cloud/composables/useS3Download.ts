@@ -12,7 +12,6 @@ import {
 } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AwsStorage, DownloadAvailability, DownloadHistoryItem } from "@/_/types/s3";
-import { useCloudGuard } from "./useCloudGuard";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { useAuthStore } from "@/app/stores/auth";
@@ -20,7 +19,6 @@ import { useAuthStore } from "@/app/stores/auth";
 const POLL_INTERVAL = 15 * 60 * 1000;
 
 export function useS3Download() {
-  const guard = useCloudGuard();
   const toast = useToast();
   const loading = useGlobalLoading();
   const authStore = useAuthStore();
@@ -48,7 +46,6 @@ export function useS3Download() {
 
   async function loadDownloadStorages() {
     if (!canUseTauriRuntime()) return;
-    if (!(await guard.ensureOnline())) return;
     isLoading.value = true;
     try {
       downloadStorages.value = await s3ListDownloadStorages();
@@ -73,7 +70,6 @@ export function useS3Download() {
   }
 
   async function refresh() {
-    if (!(await guard.ensureOnline())) return;
     isReloading.value = true;
     try {
       downloadable.value = {};
@@ -105,7 +101,6 @@ export function useS3Download() {
     localPath: string,
   ): Promise<{ syncPath: string; historyId: number | null } | null> {
     if (bugList.length === 0) return null;
-    if (!(await guard.ensureOnline())) return null;
     loading.start();
     try {
       const userId = authStore.user?.username || "";
@@ -131,7 +126,6 @@ export function useS3Download() {
 
   async function moveObjects(code: string, items: string[]) {
     if (items.length === 0) return;
-    if (!(await guard.ensureOnline())) return;
     loading.start();
     try {
       const result = await s3MoveObjects(code, items);
@@ -149,7 +143,6 @@ export function useS3Download() {
 
   async function deleteObjects(code: string, items: string[]) {
     if (items.length === 0) return;
-    if (!(await guard.ensureOnline())) return;
     loading.start();
     try {
       const result = await s3DeleteByStorage(code, items);
@@ -218,11 +211,6 @@ export function useS3Download() {
     hasDownloadable,
     downloadableStorages,
     downloadHistory,
-
-    showOfflineDialog: guard.showOfflineDialog,
-    offlineMessage: guard.offlineMessage,
-    dismissOfflineDialog: guard.dismissOfflineDialog,
-    ensureOnline: guard.ensureOnline,
 
     refresh,
     getDownloadList,

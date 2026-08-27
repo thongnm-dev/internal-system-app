@@ -3,13 +3,11 @@ import { canUseTauriRuntime, friendlyError } from "@/tauri/commands/_base";
 import { s3ListUploadStorages, s3ScanUploadFolders, s3UploadFiles, s3ListDeleteOptions, s3DeleteUploadedItems } from "@/tauri/commands/s3";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AwsStorage, ScannedFile, S3OperationResult, UploadFileRequest, DeleteUploadedItem } from "@/_/types/s3";
-import { useCloudGuard } from "./useCloudGuard";
 import { useToast } from "@/shared/composables/useToast";
 import { useGlobalLoading } from "@/shared/composables/useGlobalLoading";
 import { useAuthStore } from "@/app/stores/auth";
 
 export function useS3Upload() {
-  const guard = useCloudGuard();
   const toast = useToast();
   const loading = useGlobalLoading();
   const authStore = useAuthStore();
@@ -25,7 +23,6 @@ export function useS3Upload() {
 
   async function loadUploadStorages() {
     if (!canUseTauriRuntime()) return;
-    if (!(await guard.ensureOnline())) return;
     isLoading.value = true;
     try {
       uploadStorages.value = await s3ListUploadStorages();
@@ -38,7 +35,6 @@ export function useS3Upload() {
 
   async function scanFolder(): Promise<ScannedFile[]> {
     if (!canUseTauriRuntime()) return [];
-    if (!(await guard.ensureOnline())) return [];
 
     const result = await open({ directory: true, multiple: true, title: "Chọn thư mục chứa tập tin" });
     if (!result) return [];
@@ -69,7 +65,6 @@ export function useS3Upload() {
     createFolderSameName: boolean,
   ): Promise<S3OperationResult | null> {
     if (files.length === 0) return null;
-    if (!(await guard.ensureOnline())) return null;
     isUploading.value = true;
     loading.start();
     try {
@@ -111,7 +106,6 @@ export function useS3Upload() {
 
   async function confirmDelete() {
     if (deleteItems.value.length === 0) return;
-    if (!(await guard.ensureOnline())) return;
     showDeleteDialog.value = false;
     isDeleting.value = true;
     loading.start();
@@ -156,10 +150,6 @@ export function useS3Upload() {
     deleteItems,
     deleteOptions,
     showDeleteDialog,
-
-    showOfflineDialog: guard.showOfflineDialog,
-    offlineMessage: guard.offlineMessage,
-    dismissOfflineDialog: guard.dismissOfflineDialog,
 
     loadUploadStorages,
     scanFolder,

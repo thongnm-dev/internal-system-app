@@ -706,22 +706,5 @@ function contextCopyKey() {
         />
       </template>
     </Dialog>
-
-    <!-- Offline Dialog -->
-    <Dialog
-      v-model:visible="ctrl.showOfflineDialog.value"
-      header="Lỗi kết nối"
-      :modal="true"
-      :closable="true"
-      :style="{ width: '28rem' }"
-    >
-      <div class="flex items-center gap-3">
-        <i class="pi pi-wifi text-3xl text-red-500" />
-        <span class="text-sm text-secondary">{{ ctrl.offlineMessage }}</span>
-      </div>
-      <template #footer>
-        <Button label="Đóng" @click="ctrl.dismissOfflineDialog()" />
-      </template>
-    </Dialog>
   </section>
 </template>
