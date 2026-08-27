@@ -93,7 +93,7 @@ fn build_client(config: &S3Config) -> AppResult<(Client, String)> {
         .region(region)
         .credentials_provider(credentials)
         .behavior_version_latest()
-        .retry_config(RetryConfig::standard().with_max_attempts(20))
+        .retry_config(RetryConfig::standard().with_max_attempts(4))
         .timeout_config(
             TimeoutConfig::builder()
                 .connect_timeout(S3_CONNECT_TIMEOUT)
@@ -391,26 +391,36 @@ pub async fn download_objects(
     let mut failed: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
 
-    let mut all_keys = keys.clone();
+    let (folder_keys, mut all_keys): (Vec<String>, Vec<String>) =
+        keys.into_iter().partition(|k| k.ends_with('/'));
 
-    // Expand folder prefixes to individual object keys
-    let mut i = 0;
-    while i < all_keys.len() {
-        if all_keys[i].ends_with('/') {
-            let folder_prefix = all_keys.remove(i);
-            match list_all_objects_recursive(&client, &bucket, &folder_prefix).await {
+    // Expand folder prefixes to individual object keys — listing each folder is
+    // metadata-only (cheap) but still a network round-trip, so run them all
+    // concurrently instead of one folder at a time.
+    if !folder_keys.is_empty() {
+        let expansions: Vec<(String, AppResult<Vec<String>>)> =
+            stream::iter(folder_keys.into_iter().map(|folder_prefix| {
+                let client = client.clone();
+                let bucket = bucket.clone();
+                async move {
+                    let r = list_all_objects_recursive(&client, &bucket, &folder_prefix).await;
+                    (folder_prefix, r)
+                }
+            }))
+            .buffer_unordered(S3_CONCURRENCY)
+            .collect()
+            .await;
+
+        for (folder_prefix, r) in expansions {
+            match r {
                 Ok(child_keys) => {
-                    for k in child_keys.into_iter().filter(|k| !k.ends_with('/')).rev() {
-                        all_keys.insert(i, k);
-                    }
+                    all_keys.extend(child_keys.into_iter().filter(|k| !k.ends_with('/')));
                 }
                 Err(e) => {
                     failed += 1;
                     errors.push(format!("{folder_prefix}: {e}"));
                 }
             }
-        } else {
-            i += 1;
         }
     }
 
@@ -606,24 +616,38 @@ pub async fn delete_objects(
     let mut failed: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
 
-    // Expand folder prefixes
-    let mut all_keys: Vec<String> = Vec::new();
-    for key in &keys {
-        if key.ends_with('/') {
-            match list_all_objects_recursive(&client, &bucket, key).await {
-                Ok(child_keys) => {
-                    all_keys.extend(child_keys);
-                    if !all_keys.contains(key) {
-                        all_keys.push(key.clone());
+    // Expand folder prefixes — listing each folder is a separate network
+    // round-trip, so run them all concurrently instead of one at a time.
+    let (folder_keys, mut all_keys): (Vec<String>, Vec<String>) =
+        keys.into_iter().partition(|k| k.ends_with('/'));
+
+    if !folder_keys.is_empty() {
+        let expansions: Vec<(String, AppResult<Vec<String>>)> =
+            stream::iter(folder_keys.into_iter().map(|folder_key| {
+                let client = client.clone();
+                let bucket = bucket.clone();
+                async move {
+                    let r = list_all_objects_recursive(&client, &bucket, &folder_key).await;
+                    (folder_key, r)
+                }
+            }))
+            .buffer_unordered(S3_CONCURRENCY)
+            .collect()
+            .await;
+
+        for (folder_key, r) in expansions {
+            match r {
+                Ok(mut child_keys) => {
+                    if !child_keys.contains(&folder_key) {
+                        child_keys.push(folder_key);
                     }
+                    all_keys.extend(child_keys);
                 }
                 Err(e) => {
                     failed += 1;
-                    errors.push(format!("{key}: {e}"));
+                    errors.push(format!("{folder_key}: {e}"));
                 }
             }
-        } else {
-            all_keys.push(key.clone());
         }
     }
 
@@ -871,8 +895,22 @@ fn file_stem(file_name: &str) -> String {
     }
 }
 
+/// Cache for `get_work_folder` — the work-folder name rarely (if ever) changes
+/// once configured, so avoid a DB round-trip (connect + stored procedure call)
+/// on every single S3 command. Cached for the lifetime of the process; restart
+/// the app to pick up a changed mapping.
+static WORK_FOLDER_CACHE: OnceLock<StdRwLock<HashMap<String, String>>> = OnceLock::new();
+
 pub async fn get_work_folder(folder_key: &str) -> AppResult<String> {
-    crate::database::aws_storage_store::get_work_folder_name(folder_key).await
+    let cache = WORK_FOLDER_CACHE.get_or_init(|| StdRwLock::new(HashMap::new()));
+
+    if let Some(name) = cache.read().unwrap().get(folder_key) {
+        return Ok(name.clone());
+    }
+
+    let name = crate::database::aws_storage_store::get_work_folder_name(folder_key).await?;
+    cache.write().unwrap().insert(folder_key.to_string(), name.clone());
+    Ok(name)
 }
 
 pub async fn upload_files(
@@ -1223,10 +1261,25 @@ pub async fn download_by_storage(
     let mut errors: Vec<String> = Vec::new();
     let mut download_details: Vec<crate::database::download_store::DownloadDetail> = Vec::new();
 
+    // List every bug folder concurrently instead of one at a time.
+    let list_results: Vec<(String, AppResult<Vec<String>>)> =
+        stream::iter(bug_list.iter().cloned().map(|bug| {
+            let client = client.clone();
+            let bucket = bucket.clone();
+            let base_prefix = base_prefix.clone();
+            async move {
+                let prefix = format!("{}{}/", base_prefix, bug);
+                let r = list_all_objects_recursive(&client, &bucket, &prefix).await;
+                (bug, r)
+            }
+        }))
+        .buffer_unordered(S3_CONCURRENCY)
+        .collect()
+        .await;
+
     let mut targets: Vec<(String, String, std::path::PathBuf)> = Vec::new(); // (bug, key, local_file)
-    for bug in &bug_list {
-        let prefix = format!("{}{}/", base_prefix, bug);
-        match list_all_objects_recursive(&client, &bucket, &prefix).await {
+    for (bug, r) in list_results {
+        match r {
             Ok(keys) => {
                 for key in keys.into_iter().filter(|k| !k.ends_with('/')) {
                     let relative = key.strip_prefix(base_prefix.as_str()).unwrap_or(&key).to_string();
@@ -1339,44 +1392,64 @@ pub async fn move_s3_objects(
     let mut failed: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
 
-    for item in &items {
-        let item_prefix = format!("{}{}/", source_prefix, item);
-        match list_all_objects_recursive(&client, &bucket, &item_prefix).await {
+    // List every item's objects concurrently first, then run one combined
+    // concurrent move batch across all items instead of moving item-by-item.
+    let list_results: Vec<(String, String, AppResult<Vec<String>>)> =
+        stream::iter(items.iter().cloned().map(|item| {
+            let client = client.clone();
+            let bucket = bucket.clone();
+            let source_prefix = source_prefix.clone();
+            async move {
+                let item_prefix = format!("{}{}/", source_prefix, item);
+                let r = list_all_objects_recursive(&client, &bucket, &item_prefix).await;
+                (item, item_prefix, r)
+            }
+        }))
+        .buffer_unordered(S3_CONCURRENCY)
+        .collect()
+        .await;
+
+    let mut move_targets: Vec<(String, String)> = Vec::new();
+    let mut item_prefixes: Vec<String> = Vec::new();
+    for (item, item_prefix, r) in list_results {
+        match r {
             Ok(keys) => {
-                let targets: Vec<(String, String)> = keys
-                    .iter()
-                    .map(|key| {
-                        let relative = key.strip_prefix(source_prefix.as_str()).unwrap_or(key.as_str());
-                        (key.clone(), format!("{}{}", target_prefix, relative))
-                    })
-                    .collect();
-
-                let results: Vec<Result<(), String>> =
-                    stream::iter(targets.into_iter().map(|(key, target_key)| {
-                        let client = client.clone();
-                        let bucket = bucket.clone();
-                        async move { move_one_object(&client, &bucket, &key, &target_key).await }
-                    }))
-                    .buffer_unordered(S3_CONCURRENCY)
-                    .collect()
-                    .await;
-
-                for r in results {
-                    match r {
-                        Ok(()) => processed += 1,
-                        Err(e) => {
-                            failed += 1;
-                            errors.push(e);
-                        }
-                    }
+                for key in &keys {
+                    let relative = key.strip_prefix(source_prefix.as_str()).unwrap_or(key.as_str());
+                    move_targets.push((key.clone(), format!("{}{}", target_prefix, relative)));
                 }
-                let _ = client.delete_object().bucket(&bucket).key(&item_prefix).send().await;
+                item_prefixes.push(item_prefix);
             }
             Err(e) => {
                 failed += 1;
                 errors.push(format!("{item}: list failed: {e}"));
             }
         }
+    }
+
+    let results: Vec<Result<(), String>> =
+        stream::iter(move_targets.into_iter().map(|(key, target_key)| {
+            let client = client.clone();
+            let bucket = bucket.clone();
+            async move { move_one_object(&client, &bucket, &key, &target_key).await }
+        }))
+        .buffer_unordered(S3_CONCURRENCY)
+        .collect()
+        .await;
+
+    for r in results {
+        match r {
+            Ok(()) => processed += 1,
+            Err(e) => {
+                failed += 1;
+                errors.push(e);
+            }
+        }
+    }
+
+    // Best-effort cleanup of the now-empty folder marker objects.
+    for item_prefix in &item_prefixes {
+        let _ = client.delete_object().bucket(&bucket).key(item_prefix).send().await;
     }
 
     if processed > 0 {
@@ -1419,9 +1492,24 @@ pub async fn delete_s3_objects_by_storage(
     let mut failed: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
 
-    for item in &items {
-        let item_prefix = format!("{}{}/", base_prefix, item);
-        match list_all_objects_recursive(&client, &bucket, &item_prefix).await {
+    // List every item's objects concurrently before deleting.
+    let list_results: Vec<(String, String, AppResult<Vec<String>>)> =
+        stream::iter(items.iter().cloned().map(|item| {
+            let client = client.clone();
+            let bucket = bucket.clone();
+            let base_prefix = base_prefix.clone();
+            async move {
+                let item_prefix = format!("{}{}/", base_prefix, item);
+                let r = list_all_objects_recursive(&client, &bucket, &item_prefix).await;
+                (item, item_prefix, r)
+            }
+        }))
+        .buffer_unordered(S3_CONCURRENCY)
+        .collect()
+        .await;
+
+    for (item, item_prefix, r) in list_results {
+        match r {
             Ok(keys) => {
                 let results: Vec<Result<(), String>> =
                     stream::iter(keys.iter().cloned().map(|key| {
@@ -1480,35 +1568,52 @@ pub async fn move_browser_objects(
     let mut errors: Vec<String> = Vec::new();
 
     // Gather every (source_key, target_key) pair up front — folder keys expand to
-    // their children via a (cheap, metadata-only) list call — then run all the
-    // actual copy+delete moves concurrently instead of one at a time.
-    let mut move_targets: Vec<(String, String)> = Vec::new();
+    // their children via a (cheap, metadata-only) list call, run concurrently
+    // across all selected folders — then run all the actual copy+delete moves
+    // concurrently instead of one at a time.
+    let (folder_keys, file_keys): (Vec<String>, Vec<String>) =
+        keys.into_iter().partition(|k| k.ends_with('/'));
+
+    let mut move_targets: Vec<(String, String)> = file_keys
+        .into_iter()
+        .map(|key| {
+            let file_name = key.rsplit('/').next().unwrap_or(key.as_str()).to_string();
+            let target_key = format!("{}{}", destination_prefix, file_name);
+            (key, target_key)
+        })
+        .collect();
     let mut folder_markers: Vec<String> = Vec::new();
 
-    for key in &keys {
-        if key.ends_with('/') {
-            let folder_name = key.trim_end_matches('/')
-                .rsplit('/')
-                .next()
-                .unwrap_or("");
-            match list_all_objects_recursive(&client, &bucket, key).await {
+    if !folder_keys.is_empty() {
+        let list_results: Vec<(String, AppResult<Vec<String>>)> =
+            stream::iter(folder_keys.into_iter().map(|key| {
+                let client = client.clone();
+                let bucket = bucket.clone();
+                async move {
+                    let r = list_all_objects_recursive(&client, &bucket, &key).await;
+                    (key, r)
+                }
+            }))
+            .buffer_unordered(S3_CONCURRENCY)
+            .collect()
+            .await;
+
+        for (key, r) in list_results {
+            match r {
                 Ok(sub_keys) => {
+                    let folder_name = key.trim_end_matches('/').rsplit('/').next().unwrap_or("");
                     for sub_key in sub_keys {
-                        let relative = sub_key.strip_prefix(key).unwrap_or(&sub_key).to_string();
+                        let relative = sub_key.strip_prefix(&key).unwrap_or(&sub_key).to_string();
                         let target_key = format!("{}{}/{}", destination_prefix, folder_name, relative);
                         move_targets.push((sub_key, target_key));
                     }
-                    folder_markers.push(key.clone());
+                    folder_markers.push(key);
                 }
                 Err(e) => {
                     failed += 1;
                     errors.push(format!("{key}: list failed: {e}"));
                 }
             }
-        } else {
-            let file_name = key.rsplit('/').next().unwrap_or(key);
-            let target_key = format!("{}{}", destination_prefix, file_name);
-            move_targets.push((key.clone(), target_key));
         }
     }
 
@@ -1752,21 +1857,37 @@ pub async fn delete_uploaded_items(
     let mut failed: u32 = 0;
     let mut errors: Vec<String> = Vec::new();
 
+    // Resolve each item's prefix up front (local lookup, no I/O), then list every
+    // item's objects concurrently before deleting.
+    let mut list_targets: Vec<(String, String)> = Vec::new(); // (bug_no, prefix)
     for item in &items {
-        let storage = match storages.iter().find(|s| s.code == item.aws_cd) {
-            Some(s) => s,
+        match storages.iter().find(|s| s.code == item.aws_cd) {
+            Some(storage) => {
+                let prefix = format!("{}/{}/{}/", work_folder, storage.name, item.bug_no);
+                list_targets.push((item.bug_no.clone(), prefix));
+            }
             None => {
                 failed += 1;
                 errors.push(format!("{}: storage code '{}' not found", item.bug_no, item.aws_cd));
-                continue;
             }
-        };
+        }
+    }
 
-        let prefix = format!(
-            "{}/{}/{}/",
-            work_folder, storage.name, item.bug_no
-        );
-        match list_all_objects_recursive(&client, &bucket, &prefix).await {
+    let list_results: Vec<(String, String, AppResult<Vec<String>>)> =
+        stream::iter(list_targets.into_iter().map(|(bug_no, prefix)| {
+            let client = client.clone();
+            let bucket = bucket.clone();
+            async move {
+                let r = list_all_objects_recursive(&client, &bucket, &prefix).await;
+                (bug_no, prefix, r)
+            }
+        }))
+        .buffer_unordered(S3_CONCURRENCY)
+        .collect()
+        .await;
+
+    for (bug_no, prefix, r) in list_results {
+        match r {
             Ok(keys) => {
                 if keys.is_empty() {
                     processed += 1;
@@ -1797,7 +1918,7 @@ pub async fn delete_uploaded_items(
             }
             Err(e) => {
                 failed += 1;
-                errors.push(format!("{}: list failed: {e}", item.bug_no));
+                errors.push(format!("{bug_no}: list failed: {e}"));
             }
         }
     }
