@@ -24,9 +24,12 @@ const S3_OPERATION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const S3_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 // Max number of S3 requests (upload/download/delete/copy) allowed in flight at
-// once for a single multi-item operation. Bounds memory/socket usage while still
-// giving a large speedup over one-at-a-time sequential transfers.
-const S3_CONCURRENCY: usize = 8;
+// once for a single multi-item operation. S3 comfortably handles thousands of
+// requests/sec per prefix and the shared HTTP client has no connection-pool
+// cap (verified: hyper-util's default pool_max_idle_per_host is unbounded), so
+// this is bounded by local resource usage (memory/file handles/sockets) rather
+// than by S3 itself.
+const S3_CONCURRENCY: usize = 16;
 
 const S3_NETWORK_ERROR_MESSAGE: &str =
     "Lỗi không thể kết nối mạng. Vui lòng kiểm tra kết nối internet!";
@@ -138,22 +141,30 @@ fn get_or_build_client() -> AppResult<(Client, String)> {
     Ok((client, bucket))
 }
 
-/// Downloads a single object to `local_path`, creating parent directories as
-/// needed. Streams the response body straight to disk instead of buffering the
-/// whole object in memory first. Used as the per-item unit of work for
-/// concurrent batch downloads.
+/// Creates every unique parent directory among `paths` once, instead of
+/// redundantly calling `create_dir_all` for every single file that happens to
+/// share the same parent (the common case for a batch download).
+async fn ensure_parent_dirs<'a>(paths: impl Iterator<Item = &'a Path>) -> Vec<String> {
+    let dirs: std::collections::HashSet<&Path> = paths.filter_map(|p| p.parent()).collect();
+    let mut errors = Vec::new();
+    for dir in dirs {
+        if let Err(e) = tokio::fs::create_dir_all(dir).await {
+            errors.push(format!("failed to create directory {}: {e}", dir.display()));
+        }
+    }
+    errors
+}
+
+/// Downloads a single object to `local_path`. Assumes the parent directory
+/// already exists (see `ensure_parent_dirs`). Streams the response body
+/// straight to disk instead of buffering the whole object in memory first.
+/// Used as the per-item unit of work for concurrent batch downloads.
 async fn download_one_object(
     client: &Client,
     bucket: &str,
     key: &str,
     local_path: &Path,
 ) -> Result<(), String> {
-    if let Some(parent) = local_path.parent() {
-        tokio::fs::create_dir_all(parent)
-            .await
-            .map_err(|e| format!("{key}: failed to create directory: {e}"))?;
-    }
-
     let output = client
         .get_object()
         .bucket(bucket)
@@ -436,6 +447,11 @@ pub async fn download_objects(
             (key.clone(), dest.join(relative))
         })
         .collect();
+
+    for e in ensure_parent_dirs(targets.iter().map(|(_, p)| p.as_path())).await {
+        failed += 1;
+        errors.push(e);
+    }
 
     let results: Vec<Result<(), String>> =
         stream::iter(targets.into_iter().map(|(key, local_path)| {
@@ -1288,6 +1304,11 @@ pub async fn download_by_storage(
                 errors.push(format!("{bug}: list failed: {e}"));
             }
         }
+    }
+
+    for e in ensure_parent_dirs(targets.iter().map(|(_, _, p)| p.as_path())).await {
+        failed += 1;
+        errors.push(e);
     }
 
     let results: Vec<(String, std::path::PathBuf, Result<(), String>)> =
