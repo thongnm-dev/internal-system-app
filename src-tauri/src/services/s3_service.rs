@@ -8,6 +8,7 @@ use aws_credential_types::Credentials;
 use aws_sdk_s3::config::retry::RetryConfig;
 use aws_sdk_s3::config::timeout::TimeoutConfig;
 use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
 use futures_util::{stream, StreamExt};
 use ini::Ini;
@@ -138,7 +139,9 @@ fn get_or_build_client() -> AppResult<(Client, String)> {
 }
 
 /// Downloads a single object to `local_path`, creating parent directories as
-/// needed. Used as the per-item unit of work for concurrent batch downloads.
+/// needed. Streams the response body straight to disk instead of buffering the
+/// whole object in memory first. Used as the per-item unit of work for
+/// concurrent batch downloads.
 async fn download_one_object(
     client: &Client,
     bucket: &str,
@@ -159,26 +162,28 @@ async fn download_one_object(
         .await
         .map_err(|e| s3_error_text(&format!("{key}: download failed"), &e))?;
 
-    let data = output
-        .body
-        .collect()
+    let mut reader = output.body.into_async_read();
+    let mut file = tokio::fs::File::create(local_path)
         .await
-        .map_err(|e| format!("{key}: read stream failed: {e}"))?;
+        .map_err(|e| format!("{key}: failed to create file: {e}"))?;
 
-    tokio::fs::write(local_path, data.into_bytes())
+    tokio::io::copy(&mut reader, &mut file)
         .await
-        .map_err(|e| format!("{key}: write failed: {e}"))
+        .map_err(|e| format!("{key}: write failed: {e}"))?;
+
+    Ok(())
 }
 
-/// Uploads a single local file to `s3_key`. Used as the per-item unit of work
-/// for concurrent batch uploads.
+/// Uploads a single local file to `s3_key`. Streams the file straight from disk
+/// instead of reading it fully into memory first. Used as the per-item unit of
+/// work for concurrent batch uploads.
 async fn upload_one_file(
     client: &Client,
     bucket: &str,
     local_path: &Path,
     s3_key: &str,
 ) -> Result<(), String> {
-    let body = tokio::fs::read(local_path)
+    let body = ByteStream::from_path(local_path)
         .await
         .map_err(|e| format!("read failed: {e}"))?;
 
@@ -186,7 +191,7 @@ async fn upload_one_file(
         .put_object()
         .bucket(bucket)
         .key(s3_key)
-        .body(body.into())
+        .body(body)
         .send()
         .await
         .map_err(|e| s3_error_text("upload failed", &e))?;
@@ -587,18 +592,9 @@ pub async fn upload_file(
         return Err(AppError::new(format!("File not found: {local_path}")));
     }
 
-    let body = tokio::fs::read(path)
+    upload_one_file(&client, &bucket, path, &s3_key)
         .await
-        .map_err(|e| AppError::new(format!("Failed to read file: {e}")))?;
-
-    client
-        .put_object()
-        .bucket(&bucket)
-        .key(&s3_key)
-        .body(body.into())
-        .send()
-        .await
-        .map_err(|e| s3_error("Upload failed", e))?;
+        .map_err(AppError::new)?;
 
     Ok(S3OperationResult {
         success: true,
