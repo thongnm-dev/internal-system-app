@@ -3712,7 +3712,7 @@ dependencies = [
 
 [[package]]
 name = "management_systems"
-version = "1.2.5"
+version = "1.2.7"
 dependencies = [
  "aws-config",
  "aws-credential-types",
@@ -3725,6 +3725,7 @@ dependencies = [
  "csv",
  "dirs 5.0.1",
  "encoding_rs",
+ "futures-util",
  "image",
  "jwalk",
  "lettre",
