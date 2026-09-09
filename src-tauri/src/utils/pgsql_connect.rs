@@ -6,7 +6,16 @@
 use crate::app::error::AppError;
 use crate::app::result::AppResult;
 use ini::Ini;
-use tokio_postgres::{Client, NoTls};
+use native_tls::TlsConnector;
+use postgres_native_tls::MakeTlsConnector;
+use tokio_postgres::Client;
+
+/// Tạo TLS connector dùng chung cho các kết nối PostgreSQL (yêu cầu `sslmode=require`).
+fn make_tls_connector() -> AppResult<MakeTlsConnector> {
+    let connector = TlsConnector::new()
+        .map_err(|e| AppError::new(format!("Failed to initialize TLS connector: {e}")))?;
+    Ok(MakeTlsConnector::new(connector))
+}
 
 impl PgConfig {
     /// Ghi cấu hình xuống `config.ini` (section `[database]`).
@@ -40,7 +49,7 @@ impl PgConfig {
 }
 
 /// Thời gian chờ tối đa cho một lần thử kết nối (giây).
-const CONNECT_TIMEOUT_SECS: u64 = 5;
+const CONNECT_TIMEOUT_SECS: u64 = 30;
 
 /// Thử kết nối tới database với một cấu hình cho trước.
 ///
@@ -51,7 +60,8 @@ pub async fn test_connection(config: &PgConfig) -> AppResult<()> {
     let timeout = std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS);
 
     let attempt = async {
-        let (client, connection) = tokio_postgres::connect(&config.connection_string(), NoTls)
+        let tls = make_tls_connector()?;
+        let (client, connection) = tokio_postgres::connect(&config.connection_string(), tls)
             .await
             .map_err(|e| AppError::new(format!("Cannot connect to database: {e}")))?;
 
@@ -129,9 +139,10 @@ impl PgConfig {
     }
 
     /// Tạo chuỗi kết nối libpq dạng key=value.
+    /// Luôn kèm `sslmode=require` vì database đích (Prisma) yêu cầu kết nối qua SSL/TLS.
     pub fn connection_string(&self) -> String {
         format!(
-            "host={} port={} dbname={} user={} password={}",
+            "host={} port={} dbname={} user={} password={} sslmode=require",
             self.host, self.port, self.dbname, self.user, self.password
         )
     }
@@ -144,8 +155,9 @@ impl PgConfig {
 pub async fn connect() -> AppResult<Client> {
     let config = PgConfig::from_ini()?;
     let conn_str = config.connection_string();
+    let tls = make_tls_connector()?;
 
-    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+    let (client, connection) = tokio_postgres::connect(&conn_str, tls)
         .await
         .map_err(|e| AppError::new(format!("PostgreSQL connection failed: {e}")))?;
 
@@ -163,7 +175,8 @@ pub async fn connect() -> AppResult<Client> {
 ///
 /// Dùng cho SQL Editor — mỗi kết nối do người dùng cấu hình được mở riêng.
 pub async fn connect_with(config: &PgConfig) -> AppResult<Client> {
-    let (client, connection) = tokio_postgres::connect(&config.connection_string(), NoTls)
+    let tls = make_tls_connector()?;
+    let (client, connection) = tokio_postgres::connect(&config.connection_string(), tls)
         .await
         .map_err(|e| AppError::new(format!("PostgreSQL connection failed: {e}")))?;
 
